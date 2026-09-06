@@ -1,4 +1,4 @@
-# Hermes Story Architect — Plan (v3)
+# Hermes Story Architect — Plan (v4)
 
 > **Goal**: Build a story-writing environment inside Hermes Desktop, architecturally inspired by [Story Architect](https://github.com/story-apps/starc) (STARC). Story projects live as Markdown + YAML frontmatter in the vault. Hermes provides the intelligence layer with **section-level targeted retrieval**. The preview pane provides interactive navigation.
 
@@ -422,25 +422,34 @@ When the user makes a query:
 import re
 from pathlib import Path
 
+SECTION_RE = re.compile(r'^(##\s+.+)$', flags=re.MULTILINE)
+
 def load_section(note_path: str, section: str) -> str:
-    """Load a single ## section from a markdown note."""
+    """Load a single ## section from a markdown note body."""
     content = Path(note_path).read_text()
-    parts = re.split(r'^(## \w+(?:\s+\w+)*)', content, flags=re.MULTILINE)
+    # Remove frontmatter (between --- markers)
+    if content.startswith('---'):
+        _, _, body = content.split('---', 2)
+    else:
+        body = content
+    
+    # Split on ## headings
+    parts = SECTION_RE.split(body)
     for i in range(1, len(parts), 2):
         heading = parts[i].strip().lstrip('#').strip()
-        body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        body_text = parts[i + 1].strip() if i + 1 < len(parts) else ""
         if heading.lower() == section.lower():
-            return f"## {heading}\n{body}"
+            return f"## {heading}\n{body_text}"
     return ""
-
-def load_note(note_path: str) -> str:
-    """Load the full note (all sections)."""
-    return Path(note_path).read_text()
 
 def list_sections(note_path: str) -> list[str]:
     """List all ## section headings in a note."""
     content = Path(note_path).read_text()
-    return re.findall(r'^## (.+)$', content, flags=re.MULTILINE)
+    if content.startswith('---'):
+        _, _, body = content.split('---', 2)
+    else:
+        body = content
+    return SECTION_RE.findall(body)
 ```
 
 ### Actions (from STARC Action Protocol V3, simplified)
@@ -534,52 +543,69 @@ Port from STARC's Codex fork:
 
 ### Core Dependencies
 
-| Library | Purpose | License | Status |
-|---------|---------|---------|--------|
-| `rapidfuzz` | Fuzzy name matching | MIT | 40% faster than FuzzyWuzzy, 2025 study confirmed |
-| `python-frontmatter` | YAML frontmatter parsing | MIT | 423 stars, healthy, latest release May 2026 |
-| `screenplain` | Fountain parsing (HTML/FDX/PDF export) | MIT | Actively developed, full Fountain spec |
-| `screenplay-tools` | Fountain parsing (token-based) | MIT | Multi-language, actively maintained |
-| `vis-network` | Graph visualization | MIT/Apache 2.0 | v10.1.2, works offline once loaded |
+| Library | Purpose | License | Status | API Verified |
+|---------|---------|---------|--------|--------------|
+| `screenplay-tools` | Fountain parse + write | MIT | v0.0.10, 22 stars, 142 commits | ✅ Parser, Writer, CallbackParser, FormatHelper |
+| `python-frontmatter` | YAML frontmatter | MIT | v1.3.0, 423 stars, healthy | ✅ load, dump, Post object |
+| `rapidfuzz` | Fuzzy name matching | MIT | 40% faster than FuzzyWuzzy | ✅ |
+| `vis-network` | Graph visualization | MIT/Apache 2.0 | v10.1.2, works offline | ✅ |
 
-### Optional Dependencies
+### Not Needed (After Deep Research)
 
-| Library | Purpose | License | Status |
-|---------|---------|---------|--------|
-| `marktripy` | Markdown AST editing (round-trip) | MIT | Parse → Manipulate → Write back |
-| `mrkdwn_analysis` | Markdown section extraction | MIT | Extract headers, sections, elements |
-| `jouvence` | Fountain parsing (Python-native) | MIT | Renders to HTML, no dual dialogue |
+| Library | Purpose | Why Not |
+|---------|---------|---------|
+| `screenplain` | Fountain export | Export only, not needed yet |
+| `jouvence` | Fountain parse | No writer, can't round-trip |
+| `marktripy` | Markdown AST | Doesn't exist / obscure |
+| `mrkdwn_analysis` | Section extraction | Regex is sufficient |
 
-### Dependency Rationale
+### Final requirements.txt
 
-**Why `screenplay-tools` over `screenplain`?** Both are actively maintained. `screenplain` is better for export (HTML/FDX/PDF). `screenplay-tools` is better for token-based parsing (scene headings, character cues, dialogue). We may use both: `screenplay-tools` for reading, `screenplain` for export.
-
-**Why `marktripy`?** If we need to modify sections in place (e.g., update a character's `## Arc` section), `marktripy` provides round-trip Markdown editing. Without it, we'd need to use regex replacement which is fragile.
-
-**Why `mrkdwn_analysis`?** Alternative to regex section parsing. Provides header detection, section identification, and element extraction. May be useful for index generation.
-
-**Why not `screenplain` for Fountain parsing?** `screenplain` is export-focused. `screenplay-tools` is parse-focused. We need parsing first, export later.
-
-### Final Dependency List
-
-```txt
-# Core
-rapidfuzz              # MIT - fuzzy name matching
-python-frontmatter     # MIT - YAML frontmatter parsing
-screenplay-tools       # MIT - Fountain token parsing
-vis-network            # MIT/Apache 2.0 - graph visualization (JS, loaded via CDN)
-
-# Optional (evaluate during implementation)
-marktripy              # MIT - round-trip Markdown editing
-mrkdwn_analysis        # MIT - Markdown section extraction
-screenplain            # MIT - Fountain export (HTML/FDX/PDF)
 ```
+rapidfuzz>=3.0
+python-frontmatter>=1.0
+screenplay-tools>=0.0.10
+```
+
+vis-network is loaded via CDN/local in the HTML dashboard, not pip.
+
+---
+
+## Answers to Open Questions
+
+### Q: Fountain syntax — strict subset or full Fountain?
+
+**Answer**: Full Fountain. `screenplay-tools` handles the full spec. Subsetting would mean fighting the parser.
+
+### Q: Relationships — frontmatter array or separate note?
+
+**Answer**: Frontmatter `relationships:` array. Keeps everything in one place, no separate file to maintain. The array is small (2-5 entries per character) and the body's `## Relationships` section provides the depth.
+
+### Q: Story Memory — auto-generated or manual?
+
+**Answer**: Auto-generated by Hermes after each edit. When Hermes applies an edit (e.g., new scene, character update), it also updates `.story/memory.md` with the relevant continuity findings. The writer can correct it later.
+
+### Q: Edit history — where to store?
+
+**Answer**: `.story/history.md` in the project folder, gitignored. Contains: timestamp, action type, target, summary, before/after excerpts, continuity findings. STARC stores in Qt settings (binary), but we don't have that. A file is portable and inspectable.
+
+### Q: Multi-project — how does Hermes know which is active?
+
+**Answer**: Active project is set in conversation context. "Load project the-water-audit" → Hermes remembers it for the session. Optional: a `.story/active-project` pointer file for persistence across sessions. Priority: conversation context > pointer file > ask user.
+
+### Q: Index staleness — auto-regenerate when?
+
+**Answer**: Auto-regenerate after every edit (the skill does it as part of the apply flow). Also regenerate on project load (to catch manual edits). Manual trigger: "reindex project" command.
+
+### Q: marktripy vs regex for section editing?
+
+**Answer**: Regex. `marktripy` doesn't appear to exist or is very obscure. Our regex parser handles section extraction and insertion cleanly. For round-trip editing (modify a section and write back), we use `python-frontmatter` for frontmatter + string replacement for body sections.
 
 ---
 
 ## Architectural Reference: Obsidian StoryLine Plugin
 
-[StoryLine](https://github.com/pixerojan/obsidian-storyline) is an open-source Obsidian plugin that provides similar functionality: scene boards, character management, plot grids, timeline. Written in TypeScript for Obsidian's API.
+[StoryLine](https://github.com/PixeroJan/obsidian-storyline) is an open-source Obsidian plugin that provides similar functionality: scene boards, character management, plot grids, timeline. Written in TypeScript for Obsidian's API.
 
 **What we can learn from it**:
 - How it structures character/scene/plot relationships
@@ -601,21 +627,16 @@ screenplain            # MIT - Fountain export (HTML/FDX/PDF)
 2. ✅ Save research notes (STARC data model)
 3. ✅ Verify open-source dependencies (research report)
 4. ✅ Write `vault-conventions.md` (schemas + section retrieval + frontmatter→body mapping)
-5. ⬜ Review StoryLine plugin source for dashboard ideas
-6. ⬜ Build the index generator script
-7. ⬜ Build the Story Loader skill
-8. ⬜ Build the Story Editor skill (Action Protocol)
-9. ⬜ Build the preview pane dashboard
-10. ⬜ Test with a real project
+5. ✅ Deep-dive dependency research (APIs, constraints, integration patterns)
+6. ⬜ Review StoryLine plugin source for dashboard ideas
+7. ⬜ Build the index generator script
+8. ⬜ Build the Story Loader skill
+9. ⬜ Build the Story Editor skill (Action Protocol)
+10. ⬜ Build the preview pane dashboard
+11. ⬜ Test with a real project
 
 ---
 
-## Open Questions
+## Open Questions (Remaining)
 
-- **Fountain syntax**: Do we use a strict subset? Full Fountain? `screenplay-tools` supports the full spec.
-- **Relationships**: Frontmatter `relationships:` array vs. separate `relationships.md` note. Frontmatter is simpler but can get long.
-- **Story Memory**: Auto-generated by Hermes after each edit, or manually maintained? STARC auto-generates but allows correction.
-- **Edit history**: Store in `.story/history.md` (local, gitignored) or in the vault? STARC stores it in Qt settings.
-- **Multi-project**: How does Hermes know which project is "active"? Via the conversation, or a `.story/active-project` pointer?
-- **Index staleness**: The index is only as good as its last update. Do we auto-regenerate after every edit? Or on project load? Or on demand?
-- **marktripy vs regex**: For section-level editing, do we need round-trip AST editing or is regex replacement sufficient?
+None — all answered above.
