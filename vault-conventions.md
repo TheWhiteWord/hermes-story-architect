@@ -490,33 +490,87 @@ Stage 3: Content loading
 
 ## Section Parser
 
+We use a **pluggable parser interface** with two implementations:
+
+```python
+class MarkdownParser:
+    """Abstract interface for section-level Markdown parsing."""
+    def list_sections(self, content: str) -> list[str]: ...
+    def get_section(self, content: str, section: str) -> str: ...
+    def replace_section(self, content: str, section: str, new_body: str) -> str: ...
+```
+
+### Default: RegexParser (zero dependencies)
+
 ```python
 import re
-from pathlib import Path
 
-def load_section(note_path: str, section: str) -> str:
-    """Load a single ## section from a markdown note."""
-    content = Path(note_path).read_text()
-    # Split on ## headings, keep the heading name with its content
-    parts = re.split(r'^(## \w+(?:\s+\w+)*)', content, flags=re.MULTILINE)
-    # parts[0] is frontmatter + preamble
-    # parts[1:] alternate: heading, content, heading, content...
-    for i in range(1, len(parts), 2):
-        heading = parts[i].strip().lstrip('#').strip()
-        body = parts[i + 1].strip() if i + 1 < len(parts) else ""
-        if heading.lower() == section.lower():
-            return f"## {heading}\n{body}"
-    return ""
+SECTION_RE = re.compile(r'^(##\s+.+)$', flags=re.MULTILINE)
 
-def load_note(note_path: str) -> str:
-    """Load the full note (all sections)."""
-    return Path(note_path).read_text()
-
-def list_sections(note_path: str) -> list[str]:
-    """List all ## section headings in a note."""
-    content = Path(note_path).read_text()
-    return re.findall(r'^## (.+)$', content, flags=re.MULTILINE)
+class RegexParser(MarkdownParser):
+    def list_sections(self, content: str) -> list[str]:
+        return SECTION_RE.findall(content)
+    
+    def get_section(self, content: str, section: str) -> str:
+        parts = SECTION_RE.split(content)
+        for i in range(1, len(parts), 2):
+            heading = parts[i].strip().lstrip('#').strip()
+            body_text = parts[i + 1].strip() if i + 1 < len(parts) else ""
+            if heading.lower() == section.lower():
+                return f"## {heading}\n{body_text}"
+        return ""
+    
+    def replace_section(self, content: str, section: str, new_body: str) -> str:
+        parts = SECTION_RE.split(content)
+        for i in range(1, len(parts), 2):
+            heading = parts[i].strip().lstrip('#').strip()
+            if heading.lower() == section.lower():
+                parts[i + 1] = '\n\n' + new_body
+                return ''.join(parts)
+        return content
 ```
+
+### Optional: MarktripyParser (round-trip AST editing)
+
+[marktripy](https://github.com/twardoch/marktripy) (v1.0.3, MIT) provides AST-based Markdown editing:
+
+```python
+from marktripy import parse_markdown, render_markdown
+
+class MarktripyParser(MarkdownParser):
+    def list_sections(self, content: str) -> list[str]:
+        ast = parse_markdown(content)
+        return [node.get_text() for node in ast.walk() if node.type == "heading"]
+    
+    def get_section(self, content: str, section: str) -> str:
+        ast = parse_markdown(content)
+        # Find heading node, collect content until next heading
+        ...
+    
+    def replace_section(self, content: str, section: str, new_body: str) -> str:
+        ast = parse_markdown(content)
+        # Find heading node, replace content
+        return render_markdown(ast)
+```
+
+**Configuration** (in `config.yaml`):
+```yaml
+markdown_parser: regex  # or "marktripy"
+```
+
+### Why regex as default
+
+- Our notes are structured and predictable (we control the format)
+- Zero dependencies
+- Simple, fast, easy to debug
+- Edge cases (headings in code blocks, nested lists) won't happen by convention
+
+### Why marktripy as optional
+
+- Robust against all Markdown edge cases
+- Round-trip: parse → modify → render without losing formatting
+- Future-proof for complex manipulation
+- Adds dependency (markdown-it-py, mistletoe transitive) — only if needed
 
 ---
 
@@ -652,3 +706,53 @@ The index is **regenerated** from the vault:
 - On demand (user says "reindex project")
 
 A script (`scripts/update_index.py`) walks the vault, reads frontmatter from all entity notes, and rebuilds `.story/index.yaml`.
+
+---
+
+## Dependencies
+
+### Core Libraries (Verified)
+
+| Library | Purpose | License | API |
+|---------|---------|---------|-----|
+| `screenplay-tools` | Fountain parse + write | MIT | `Parser()`, `Writer()`, `CallbackParser()` |
+| `python-frontmatter` | YAML frontmatter | MIT | `load()`, `dump()`, `Post` object |
+| `rapidfuzz` | Fuzzy name matching | MIT | `fuzz.ratio()`, `process.extract()` |
+| `vis-network` | Graph visualization | MIT/Apache 2.0 | Loaded via CDN/local in HTML |
+
+### Optional Libraries
+
+| Library | Purpose | License | When to Use |
+|---------|---------|---------|-------------|
+| `marktripy` | Markdown AST editing | MIT | If regex section editing proves fragile |
+
+### Integration Notes
+
+**screenplay-tools** provides `Parser`, `Writer`, and `CallbackParser`:
+```python
+from screenplay_tools.fountain.parser import Parser
+from screenplay_tools.fountain.writer import Writer
+
+parser = Parser()
+parser.addText(open("screenplay.md").read())
+script = parser.script  # Script object with .elements, .titleEntries
+
+writer = Writer()
+fountain_text = writer.write(script)  # Round-trip back to Fountain
+```
+
+**python-frontmatter** handles frontmatter round-trips:
+```python
+import frontmatter
+
+post = frontmatter.load("characters/mara.md")
+post['age'] = 35  # Modify
+frontmatter.dump(post, open("characters/mara.md", "w"))  # Write back
+```
+
+**Regex section parser** extracts `##` sections from body text:
+```python
+# After frontmatter.split(), body is passed to the parser
+body = post.content  # Everything after frontmatter
+section = parser.get_section(body, "Voice")  # Returns "## Voice\n..."
+```

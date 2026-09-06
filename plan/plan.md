@@ -418,39 +418,81 @@ When the user makes a query:
 
 ### Section Parser
 
+We use a **pluggable parser interface** with two implementations:
+
+```python
+class MarkdownParser:
+    """Abstract interface for section-level Markdown parsing."""
+    def list_sections(self, content: str) -> list[str]: ...
+    def get_section(self, content: str, section: str) -> str: ...
+    def replace_section(self, content: str, section: str, new_body: str) -> str: ...
+```
+
+**Default: RegexParser** (zero dependencies):
 ```python
 import re
-from pathlib import Path
 
 SECTION_RE = re.compile(r'^(##\s+.+)$', flags=re.MULTILINE)
 
-def load_section(note_path: str, section: str) -> str:
-    """Load a single ## section from a markdown note body."""
-    content = Path(note_path).read_text()
-    # Remove frontmatter (between --- markers)
-    if content.startswith('---'):
-        _, _, body = content.split('---', 2)
-    else:
-        body = content
+class RegexParser(MarkdownParser):
+    def list_sections(self, content: str) -> list[str]:
+        return SECTION_RE.findall(content)
     
-    # Split on ## headings
-    parts = SECTION_RE.split(body)
-    for i in range(1, len(parts), 2):
-        heading = parts[i].strip().lstrip('#').strip()
-        body_text = parts[i + 1].strip() if i + 1 < len(parts) else ""
-        if heading.lower() == section.lower():
-            return f"## {heading}\n{body_text}"
-    return ""
-
-def list_sections(note_path: str) -> list[str]:
-    """List all ## section headings in a note."""
-    content = Path(note_path).read_text()
-    if content.startswith('---'):
-        _, _, body = content.split('---', 2)
-    else:
-        body = content
-    return SECTION_RE.findall(body)
+    def get_section(self, content: str, section: str) -> str:
+        parts = SECTION_RE.split(content)
+        for i in range(1, len(parts), 2):
+            heading = parts[i].strip().lstrip('#').strip()
+            body_text = parts[i + 1].strip() if i + 1 < len(parts) else ""
+            if heading.lower() == section.lower():
+                return f"## {heading}\n{body_text}"
+        return ""
+    
+    def replace_section(self, content: str, section: str, new_body: str) -> str:
+        parts = SECTION_RE.split(content)
+        for i in range(1, len(parts), 2):
+            heading = parts[i].strip().lstrip('#').strip()
+            if heading.lower() == section.level():
+                parts[i + 1] = '\n\n' + new_body
+                return ''.join(parts)
+        return content
 ```
+
+**Optional: MarktripyParser** (round-trip AST editing):
+```python
+from marktripy import parse_markdown, render_markdown
+
+class MarktripyParser(MarkdownParser):
+    def list_sections(self, content: str) -> list[str]:
+        ast = parse_markdown(content)
+        return [node.get_text() for node in ast.walk() if node.type == "heading"]
+    
+    def get_section(self, content: str, section: str) -> str:
+        ast = parse_markdown(content)
+        # Find heading node, collect content until next heading
+        ...
+    
+    def replace_section(self, content: str, section: str, new_body: str) -> str:
+        ast = parse_markdown(content)
+        # Find heading node, replace content
+        return render_markdown(ast)
+```
+
+**Configuration** (in `config.yaml`):
+```yaml
+markdown_parser: regex  # or "marktripy"
+```
+
+**Why regex as default:**
+- Our notes are structured and predictable (we control the format)
+- Zero dependencies
+- Simple, fast, easy to debug
+- Edge cases (headings in code blocks, nested lists) won't happen by convention
+
+**Why marktripy as optional:**
+- Robust against all Markdown edge cases
+- Round-trip: parse → modify → render without losing formatting
+- Future-proof for complex manipulation
+- Adds dependency (markdown-it-py, mistletoe transitive) — only if needed
 
 ### Actions (from STARC Action Protocol V3, simplified)
 
@@ -550,14 +592,14 @@ Port from STARC's Codex fork:
 | `rapidfuzz` | Fuzzy name matching | MIT | 40% faster than FuzzyWuzzy | ✅ |
 | `vis-network` | Graph visualization | MIT/Apache 2.0 | v10.1.2, works offline | ✅ |
 
-### Not Needed (After Deep Research)
+### Optional / Not Needed
 
-| Library | Purpose | Why Not |
-|---------|---------|---------|
-| `screenplain` | Fountain export | Export only, not needed yet |
-| `jouvence` | Fountain parse | No writer, can't round-trip |
-| `marktripy` | Markdown AST | Doesn't exist / obscure |
-| `mrkdwn_analysis` | Section extraction | Regex is sufficient |
+| Library | Purpose | Status | Notes |
+|---------|---------|--------|-------|
+| `marktripy` | Markdown AST editing | **Optional** | Round-trip section editing. Exists (github.com/twardoch/marktripy, v1.0.3). Use if regex proves fragile. |
+| `screenplain` | Fountain export | Not needed yet | Export only |
+| `jouvence` | Fountain parse | Not needed | No writer, can't round-trip |
+| `mrkdwn_analysis` | Section extraction | Not needed | Regex is sufficient |
 
 ### Final requirements.txt
 
