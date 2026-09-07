@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Dashboard</title>
+
+<!-- vis-network from CDN (MIT/Apache 2.0) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Fallback tokens for standalone preview — Hermes will override */
+  --foreground: #e8e8e8;
+  --muted-foreground: #8a8a8a;
+  --accent: #7b9cf0;
+  --border: rgba(255,255,255,0.1);
+  --card: rgba(255,255,255,0.04);
+  --background: #111;
+  /* Panel must always be opaque — not just var(--card) which is translucent */
+  --panel-bg: #181818;
+
+  /* Internal tokens */
+  --sidebar-w: 44px;
+  --sidebar-w-open: 180px;
+  --panel-w: 320px;
+  --radius: 6px;
+  --gap: 12px;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 13px;
+  --font-size-lg: 15px;
+  --tag-gap: 4px;
+
+  --role-protagonist: #7b9cf0;
+  --role-antagonist: #e07070;
+  --role-mentor: #b07be0;
+  --role-rival: #e0a86b;
+  --role-supporting: #6bbfb0;
+  --role-entity: #e06b9b;
+
+  --status-active: #6bbfb0;
+  --status-building: #e0a86b;
+  --status-resolved: var(--muted-foreground);
+}
+
+html, body {
+  height: 100%;
+  background: transparent;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ─── Layout Shell ─────────────────────────────────────────── */
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ─── Sidebar ──────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--gap) 0;
+  gap: 2px;
+  transition: width 0.18s ease;
+  overflow: hidden;
+  background: var(--card);
+  z-index: 10;
+}
+
+#sidebar.expanded { width: var(--sidebar-w-open); }
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  border-radius: 0;
+  transition: color 0.12s, background 0.12s;
+  width: 100%;
+  text-align: left;
+}
+.nav-btn:hover { color: var(--foreground); background: var(--card); }
+.nav-btn.active { color: var(--accent); }
+.nav-btn .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.nav-label { opacity: 0; transition: opacity 0.1s; pointer-events: none; }
+#sidebar.expanded .nav-label { opacity: 1; pointer-events: auto; }
+
+.nav-separator { height: 1px; background: var(--border); margin: 6px 10px; flex-shrink: 0; }
+
+.sidebar-toggle {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+}
+.sidebar-toggle:hover { color: var(--foreground); }
+
+/* ─── Main Content ─────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.view { display: none; flex-direction: column; height: 100%; }
+.view.active { display: flex; }
+
+/* ─── View Header ──────────────────────────────────────────── */
+.view-header {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.view-title {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--foreground);
+}
+.view-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+}
+.view-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ─── Graph View ───────────────────────────────────────────── */
+#graph-view .view-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#network-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Scenes View ──────────────────────────────────────────── */
+#scenes-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+}
+
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scene-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+}
+.scene-item:hover { background: var(--card); border-color: var(--border); }
+.scene-item.selected { background: var(--card); border-color: var(--accent); }
+
+.scene-number {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+  min-width: 24px;
+  flex-shrink: 0;
+}
+.scene-body { flex: 1; min-width: 0; }
+.scene-heading {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scene-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* ─── Story View ───────────────────────────────────────────── */
+#story-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap) 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.story-section-title {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.project-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.project-stat {
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.project-stat-value {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--foreground);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.project-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.project-logline {
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  line-height: 1.6;
+  grid-column: 1 / -1;
+  font-style: italic;
+}
+
+.plot-list { display: flex; flex-direction: column; gap: 6px; }
+.plot-item {
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+.plot-item:hover { border-color: var(--accent); }
+.plot-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.plot-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--foreground); }
+.plot-sentence { font-size: var(--font-size-xs); color: var(--muted-foreground); line-height: 1.5; }
+
+.risk-list { display: flex; flex-direction: column; gap: 4px; }
+.risk-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: var(--card);
+  border-left: 2px solid #e07070;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+/* ─── Tags & Chips ─────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.tag-scene { background: rgba(123,156,240,0.12); color: var(--accent); }
+.tag-location { background: rgba(107,191,176,0.12); color: #6bbfb0; }
+.tag-plot { background: rgba(176,123,224,0.12); color: #b07be0; }
+.tag-char { background: rgba(107,191,176,0.1); color: var(--muted-foreground); border: 1px solid var(--border); }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.status-badge.active { color: var(--status-active); }
+.status-badge.active::before { background: var(--status-active); }
+.status-badge.building { color: var(--status-building); }
+.status-badge.building::before { background: var(--status-building); }
+
+/* ─── Buttons ──────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: opacity 0.1s, background 0.1s;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+}
+.btn:hover { color: var(--foreground); }
+.btn-primary {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-hermes {
+  border-color: rgba(123,156,240,0.3);
+  color: var(--accent);
+}
+.btn-hermes:hover { background: rgba(123,156,240,0.1); }
+
+/* ─── Detail Panel ─────────────────────────────────────────── */
+#detail-panel {
+  width: 0;
+  flex-shrink: 0;
+  border-left: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Solid background — fallback ensures it's never transparent */
+  background: var(--panel-bg, #1a1a1a);
+  transition: width 0.2s ease, border-color 0.2s ease;
+  position: relative; /* flow element, not overlay */
+  z-index: 1;
+}
+#detail-panel.open {
+  width: var(--panel-w);
+  border-left: 1px solid var(--border);
+}
+/* Wide-screen: panel opens beside content */
+@media (min-width: 700px) {
+  #detail-panel { min-width: 0; }
+}
+/* Narrow: panel takes full width as a layer */
+@media (max-width: 699px) {
+  #detail-panel {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 0;
+    z-index: 20;
+  }
+  #detail-panel.open {
+    width: min(var(--panel-w), calc(100vw - var(--sidebar-w)));
+  }
+}
+
+.panel-header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.panel-title-block { flex: 1; min-width: 0; }
+.panel-entity-type {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  margin-bottom: 2px;
+}
+.panel-name {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-close {
+  background: none;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 2px;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.panel-close:hover { color: var(--foreground); }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-section-title {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.panel-text {
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  line-height: 1.6;
+}
+.panel-muted {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+
+.panel-tags { display: flex; flex-wrap: wrap; gap: var(--tag-gap); }
+
+.entity-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.1s, color 0.1s;
+}
+.entity-link:hover { border-color: var(--accent); color: var(--accent); }
+
+.panel-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.role-pip {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Loading & Empty States ───────────────────────────────── */
+#loading-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  background: transparent;
+}
+.loading-icon {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: var(--font-size-sm); color: var(--muted-foreground); }
+
+#error-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  padding: 32px;
+  text-align: center;
+}
+.error-title { font-size: var(--font-size-lg); font-weight: 500; color: var(--foreground); }
+.error-body { font-size: var(--font-size-sm); color: var(--muted-foreground); max-width: 280px; line-height: 1.6; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 6px;
+  text-align: center;
+}
+.empty-state-title { font-size: var(--font-size-base); color: var(--muted-foreground); }
+.empty-state-sub { font-size: var(--font-size-xs); color: var(--muted-foreground); opacity: 0.6; }
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ─── Search ───────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  height: 28px;
+  flex: 1;
+  max-width: 200px;
+}
+.search-bar input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--font-size-xs);
+}
+.search-bar input::placeholder { color: var(--muted-foreground); }
+
+/* ─── Entity List Views (locations, plots, worlds) ─────────── */
+.entity-list-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+}
+.entity-grid { display: flex; flex-direction: column; gap: 4px; }
+.entity-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.entity-card:hover { background: var(--card); border-color: var(--border); }
+.entity-card.selected { background: var(--card); border-color: var(--accent); }
+.entity-card-pip {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.entity-card-body { flex: 1; min-width: 0; }
+.entity-card-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--foreground); }
+.entity-card-sub { font-size: var(--font-size-xs); color: var(--muted-foreground); line-height: 1.5; margin-top: 2px; }
+.entity-card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+
+/* World rules */
+.world-rule {
+  padding: 5px 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.world-rule::before { content: '∙'; color: var(--accent); flex-shrink: 0; }
+
+/* Fountain scene content */
+.fountain-content {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: var(--font-size-xs);
+  line-height: 1.7;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* Relationship rows */
+.relationship-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.relationship-row:last-child { border-bottom: none; }
+.relationship-name { font-size: var(--font-size-sm); color: var(--foreground); font-weight: 500; flex-shrink: 0; }
+.relationship-label { font-size: var(--font-size-xs); color: var(--accent); flex-shrink: 0; }
+.relationship-feeling { font-size: var(--font-size-xs); color: var(--muted-foreground); flex: 1; min-width: 0; line-height: 1.4; }
+
+/* Knowledge list */
+.knowledge-item {
+  font-size: var(--font-size-xs); color: var(--muted-foreground);
+  padding: 4px 0; border-bottom: 1px solid var(--border);
+  line-height: 1.5; display: flex; gap: 6px;
+}
+.knowledge-item::before { content: '→'; opacity: 0.5; flex-shrink: 0; }
+.knowledge-item:last-child { border-bottom: none; }
+
+/* Setup/payoff rows in plot panel */
+.beat-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+.beat-row .beat-scene {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.beat-row:last-child { border-bottom: none; }
+
+/* Narrow layout */
+@media (max-width: 520px) {
+  .search-bar { display: none; }
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- Loading -->
+  <div id="loading-screen">
+    <div class="loading-icon"></div>
+    <div class="loading-text">Loading story index…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-screen">
+    <div class="error-title">No story index found</div>
+    <div class="error-body">
+      Place this file in your project root and make sure <code>.story/index.yaml</code> exists, or
+      use the button below to load a file manually.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-primary" onclick="loadFromFile()">Load index.yaml</button>
+      <button class="btn" onclick="loadSampleData()">Preview with sample data</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <button class="nav-btn active" data-view="graph" onclick="switchView('graph', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="2.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="2.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="6.5" x2="3.5" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10.5" y1="6.5" x2="12.5" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="9.5" x2="3.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10.5" y1="9.5" x2="12.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Characters</span>
+    </button>
+
+    <button class="nav-btn" data-view="scenes" onclick="switchView('scenes', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="5" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5" y1="8.5" x2="11" y2="8.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5" y1="11" x2="8.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Scenes</span>
+    </button>
+
+    <button class="nav-btn" data-view="locations" onclick="switchView('locations', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M8 2a4 4 0 0 1 4 4c0 3-4 8-4 8S4 9 4 6a4 4 0 0 1 4-4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <circle cx="8" cy="6" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Locations</span>
+    </button>
+
+    <button class="nav-btn" data-view="plots" onclick="switchView('plots', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M2 12 L5 7 L8 9 L11 4 L14 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="5" cy="7" r="1.2" fill="currentColor"/>
+        <circle cx="11" cy="4" r="1.2" fill="currentColor"/>
+      </svg>
+      <span class="nav-label">Plots</span>
+    </button>
+
+    <button class="nav-btn" data-view="worlds" onclick="switchView('worlds', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M2.5 8h11M8 2.5a8 6 0 0 1 0 11M8 2.5a8 6 0 0 0 0 11" stroke="currentColor" stroke-width="1.1"/>
+      </svg>
+      <span class="nav-label">Worlds</span>
+    </button>
+
+    <button class="nav-btn" data-view="story" onclick="switchView('story', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M3 8h10" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M8 3v5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Story</span>
+    </button>
+
+    <div class="nav-separator"></div>
+
+    <button class="nav-btn" onclick="refreshIndex()" title="Refresh index">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M13.5 2.5v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 8a6 6 0 0 1 10-4.47l1.5 2.97" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M2.5 13.5v-4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 8a6 6 0 0 1-10 4.47L2.5 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span class="nav-label">Refresh</span>
+    </button>
+
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </nav>
+
+  <!-- Main -->
+  <main id="main">
+
+    <!-- Graph View -->
+    <div class="view active" id="graph-view">
+      <div class="view-header">
+        <div class="view-title">Character web</div>
+        <div class="view-subtitle" id="graph-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="resetGraphLayout()" title="Reset layout">Reset</button>
+        </div>
+      </div>
+      <div class="view-body">
+        <div id="network-canvas"></div>
+        <div class="graph-legend" id="graph-legend"></div>
+      </div>
+    </div>
+
+    <!-- Scenes View -->
+    <div class="view" id="scenes-view">
+      <div class="view-header">
+        <div class="view-title">Scenes</div>
+        <div class="view-subtitle" id="scenes-subtitle">—</div>
+        <div class="view-header-actions">
+          <div class="search-bar">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><line x1="7" y1="7" x2="9" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <input type="text" placeholder="Filter scenes…" id="scene-search" oninput="filterScenes(this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="view-body">
+        <div class="scene-list" id="scene-list"></div>
+      </div>
+    </div>
+
+    <!-- Locations View -->
+    <div class="view entity-list-view" id="locations-view">
+      <div class="view-header">
+        <div class="view-title">Locations</div>
+        <div class="view-subtitle" id="locations-subtitle">—</div>
+      </div>
+      <div class="view-body">
+        <div class="entity-grid" id="location-list"></div>
+      </div>
+    </div>
+
+    <!-- Plots View -->
+    <div class="view entity-list-view" id="plots-view">
+      <div class="view-header">
+        <div class="view-title">Plots</div>
+        <div class="view-subtitle" id="plots-subtitle">—</div>
+      </div>
+      <div class="view-body">
+        <div class="entity-grid" id="plot-list"></div>
+      </div>
+    </div>
+
+    <!-- Worlds View -->
+    <div class="view entity-list-view" id="worlds-view">
+      <div class="view-header">
+        <div class="view-title">Worlds</div>
+        <div class="view-subtitle" id="worlds-subtitle">—</div>
+      </div>
+      <div class="view-body">
+        <div class="entity-grid" id="world-list"></div>
+      </div>
+    </div>
+
+    <!-- Story View -->
+    <div class="view" id="story-view">
+      <div class="view-header">
+        <div class="view-title" id="story-project-name">Story</div>
+        <div class="view-subtitle" id="story-subtitle">—</div>
+      </div>
+      <div class="view-body" id="story-body"></div>
+    </div>
+
+  </main>
+
+  <!-- Detail Panel -->
+  <aside id="detail-panel">
+    <div class="panel-header">
+      <div class="panel-title-block">
+        <div class="panel-entity-type" id="panel-type">—</div>
+        <div class="panel-name" id="panel-name">—</div>
+      </div>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+    <div class="panel-footer" id="panel-footer"></div>
+  </aside>
+
+</div>
+
+<!-- Hidden file input for manual load -->
+<input type="file" id="file-input" accept=".yaml,.yml" style="display:none" onchange="handleFileLoad(this)">
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let story = null;
+let network = null;
+let sidebarExpanded = false;
+let currentView = 'graph';
+const INDEX_PATH = '.story/index.yaml';
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    const res = await fetch(INDEX_PATH);
+    if (!res.ok) throw new Error('not found');
+    const text = await res.text();
+    const data = jsyaml.load(text);
+    initStory(data);
+  } catch (e) {
+    showError();
+  }
+}
+
+function showError() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'flex';
+}
+
+function loadFromFile() {
+  document.getElementById('file-input').click();
+}
+
+function handleFileLoad(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = jsyaml.load(e.target.result);
+      document.getElementById('error-screen').style.display = 'none';
+      document.getElementById('loading-screen').style.display = 'flex';
+      initStory(data);
+    } catch(err) {
+      alert('Could not parse YAML: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function loadSampleData() {
+  // Sample data in the REAL backend schema (as per brief) — exercises the normaliser
+  const sample = {
+    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+    characters: [
+      {
+        id: "detective-oak", name: "Detective Oak", story_role: "Supporting",
+        one_sentence: "Homicide detective investigating the same cartel.",
+        sections: ["Personality","Background","Voice","Arc","Relationships"],
+        relationships: [{ id: "mara", feeling: "Wary respect — she's useful but unpredictable", label: "Partner" }],
+        scenes: [{ number: 2, heading: "INT. POLICE STATION - DAY" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
+        goals: { short: "Bring down the cartel's leadership.", long: "Redeem his failure to protect his last partner." }
+      },
+      {
+        id: "mara", name: "Mara Chen", story_role: "Protagonist", age: 34,
+        one_sentence: "Forensic accountant who finds her firm laundering cartel money.",
+        sections: ["Personality","Background","Voice","Greatest Fear","Secrets","Arc","Relationships","Goals"],
+        relationships: [
+          { id: "detective-oak", feeling: "Wary respect", label: "Partner" },
+          { id: "victor-hale", feeling: "Fear — he knows what she's found", label: "Boss" }
+        ],
+        scenes: [{ number: 1, heading: "INT. MARA'S APARTMENT - NIGHT" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
+        goals: { short: "Find the account number her brother left behind.", long: "Burn the cartel's financial network to the ground." },
+        knowledge: ["Her brother Daniel was murdered", "Victor Hale is the cartel's CFO"]
+      }
+    ],
+    locations: [
+      { id: "kitchen", name: "The Kitchen", one_sentence: "Commercial kitchen in a closed restaurant.", sections: ["Description","History","Scenes"], scenes: ["INT. KITCHEN - NIGHT"] }
+    ],
+    worlds: [
+      { id: "gilead", name: "Gilead", one_sentence: "Near-future city-state where water is privatized.", sections: ["Description","History","Conflict"], rules: ["Water rationing is enforced by biometric scanners.", "Off-grid water extraction is a capital offense.", "The police are funded by AquaCorp."] }
+    ],
+    plots: [
+      {
+        id: "brother-investigation", name: "Brother Investigation", status: "active",
+        one_sentence: "Mara follows her brother's account number into the cartel's network.",
+        setups: [{ scene: "INT. MARA'S APARTMENT - NIGHT", description: "" }, { scene: "INT. POLICE STATION - DAY", description: "" }],
+        payoffs: [{ scene: "INT. KITCHEN - NIGHT", description: "" }],
+        characters: ["mara", "detective-oak"],
+        sections: ["Summary","Obstacles","Stakes"]
+      }
+    ],
+    scenes: [
+      { heading: "INT. MARA'S APARTMENT - NIGHT", scene_number: null, characters: ["mara"], id: 1, locations: [] },
+      { heading: "INT. POLICE STATION - DAY", scene_number: null, characters: ["detective-oak"], id: 2, locations: [] },
+      { heading: "INT. KITCHEN - NIGHT", scene_number: null, characters: ["detective-oak","mara"], id: 3, locations: ["kitchen"] }
+    ],
+    story_memory: {
+      last_updated: "2026-09-06T14:30:00",
+      continuity_risks: ["Mara's skimming hasn't been discovered (ticking clock)", "Oak's investigation is off-books (if his captain finds out, he's burned)"],
+      summary: "Mara and Oak are allied but don't fully trust each other. Victor Hale is the cartel's CFO — Mara doesn't know yet."
+    }
+  };
+  document.getElementById('error-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  initStory(sample);
+}
+
+// ─── Normalise ─────────────────────────────────────────────────────────────────
+// Maps real backend schema → internal rendering schema.
+// Real schema differences:
+//   characters: story_role (not role), relationships[] (not related[]),
+//               goals.short/long (not goals_short/long), knowledge as string[]
+//   scenes: id as integer (string lookup needs String()), locations as id[] but
+//           also sometimes heading strings; characters array is id strings
+//   plots: setups/payoffs are [{scene, description}] objects (not strings)
+//   locations/worlds: scenes array contains heading strings (not ids)
+function normalise(data) {
+  const d = JSON.parse(JSON.stringify(data)); // deep clone
+
+  // Characters
+  (d.characters || []).forEach(c => {
+    // story_role → role
+    if (c.story_role && !c.role) c.role = c.story_role;
+    // relationships → related (keep both for panel)
+    if (c.relationships && !c.related) {
+      c.related = c.relationships.map(r => ({ id: r.id, label: r.label, feeling: r.feeling }));
+    }
+    // goals object → flat
+    if (c.goals && typeof c.goals === 'object') {
+      if (!c.goals_short) c.goals_short = c.goals.short;
+      if (!c.goals_long)  c.goals_long  = c.goals.long;
+    }
+    // knowledge: string[] → join for display (keep array for panel)
+    if (Array.isArray(c.knowledge)) {
+      c._knowledge_arr = c.knowledge;
+      c.knowledge = c.knowledge.join(' · ');
+    }
+    // scenes: [{number, heading}] → extract IDs or headings for lookup
+    if (Array.isArray(c.scenes) && c.scenes.length && typeof c.scenes[0] === 'object') {
+      c._scene_objs = c.scenes;
+      // map to scene IDs by matching headings
+      c.scenes = c.scenes.map(s => {
+        const found = (d.scenes || []).find(sc =>
+          String(sc.id) === String(s.number) ||
+          sc.heading === s.heading ||
+          (sc.heading || '').includes(s.heading || '__NOMATCH__')
+        );
+        return found ? String(found.id) : (s.heading || String(s.number));
+      });
+    } else {
+      // ensure they're strings for consistent lookup
+      c.scenes = (c.scenes || []).map(s => String(s));
+    }
+  });
+
+  // Scenes: ensure id is string, normalise character/location arrays
+  (d.scenes || []).forEach(s => {
+    s.id = String(s.id);
+    s.characters = (s.characters || []).map(String);
+    // locations: may be id strings or heading strings — keep as-is for lookup
+    s.locations = (s.locations || []);
+    s.plots = (s.plots || []);
+  });
+
+  // Plots: normalise setups/payoffs from [{scene, description}] → strings
+  (d.plots || []).forEach(pl => {
+    if (pl.setups && pl.setups.length && typeof pl.setups[0] === 'object') {
+      pl._setup_objs = pl.setups;
+      pl._payoff_objs = pl.payoffs || [];
+      // keep as objects — panel renderer handles both
+    }
+    pl.characters = (pl.characters || []).map(String);
+  });
+
+  // Locations: scenes may be heading strings — keep for cross-reference
+  (d.locations || []).forEach(loc => {
+    if (!loc._scene_headings && Array.isArray(loc.scenes)) {
+      loc._scene_headings = loc.scenes.filter(s => typeof s === 'string');
+    }
+  });
+
+  d.worlds = d.worlds || [];
+  d.story_memory = d.story_memory || {};
+
+  return d;
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+function initStory(data) {
+  story = normalise(data);
+  story.characters = story.characters || [];
+  story.locations  = story.locations  || [];
+  story.plots      = story.plots      || [];
+  story.scenes     = story.scenes     || [];
+  story.worlds     = story.worlds     || [];
+  story.story_memory = story.story_memory || {};
+
+  document.getElementById('loading-screen').style.display = 'none';
+
+  buildGraphView();
+  buildScenesView();
+  buildLocationsView();
+  buildPlotsView();
+  buildWorldsView();
+  buildStoryView();
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function switchView(view, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+  document.getElementById(view + '-view').classList.add('active');
+  btn.classList.add('active');
+  currentView = view;
+  closePanel();
+}
+
+function toggleSidebar() {
+  sidebarExpanded = !sidebarExpanded;
+  document.getElementById('sidebar').classList.toggle('expanded', sidebarExpanded);
+  const icon = document.querySelector('.sidebar-toggle svg path');
+  icon.setAttribute('d', sidebarExpanded ? 'M9 3l-4 4 4 4' : 'M5 3l4 4-4 4');
+}
+
+function refreshIndex() {
+  document.getElementById('loading-screen').style.display = 'flex';
+  if (network) { network.destroy(); network = null; }
+  setTimeout(boot, 50);
+}
+
+// ─── Role Colors ───────────────────────────────────────────────────────────────
+const ROLE_COLORS = {
+  'protagonist': '#7b9cf0',
+  'antagonist':  '#e07070',
+  'mentor':      '#b07be0',
+  'rival':       '#e0a86b',
+  'supporting':  '#6bbfb0',
+  'entity':      '#e06b9b',
+};
+
+function roleColor(role) {
+  if (!role) return '#8a8a8a';
+  const r = role.toLowerCase();
+  for (const [key, val] of Object.entries(ROLE_COLORS)) {
+    if (r.includes(key)) return val;
+  }
+  return '#8a8a8a';
+}
+
+function getRoleKey(role) {
+  if (!role) return 'other';
+  const r = role.toLowerCase();
+  for (const key of Object.keys(ROLE_COLORS)) {
+    if (r.includes(key)) return key;
+  }
+  return 'other';
+}
+
+// ─── Graph View ────────────────────────────────────────────────────────────────
+function buildGraphView() {
+  const chars = story.characters || [];
+  document.getElementById('graph-subtitle').textContent = chars.length + ' characters';
+
+  const fgColor = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#e8e8e8';
+  const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim() || '#8a8a8a';
+
+  const nodes = new vis.DataSet(chars.map(c => {
+    const role = c.role || c.story_role || '';
+    const col = roleColor(role);
+    return {
+      id: c.id,
+      label: c.name,
+      color: {
+        background: col + '22',
+        border: col,
+        highlight: { background: col + '44', border: col },
+        hover: { background: col + '33', border: col }
+      },
+      font: { color: fgColor, size: 12, face: 'inherit' },
+      borderWidth: 1.5,
+      borderWidthSelected: 2,
+      size: 22,
+      shape: 'dot',
+      title: role
+    };
+  }));
+
+  const edges = [];
+  const seen = new Set();
+  chars.forEach(c => {
+    (c.related || []).forEach(rel => {
+      if (!rel.id) return;
+      const key = [c.id, rel.id].sort().join('|');
+      if (!seen.has(key)) {
+        seen.add(key);
+        edges.push({
+          from: c.id,
+          to: rel.id,
+          label: rel.label || '',
+          color: { color: 'rgba(255,255,255,0.15)', highlight: 'rgba(255,255,255,0.4)' },
+          font: { color: mutedColor, size: 9, align: 'middle', strokeWidth: 0 },
+          width: 1,
+          smooth: { type: 'curvedCW', roundness: 0.2 }
+        });
+      }
+    });
+  });
+
+  const edgeDataSet = new vis.DataSet(edges);
+  const container = document.getElementById('network-canvas');
+
+  const options = {
+    nodes: { borderWidthSelected: 2 },
+    edges: { arrows: { to: { enabled: true, scaleFactor: 0.5 } } },
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.01, springLength: 120, springConstant: 0.08, damping: 0.4 }
+    },
+    interaction: { hover: true, tooltipDelay: 200, hideEdgesOnDrag: false },
+    layout: { randomSeed: 42 }
+  };
+
+  network = new vis.Network(container, { nodes, edges: edgeDataSet }, options);
+
+  network.on('click', params => {
+    if (params.nodes.length > 0) {
+      const charId = params.nodes[0];
+      const char = chars.find(c => c.id === charId);
+      if (char) showCharacterPanel(char);
+    }
+  });
+
+  // Legend
+  const legend = document.getElementById('graph-legend');
+  const seen_roles = new Set();
+  chars.forEach(c => seen_roles.add(getRoleKey(c.role)));
+  legend.innerHTML = [...seen_roles].map(role => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${ROLE_COLORS[role] || '#8a8a8a'}"></div>
+      <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>
+    </div>
+  `).join('');
+}
+
+function resetGraphLayout() {
+  if (network) {
+    network.setOptions({ physics: { enabled: true } });
+    setTimeout(() => network.setOptions({ physics: { enabled: false } }), 3000);
+  }
+}
+
+// ─── Scenes View ───────────────────────────────────────────────────────────────
+let allScenes = [];
+
+function buildScenesView() {
+  allScenes = story.scenes || [];
+  document.getElementById('scenes-subtitle').textContent = allScenes.length + ' scenes';
+  renderSceneList(allScenes);
+}
+
+// Helper: find location by id OR by heading string (backend sometimes uses headings)
+function findLocation(ref) {
+  return (story.locations || []).find(l =>
+    l.id === ref || l.id === String(ref) ||
+    (l._scene_headings || []).includes(ref) ||
+    l.name === ref
+  );
+}
+
+function renderSceneList(scenes) {
+  const list = document.getElementById('scene-list');
+  if (!scenes.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No scenes yet</div><div class="empty-state-sub">Scenes will appear here once added to the index.</div></div>';
+    return;
+  }
+  list.innerHTML = scenes.map((s, i) => {
+    const charTags = (s.characters || []).map(cid => {
+      const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+      return c ? `<span class="tag tag-char">${c.name}</span>` : '';
+    }).join('');
+    const locTags = (s.locations || []).map(lref => {
+      const l = findLocation(lref);
+      return l ? `<span class="tag tag-location">${l.name}</span>` : '';
+    }).join('');
+    const plotTags = (s.plots || []).map(pid => {
+      const p = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
+      return p ? `<span class="tag tag-plot">${p.name}</span>` : '';
+    }).join('');
+    const sceneNum = s.scene_number != null ? String(s.scene_number) : String(i + 1).padStart(2, '0');
+    return `
+      <div class="scene-item" data-id="${s.id}" onclick="showScenePanel('${s.id}')">
+        <div class="scene-number">${sceneNum}</div>
+        <div class="scene-body">
+          <div class="scene-heading">${s.heading || s.id}</div>
+          <div class="scene-meta">${charTags}${locTags}${plotTags}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterScenes(query) {
+  if (!query.trim()) { renderSceneList(allScenes); return; }
+  const q = query.toLowerCase();
+  const filtered = allScenes.filter(s => {
+    if ((s.heading || '').toLowerCase().includes(q)) return true;
+    if ((s.characters || []).some(cid => {
+      const c = (story.characters || []).find(x => x.id === cid);
+      return c && c.name.toLowerCase().includes(q);
+    })) return true;
+    if ((s.locations || []).some(lid => {
+      const l = (story.locations || []).find(x => x.id === lid);
+      return l && l.name.toLowerCase().includes(q);
+    })) return true;
+    return false;
+  });
+  renderSceneList(filtered);
+}
+
+// ─── Locations View ────────────────────────────────────────────────────────────
+function buildLocationsView() {
+  const locs = story.locations || [];
+  document.getElementById('locations-subtitle').textContent = locs.length + ' locations';
+  const list = document.getElementById('location-list');
+  if (!locs.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No locations</div></div>';
+    return;
+  }
+  list.innerHTML = locs.map(l => {
+    const sceneHeadings = (l._scene_headings || l.scenes || []);
+    const sceneTags = sceneHeadings.slice(0, 4).map(h =>
+      `<span class="tag tag-scene">${h}</span>`
+    ).join('');
+    return `
+      <div class="entity-card" data-id="${l.id}" onclick="showLocationPanel('${l.id}')">
+        <div class="entity-card-pip" style="background:#6bbfb0"></div>
+        <div class="entity-card-body">
+          <div class="entity-card-name">${l.name}</div>
+          <div class="entity-card-sub">${l.one_sentence || ''}</div>
+          ${sceneTags ? `<div class="entity-card-meta">${sceneTags}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Plots View ────────────────────────────────────────────────────────────────
+function buildPlotsView() {
+  const plots = story.plots || [];
+  document.getElementById('plots-subtitle').textContent = plots.length + ' threads';
+  const list = document.getElementById('plot-list');
+  if (!plots.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No plots</div></div>';
+    return;
+  }
+  list.innerHTML = plots.map(pl => {
+    const charTags = (pl.characters || []).map(cid => {
+      const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+      return c ? `<span class="tag tag-char">${c.name}</span>` : '';
+    }).join('');
+    return `
+      <div class="entity-card" data-id="${pl.id}" onclick="showPlotPanel('${pl.id}')">
+        <div class="entity-card-pip" style="background:#b07be0"></div>
+        <div class="entity-card-body">
+          <div class="entity-card-name" style="display:flex;align-items:center;gap:8px;">
+            ${pl.name}
+            <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
+          </div>
+          <div class="entity-card-sub">${pl.one_sentence || ''}</div>
+          ${charTags ? `<div class="entity-card-meta">${charTags}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Worlds View ───────────────────────────────────────────────────────────────
+function buildWorldsView() {
+  const worlds = story.worlds || [];
+  document.getElementById('worlds-subtitle').textContent = worlds.length + ' world' + (worlds.length !== 1 ? 's' : '');
+  const list = document.getElementById('world-list');
+  if (!worlds.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No worlds defined</div><div class="empty-state-sub">Add worlds to index.yaml to see them here.</div></div>';
+    return;
+  }
+  list.innerHTML = worlds.map(w => {
+    const ruleCount = (w.rules || []).length;
+    return `
+      <div class="entity-card" data-id="${w.id}" onclick="showWorldPanel('${w.id}')">
+        <div class="entity-card-pip" style="background:#e0a86b"></div>
+        <div class="entity-card-body">
+          <div class="entity-card-name">${w.name}</div>
+          <div class="entity-card-sub">${w.one_sentence || ''}</div>
+          ${ruleCount ? `<div class="entity-card-meta"><span class="tag tag-plot">${ruleCount} rule${ruleCount !== 1 ? 's' : ''}</span></div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Story View ────────────────────────────────────────────────────────────────
+function buildStoryView() {
+  const p = story.project || {};
+  const mem = story.story_memory || {};
+
+  document.getElementById('story-project-name').textContent = p.name || 'Story';
+  document.getElementById('story-subtitle').textContent = [p.genre, p.setting].filter(Boolean).join(' · ');
+
+  const body = document.getElementById('story-body');
+
+  // Project stats
+  const statsGrid = [
+    { v: p.scene_count     || (story.scenes     || []).length, l: 'Scenes' },
+    { v: p.character_count || (story.characters || []).length, l: 'Characters' },
+    { v: p.location_count  || (story.locations  || []).length || null, l: 'Locations' },
+    { v: p.world_count     || (story.worlds     || []).length || null, l: 'Worlds' },
+    { v: p.plot_count      || (story.plots      || []).length || null, l: 'Plots' },
+  ].filter(s => s.v != null && s.v > 0);
+
+  const statsHtml = `
+    <div>
+      <div class="story-section-title">Project</div>
+      <div class="project-card">
+        <div class="project-logline">${p.logline || ''}</div>
+        ${statsGrid.map(s => `<div class="project-stat"><div class="project-stat-value">${s.v}</div><div class="project-stat-label">${s.l}</div></div>`).join('')}
+      </div>
+    </div>`;
+
+  // Plots
+  const plots = story.plots || [];
+  const plotsHtml = plots.length ? `
+    <div>
+      <div class="story-section-title">Active plot threads</div>
+      <div class="plot-list">
+        ${plots.map(pl => `
+          <div class="plot-item" onclick="showPlotPanel('${pl.id}')">
+            <div class="plot-header">
+              <span class="plot-name">${pl.name}</span>
+              <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
+            </div>
+            <div class="plot-sentence">${pl.one_sentence || ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : '';
+
+  // Continuity risks
+  const risks = mem.continuity_risks || [];
+  const risksHtml = risks.length ? `
+    <div>
+      <div class="story-section-title">Continuity risks</div>
+      <div class="risk-list">
+        ${risks.map(r => `<div class="risk-item">${r}</div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // Hermes ask button
+  const hermesHtml = p.name ? `
+    <div style="padding-top:4px;">
+      <button class="btn btn-hermes" data-hermes-send="Give me an overview of ${p.name}.">Ask Hermes about this story</button>
+    </div>` : '';
+
+  body.innerHTML = statsHtml + plotsHtml + risksHtml + hermesHtml;
+}
+
+// ─── Detail Panel ──────────────────────────────────────────────────────────────
+function openPanel() { document.getElementById('detail-panel').classList.add('open'); }
+function closePanel() { document.getElementById('detail-panel').classList.remove('open'); }
+
+function showCharacterPanel(char) {
+  if (!char) return;
+  document.getElementById('panel-type').textContent = char.role || char.story_role || 'Character';
+  document.getElementById('panel-name').textContent = char.name;
+
+  // Scenes: char.scenes is normalised to an array of scene ids (strings)
+  const scenes = (char.scenes || []).map(sid => {
+    const s = (story.scenes || []).find(x => String(x.id) === String(sid));
+    return s
+      ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>`
+      : (sid ? `<span class="tag tag-scene">${sid}</span>` : '');
+  }).filter(Boolean).join('');
+
+  // Relationships: use related[] which normaliser mapped from relationships[]
+  const rels = (char.related || []).map(rel => {
+    const c = (story.characters || []).find(x => x.id === rel.id || String(x.id) === String(rel.id));
+    const nameEl = c
+      ? `<button class="relationship-name entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))">${c.name}</button>`
+      : `<span class="relationship-name">${rel.id}</span>`;
+    return `
+      <div class="relationship-row">
+        ${nameEl}
+        ${rel.label ? `<span class="relationship-label">${rel.label}</span>` : ''}
+        ${rel.feeling ? `<span class="relationship-feeling">— ${rel.feeling}</span>` : ''}
+      </div>`;
+  }).join('');
+
+  // Knowledge: may be array (_knowledge_arr) or string
+  const knowledgeArr = char._knowledge_arr || (char.knowledge ? [char.knowledge] : []);
+  const knowledgeHtml = knowledgeArr.length
+    ? knowledgeArr.map(k => `<div class="knowledge-item">${k}</div>`).join('')
+    : '';
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">In one sentence</div>
+      <div class="panel-text">${char.one_sentence || '—'}</div>
+    </div>
+    ${char.age ? `<div><div class="panel-section-title">Age</div><div class="panel-muted">${char.age}</div></div>` : ''}
+    ${char.goals_short ? `<div>
+      <div class="panel-section-title">Immediate goal</div>
+      <div class="panel-text">${char.goals_short}</div>
+    </div>` : ''}
+    ${char.goals_long ? `<div>
+      <div class="panel-section-title">Deeper goal</div>
+      <div class="panel-muted">${char.goals_long}</div>
+    </div>` : ''}
+    ${knowledgeHtml ? `<div>
+      <div class="panel-section-title">What they know</div>
+      ${knowledgeHtml}
+    </div>` : ''}
+    ${scenes ? `<div>
+      <div class="panel-section-title">Appears in</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+    ${rels ? `<div>
+      <div class="panel-section-title">Relationships</div>
+      ${rels}
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Tell me more about ${char.name}'s character development.">Ask Hermes about ${char.name}</button>
+  `;
+
+  openPanel();
+
+  if (network) {
+    network.selectNodes([char.id]);
+    network.focus(char.id, { scale: 1.2, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+  }
+}
+
+function showScenePanel(sceneId) {
+  const scene = (story.scenes || []).find(s => String(s.id) === String(sceneId));
+  if (!scene) return;
+
+  document.querySelectorAll('.scene-item').forEach(el => el.classList.remove('selected'));
+  const sceneEl = document.querySelector(`.scene-item[data-id="${sceneId}"]`);
+  if (sceneEl) sceneEl.classList.add('selected');
+
+  document.getElementById('panel-type').textContent = 'Scene';
+  document.getElementById('panel-name').textContent = scene.heading || scene.id;
+
+  const chars = (scene.characters || []).map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c
+      ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>`
+      : '';
+  }).filter(Boolean).join('');
+
+  const locs = (scene.locations || []).map(lref => {
+    const l = findLocation(lref);
+    return l ? `<button class="entity-link" onclick="showLocationPanel('${l.id}')">${l.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  // Plots: scene.plots may be empty (backend doesn't always populate from scene side)
+  // Also check reverse: which plots reference this scene's heading
+  let plotRefs = (scene.plots || []);
+  if (!plotRefs.length) {
+    const h = scene.heading || '';
+    plotRefs = (story.plots || [])
+      .filter(pl =>
+        (pl._setup_objs || []).some(su => su.scene === h) ||
+        (pl._payoff_objs || []).some(pa => pa.scene === h) ||
+        (pl.characters || []).some(cid =>
+          (scene.characters || []).includes(cid)
+        )
+      )
+      .map(pl => pl.id);
+  }
+  const plots = plotRefs.map(pid => {
+    const pl = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
+    return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${locs ? `<div>
+      <div class="panel-section-title">Location</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${locs}</div>
+    </div>` : ''}
+    ${plots ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plots}</div>
+    </div>` : ''}
+    <div>
+      <div class="panel-section-title">Scene content</div>
+      <div id="scene-content-area" class="panel-muted">Loading from screenplay.md…</div>
+    </div>
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="What happens in ${scene.heading || scene.id}?">Ask Hermes about this scene</button>
+  `;
+
+  openPanel();
+  loadSceneContent(scene);
+}
+
+// Cached screenplay text
+let _screenplayText = null;
+let _screenplayLoaded = false;
+
+async function loadSceneContent(scene) {
+  const area = document.getElementById('scene-content-area');
+  if (!area) return;
+
+  try {
+    if (!_screenplayLoaded) {
+      const res = await fetch('screenplay.md');
+      _screenplayLoaded = true;
+      if (!res.ok) throw new Error('not found');
+      _screenplayText = await res.text();
+    }
+    if (!_screenplayText) throw new Error('empty');
+
+    const heading = (scene.heading || '').trim();
+    const content = extractFountainScene(_screenplayText, heading);
+
+    if (content) {
+      area.innerHTML = '';
+      area.className = '';
+      const pre = document.createElement('pre');
+      pre.className = 'fountain-content';
+      pre.textContent = content;
+      area.appendChild(pre);
+    } else {
+      area.className = 'panel-muted';
+      area.textContent = 'Scene not found in screenplay.md.';
+    }
+  } catch(e) {
+    area.className = 'panel-muted';
+    area.textContent = 'screenplay.md not found — place it in the same directory as this file.';
+  }
+}
+
+// Extract scene from Fountain-format text.
+// Fountain scene headings: lines starting with INT./EXT./INT-EXT. etc., all caps
+function extractFountainScene(text, heading) {
+  const lines = text.split('\n');
+  const headingNorm = heading.toUpperCase().trim();
+
+  // Find starting line: exact match or partial match on the scene slug
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim().toUpperCase();
+    if (line === headingNorm || line.startsWith(headingNorm) || headingNorm.startsWith(line.replace(/\s*-\s*\w+\s*$/, ''))) {
+      startIdx = i;
+      break;
+    }
+    // also match if the line IS a scene heading and the scene id/heading matches
+    if (isFountainSceneHeading(lines[i].trim()) && line.includes(headingNorm.replace(/^(INT|EXT)\.?\s*/i, ''))) {
+      startIdx = i;
+      break;
+    }
+  }
+
+  if (startIdx === -1) return null;
+
+  // Collect lines until next scene heading or end
+  const result = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    if (i > startIdx && isFountainSceneHeading(lines[i].trim())) break;
+    result.push(lines[i]);
+    if (result.length > 80) { result.push('…'); break; } // cap at ~80 lines
+  }
+  return result.join('\n').trim();
+}
+
+function isFountainSceneHeading(line) {
+  return /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(line) && line === line.toUpperCase();
+}
+
+function showLocationPanel(locId) {
+  // Deselect all entity cards, select the one clicked
+  document.querySelectorAll('#location-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#location-list .entity-card[data-id="${locId}"]`);
+  if (card) card.classList.add('selected');
+
+  const loc = (story.locations || []).find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('panel-type').textContent = 'Location';
+  document.getElementById('panel-name').textContent = loc.name;
+
+  // Backend gives loc.scenes as heading strings; find scene objects by heading
+  const sceneRefs = loc._scene_headings || loc.scenes || [];
+  const scenes = sceneRefs.map(ref => {
+    const s = (story.scenes || []).find(x =>
+      x.heading === ref || String(x.id) === String(ref)
+    );
+    return s
+      ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>`
+      : `<span class="tag tag-scene">${ref}</span>`;
+  }).join('');
+
+  // Characters in this location (via their scenes)
+  const charIds = new Set();
+  sceneRefs.forEach(ref => {
+    const s = (story.scenes || []).find(x => x.heading === ref || String(x.id) === String(ref));
+    if (s) (s.characters || []).forEach(cid => charIds.add(cid));
+  });
+  const charLinks = [...charIds].map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  // World rules relevant to this location (from worlds array)
+  const sections = (loc.sections || []).join(', ');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Description</div>
+      <div class="panel-text">${loc.one_sentence || '—'}</div>
+    </div>
+    ${sections ? `<div><div class="panel-section-title">Sections</div><div class="panel-muted">${sections}</div></div>` : ''}
+    ${charLinks ? `<div>
+      <div class="panel-section-title">Characters here</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
+    </div>` : ''}
+    ${scenes ? `<div>
+      <div class="panel-section-title">Scenes set here</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Describe ${loc.name} and its role in the story.">Ask Hermes about this location</button>
+  `;
+
+  openPanel();
+}
+
+function showPlotPanel(plotId) {
+  document.querySelectorAll('#plot-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#plot-list .entity-card[data-id="${plotId}"]`);
+  if (card) card.classList.add('selected');
+
+  const plot = (story.plots || []).find(p => p.id === plotId || String(p.id) === String(plotId));
+  if (!plot) return;
+
+  document.getElementById('panel-type').textContent = 'Plot thread';
+  document.getElementById('panel-name').textContent = plot.name;
+
+  const chars = (plot.characters || []).map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c
+      ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>`
+      : '';
+  }).filter(Boolean).join('');
+
+  // Setups/payoffs: may be string[] (old) or [{scene, description}] (new schema)
+  function renderBeats(arr) {
+    if (!arr || !arr.length) return '';
+    return arr.map(item => {
+      if (typeof item === 'string') {
+        return `<div class="beat-row">${item}</div>`;
+      }
+      // object: {scene, description}
+      const sceneObj = (story.scenes || []).find(s => s.heading === item.scene || String(s.id) === String(item.scene));
+      const sceneLink = sceneObj
+        ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${item.scene}</span>`
+        : (item.scene ? `<span class="beat-scene">${item.scene}</span>` : '');
+      return `<div class="beat-row">${sceneLink}${item.description ? `<span>${item.description}</span>` : ''}</div>`;
+    }).join('');
+  }
+
+  const setupObjs = plot._setup_objs || plot.setups || [];
+  const payoffObjs = plot._payoff_objs || plot.payoffs || [];
+  const setupsHtml = renderBeats(setupObjs);
+  const payoffsHtml = renderBeats(payoffObjs);
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Thread</div>
+      <div class="panel-text">${plot.one_sentence || '—'}</div>
+    </div>
+    <div><span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span></div>
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters involved</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${setupsHtml ? `<div>
+      <div class="panel-section-title">Setups</div>
+      ${setupsHtml}
+    </div>` : ''}
+    ${payoffsHtml ? `<div>
+      <div class="panel-section-title">Payoffs</div>
+      ${payoffsHtml}
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  openPanel();
+}
+
+function showWorldPanel(worldId) {
+  document.querySelectorAll('#world-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#world-list .entity-card[data-id="${worldId}"]`);
+  if (card) card.classList.add('selected');
+
+  const world = (story.worlds || []).find(w => w.id === worldId);
+  if (!world) return;
+
+  document.getElementById('panel-type').textContent = 'World';
+  document.getElementById('panel-name').textContent = world.name;
+
+  const rules = (world.rules || []).map(r =>
+    `<div class="world-rule">${r}</div>`
+  ).join('');
+
+  const sections = (world.sections || []).join(', ');
+
+  // Plots in this world
+  const worldPlots = (story.plots || []).filter(pl =>
+    (pl.worlds || []).includes(worldId) ||
+    (pl.world === worldId)
+  );
+  const plotLinks = worldPlots.map(pl =>
+    `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>`
+  ).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Setting</div>
+      <div class="panel-text">${world.one_sentence || '—'}</div>
+    </div>
+    ${sections ? `<div><div class="panel-section-title">Sections</div><div class="panel-muted">${sections}</div></div>` : ''}
+    ${rules ? `<div>
+      <div class="panel-section-title">Rules</div>
+      ${rules}
+    </div>` : ''}
+    ${plotLinks ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plotLinks}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  openPanel();
+}
+
+// ─── Start ─────────────────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>

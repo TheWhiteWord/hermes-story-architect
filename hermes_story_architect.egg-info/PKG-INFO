@@ -1,3 +1,17 @@
+Metadata-Version: 2.4
+Name: hermes-story-architect
+Version: 0.1.0
+Summary: Story-writing environment for Hermes Desktop
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: rapidfuzz>=3.0
+Requires-Dist: python-frontmatter>=1.0
+Requires-Dist: screenplay-tools>=0.0.10
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+
 # Hermes Story Architect
 
 > A story-writing environment for Hermes Desktop, architecturally inspired by [Story Architect](https://github.com/story-apps/starc) (STARC).

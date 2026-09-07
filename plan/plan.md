@@ -1,6 +1,24 @@
-# Hermes Story Architect — Plan (v4)
+# Hermes Story Architect — Plan (v6)
 
-> **Goal**: Build a story-writing environment inside Hermes Desktop, architecturally inspired by [Story Architect](https://github.com/story-apps/starc) (STARC). Story projects live as Markdown + YAML frontmatter in the vault. Hermes provides the intelligence layer with **section-level targeted retrieval**. The preview pane provides interactive navigation.
+> **Goal**: Build a story-writing environment as a standalone Hermes plugin. Story projects live as Markdown + YAML frontmatter in a dedicated vault. Hermes provides the intelligence layer with **section-level targeted retrieval**. The preview pane provides interactive navigation.
+
+---
+
+## Plugin Architecture
+
+**Standalone plugin** — registers its own tools, manages its own vault. No dependency on obsidian-vault plugin.
+
+- Vault: `~/story-vault/` (configurable)
+- Tools: `story_load`, `story_retrieve`, `story_edit`, `story_create`, `story_index`, `story_search`
+- Config: Hermes plugin config
+- No grants, no roles — single-user plugin
+
+**Concepts borrowed** (ideas, not code):
+- Three-stage retrieval (index → target → load)
+- Frontmatter → body mapping
+- Standard `##` sections for targeting
+- Always-loaded project index
+- Zero-dependency regex section parser
 
 ---
 
@@ -97,29 +115,29 @@ Stage 3: Content loading
 ## Stage 1: Schema & Conventions
 
 ### Vault structure for a story project
+
 ```
-work/creative/projects/<project-slug>/
-├── project.md                  # Project metadata
-├── title-page.md
-├── synopsis.md
-├── treatment.md                # Ordered outline, one paragraph per beat
-├── screenplay.md               # Fountain syntax
-├── characters/
-│   ├── mara.md
-│   ├── detective-oak.md
-│   └── _index.md               # Auto-generated character list
-├── locations/
-│   ├── kitchen.md
-│   └── _index.md
-├── worlds/
-│   ├── gilead.md
-│   └── _index.md
-├── plots/
-│   └── main-plot.md
-└── .story/
-    ├── index.yaml              # Project graph (always-loaded)
-    ├── memory.md               # Story Memory (continuity map)
-    └── history.md              # Edit history (gitignored)
+~/story-vault/
+├── .story/
+│   ├── index.yaml                      # Project graph (always-loaded)
+│   ├── memory.md                       # Story Memory (continuity map)
+│   └── history.md                      # Edit history (gitignored)
+└── projects/
+    └── <project-slug>/
+        ├── project.md                  # Project metadata
+        ├── title-page.md
+        ├── synopsis.md
+        ├── treatment.md                # Ordered outline, one paragraph per beat
+        ├── screenplay.md               # Fountain syntax
+        ├── characters/
+        │   ├── mara.md
+        │   └── detective-oak.md
+        ├── locations/
+        │   └── kitchen.md
+        ├── worlds/
+        │   └── gilead.md
+        └── plots/
+            └── main-plot.md
 ```
 
 ### Frontmatter Schemas
@@ -166,6 +184,8 @@ accident she believes was murder.
 
 ## Voice
 Precise, clinical. Rarely uses contractions. Avoids eye contact when lying.
+Speaks in short sentences under stress. Uses accounting metaphors in 
+emotional conversations (unconscious tell).
 
 ## Greatest Fear
 That she's complicit in the system she serves.
@@ -280,6 +300,8 @@ If Mara fails, the cartel keeps laundering. Daniel's death stays unsolved.
 ```
 
 ### The Project Index (`.story/index.yaml`)
+
+The index maintains **basic visibility** — enough to navigate the project, answer simple queries, and target retrieval without loading content.
 
 ```yaml
 project:
@@ -418,86 +440,43 @@ When the user makes a query:
 
 ### Section Parser
 
-We use a **pluggable parser interface** with two implementations:
+Zero-dependency regex section parser:
 
-```python
-class MarkdownParser:
-    """Abstract interface for section-level Markdown parsing."""
-    def list_sections(self, content: str) -> list[str]: ...
-    def get_section(self, content: str, section: str) -> str: ...
-    def replace_section(self, content: str, section: str, new_body: str) -> str: ...
-```
-
-**Default: RegexParser** (zero dependencies):
 ```python
 import re
 
 SECTION_RE = re.compile(r'^(##\s+.+)$', flags=re.MULTILINE)
 
-class RegexParser(MarkdownParser):
-    def list_sections(self, content: str) -> list[str]:
-        return SECTION_RE.findall(content)
-    
-    def get_section(self, content: str, section: str) -> str:
-        parts = SECTION_RE.split(content)
-        for i in range(1, len(parts), 2):
-            heading = parts[i].strip().lstrip('#').strip()
-            body_text = parts[i + 1].strip() if i + 1 < len(parts) else ""
-            if heading.lower() == section.lower():
-                return f"## {heading}\n{body_text}"
-        return ""
-    
-    def replace_section(self, content: str, section: str, new_body: str) -> str:
-        parts = SECTION_RE.split(content)
-        for i in range(1, len(parts), 2):
-            heading = parts[i].strip().lstrip('#').strip()
-            if heading.lower() == section.level():
-                parts[i + 1] = '\n\n' + new_body
-                return ''.join(parts)
-        return content
+def list_sections(content: str) -> list[str]:
+    return SECTION_RE.findall(content)
+
+def get_section(content: str, section: str) -> str:
+    parts = SECTION_RE.split(content)
+    for i in range(1, len(parts), 2):
+        heading = parts[i].strip().lstrip('#').strip()
+        body_text = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        if heading.lower() == section.lower():
+            return f"## {heading}\n{body_text}"
+    return ""
+
+def replace_section(content: str, section: str, new_body: str) -> str:
+    parts = SECTION_RE.split(content)
+    for i in range(1, len(parts), 2):
+        heading = parts[i].strip().lstrip('#').strip()
+        if heading.lower() == section.lower():
+            parts[i + 1] = '\n\n' + new_body
+            return ''.join(parts)
+    return content
 ```
 
-**Optional: MarktripyParser** (round-trip AST editing):
-```python
-from marktripy import parse_markdown, render_markdown
-
-class MarktripyParser(MarkdownParser):
-    def list_sections(self, content: str) -> list[str]:
-        ast = parse_markdown(content)
-        return [node.get_text() for node in ast.walk() if node.type == "heading"]
-    
-    def get_section(self, content: str, section: str) -> str:
-        ast = parse_markdown(content)
-        # Find heading node, collect content until next heading
-        ...
-    
-    def replace_section(self, content: str, section: str, new_body: str) -> str:
-        ast = parse_markdown(content)
-        # Find heading node, replace content
-        return render_markdown(ast)
-```
-
-**Configuration** (in `config.yaml`):
-```yaml
-markdown_parser: regex  # or "marktripy"
-```
-
-**Why regex as default:**
-- Our notes are structured and predictable (we control the format)
-- Zero dependencies
-- Simple, fast, easy to debug
-- Edge cases (headings in code blocks, nested lists) won't happen by convention
-
-**Why marktripy as optional:**
-- Robust against all Markdown edge cases
-- Round-trip: parse → modify → render without losing formatting
-- Future-proof for complex manipulation
-- Adds dependency (markdown-it-py, mistletoe transitive) — only if needed
-
-### Actions (from STARC Action Protocol V3, simplified)
+### Actions
 
 | Action | What it does | Target |
 |--------|-------------|--------|
+| `edit_note` | Edit any project/character/location/world/plot note | note path |
+| `edit_screenplay` | Add/replace/delete screenplay content | scene range |
+| `create_entity` | Add a new character/location/world/plot | entity type |
+| `delete_entity` | Move entity to `_recycle-bin/` | entity id |
 | `answer` | Conversational response, no edit | — |
 | `suggest_ideas` | Brainstorm possibilities, no edit | — |
 | `insert_screenplay` | Add new scene/paragraphs | `cursor`, `beginning`, `end` |
@@ -520,7 +499,7 @@ markdown_parser: regex  # or "marktripy"
    - The action type and target
    - The content (Fountain for screenplay, YAML fields for characters)
    - A summary of what it does
-   - Continuity checks (impact, conflicts)
+   - Continuity checks (conflicts + notes)
 4. Hermes shows the proposal in chat
 5. User approves or rejects
 6. On approval, the skill applies the edit to the vault file
@@ -529,9 +508,6 @@ markdown_parser: regex  # or "marktripy"
 ### Safety
 - No edit is applied without explicit approval
 - Character removal → move to `_recycle-bin/` folder, don't delete screenplay prose
-- Character merge → snapshot before merge, allow rollback
-- Stale protection: if the file changed since the proposal, re-read before applying
-- Transaction log for multi-step edits: before a merge, write intended operations to `.story/transaction-log.json`. If Hermes crashes mid-merge, the log can be replayed or rolled back.
 
 **Output**: `skills/story-editor/SKILL.md` + `skills/story-editor/scripts/`
 
@@ -554,7 +530,7 @@ markdown_parser: regex  # or "marktripy"
 
 ### Technical
 - Single HTML file with embedded CSS/JS
-- vis-network (MIT/Apache 2.0) loaded from CDN or local static file
+- vis-network (MIT/Apache 2.0) loaded from CDN
 - Reads from `.story/index.yaml` for structure, vault for content
 - Updates when the project changes (manual refresh or file watcher)
 
@@ -562,104 +538,18 @@ markdown_parser: regex  # or "marktripy"
 
 ---
 
-## Stage 5: Writer's Room Mode (Optional)
+## Dependencies
 
-After a meaningful burst of writing + 45s quiet + 5min cooldown, Hermes offers a short advisory note:
-1. Strongest recent development
-2. One continuity or structural watchpoint
-3. One concrete possibility for the next turn
-
-Advisory only — no edits without approval.
-
----
-
-## Stage 6: Story Method Skills (Optional)
-
-Port from STARC's Codex fork:
-- `edit-story`: continuity, canon protection, voice preservation
-- `eric-edson-story-skill`: Hero Goal sequences, three-act tent poles, Stunning Surprises
-
----
-
-## Dependencies (Verified)
-
-### Core Dependencies
-
-| Library | Purpose | License | Status | API Verified |
-|---------|---------|---------|--------|--------------|
-| `screenplay-tools` | Fountain parse + write | MIT | v0.0.10, 22 stars, 142 commits | ✅ Parser, Writer, CallbackParser, FormatHelper |
-| `python-frontmatter` | YAML frontmatter | MIT | v1.3.0, 423 stars, healthy | ✅ load, dump, Post object |
-| `rapidfuzz` | Fuzzy name matching | MIT | 40% faster than FuzzyWuzzy | ✅ |
-| `vis-network` | Graph visualization | MIT/Apache 2.0 | v10.1.2, works offline | ✅ |
-
-### Optional / Not Needed
-
-| Library | Purpose | Status | Notes |
-|---------|---------|--------|-------|
-| `marktripy` | Markdown AST editing | **Optional** | Round-trip section editing. Exists (github.com/twardoch/marktripy, v1.0.3). Use if regex proves fragile. |
-| `screenplain` | Fountain export | Not needed yet | Export only |
-| `jouvence` | Fountain parse | Not needed | No writer, can't round-trip |
-| `mrkdwn_analysis` | Section extraction | Not needed | Regex is sufficient |
-
-### Final requirements.txt
-
-```
+```python
 rapidfuzz>=3.0
 python-frontmatter>=1.0
 screenplay-tools>=0.0.10
 ```
 
-vis-network is loaded via CDN/local in the HTML dashboard, not pip.
-
----
-
-## Answers to Open Questions
-
-### Q: Fountain syntax — strict subset or full Fountain?
-
-**Answer**: Full Fountain. `screenplay-tools` handles the full spec. Subsetting would mean fighting the parser.
-
-### Q: Relationships — frontmatter array or separate note?
-
-**Answer**: Frontmatter `relationships:` array. Keeps everything in one place, no separate file to maintain. The array is small (2-5 entries per character) and the body's `## Relationships` section provides the depth.
-
-### Q: Story Memory — auto-generated or manual?
-
-**Answer**: Auto-generated by Hermes after each edit. When Hermes applies an edit (e.g., new scene, character update), it also updates `.story/memory.md` with the relevant continuity findings. The writer can correct it later.
-
-### Q: Edit history — where to store?
-
-**Answer**: `.story/history.md` in the project folder, gitignored. Contains: timestamp, action type, target, summary, before/after excerpts, continuity findings. STARC stores in Qt settings (binary), but we don't have that. A file is portable and inspectable.
-
-### Q: Multi-project — how does Hermes know which is active?
-
-**Answer**: Active project is set in conversation context. "Load project the-water-audit" → Hermes remembers it for the session. Optional: a `.story/active-project` pointer file for persistence across sessions. Priority: conversation context > pointer file > ask user.
-
-### Q: Index staleness — auto-regenerate when?
-
-**Answer**: Auto-regenerate after every edit (the skill does it as part of the apply flow). Also regenerate on project load (to catch manual edits). Manual trigger: "reindex project" command.
-
-### Q: marktripy vs regex for section editing?
-
-**Answer**: Regex. `marktripy` doesn't appear to exist or is very obscure. Our regex parser handles section extraction and insertion cleanly. For round-trip editing (modify a section and write back), we use `python-frontmatter` for frontmatter + string replacement for body sections.
-
----
-
-## Architectural Reference: Obsidian StoryLine Plugin
-
-[StoryLine](https://github.com/PixeroJan/obsidian-storyline) is an open-source Obsidian plugin that provides similar functionality: scene boards, character management, plot grids, timeline. Written in TypeScript for Obsidian's API.
-
-**What we can learn from it**:
-- How it structures character/scene/plot relationships
-- How it renders interactive views in Obsidian's UI
-- How it handles project navigation
-
-**What we cannot use directly**:
-- It's an Obsidian plugin, not a Hermes skill
-- It uses Obsidian's API, not Hermes' preview pane
-- It's TypeScript, not Python
-
-**Action**: Review StoryLine's source code during Stage 4 (Dashboard) for UI/UX ideas.
+- `screenplay-tools`: Fountain parse + write (round-trip editing)
+- `python-frontmatter`: YAML frontmatter load/modify/dump
+- `rapidfuzz`: Fuzzy name matching (typo tolerance)
+- `vis-network`: Graph visualization, loaded via CDN in HTML dashboard (not pip)
 
 ---
 
@@ -670,15 +560,8 @@ vis-network is loaded via CDN/local in the HTML dashboard, not pip.
 3. ✅ Verify open-source dependencies (research report)
 4. ✅ Write `vault-conventions.md` (schemas + section retrieval + frontmatter→body mapping)
 5. ✅ Deep-dive dependency research (APIs, constraints, integration patterns)
-6. ⬜ Review StoryLine plugin source for dashboard ideas
-7. ⬜ Build the index generator script
-8. ⬜ Build the Story Loader skill
-9. ⬜ Build the Story Editor skill (Action Protocol)
-10. ⬜ Build the preview pane dashboard
-11. ⬜ Test with a real project
-
----
-
-## Open Questions (Remaining)
-
-None — all answered above.
+6. ⬜ Build the index generator script
+7. ⬜ Build the Story Loader skill
+8. ⬜ Build the Story Editor skill (Action Protocol)
+9. ⬜ Build the preview pane dashboard
+10. ⬜ Test with a real project
