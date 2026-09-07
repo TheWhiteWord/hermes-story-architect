@@ -23,12 +23,12 @@ def _requirements_met() -> bool:
 
 def register(ctx) -> None:
     """Register all Story Architect tools."""
-    from .tools.story_load import story_load
-    from .tools.story_retrieve import story_retrieve
-    from .tools.story_index import story_index
-    from .tools.story_search import story_search
-    from .tools.story_edit import story_edit
-    from .tools.story_create import story_create
+    from .tools import story_load
+    from .tools import story_retrieve
+    from .tools import story_index
+    from .tools import story_search
+    from .tools import story_edit
+    from .tools import story_create
 
     ctx.register_tool(
         name="story_load",
