@@ -1,3 +1,10 @@
+<!--
+  DEV BRANCH — HTML comments are preserved here for documentation.
+  BEFORE merging to master: strip all <!-- ... --> comments.
+  Hermes's plugin scanner flags HTML comments as injection (false positive on <!-- ... -->).
+  JS/CSS comments (// and /* */) are safe to keep.
+  Run to strip: sed -i 's/<!--[^>]*-->//g' src/dashboard/story-dashboard.html
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
