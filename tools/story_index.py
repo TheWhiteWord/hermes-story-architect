@@ -49,13 +49,6 @@ def handler(args: dict, **kwargs) -> str:
     if not memory_path.exists():
         memory_path.write_text("# Story Memory\n\n")
 
-    # Copy dashboard HTML to project folder
-    dashboard_src = Path(__file__).parent.parent / "src" / "dashboard" / "story-dashboard.html"
-    dashboard_dest = project_path / "story-dashboard.html"
-    if dashboard_src.exists() and not dashboard_dest.exists():
-        import shutil
-        shutil.copy2(dashboard_src, dashboard_dest)
-
     # Generate index
     index = generate_index(project_path)
 
