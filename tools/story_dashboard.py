@@ -1,6 +1,5 @@
 """story_dashboard tool — open project dashboard in preview pane."""
 import json
-import shutil
 from pathlib import Path
 
 SCHEMA = {
@@ -29,19 +28,14 @@ def handler(args: dict, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    # Source dashboard file
-    dashboard_src = Path(__file__).parent.parent / "src" / "dashboard" / "story-dashboard.html"
-    if not dashboard_src.exists():
-        return json.dumps({"error": "Dashboard file not found in plugin"})
-
-    # Copy to project folder
+    # Dashboard is auto-created by story_index
     dashboard_dest = project_path / "story-dashboard.html"
-    shutil.copy2(dashboard_src, dashboard_dest)
+    if not dashboard_dest.exists():
+        return json.dumps({"error": "Dashboard not found. Run story_index first."})
 
-    # Return the path for the preview tool
     return json.dumps({
         "success": True,
-        "message": f"Dashboard ready for {project}",
+        "message": f"Dashboard opened for {project}",
         "dashboard_url": f"file://{dashboard_dest}",
         "project": project
     })
