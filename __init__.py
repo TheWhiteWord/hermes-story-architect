@@ -2,6 +2,8 @@
 from pathlib import Path
 from hermes_constants import get_hermes_home
 
+_SKILL_DIR = Path(__file__).parent / "skills"
+
 
 def load_plugin_config() -> dict:
     """Load plugin config from Hermes config.yaml."""
@@ -22,7 +24,7 @@ def _requirements_met() -> bool:
 
 
 def register(ctx) -> None:
-    """Register all Story Architect tools."""
+    """Register all Story Architect tools and skills."""
     from .tools import story_load
     from .tools import story_retrieve
     from .tools import story_index
@@ -78,3 +80,9 @@ def register(ctx) -> None:
         check_fn=_requirements_met,
         emoji="➕",
     )
+
+    # Register skills
+    for child in _SKILL_DIR.iterdir():
+        skill_md = child / "SKILL.md"
+        if child.is_dir() and skill_md.exists():
+            ctx.register_skill(child.name, skill_md)
