@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Dashboard</title>
+
+<!-- vis-network from CDN (MIT/Apache 2.0) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Fallback tokens for standalone preview — Hermes will override */
+  --foreground: #e8e8e8;
+  --muted-foreground: #8a8a8a;
+  --accent: #7b9cf0;
+  --border: rgba(255,255,255,0.1);
+  --card: rgba(255,255,255,0.04);
+  --background: #111;
+
+  /* Internal tokens */
+  --sidebar-w: 44px;
+  --sidebar-w-open: 180px;
+  --panel-w: 320px;
+  --radius: 6px;
+  --gap: 12px;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 13px;
+  --font-size-lg: 15px;
+  --tag-gap: 4px;
+
+  --role-protagonist: #7b9cf0;
+  --role-antagonist: #e07070;
+  --role-mentor: #b07be0;
+  --role-rival: #e0a86b;
+  --role-supporting: #6bbfb0;
+  --role-entity: #e06b9b;
+
+  --status-active: #6bbfb0;
+  --status-building: #e0a86b;
+  --status-resolved: var(--muted-foreground);
+}
+
+html, body {
+  height: 100%;
+  background: transparent;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ─── Layout Shell ─────────────────────────────────────────── */
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ─── Sidebar ──────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--gap) 0;
+  gap: 2px;
+  transition: width 0.18s ease;
+  overflow: hidden;
+  background: var(--card);
+  z-index: 10;
+}
+
+#sidebar.expanded { width: var(--sidebar-w-open); }
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  border-radius: 0;
+  transition: color 0.12s, background 0.12s;
+  width: 100%;
+  text-align: left;
+}
+.nav-btn:hover { color: var(--foreground); background: var(--card); }
+.nav-btn.active { color: var(--accent); }
+.nav-btn .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.nav-label { opacity: 0; transition: opacity 0.1s; pointer-events: none; }
+#sidebar.expanded .nav-label { opacity: 1; pointer-events: auto; }
+
+.nav-separator { height: 1px; background: var(--border); margin: 6px 10px; flex-shrink: 0; }
+
+.sidebar-toggle {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+}
+.sidebar-toggle:hover { color: var(--foreground); }
+
+/* ─── Main Content ─────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.view { display: none; flex-direction: column; height: 100%; }
+.view.active { display: flex; }
+
+/* ─── View Header ──────────────────────────────────────────── */
+.view-header {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.view-title {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--foreground);
+}
+.view-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+}
+.view-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ─── Graph View ───────────────────────────────────────────── */
+#graph-view .view-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#network-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Scenes View ──────────────────────────────────────────── */
+#scenes-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+}
+
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scene-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+}
+.scene-item:hover { background: var(--card); border-color: var(--border); }
+.scene-item.selected { background: var(--card); border-color: var(--accent); }
+
+.scene-number {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+  min-width: 24px;
+  flex-shrink: 0;
+}
+.scene-body { flex: 1; min-width: 0; }
+.scene-heading {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scene-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* ─── Story View ───────────────────────────────────────────── */
+#story-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap) 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.story-section-title {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.project-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.project-stat {
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.project-stat-value {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--foreground);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.project-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.project-logline {
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  line-height: 1.6;
+  grid-column: 1 / -1;
+  font-style: italic;
+}
+
+.plot-list { display: flex; flex-direction: column; gap: 6px; }
+.plot-item {
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+.plot-item:hover { border-color: var(--accent); }
+.plot-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.plot-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--foreground); }
+.plot-sentence { font-size: var(--font-size-xs); color: var(--muted-foreground); line-height: 1.5; }
+
+.risk-list { display: flex; flex-direction: column; gap: 4px; }
+.risk-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: var(--card);
+  border-left: 2px solid #e07070;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+/* ─── Tags & Chips ─────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.tag-scene { background: rgba(123,156,240,0.12); color: var(--accent); }
+.tag-location { background: rgba(107,191,176,0.12); color: #6bbfb0; }
+.tag-plot { background: rgba(176,123,224,0.12); color: #b07be0; }
+.tag-char { background: rgba(107,191,176,0.1); color: var(--muted-foreground); border: 1px solid var(--border); }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.status-badge.active { color: var(--status-active); }
+.status-badge.active::before { background: var(--status-active); }
+.status-badge.building { color: var(--status-building); }
+.status-badge.building::before { background: var(--status-building); }
+
+/* ─── Buttons ──────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: opacity 0.1s, background 0.1s;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+}
+.btn:hover { color: var(--foreground); }
+.btn-primary {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-hermes {
+  border-color: rgba(123,156,240,0.3);
+  color: var(--accent);
+}
+.btn-hermes:hover { background: rgba(123,156,240,0.1); }
+
+/* ─── Detail Panel ─────────────────────────────────────────── */
+#detail-panel {
+  width: var(--panel-w);
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+}
+#detail-panel.open { transform: translateX(0); }
+
+.panel-header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.panel-title-block { flex: 1; min-width: 0; }
+.panel-entity-type {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  margin-bottom: 2px;
+}
+.panel-name {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-close {
+  background: none;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 2px;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.panel-close:hover { color: var(--foreground); }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-section-title {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.panel-text {
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  line-height: 1.6;
+}
+.panel-muted {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+
+.panel-tags { display: flex; flex-wrap: wrap; gap: var(--tag-gap); }
+
+.entity-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.1s, color 0.1s;
+}
+.entity-link:hover { border-color: var(--accent); color: var(--accent); }
+
+.panel-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.role-pip {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Loading & Empty States ───────────────────────────────── */
+#loading-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  background: transparent;
+}
+.loading-icon {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: var(--font-size-sm); color: var(--muted-foreground); }
+
+#error-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  padding: 32px;
+  text-align: center;
+}
+.error-title { font-size: var(--font-size-lg); font-weight: 500; color: var(--foreground); }
+.error-body { font-size: var(--font-size-sm); color: var(--muted-foreground); max-width: 280px; line-height: 1.6; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 6px;
+  text-align: center;
+}
+.empty-state-title { font-size: var(--font-size-base); color: var(--muted-foreground); }
+.empty-state-sub { font-size: var(--font-size-xs); color: var(--muted-foreground); opacity: 0.6; }
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ─── Search ───────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  height: 28px;
+  flex: 1;
+  max-width: 200px;
+}
+.search-bar input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--font-size-xs);
+}
+.search-bar input::placeholder { color: var(--muted-foreground); }
+
+/* ─── Narrow layout (≤520px) ───────────────────────────────── */
+@media (max-width: 520px) {
+  :root { --panel-w: 100%; }
+  .search-bar { display: none; }
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- Loading -->
+  <div id="loading-screen">
+    <div class="loading-icon"></div>
+    <div class="loading-text">Loading story index…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-screen">
+    <div class="error-title">No story index found</div>
+    <div class="error-body">
+      Place this file in your project root and make sure <code>.story/index.yaml</code> exists, or
+      use the button below to load a file manually.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-primary" onclick="loadFromFile()">Load index.yaml</button>
+      <button class="btn" onclick="loadSampleData()">Preview with sample data</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <button class="nav-btn active" data-view="graph" onclick="switchView('graph', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="2.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="2.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="6.5" x2="3.5" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10.5" y1="6.5" x2="12.5" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="9.5" x2="3.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10.5" y1="9.5" x2="12.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Characters</span>
+    </button>
+
+    <button class="nav-btn" data-view="scenes" onclick="switchView('scenes', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="5" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5" y1="8.5" x2="11" y2="8.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5" y1="11" x2="8.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Scenes</span>
+    </button>
+
+    <button class="nav-btn" data-view="story" onclick="switchView('story', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M3 8h10" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M8 3v5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Story</span>
+    </button>
+
+    <div class="nav-separator"></div>
+
+    <button class="nav-btn" onclick="refreshIndex()" title="Refresh index">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M13.5 2.5v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 8a6 6 0 0 1 10-4.47l1.5 2.97" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M2.5 13.5v-4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 8a6 6 0 0 1-10 4.47L2.5 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span class="nav-label">Refresh</span>
+    </button>
+
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </nav>
+
+  <!-- Main -->
+  <main id="main">
+
+    <!-- Graph View -->
+    <div class="view active" id="graph-view">
+      <div class="view-header">
+        <div class="view-title">Character web</div>
+        <div class="view-subtitle" id="graph-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="resetGraphLayout()" title="Reset layout">Reset</button>
+        </div>
+      </div>
+      <div class="view-body">
+        <div id="network-canvas"></div>
+        <div class="graph-legend" id="graph-legend"></div>
+      </div>
+    </div>
+
+    <!-- Scenes View -->
+    <div class="view" id="scenes-view">
+      <div class="view-header">
+        <div class="view-title">Scenes</div>
+        <div class="view-subtitle" id="scenes-subtitle">—</div>
+        <div class="view-header-actions">
+          <div class="search-bar">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><line x1="7" y1="7" x2="9" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <input type="text" placeholder="Filter scenes…" id="scene-search" oninput="filterScenes(this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="view-body">
+        <div class="scene-list" id="scene-list"></div>
+      </div>
+    </div>
+
+    <!-- Story View -->
+    <div class="view" id="story-view">
+      <div class="view-header">
+        <div class="view-title" id="story-project-name">Story</div>
+        <div class="view-subtitle" id="story-subtitle">—</div>
+      </div>
+      <div class="view-body" id="story-body"></div>
+    </div>
+
+  </main>
+
+  <!-- Detail Panel -->
+  <aside id="detail-panel">
+    <div class="panel-header">
+      <div class="panel-title-block">
+        <div class="panel-entity-type" id="panel-type">—</div>
+        <div class="panel-name" id="panel-name">—</div>
+      </div>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+    <div class="panel-footer" id="panel-footer"></div>
+  </aside>
+
+</div>
+
+<!-- Hidden file input for manual load -->
+<input type="file" id="file-input" accept=".yaml,.yml" style="display:none" onchange="handleFileLoad(this)">
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let story = null;
+let network = null;
+let sidebarExpanded = false;
+let currentView = 'graph';
+const INDEX_PATH = '.story/index.yaml';
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    const res = await fetch(INDEX_PATH);
+    if (!res.ok) throw new Error('not found');
+    const text = await res.text();
+    const data = jsyaml.load(text);
+    initStory(data);
+  } catch (e) {
+    showError();
+  }
+}
+
+function showError() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'flex';
+}
+
+function loadFromFile() {
+  document.getElementById('file-input').click();
+}
+
+function handleFileLoad(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = jsyaml.load(e.target.result);
+      document.getElementById('error-screen').style.display = 'none';
+      document.getElementById('loading-screen').style.display = 'flex';
+      initStory(data);
+    } catch(err) {
+      alert('Could not parse YAML: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function loadSampleData() {
+  const sample = {
+    project: { name: "The Fracture Line", logline: "A geologist discovers the fault beneath her city is alive — and hungry.", genre: "Literary Thriller", setting: "Pacific Northwest, near future", scene_count: 12, character_count: 5 },
+    characters: [
+      { id: "char_mara", name: "Mara Chen", role: "Protagonist", one_sentence: "A seismologist who begins hearing patterns in earthquake data that no instrument should be able to detect.", scenes: ["scene_01","scene_03","scene_05"], related: [{id:"char_eli",label:"mentor"},{id:"char_val",label:"rival"}], goals_short: "Warn the city before the quake hits.", goals_long: "Prove that geological systems have emergent consciousness.", knowledge: "Knows the fault is active. Doesn't know Eli has suppressed prior data." },
+      { id: "char_eli", name: "Eli Vasquez", role: "Mentor / Antagonist", one_sentence: "Mara's supervisor, who buried data from the last event twenty years ago to protect his career.", scenes: ["scene_02","scene_05"], related: [{id:"char_mara",label:"protégé"},{id:"char_jun",label:"colleague"}], goals_short: "Keep the old data buried.", goals_long: "Retire with his legacy intact.", knowledge: "Knows about the 2004 suppression. Suspects Mara is getting close." },
+      { id: "char_val", name: "Valentina Reyes", role: "Rival / Ally", one_sentence: "A journalist who has been tracking infrastructure failures for three years without knowing the cause.", scenes: ["scene_04","scene_07"], related: [{id:"char_mara",label:"reluctant ally"}], goals_short: "Break the story before the government buries it.", goals_long: "Expose institutional failure before another disaster.", knowledge: "Knows something big is being hidden. Doesn't know the geological angle." },
+      { id: "char_jun", name: "Jun Park", role: "Supporting", one_sentence: "A junior technician at the seismic monitoring station who idolizes Mara.", scenes: ["scene_01","scene_06"], related: [{id:"char_mara",label:"admirer"},{id:"char_eli",label:"employee"}], goals_short: "Do his job well and stay out of trouble.", knowledge: "Has noticed anomalies but hasn't connected them yet." },
+      { id: "char_rook", name: "The Rook", role: "Antagonist (entity)", one_sentence: "A geological formation — or something older — that communicates through tremor patterns.", scenes: ["scene_03","scene_06"], related: [{id:"char_mara",label:"contact"}], goals_short: "Unknown.", knowledge: "Possibly: everything underground." }
+    ],
+    locations: [
+      { id: "loc_station", name: "Cascadia Seismic Station", one_sentence: "The monitoring hub where Mara works — all glass and instruments on a ridge above the city.", scenes: ["scene_01","scene_02","scene_06"] },
+      { id: "loc_fault", name: "The Fault Mouth", one_sentence: "A sealed cave system along the fault line where tremor patterns are strongest.", scenes: ["scene_03","scene_07"] },
+      { id: "loc_archive", name: "City Geological Archive", one_sentence: "A basement records office with paper files going back to the 1800s.", scenes: ["scene_05"] }
+    ],
+    plots: [
+      { id: "plot_data", name: "The Buried Data", status: "active", one_sentence: "Eli's suppression of the 2004 event is the central cover-up Mara has to unravel.", characters: ["char_mara","char_eli"], setups: ["Eli deflects Mara's questions in scene 2","Archive visit in scene 5 finds gaps in records"], payoffs: ["Mara finds the original files in scene 8","Eli confronts her in scene 11"] },
+      { id: "plot_contact", name: "Contact with the Rook", status: "active", one_sentence: "Mara begins to suspect the tremor patterns are intentional communication.", characters: ["char_mara","char_rook"], setups: ["First anomaly in scene 1","Pattern repeats in scene 6"], payoffs: ["Mara decodes a message in scene 9"] },
+      { id: "plot_press", name: "The Journalist's Story", status: "building", one_sentence: "Val's investigation converges with Mara's from a different direction.", characters: ["char_val","char_mara","char_eli"], setups: ["Val's infrastructure article in scene 4","Val and Mara meet in scene 7"], payoffs: ["Alliance forms in scene 10"] }
+    ],
+    scenes: [
+      { id: "scene_01", heading: "S01 — Baseline Reading", characters: ["char_mara","char_jun"], locations: ["loc_station"], plots: ["plot_contact"] },
+      { id: "scene_02", heading: "S02 — Supervisor's Office", characters: ["char_mara","char_eli"], locations: ["loc_station"], plots: ["plot_data"] },
+      { id: "scene_03", heading: "S03 — First Descent", characters: ["char_mara","char_rook"], locations: ["loc_fault"], plots: ["plot_contact"] },
+      { id: "scene_04", heading: "S04 — The Infrastructure Piece", characters: ["char_val"], locations: [], plots: ["plot_press"] },
+      { id: "scene_05", heading: "S05 — Archive Visit", characters: ["char_mara","char_eli"], locations: ["loc_archive"], plots: ["plot_data"] },
+      { id: "scene_06", heading: "S06 — The Signal Repeats", characters: ["char_jun","char_rook"], locations: ["loc_station"], plots: ["plot_contact"] },
+      { id: "scene_07", heading: "S07 — First Contact (Val)", characters: ["char_mara","char_val"], locations: ["loc_fault"], plots: ["plot_press"] }
+    ],
+    story_memory: {
+      last_updated: "2025-08-12",
+      continuity_risks: ["Val doesn't know Mara's name until scene 7 — don't introduce earlier","The 2004 suppression date must stay consistent (currently: Aug 2004)","Jun's anomaly notes: established in scene 6, referenced in scene 9"],
+      summary: "A seismologist races to expose covered-up geological data while making first contact with an ancient underground intelligence."
+    }
+  };
+  document.getElementById('error-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  initStory(sample);
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+function initStory(data) {
+  story = data;
+  story.characters = story.characters || [];
+  story.locations = story.locations || [];
+  story.plots = story.plots || [];
+  story.scenes = story.scenes || [];
+  story.story_memory = story.story_memory || {};
+
+  document.getElementById('loading-screen').style.display = 'none';
+
+  buildGraphView();
+  buildScenesView();
+  buildStoryView();
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function switchView(view, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+  document.getElementById(view + '-view').classList.add('active');
+  btn.classList.add('active');
+  currentView = view;
+  closePanel();
+}
+
+function toggleSidebar() {
+  sidebarExpanded = !sidebarExpanded;
+  document.getElementById('sidebar').classList.toggle('expanded', sidebarExpanded);
+  const icon = document.querySelector('.sidebar-toggle svg path');
+  icon.setAttribute('d', sidebarExpanded ? 'M9 3l-4 4 4 4' : 'M5 3l4 4-4 4');
+}
+
+function refreshIndex() {
+  document.getElementById('loading-screen').style.display = 'flex';
+  if (network) { network.destroy(); network = null; }
+  setTimeout(boot, 50);
+}
+
+// ─── Role Colors ───────────────────────────────────────────────────────────────
+const ROLE_COLORS = {
+  'protagonist': '#7b9cf0',
+  'antagonist':  '#e07070',
+  'mentor':      '#b07be0',
+  'rival':       '#e0a86b',
+  'supporting':  '#6bbfb0',
+  'entity':      '#e06b9b',
+};
+
+function roleColor(role) {
+  if (!role) return '#8a8a8a';
+  const r = role.toLowerCase();
+  for (const [key, val] of Object.entries(ROLE_COLORS)) {
+    if (r.includes(key)) return val;
+  }
+  return '#8a8a8a';
+}
+
+function getRoleKey(role) {
+  if (!role) return 'other';
+  const r = role.toLowerCase();
+  for (const key of Object.keys(ROLE_COLORS)) {
+    if (r.includes(key)) return key;
+  }
+  return 'other';
+}
+
+// ─── Graph View ────────────────────────────────────────────────────────────────
+function buildGraphView() {
+  const chars = story.characters || [];
+  document.getElementById('graph-subtitle').textContent = chars.length + ' characters';
+
+  const nodes = new vis.DataSet(chars.map(c => ({
+    id: c.id,
+    label: c.name,
+    color: {
+      background: roleColor(c.role) + '22',
+      border: roleColor(c.role),
+      highlight: { background: roleColor(c.role) + '44', border: roleColor(c.role) },
+      hover: { background: roleColor(c.role) + '33', border: roleColor(c.role) }
+    },
+    font: {
+      color: getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#e8e8e8',
+      size: 12,
+      face: 'inherit'
+    },
+    borderWidth: 1.5,
+    borderWidthSelected: 2,
+    size: 22,
+    shape: 'dot',
+    title: c.role || ''
+  })));
+
+  const edges = [];
+  const seen = new Set();
+  chars.forEach(c => {
+    (c.related || []).forEach(rel => {
+      const key = [c.id, rel.id].sort().join('|');
+      if (!seen.has(key)) {
+        seen.add(key);
+        edges.push({
+          from: c.id,
+          to: rel.id,
+          label: rel.label || '',
+          color: { color: 'rgba(255,255,255,0.15)', highlight: 'rgba(255,255,255,0.4)' },
+          font: { color: getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim() || '#8a8a8a', size: 9, align: 'middle', strokeWidth: 0 },
+          width: 1,
+          smooth: { type: 'curvedCW', roundness: 0.2 }
+        });
+      }
+    });
+  });
+
+  const edgeDataSet = new vis.DataSet(edges);
+  const container = document.getElementById('network-canvas');
+
+  const options = {
+    nodes: { borderWidthSelected: 2 },
+    edges: { arrows: { to: { enabled: true, scaleFactor: 0.5 } } },
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.01, springLength: 120, springConstant: 0.08, damping: 0.4 }
+    },
+    interaction: { hover: true, tooltipDelay: 200, hideEdgesOnDrag: false },
+    layout: { randomSeed: 42 }
+  };
+
+  network = new vis.Network(container, { nodes, edges: edgeDataSet }, options);
+
+  network.on('click', params => {
+    if (params.nodes.length > 0) {
+      const charId = params.nodes[0];
+      const char = chars.find(c => c.id === charId);
+      if (char) showCharacterPanel(char);
+    }
+  });
+
+  // Legend
+  const legend = document.getElementById('graph-legend');
+  const seen_roles = new Set();
+  chars.forEach(c => seen_roles.add(getRoleKey(c.role)));
+  legend.innerHTML = [...seen_roles].map(role => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${ROLE_COLORS[role] || '#8a8a8a'}"></div>
+      <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>
+    </div>
+  `).join('');
+}
+
+function resetGraphLayout() {
+  if (network) {
+    network.setOptions({ physics: { enabled: true } });
+    setTimeout(() => network.setOptions({ physics: { enabled: false } }), 3000);
+  }
+}
+
+// ─── Scenes View ───────────────────────────────────────────────────────────────
+let allScenes = [];
+
+function buildScenesView() {
+  allScenes = story.scenes || [];
+  document.getElementById('scenes-subtitle').textContent = allScenes.length + ' scenes';
+  renderSceneList(allScenes);
+}
+
+function renderSceneList(scenes) {
+  const list = document.getElementById('scene-list');
+  if (!scenes.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No scenes yet</div><div class="empty-state-sub">Scenes will appear here once added to the index.</div></div>';
+    return;
+  }
+  list.innerHTML = scenes.map((s, i) => {
+    const charTags = (s.characters || []).map(cid => {
+      const c = (story.characters || []).find(x => x.id === cid);
+      return c ? `<span class="tag tag-char">${c.name}</span>` : '';
+    }).join('');
+    const locTags = (s.locations || []).map(lid => {
+      const l = (story.locations || []).find(x => x.id === lid);
+      return l ? `<span class="tag tag-location">${l.name}</span>` : '';
+    }).join('');
+    const plotTags = (s.plots || []).map(pid => {
+      const p = (story.plots || []).find(x => x.id === pid);
+      return p ? `<span class="tag tag-plot">${p.name}</span>` : '';
+    }).join('');
+    return `
+      <div class="scene-item" data-id="${s.id}" onclick="showScenePanel('${s.id}')">
+        <div class="scene-number">${String(i + 1).padStart(2, '0')}</div>
+        <div class="scene-body">
+          <div class="scene-heading">${s.heading || s.id}</div>
+          <div class="scene-meta">${charTags}${locTags}${plotTags}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterScenes(query) {
+  if (!query.trim()) { renderSceneList(allScenes); return; }
+  const q = query.toLowerCase();
+  const filtered = allScenes.filter(s => {
+    if ((s.heading || '').toLowerCase().includes(q)) return true;
+    if ((s.characters || []).some(cid => {
+      const c = (story.characters || []).find(x => x.id === cid);
+      return c && c.name.toLowerCase().includes(q);
+    })) return true;
+    if ((s.locations || []).some(lid => {
+      const l = (story.locations || []).find(x => x.id === lid);
+      return l && l.name.toLowerCase().includes(q);
+    })) return true;
+    return false;
+  });
+  renderSceneList(filtered);
+}
+
+// ─── Story View ────────────────────────────────────────────────────────────────
+function buildStoryView() {
+  const p = story.project || {};
+  const mem = story.story_memory || {};
+
+  document.getElementById('story-project-name').textContent = p.name || 'Story';
+  document.getElementById('story-subtitle').textContent = [p.genre, p.setting].filter(Boolean).join(' · ');
+
+  const body = document.getElementById('story-body');
+
+  // Project stats
+  const statsHtml = `
+    <div>
+      <div class="story-section-title">Project</div>
+      <div class="project-card">
+        <div class="project-logline">${p.logline || ''}</div>
+        <div class="project-stat"><div class="project-stat-value">${p.scene_count || (story.scenes || []).length}</div><div class="project-stat-label">Scenes</div></div>
+        <div class="project-stat"><div class="project-stat-value">${p.character_count || (story.characters || []).length}</div><div class="project-stat-label">Characters</div></div>
+      </div>
+    </div>`;
+
+  // Plots
+  const plots = story.plots || [];
+  const plotsHtml = plots.length ? `
+    <div>
+      <div class="story-section-title">Active plot threads</div>
+      <div class="plot-list">
+        ${plots.map(pl => `
+          <div class="plot-item" onclick="showPlotPanel('${pl.id}')">
+            <div class="plot-header">
+              <span class="plot-name">${pl.name}</span>
+              <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
+            </div>
+            <div class="plot-sentence">${pl.one_sentence || ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : '';
+
+  // Continuity risks
+  const risks = mem.continuity_risks || [];
+  const risksHtml = risks.length ? `
+    <div>
+      <div class="story-section-title">Continuity risks</div>
+      <div class="risk-list">
+        ${risks.map(r => `<div class="risk-item">${r}</div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // Hermes ask button
+  const hermesHtml = p.name ? `
+    <div style="padding-top:4px;">
+      <button class="btn btn-hermes" data-hermes-send="Give me an overview of ${p.name}.">Ask Hermes about this story</button>
+    </div>` : '';
+
+  body.innerHTML = statsHtml + plotsHtml + risksHtml + hermesHtml;
+}
+
+// ─── Detail Panel ──────────────────────────────────────────────────────────────
+function openPanel() { document.getElementById('detail-panel').classList.add('open'); }
+function closePanel() { document.getElementById('detail-panel').classList.remove('open'); }
+
+function showCharacterPanel(char) {
+  document.getElementById('panel-type').textContent = char.role || 'Character';
+  document.getElementById('panel-name').textContent = char.name;
+
+  const scenes = (char.scenes || []).map(sid => {
+    const s = (story.scenes || []).find(x => x.id === sid);
+    return s ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>` : '';
+  }).join('');
+
+  const related = (char.related || []).map(rel => {
+    const c = (story.characters || []).find(x => x.id === rel.id);
+    return c ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))">${c.name} <span style="color:var(--muted-foreground)">· ${rel.label}</span></button>` : '';
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">In one sentence</div>
+      <div class="panel-text">${char.one_sentence || '—'}</div>
+    </div>
+    ${char.goals_short ? `<div>
+      <div class="panel-section-title">Immediate goal</div>
+      <div class="panel-text">${char.goals_short}</div>
+    </div>` : ''}
+    ${char.goals_long ? `<div>
+      <div class="panel-section-title">Deeper goal</div>
+      <div class="panel-muted">${char.goals_long}</div>
+    </div>` : ''}
+    ${char.knowledge ? `<div>
+      <div class="panel-section-title">What they know</div>
+      <div class="panel-muted">${char.knowledge}</div>
+    </div>` : ''}
+    ${scenes ? `<div>
+      <div class="panel-section-title">Appears in</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+    ${related ? `<div>
+      <div class="panel-section-title">Relationships</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${related}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Tell me more about ${char.name}'s character development.">Ask Hermes about ${char.name}</button>
+  `;
+
+  openPanel();
+
+  // Highlight in graph
+  if (network) {
+    network.selectNodes([char.id]);
+    network.focus(char.id, { scale: 1.2, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+  }
+}
+
+function showScenePanel(sceneId) {
+  const scene = (story.scenes || []).find(s => s.id === sceneId);
+  if (!scene) return;
+
+  // Highlight in scene list
+  document.querySelectorAll('.scene-item').forEach(el => el.classList.remove('selected'));
+  const sceneEl = document.querySelector(`.scene-item[data-id="${sceneId}"]`);
+  if (sceneEl) sceneEl.classList.add('selected');
+
+  document.getElementById('panel-type').textContent = 'Scene';
+  document.getElementById('panel-name').textContent = scene.heading || scene.id;
+
+  const chars = (scene.characters || []).map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid);
+    return c ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>` : '';
+  }).join('');
+
+  const locs = (scene.locations || []).map(lid => {
+    const l = (story.locations || []).find(x => x.id === lid);
+    return l ? `<button class="entity-link" onclick="showLocationPanel('${l.id}')">${l.name}</button>` : '';
+  }).join('');
+
+  const plots = (scene.plots || []).map(pid => {
+    const pl = (story.plots || []).find(x => x.id === pid);
+    return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${locs ? `<div>
+      <div class="panel-section-title">Location</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${locs}</div>
+    </div>` : ''}
+    ${plots ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plots}</div>
+    </div>` : ''}
+    <div>
+      <div class="panel-section-title">Scene content</div>
+      <div class="panel-muted" id="scene-content-area">Loading from screenplay.md…</div>
+    </div>
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="What happens in ${scene.heading || scene.id}?">Ask Hermes about this scene</button>
+  `;
+
+  openPanel();
+  loadSceneContent(scene);
+}
+
+async function loadSceneContent(scene) {
+  const area = document.getElementById('scene-content-area');
+  if (!area) return;
+  try {
+    const res = await fetch('screenplay.md');
+    if (!res.ok) throw new Error();
+    const text = await res.text();
+    // Try to find the scene's section
+    const heading = scene.heading || scene.id;
+    const headingClean = heading.replace(/^S\d+\s*[—-]\s*/i, '').trim();
+    const regex = new RegExp(`(?:^|\n)#+\\s*.*${headingClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\n([\\s\\S]*?)(?=\n#+|$)`, 'i');
+    const match = text.match(regex);
+    if (match) {
+      area.textContent = match[1].trim().slice(0, 600) + (match[1].length > 600 ? '…' : '');
+    } else {
+      area.textContent = 'Scene section not found in screenplay.md.';
+    }
+  } catch(e) {
+    area.textContent = 'screenplay.md not loaded — place it alongside this file to preview scene content.';
+  }
+}
+
+function showLocationPanel(locId) {
+  const loc = (story.locations || []).find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('panel-type').textContent = 'Location';
+  document.getElementById('panel-name').textContent = loc.name;
+
+  const scenes = (loc.scenes || []).map(sid => {
+    const s = (story.scenes || []).find(x => x.id === sid);
+    return s ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>` : '';
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Description</div>
+      <div class="panel-text">${loc.one_sentence || '—'}</div>
+    </div>
+    ${scenes ? `<div>
+      <div class="panel-section-title">Appears in</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Describe ${loc.name} and its role in the story.">Ask Hermes about this location</button>
+  `;
+
+  openPanel();
+}
+
+function showPlotPanel(plotId) {
+  const plot = (story.plots || []).find(p => p.id === plotId);
+  if (!plot) return;
+
+  document.getElementById('panel-type').textContent = 'Plot thread';
+  document.getElementById('panel-name').textContent = plot.name;
+
+  const chars = (plot.characters || []).map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid);
+    return c ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))">${c.name}</button>` : '';
+  }).join('');
+
+  const setups = (plot.setups || []).map(s => `<div class="panel-muted" style="padding:4px 0;border-bottom:1px solid var(--border)">${s}</div>`).join('');
+  const payoffs = (plot.payoffs || []).map(s => `<div class="panel-muted" style="padding:4px 0;border-bottom:1px solid var(--border)">${s}</div>`).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Thread</div>
+      <div class="panel-text">${plot.one_sentence || '—'}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span>
+    </div>
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters involved</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${setups ? `<div>
+      <div class="panel-section-title">Setups</div>
+      ${setups}
+    </div>` : ''}
+    ${payoffs ? `<div>
+      <div class="panel-section-title">Payoffs</div>
+      ${payoffs}
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  openPanel();
+}
+
+// ─── Start ─────────────────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>
