@@ -28,14 +28,22 @@ def handler(args: dict, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    # Dashboard is auto-created by story_index
-    dashboard_dest = project_path / "story-dashboard.html"
-    if not dashboard_dest.exists():
-        return json.dumps({"error": "Dashboard not found. Run story_index first."})
+    # Check that index exists
+    index_path = project_path / ".story" / "index.yaml"
+    if not index_path.exists():
+        return json.dumps({"error": "Index not found. Run story_index first."})
+
+    # Dashboard is in the plugin src/ directory
+    dashboard_src = Path(__file__).parent.parent / "src" / "dashboard" / "story-dashboard.html"
+    if not dashboard_src.exists():
+        return json.dumps({"error": "Dashboard file not found in plugin"})
+
+    # Return URL with project path as query param
+    dashboard_url = f"file://{dashboard_src}?project={project_path}"
 
     return json.dumps({
         "success": True,
         "message": f"Dashboard opened for {project}",
-        "dashboard_url": f"file://{dashboard_dest}",
+        "dashboard_url": dashboard_url,
         "project": project
     })

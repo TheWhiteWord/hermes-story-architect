@@ -901,12 +901,24 @@ let story = null;
 let network = null;
 let sidebarExpanded = false;
 let currentView = 'graph';
-const INDEX_PATH = '.story/index.yaml';
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 async function boot() {
   try {
-    const res = await fetch(INDEX_PATH);
+    // Check for project path in URL query param first
+    const params = new URLSearchParams(window.location.search);
+    const projectPath = params.get('project');
+    let indexPath;
+
+    if (projectPath) {
+      // Load from specified project path
+      indexPath = projectPath.replace(/\/$/, '') + '/.story/index.yaml';
+    } else {
+      // Fallback: local index.yaml (legacy behavior)
+      indexPath = '.story/index.yaml';
+    }
+
+    const res = await fetch('file://' + indexPath);
     if (!res.ok) throw new Error('not found');
     const text = await res.text();
     const data = jsyaml.load(text);
