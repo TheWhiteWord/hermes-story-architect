@@ -2,7 +2,7 @@
 name: story-editor
 description: "Edit story entities, screenplay, and memory with review loop."
 version: 0.1.0
-author: Davide, Hermes Agent
+author: TWW, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
 metadata:

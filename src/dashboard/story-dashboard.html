@@ -1,8 +1,3 @@
- comments.
-  Hermes's plugin scanner flags HTML comments as injection (false positive on ).
-  JS/CSS comments (// and /* */) are safe to keep.
-  Run to strip: sed -i 's///g' src/dashboard/story-dashboard.html
--->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Dashboard</title>
 
+<!-- vis-network from CDN (MIT/Apache 2.0) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
@@ -703,13 +699,13 @@ html, body {
 <body>
 <div id="app">
 
-  
+  <!-- Loading -->
   <div id="loading-screen">
     <div class="loading-icon"></div>
     <div class="loading-text">Loading story index…</div>
   </div>
 
-  
+  <!-- Error -->
   <div id="error-screen">
     <div class="error-title">No story index found</div>
     <div class="error-body">
@@ -722,7 +718,7 @@ html, body {
     </div>
   </div>
 
-  
+  <!-- Sidebar -->
   <nav id="sidebar">
     <button class="nav-btn active" data-view="graph" onclick="switchView('graph', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -802,10 +798,10 @@ html, body {
     </button>
   </nav>
 
-  
+  <!-- Main -->
   <main id="main">
 
-    
+    <!-- Graph View -->
     <div class="view active" id="graph-view">
       <div class="view-header">
         <div class="view-title">Character web</div>
@@ -820,7 +816,7 @@ html, body {
       </div>
     </div>
 
-    
+    <!-- Scenes View -->
     <div class="view" id="scenes-view">
       <div class="view-header">
         <div class="view-title">Scenes</div>
@@ -837,7 +833,7 @@ html, body {
       </div>
     </div>
 
-    
+    <!-- Locations View -->
     <div class="view entity-list-view" id="locations-view">
       <div class="view-header">
         <div class="view-title">Locations</div>
@@ -848,7 +844,7 @@ html, body {
       </div>
     </div>
 
-    
+    <!-- Plots View -->
     <div class="view entity-list-view" id="plots-view">
       <div class="view-header">
         <div class="view-title">Plots</div>
@@ -859,7 +855,7 @@ html, body {
       </div>
     </div>
 
-    
+    <!-- Worlds View -->
     <div class="view entity-list-view" id="worlds-view">
       <div class="view-header">
         <div class="view-title">Worlds</div>
@@ -870,7 +866,7 @@ html, body {
       </div>
     </div>
 
-    
+    <!-- Story View -->
     <div class="view" id="story-view">
       <div class="view-header">
         <div class="view-title" id="story-project-name">Story</div>
@@ -881,7 +877,7 @@ html, body {
 
   </main>
 
-  
+  <!-- Detail Panel -->
   <aside id="detail-panel">
     <div class="panel-header">
       <div class="panel-title-block">
@@ -896,6 +892,7 @@ html, body {
 
 </div>
 
+<!-- Hidden file input for manual load -->
 <input type="file" id="file-input" accept=".yaml,.yml" style="display:none" onchange="handleFileLoad(this)">
 
 <script>
