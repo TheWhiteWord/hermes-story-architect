@@ -21,9 +21,10 @@ not edit anything. Works with any story project in the configured vault.
 - "load project <slug or name>"
 - "open story <name>"
 - "switch to project <slug>"
+- "start a new project"
+- "create a story called <name>"
 
-Don't use for: editing (use story-editor), searching across projects (use
-story_search), creating projects (use story_create).
+Don't use for: editing (use story-editor), searching across projects (use story_search).
 
 ## Prerequisites
 
@@ -38,7 +39,8 @@ story_search), creating projects (use story_create).
    - `project.md` (minimal frontmatter with name)
    - `.story/memory.md` (empty)
    - `.story/index.yaml` (initial index)
-3. The project is now ready for entity creation via `story_create`
+3. Ask the user: "Would you like to open the dashboard?" — if yes, use `story_dashboard`
+4. The project is now ready for entity creation via `story_create`
 
 ## Procedure
 

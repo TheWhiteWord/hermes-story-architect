@@ -86,3 +86,14 @@ def register(ctx) -> None:
         skill_md = child / "SKILL.md"
         if child.is_dir() and skill_md.exists():
             ctx.register_skill(child.name, skill_md)
+
+    from .tools import story_dashboard
+
+    ctx.register_tool(
+        name="story_dashboard",
+        toolset="story_architect",
+        schema=story_dashboard.SCHEMA,
+        handler=story_dashboard.handler,
+        check_fn=_requirements_met,
+        emoji="📊",
+    )

@@ -10,6 +10,7 @@ provides_tools:
   - story_search
   - story_edit
   - story_create
+  - story_dashboard
 provides_skills:
   - story-loader
   - story-editor
