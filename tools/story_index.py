@@ -42,7 +42,10 @@ def handler(args: dict, **kwargs) -> str:
         )
 
     # Initialize memory.md if missing
-    memory_path = project_path / ".story" / "memory.md"
+    memory_dir = project_path / ".story"
+    if not memory_dir.exists():
+        memory_dir.mkdir(parents=True, exist_ok=True)
+    memory_path = memory_dir / "memory.md"
     if not memory_path.exists():
         memory_path.write_text("# Story Memory\n\n")
 
