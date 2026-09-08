@@ -28,19 +28,23 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 
 ## Prerequisites
 
-- Project loaded (story_load)
+- Project loaded (story_loader skill)
 - Index in context
 - Relevant sections retrieved (story_retrieve)
+
+## Creating a New Project
+
+Same as story-loader: create folder + run `story_index`. Then use `story_create` for entities.
 
 ## Quick Reference
 
 | Action | Tool | Core Module |
 |--------|------|-------------|
-| Edit entity | story_edit | section_parser, entity |
-| Edit screenplay | story_edit | screenplay (Parser/Writer) |
+| Edit entity | story_edit (action: edit_note) | section_parser, entity |
+| Edit screenplay | story_edit (action: edit_screenplay) | screenplay (Parser/Writer) |
 | Create entity | story_create | entity, frontmatter |
-| Delete entity | story_delete | entity |
-| Update memory | story_update_memory | screenplay, entity |
+| Delete entity | story_edit (action: delete_entity) | entity |
+| Update memory | story_edit (action: update_story_memory) | screenplay, entity |
 
 ## Procedure
 
@@ -54,8 +58,7 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 
 ## Action Types
 
-Seven action types: edit_note, edit_screenplay, create_entity, delete_entity,
-update_story_memory, answer, suggest_ideas.
+Five action types: edit_note, edit_screenplay, create_entity, delete_entity, update_story_memory.
 
 For detailed procedures, see `references/action-types.md`.
 

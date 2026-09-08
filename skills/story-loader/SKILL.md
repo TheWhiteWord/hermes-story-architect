@@ -31,6 +31,15 @@ story_search), creating projects (use story_create).
 - Project exists at `<vault>/projects/<slug>/`
 - Index generated (`.story/index.yaml`) — run `story_index` if missing
 
+## Creating a New Project
+
+1. Create the project folder: `mkdir -p <vault>/projects/<slug>/`
+2. Run `story_index` with the project slug — this auto-creates:
+   - `project.md` (minimal frontmatter with name)
+   - `.story/memory.md` (empty)
+   - `.story/index.yaml` (initial index)
+3. The project is now ready for entity creation via `story_create`
+
 ## Procedure
 
 1. **Resolve project**: match user input to a project folder
