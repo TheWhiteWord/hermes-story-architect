@@ -61,11 +61,9 @@ def generate_index(project_path: Path) -> dict:
 
 
 def _parse_project(project_path: Path, characters, locations, worlds, plots, scenes_count=0) -> dict:
-    """Parse project.md and add count fields. If missing, use folder name."""
+    """Parse project.md and add count fields."""
     fm = project_path / "project.md"
     project = extract_entity(fm, "project") if fm.exists() else {}
-    if not project:
-        project = {"id": "project", "name": project_path.name}
     project["scene_count"] = scenes_count
     project["character_count"] = len(characters)
     project["location_count"] = len(locations)
