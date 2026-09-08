@@ -720,7 +720,16 @@ html, body {
 
   <!-- Sidebar -->
   <nav id="sidebar">
-    <button class="nav-btn active" data-view="graph" onclick="switchView('graph', this)">
+    <button class="nav-btn active" data-view="story" onclick="switchView('story', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M3 8h10" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M8 3v5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Story</span>
+    </button>
+
+    <button class="nav-btn" data-view="graph" onclick="switchView('graph', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
         <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
         <circle cx="2.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
@@ -770,15 +779,6 @@ html, body {
       <span class="nav-label">Worlds</span>
     </button>
 
-    <button class="nav-btn" data-view="story" onclick="switchView('story', this)">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-        <path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-        <path d="M3 8h10" stroke="currentColor" stroke-width="1.2"/>
-        <path d="M8 3v5" stroke="currentColor" stroke-width="1.2"/>
-      </svg>
-      <span class="nav-label">Story</span>
-    </button>
-
     <div class="nav-separator"></div>
 
     <button class="nav-btn" onclick="refreshIndex()" title="Refresh index">
@@ -801,8 +801,17 @@ html, body {
   <!-- Main -->
   <main id="main">
 
+    <!-- Story View -->
+    <div class="view active" id="story-view">
+      <div class="view-header">
+        <div class="view-title" id="story-project-name">Story</div>
+        <div class="view-subtitle" id="story-subtitle">—</div>
+      </div>
+      <div class="view-body" id="story-body"></div>
+    </div>
+
     <!-- Graph View -->
-    <div class="view active" id="graph-view">
+    <div class="view" id="graph-view">
       <div class="view-header">
         <div class="view-title">Character web</div>
         <div class="view-subtitle" id="graph-subtitle">—</div>
@@ -866,15 +875,6 @@ html, body {
       </div>
     </div>
 
-    <!-- Story View -->
-    <div class="view" id="story-view">
-      <div class="view-header">
-        <div class="view-title" id="story-project-name">Story</div>
-        <div class="view-subtitle" id="story-subtitle">—</div>
-      </div>
-      <div class="view-body" id="story-body"></div>
-    </div>
-
   </main>
 
   <!-- Detail Panel -->
@@ -905,16 +905,20 @@ let currentView = 'graph';
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 async function boot() {
   try {
+    // Injected data takes precedence (avoids fetch('file://') which Electron blocks)
+    if (window.__STORY_DATA__) {
+      initStory(window.__STORY_DATA__);
+      return;
+    }
+
     // Check for project path in URL query param first
     const params = new URLSearchParams(window.location.search);
     const projectPath = params.get('project');
     let indexPath;
 
     if (projectPath) {
-      // Load from specified project path
       indexPath = projectPath.replace(/\/$/, '') + '/.story/index.yaml';
     } else {
-      // Fallback: local index.yaml (legacy behavior)
       indexPath = '.story/index.yaml';
     }
 

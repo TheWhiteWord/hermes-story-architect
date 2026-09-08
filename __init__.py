@@ -1,4 +1,5 @@
 """Hermes Story Architect — plugin entry point."""
+import json
 from pathlib import Path
 from hermes_constants import get_hermes_home
 
@@ -97,3 +98,17 @@ def register(ctx) -> None:
         check_fn=_requirements_met,
         emoji="📊",
     )
+
+    # Auto-open preview pane when story_dashboard succeeds
+    def auto_open_dashboard(*, tool_name, result, **kwargs):
+        if tool_name != "story_dashboard":
+            return
+        try:
+            data = json.loads(result)
+            url = data.get("dashboard_url")
+            if url:
+                ctx.dispatch_tool("desktop_preview", {"action": "open", "url": url})
+        except Exception:
+            pass
+
+    ctx.register_hook("post_tool_call", auto_open_dashboard)
