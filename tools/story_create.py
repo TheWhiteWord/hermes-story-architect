@@ -67,7 +67,16 @@ def handler(args: dict, **kwargs) -> str:
     # Write file
     with open(file_path, 'w') as f:
         frontmatter.dump(post, f)
-    
+
+    # Refresh index so story_load reflects changes immediately
+    try:
+        from ..core.index import generate_index, write_index
+        index_path = project_path / ".story" / "index.yaml"
+        index = generate_index(project_path)
+        write_index(index, index_path)
+    except Exception:
+        pass
+
     return json.dumps({
         "success": True,
         "message": f"Created {entity_type}: {slug}",

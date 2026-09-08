@@ -59,11 +59,28 @@ def handler(args: dict, **kwargs) -> str:
     elif action == "delete_entity":
         return _delete_entity(project_path, target, summary)
     elif action == "create_entity":
-        return _create_entity(project_path, target, changes, summary)
+        result = _create_entity(project_path, target, changes, summary)
+        if '"success": true' in result:
+            _refresh_index(project_path)
+        return result
     elif action == "update_story_memory":
-        return _update_story_memory(project_path, changes, summary)
+        result = _update_story_memory(project_path, changes, summary)
+        if '"success": true' in result:
+            _refresh_index(project_path)
+        return result
     else:
         return json.dumps({"error": f"Unknown action: {action}"})
+
+
+def _refresh_index(project_path: Path) -> None:
+    """Refresh the index file to reflect changes."""
+    try:
+        from ..core.index import generate_index, write_index
+        index_path = project_path / ".story" / "index.yaml"
+        index = generate_index(project_path)
+        write_index(index, index_path)
+    except Exception:
+        pass  # Don't fail the operation if index refresh fails
 
 
 def _edit_note(project_path: Path, target: dict, changes: list, summary: str) -> str:
@@ -77,9 +94,9 @@ def _edit_note(project_path: Path, target: dict, changes: list, summary: str) ->
     
     if not file_path.exists():
         return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
-    
+
     post = frontmatter.load(file_path)
-    
+
     for change in changes:
         change_type = change.get("type")
         if change_type == "body_section":
@@ -90,10 +107,13 @@ def _edit_note(project_path: Path, target: dict, changes: list, summary: str) ->
             field = change["field"]
             value = change["value"]
             post[field] = value
-    
+
     with open(file_path, 'w') as f:
         frontmatter.dump(post, f)
-    
+
+    # Refresh index so story_load reflects changes immediately
+    _refresh_index(project_path)
+
     return json.dumps({
         "success": True,
         "message": f"Applied: {summary}",
@@ -152,6 +172,9 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
     dest = recycle_bin / f"{slug}.md"
     shutil.move(str(file_path), str(dest))
 
+    # Refresh index so story_load reflects changes immediately
+    _refresh_index(project_path)
+
     return json.dumps({
         "success": True,
         "message": f"Moved to recycle bin: {summary}",
@@ -187,9 +210,12 @@ def _create_entity(project_path: Path, target: dict, changes: list, summary: str
     with open(file_path, 'w') as f:
         frontmatter.dump(post, f)
 
+    # Refresh index so story_load reflects changes immediately
+    _refresh_index(project_path)
+
     return json.dumps({
         "success": True,
-        "message": f"Created {entity_type}: {slug}",
+        "message": f"Applied: {summary}",
         "file": str(file_path)
     })
 
