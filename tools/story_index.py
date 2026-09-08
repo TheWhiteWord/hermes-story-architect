@@ -36,6 +36,11 @@ def handler(args: dict, **kwargs) -> str:
     index_path = project_path / ".story" / "index.yaml"
     index_path.parent.mkdir(exist_ok=True)
     write_index(index, index_path)
+
+    # Initialize memory.md if missing
+    memory_path = project_path / ".story" / "memory.md"
+    if not memory_path.exists():
+        memory_path.write_text("# Story Memory\n\n")
     
     return json.dumps({
         "success": True,
