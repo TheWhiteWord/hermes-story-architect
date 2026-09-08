@@ -37,6 +37,18 @@ def handler(args: dict, **kwargs) -> str:
     index_path.parent.mkdir(exist_ok=True)
     write_index(index, index_path)
 
+    # Initialize project.md if missing (marker file)
+    project_md = project_path / "project.md"
+    if not project_md.exists():
+        project_md.write_text(
+            f"---\n"
+            f"name: {project_path.name}\n"
+            f"---\n"
+            f"\n"
+            f"# {project_path.name}\n"
+            f"\n"
+        )
+
     # Initialize memory.md if missing
     memory_path = project_path / ".story" / "memory.md"
     if not memory_path.exists():
