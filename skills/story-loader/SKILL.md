@@ -1,8 +1,8 @@
 ---
 name: story-loader
-description: "Load a story project's index and memory into context."
+description: "Load a story project's index and memory into context. Also use to start new projects."
 version: 0.1.0
-author: Davide, Hermes Agent
+author: TWW, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
