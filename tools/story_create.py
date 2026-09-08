@@ -20,7 +20,7 @@ SCHEMA = {
             "description": "Frontmatter fields"
         }
     },
-    "required": ["entity_type", "slug", "frontmatter"]
+    "required": ["entity_type", "slug", "project", "frontmatter"]
 }
 
 
