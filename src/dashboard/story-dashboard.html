@@ -1365,6 +1365,13 @@ function buildScenesView() {
   renderSceneList(allScenes);
 }
 
+// Helper: normalize location field (string, array, or undefined) to array
+function normalizeLocs(loc) {
+  if (!loc) return [];
+  if (Array.isArray(loc)) return loc;
+  return [loc];
+}
+
 // Helper: find location by id OR by heading string (backend sometimes uses headings)
 function findLocation(ref) {
   return (story.locations || []).find(l =>
