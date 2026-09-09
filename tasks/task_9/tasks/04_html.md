@@ -52,3 +52,25 @@ All tests must pass.
 - The test checks for `fountain-scene_heading`, `fountain-character`, `fountain-dialogue`, `fountain-action` in output
 - These are CSS class prefixes, not the same as BF's `haseditorline` — check what the test actually expects
 - The test uses single-token lists, so action block wrapping may not be fully tested
+
+---
+
+## Report
+
+**Status:** GREEN — 5/5 `TestHtmlRendering` tests pass.
+
+**What changed:**
+- Rewrote `tokens_to_html()` to use `fountain-{type}` CSS class prefixes (not BF's `haseditorline`)
+- Added `token.get()` fallbacks so raw tokens (missing `number`, `ignore`, etc.) don't crash
+- Added handlers for all token types: `dual_dialogue_begin`, `dual_dialogue_end`, `section`, `synopsis`, `lyric`, `note`, `boneyard_begin`, `boneyard_end`, `centered`
+- Fixed action block wrapping: first action gets `<p><span>`, subsequent get `<span>`, trailing `</p>` on close
+- `fountain_to_html()` already worked (it's a thin wrapper)
+
+**Skipped:**
+- `haseditorline` class — tests expect `fountain-*` prefixes, not BF's class
+- `data-position` on scene_heading — not in test, not needed by consumer
+- Inline emphasis parsing (`*bold*`, `_italic_`) — not in test scope
+
+**Pre-existing failures (not Task 4 scope):**
+- `test_with_caret` — `trim_character_extension()` doesn't strip `^`
+- `test_scene_characters` — `extract_scenes()` strips `(V.O.)` but test expects full string

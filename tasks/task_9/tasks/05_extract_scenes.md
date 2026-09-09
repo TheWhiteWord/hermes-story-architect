@@ -16,10 +16,8 @@
     "id": 1,                          # Scene number (1-based)
     "heading": "INT. ROOM - DAY",     # Raw heading text
     "number": "1",                    # Scene number (string)
-    "characters": ["KAEL", "MIRA"],   # Unique character names (extensions stripped)
-    "location": "",                   # Parsed location (from parse_location)
-    "content": "...",                 # Raw fountain text (preserves formatting)
-    "content_html": "...",            # Tokenized HTML with CSS classes
+    "characters": ["KAEL", "MIRA"],   # Raw character text (extensions preserved)
+    "content": "...",                 # Raw fountain text (ALL tokens)
 }
 ```
 
@@ -34,7 +32,9 @@ All tests must pass.
 ## Notes
 
 - `extract_scenes` uses `parse()` internally
-- `content` is the raw text of the scene (heading + all tokens until next heading)
-- `content_html` is the HTML rendering of all tokens (via `tokens_to_html`)
-- `characters` are extracted from `character` tokens, with extensions stripped
-- `extract_scene_content` returns just the text content for a specific scene
+- `content` includes ALL token types: action, character, dialogue, parenthetical, transition, centered, note, page_break
+- `characters` are raw character text from `character` tokens (extensions like `(V.O.)` are preserved)
+- Dual dialogue: `^` is stripped from character text, `dual_dialogue_begin` token marks the block
+- `extract_scene_content` returns the full raw text for a specific scene (heading + all tokens until next heading)
+- Scene 6 (OPENING TITLES) includes centered text `THE END` and page break
+- Scene 7 includes dual dialogue (`MIRA ^`)

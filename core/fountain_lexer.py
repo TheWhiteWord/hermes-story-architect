@@ -650,45 +650,68 @@ def extract_scenes(screenplay_content):
 
 
 def tokens_to_html(tokens):
-    """Convert tokens to HTML."""
+    """Convert tokens to HTML with fountain-{type} CSS classes."""
     html = []
     isaction = False
-    
+
     for token in tokens:
-        if token['type'] in ('action', 'centered') and not token['ignore']:
-            classes = 'haseditorline'
-            el_start = '\n'
+        t = token.get('type', '')
+        text = token.get('text', '')
+        ignore = token.get('ignore', False)
+
+        if t in ('action', 'centered') and not ignore:
+            classes = f'fountain-{t}'
             if not isaction:
-                el_start = '<p>'
-            if token['type'] == 'centered':
-                if isaction:
-                    el_start = ''
-                classes += ' centered'
-            html.append(f'{el_start}<span class="{classes}">{token.get("text", "")}</span>')
+                html.append(f'<p><span class="{classes}">{text}</span>')
+            else:
+                html.append(f'<span class="{classes}">{text}</span>')
             isaction = True
-        
-        elif token['type'] == 'separator' and isaction:
+        elif t == 'separator' and isaction:
             html.append('</p>')
+            isaction = False
         else:
             if isaction:
                 isaction = False
                 html.append('</p>')
-            
-            if token['type'] == 'scene_heading':
-                html.append(f'<h3 data-scenenumber="{token["number"]}">{token["text"]}</h3>')
-            elif token['type'] == 'transition':
-                html.append(f'<h2>{token["text"]}</h2>')
-            elif token['type'] == 'dialogue_begin':
-                html.append(f'<div class="dialogue">')
-            elif token['type'] == 'character':
-                html.append(f'<h4>{token["text"]}</h4>')
-            elif token['type'] == 'parenthetical':
-                html.append(f'<p class="parenthetical">{token["text"]}</p>')
-            elif token['type'] == 'dialogue':
-                html.append(f'<p>{token["text"]}</p>')
-            elif token['type'] == 'dialogue_end':
+
+            if t == 'scene_heading':
+                num = token.get('number', '')
+                html.append(f'<h3 class="fountain-scene_heading" data-scenenumber="{num}">{text}</h3>')
+            elif t == 'transition':
+                html.append(f'<h2 class="fountain-transition">{text}</h2>')
+            elif t == 'dual_dialogue_begin':
+                html.append('<div class="dual-dialogue">')
+            elif t == 'dialogue_begin':
+                html.append('<div class="dialogue">')
+            elif t == 'character':
+                html.append(f'<h4 class="fountain-character">{text}</h4>')
+            elif t == 'parenthetical':
+                html.append(f'<p class="fountain-parenthetical">{text}</p>')
+            elif t == 'dialogue':
+                html.append(f'<p class="fountain-dialogue">{text}</p>')
+            elif t == 'dialogue_end':
                 html.append('</div>')
-            elif token['type'] == 'page_break':
+            elif t == 'dual_dialogue_end':
+                html.append('</div></div>')
+            elif t == 'section':
+                depth = token.get('level', '')
+                html.append(f'<p class="fountain-section" data-depth="{depth}">{text}</p>')
+            elif t == 'synopsis':
+                html.append(f'<p class="fountain-synopsis">{text}</p>')
+            elif t == 'lyric':
+                html.append(f'<p class="fountain-lyric">{text}</p>')
+            elif t == 'note':
+                html.append(f'<p class="fountain-note">{text}</p>')
+            elif t == 'boneyard_begin':
+                html.append('<!-- ')
+            elif t == 'boneyard_end':
+                html.append(' -->')
+            elif t == 'page_break':
                 html.append('<hr />')
-    
+            elif t == 'centered':
+                html.append(f'<span class="fountain-centered">{text}</span>')
+
+    if isaction:
+        html.append('</p>')
+
     return '\n'.join(html)
