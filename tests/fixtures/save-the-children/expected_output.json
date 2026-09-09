@@ -275,7 +275,7 @@
       "original_line": 24
     },
     {
-      "text": "A vast decaying building. Nature reclaims the walls. ",
+      "text": "A vast decaying building. Nature reclaims the walls. [[This is a writer's note about the scene]]",
       "type": "action",
       "start": 538,
       "end": 634,
@@ -600,7 +600,7 @@
       "original_line": 49
     },
     {
-      "text": "Kael walks through simulated moonlight. The grass feels real. ",
+      "text": "Kael walks through simulated moonlight. The grass feels real. [[Another note about the garden]]",
       "type": "action",
       "start": 975,
       "end": 1070,
@@ -1376,6 +1376,29 @@
       "original_line": 111
     },
     {
+      "text": "[[This is a writer's note about the scene]]",
+      "type": "action",
+      "start": 1833,
+      "end": 1876,
+      "line": 111,
+      "ignore": false,
+      "time": 0,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 112
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1877,
+      "end": 1877,
+      "line": 112,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 113
+    },
+    {
       "text": "INT. THE CORE - DAY",
       "type": "scene_heading",
       "start": 1878,
@@ -1516,7 +1539,7 @@
       "original_line": 123
     },
     {
-      "type": "dialogue_begin",
+      "type": "dual_dialogue_begin",
       "ignore": false,
       "index": -1,
       "takeNumber": -1
@@ -1528,6 +1551,7 @@
       "end": 2042,
       "line": 123,
       "ignore": false,
+      "dual": "left",
       "index": -1,
       "takeNumber": 12,
       "original_line": 124
@@ -1539,6 +1563,7 @@
       "end": 2076,
       "line": 124,
       "ignore": false,
+      "dual": "left",
       "time": 1.7509932,
       "character": "ELENA",
       "index": -1,
@@ -1546,7 +1571,33 @@
       "original_line": 125
     },
     {
-      "type": "dialogue_end",
+      "text": "MIRA",
+      "type": "character",
+      "start": 2078,
+      "end": 2084,
+      "line": 126,
+      "ignore": false,
+      "dual": "right",
+      "index": -1,
+      "takeNumber": 13,
+      "original_line": 127
+    },
+    {
+      "text": "Because the door was always open.",
+      "type": "dialogue",
+      "start": 2085,
+      "end": 2118,
+      "line": 127,
+      "ignore": false,
+      "dual": "right",
+      "time": 1.7509932,
+      "character": "MIRA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 128
+    },
+    {
+      "type": "dual_dialogue_end",
       "ignore": false,
       "index": -1,
       "takeNumber": -1
@@ -1554,53 +1605,19 @@
     {
       "text": "",
       "type": "separator",
-      "start": 2077,
-      "end": 2077,
-      "line": 125,
-      "ignore": false,
-      "index": -1,
-      "takeNumber": -1,
-      "original_line": 126
-    },
-    {
-      "text": "SMASH CUT TO:",
-      "type": "transition",
-      "start": 2078,
-      "end": 2107,
-      "line": 126,
-      "ignore": false,
-      "index": -1,
-      "takeNumber": -1,
-      "original_line": 127
-    },
-    {
-      "text": "",
-      "type": "separator",
-      "start": 2108,
-      "end": 2108,
-      "line": 127,
-      "ignore": false,
-      "index": -1,
-      "takeNumber": -1,
-      "original_line": 128
-    },
-    {
-      "text": "EXT. THE INSTITUTE - DAY",
-      "type": "scene_heading",
-      "start": 2109,
-      "end": 2133,
+      "start": 2119,
+      "end": 2119,
       "line": 128,
       "ignore": false,
-      "number": "9",
       "index": -1,
       "takeNumber": -1,
       "original_line": 129
     },
     {
-      "text": "",
-      "type": "separator",
-      "start": 2134,
-      "end": 2134,
+      "text": "SMASH CUT TO:",
+      "type": "transition",
+      "start": 2120,
+      "end": 2149,
       "line": 129,
       "ignore": false,
       "index": -1,
@@ -1608,44 +1625,78 @@
       "original_line": 130
     },
     {
-      "text": "The building crumbles. The children emerge into the real world.",
-      "type": "action",
-      "start": 2135,
-      "end": 2198,
+      "text": "",
+      "type": "separator",
+      "start": 2150,
+      "end": 2150,
       "line": 130,
       "ignore": false,
-      "time": 3.15,
       "index": -1,
       "takeNumber": -1,
       "original_line": 131
     },
     {
-      "text": "",
-      "type": "separator",
-      "start": 2199,
-      "end": 2199,
+      "text": "EXT. THE INSTITUTE - DAY",
+      "type": "scene_heading",
+      "start": 2151,
+      "end": 2175,
       "line": 131,
       "ignore": false,
+      "number": "9",
       "index": -1,
       "takeNumber": -1,
       "original_line": 132
     },
     {
-      "text": "FADE OUT.",
-      "type": "transition",
-      "start": 2200,
-      "end": 2225,
+      "text": "",
+      "type": "separator",
+      "start": 2176,
+      "end": 2176,
       "line": 132,
       "ignore": false,
       "index": -1,
       "takeNumber": -1,
       "original_line": 133
+    },
+    {
+      "text": "The building crumbles. The children emerge into the real world.",
+      "type": "action",
+      "start": 2177,
+      "end": 2240,
+      "line": 133,
+      "ignore": false,
+      "time": 3.15,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 134
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2241,
+      "end": 2241,
+      "line": 134,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 135
+    },
+    {
+      "text": "FADE OUT.",
+      "type": "transition",
+      "start": 2242,
+      "end": 2267,
+      "line": 135,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 136
     }
   ],
   "scriptHtml": "",
   "titleHtml": "",
   "lengthAction": 34.400000000000006,
-  "lengthDialogue": 27.157957199999995,
+  "lengthDialogue": 28.908950399999995,
   "tokenLines": {
     "8": 0,
     "9": 1,
@@ -1750,29 +1801,34 @@
     "108": 118,
     "109": 119,
     "110": 120,
-    "113": 121,
-    "114": 122,
-    "115": 123,
-    "116": 124,
-    "117": 126,
-    "118": 127,
-    "119": 129,
-    "120": 131,
-    "121": 132,
-    "122": 134,
-    "123": 136,
-    "124": 137,
-    "125": 139,
+    "111": 121,
+    "112": 122,
+    "113": 123,
+    "114": 124,
+    "115": 125,
+    "116": 126,
+    "117": 128,
+    "118": 129,
+    "119": 131,
+    "120": 133,
+    "121": 134,
+    "122": 136,
+    "123": 138,
+    "124": 139,
+    "125": 141,
     "126": 140,
     "127": 141,
-    "128": 142,
-    "129": 143,
-    "130": 144,
-    "131": 145,
-    "132": 146,
-    "133": 147
+    "128": 143,
+    "129": 144,
+    "130": 145,
+    "131": 146,
+    "132": 147,
+    "133": 148,
+    "134": 149,
+    "135": 150,
+    "136": 151
   },
-  "parseTime": 1788956227832,
+  "parseTime": 1788959529935,
   "properties": {
     "sceneLines": [
       22,
@@ -1783,7 +1839,7 @@
       72,
       86,
       113,
-      128
+      131
     ],
     "scenes": [
       {
@@ -1840,12 +1896,12 @@
         "text": "INT. THE CORE - DAY",
         "line": 113,
         "actionLength": 3.1999999999999993,
-        "dialogueLength": 4.6693152
+        "dialogueLength": 6.4203084
       },
       {
         "scene": "9",
         "text": "EXT. THE INSTITUTE - DAY",
-        "line": 128,
+        "line": 131,
         "actionLength": 0,
         "dialogueLength": 0
       }
@@ -1906,7 +1962,7 @@
         },
         {
           "scene_number": 9,
-          "line": 128,
+          "line": 131,
           "name": "THE INSTITUTE",
           "interior": false,
           "exterior": true,
@@ -2172,15 +2228,15 @@
             "children": null,
             "range": {
               "start": {
-                "line": 128,
+                "line": 131,
                 "character": 0
               },
               "end": {
-                "line": 128,
+                "line": 131,
                 "character": 24
               }
             },
-            "id": "/92/128"
+            "id": "/92/131"
           }
         ],
         "range": {

@@ -128,7 +128,34 @@ const stubs = {
             use_dual_dialogue: true,
             merge_multiple_empty_lines: false,
             each_scene_on_new_page: false,
-            embolden_scene_headers: false
+            embolden_scene_headers: false,
+            print_sections: true,
+            print_synopsis: true,
+            print_actions: true,
+            print_headers: true,
+            print_dialogues: true,
+            number_sections: false,
+            print_header: '',
+            print_footer: '',
+            print_watermark: '',
+            scenes_numbers: 'none',
+            text_more: '(MORE)',
+            text_contd: '(CONT\'D)',
+            text_scene_continued: 'CONTINUED:',
+            scene_continuation_top: false,
+            scene_continuation_bottom: false,
+            synchronized_markup_and_preview: true,
+            preview_theme: 'paper',
+            preview_texture: false,
+            parenthetical_newline_helper: false,
+            split_dialogue: false,
+            print_title_page: true,
+            print_profile: 'usletter',
+            double_space_between_scenes: false,
+            show_page_numbers: true,
+            embolden_character_names: false,
+            create_bookmarks: false,
+            invisible_section_bookmarks: false
         })
     },
     './providers/Decorations': {
@@ -154,7 +181,42 @@ Module._load = function(req, ...args) {
 const parser = require('/home/davide/.vscode/extensions/piersdeseilligny.betterfountain-1.14.2/out/afterwriting-parser.js');
 const fs = require('fs');
 const text = fs.readFileSync(process.argv[2], 'utf-8');
-const result = parser.parse(text, {}, false);
+const config = {
+    print_notes: true,
+    print_dialogue_numbers: false,
+    use_dual_dialogue: true,
+    merge_multiple_empty_lines: false,
+    each_scene_on_new_page: false,
+    embolden_scene_headers: false,
+    print_sections: true,
+    print_synopsis: true,
+    print_actions: true,
+    print_headers: true,
+    print_dialogues: true,
+    number_sections: false,
+    print_header: '',
+    print_footer: '',
+    print_watermark: '',
+    scenes_numbers: 'none',
+    text_more: '(MORE)',
+    text_contd: '(CONT\'D)',
+    text_scene_continued: 'CONTINUED:',
+    scene_continuation_top: false,
+    scene_continuation_bottom: false,
+    synchronized_markup_and_preview: true,
+    preview_theme: 'paper',
+    preview_texture: false,
+    parenthetical_newline_helper: false,
+    split_dialogue: false,
+    print_title_page: true,
+    print_profile: 'usletter',
+    double_space_between_scenes: false,
+    show_page_numbers: true,
+    embolden_character_names: false,
+    create_bookmarks: false,
+    invisible_section_bookmarks: false
+};
+const result = parser.parse(text, config, false);
 
 // Convert Maps to plain objects for JSON serialization
 function mapToObject(map) {

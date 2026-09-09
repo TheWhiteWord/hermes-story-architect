@@ -49,6 +49,33 @@ NOTE_INLINE_RE = REGEX['note_inline']
 BONEYARD_START_RE = re.compile(r'/\*')
 BONEYARD_END_RE = re.compile(r'\*/')
 
+# ─── Title page positioning (from BF titlePageDisplay) ───
+
+TITLE_PAGE_DISPLAY = {
+    'title': {'position': 'cc', 'index': 0},
+    'credit': {'position': 'cc', 'index': 1},
+    'author': {'position': 'cc', 'index': 2},
+    'authors': {'position': 'cc', 'index': 3},
+    'source': {'position': 'cc', 'index': 4},
+    'watermark': {'position': 'hidden', 'index': -1},
+    'font': {'position': 'hidden', 'index': -1},
+    'header': {'position': 'hidden', 'index': -1},
+    'footer': {'position': 'hidden', 'index': -1},
+    'notes': {'position': 'bl', 'index': 0},
+    'copyright': {'position': 'bl', 'index': 1},
+    'revision': {'position': 'br', 'index': 0},
+    'date': {'position': 'br', 'index': 1},
+    'draft_date': {'position': 'br', 'index': 2},
+    'contact': {'position': 'br', 'index': 3},
+    'contact_info': {'position': 'br', 'index': 4},
+    'br': {'position': 'br', 'index': -1},
+    'bl': {'position': 'bl', 'index': -1},
+    'tr': {'position': 'tr', 'index': -1},
+    'tc': {'position': 'tc', 'index': -1},
+    'tl': {'position': 'tl', 'index': -1},
+    'cc': {'position': 'cc', 'index': -1},
+}
+
 # ─── Token creation (from token.js lines 4-66) ───
 
 def create_token(text, cursor, line, new_line_length, type=None):
@@ -162,15 +189,23 @@ def fountain_to_html(fountain):
 
 # ─── Main parser (from afterwriting-parser.js lines 126-749) ───
 
-def parse(original_script, generate_html=False):
+def parse(original_script, cfg=None, generate_html=False):
     """Parse Fountain screenplay into tokens.
-    
+
     Faithful port of Better Fountain's parse() function.
     """
+    if cfg is None:
+        cfg = {
+            'print_notes': True,
+            'print_dialogue_numbers': False,
+            'use_dual_dialogue': True,
+            'merge_multiple_empty_lines': False,
+            'each_scene_on_new_page': False,
+        }
     emptytitlepage = True
     new_line_length = 2 if '\r\n' in original_script else 1
     lines = re.split(r'\r\n|\r|\n', original_script)
-    
+
     result = {
         'title_page': {'tl': [], 'tc': [], 'tr': [], 'cc': [], 'bl': [], 'br': [], 'hidden': []},
         'tokens': [],
@@ -193,12 +228,13 @@ def parse(original_script, generate_html=False):
             'structure': [],
         }
     }
-    
+
     if not original_script:
         return result
-    
+
     # State variables
     nested_comments = 0
+    cache_state_for_comment = 'normal'
     current = 0
     scene_number = 1
     current_depth = 0
@@ -211,18 +247,102 @@ def parse(original_script, generate_html=False):
     previous_character = None
     title_page_started = False
     ignored_last_token = False
-    
+    take_count = 1
+    length_action_so_far = 0
+    length_dialogue_so_far = 0
+
     def push_token(token):
         result['tokens'].append(token)
         if token['line'] is not None:
             result['tokenLines'][token['line']] = len(result['tokens']) - 1
-    
+
+    def update_previous_scene_length():
+        nonlocal length_action_so_far, length_dialogue_so_far
+        action = result['lengthAction'] - length_action_so_far
+        dialogue = result['lengthDialogue'] - length_dialogue_so_far
+        length_action_so_far = result['lengthAction']
+        length_dialogue_so_far = result['lengthDialogue']
+        if result['properties']['scenes']:
+            result['properties']['scenes'][-1]['actionLength'] = action
+            result['properties']['scenes'][-1]['dialogueLength'] = dialogue
+
+    def latest_section_or_scene(depth, condition):
+        if depth <= 0:
+            return None
+        elif depth == 1:
+            items = [s for s in result['properties']['structure'] if condition(s)]
+            return items[-1] if items else None
+        else:
+            prev = latest_section_or_scene(depth - 1, condition)
+            if prev and prev.get('children'):
+                children = [c for c in prev['children'] if condition(c)]
+                if children:
+                    return children[-1]
+            return prev
+
+    def latest_section(depth):
+        return latest_section_or_scene(depth, lambda t: t.get('section'))
+
+    def process_inline_note(text, linenumber):
+        notes = REGEX['note_inline'].findall(text)
+        if not notes:
+            return 0
+        irrelevant_length = 0
+        level = latest_section_or_scene(current_depth + 1, lambda _: True)
+        if level:
+            level['notes'] = level.get('notes', [])
+            for note in notes:
+                level['notes'].append({'note': note, 'line': linenumber})
+                irrelevant_length += len(note) + 4
+        else:
+            for note in notes:
+                result['properties']['structure'].append({
+                    'text': note, 'id': '/' + str(linenumber), 'isnote': True,
+                    'children': [], 'level': 0, 'notes': [], 'section': False, 'synopses': []
+                })
+                irrelevant_length += len(note) + 4
+        return irrelevant_length
+
+    def calculate_dialogue_duration(text):
+        duration = 0
+        sanitized = re.sub(r'[^\w]', '', text)
+        duration += (len(sanitized) / 3) * 0.1945548
+        punct = re.findall(r'(\.|\?|\!|\:) |(\, )', text)
+        if punct:
+            if punct[0][0]:
+                duration += 0.75 * len([p for p in punct if p[0]])
+            if punct[0][1]:
+                duration += 0.3 * len([p for p in punct if p[1]])
+        return duration
+
+    def process_dialogue_block(token):
+        text_without_notes = REGEX['note_inline'].sub('', token['text'])
+        process_inline_note(token['text'], token['line'])
+        token['time'] = calculate_dialogue_duration(text_without_notes)
+        if not cfg.get('print_notes'):
+            token['text'] = text_without_notes
+            if token['text'].strip() == '':
+                token['ignore'] = True
+        result['lengthDialogue'] += token['time']
+
+    def process_action_block(token):
+        irrelevant = process_inline_note(token['text'], token['line'])
+        token['time'] = (len(token['text']) - irrelevant) / 20
+        if not cfg.get('print_notes'):
+            token['text'] = REGEX['note_inline'].sub('', token['text'])
+            if token['text'].strip() == '':
+                token['ignore'] = True
+        result['lengthAction'] += token['time']
+
+    def slugify(text):
+        return re.sub(r'-+$', '', re.sub(r'^-+', '', re.sub(r'-{2,}', '-', re.sub(r'[^\w-]+', '', re.sub(r'\s+', '-', text.lower())))))
+
     lines_length = len(lines)
-    
+
     for i in range(lines_length):
         text = lines[i]
-        
-        # Handle boneyard (comments) with nesting (line 276)
+
+        # Handle boneyard (comments) with nesting
         parts = re.split(r'(\/\*|\*\/)', text)
         new_parts = []
         for part in parts:
@@ -233,49 +353,67 @@ def parse(original_script, generate_html=False):
             elif nested_comments == 0:
                 new_parts.append(part)
         text = ''.join(new_parts)
-        
-        if nested_comments > 0 and state != 'ignore':
+
+        if nested_comments and state != 'ignore':
+            cache_state_for_comment = state
             state = 'ignore'
-        elif state == 'ignore' and nested_comments == 0:
-            state = 'normal'
-        
+        elif state == 'ignore':
+            state = cache_state_for_comment
+        if nested_comments == 0 and state == 'ignore':
+            state = cache_state_for_comment
+
         thistoken = create_token(text, current, i, new_line_length)
         thistoken['original_line'] = i + 1
         current = thistoken['end'] + 1
-        
-        # Empty line handling (lines 290-307)
+
+        # Empty line handling
         if text.strip() == '' and text != '  ':
+            skip_separator = (cfg.get('merge_multiple_empty_lines') and last_was_separator) or (ignored_last_token and len(result['tokens']) > 1 and result['tokens'][-1]['type'] == 'separator')
+            if ignored_last_token:
+                ignored_last_token = False
             if state == 'dialogue':
                 push_token(create_token(None, None, None, None, 'dialogue_end'))
             if state == 'dual_dialogue':
                 push_token(create_token(None, None, None, None, 'dual_dialogue_end'))
             state = 'normal'
+            if skip_separator or state == 'title_page':
+                continue
             dual_right = False
             thistoken['type'] = 'separator'
             last_was_separator = True
             push_token(thistoken)
             continue
-        
+
         token_category = 'script'
-        
-        # Title page detection (lines 310-332)
+
+        # Title page detection
         if not title_page_started and REGEX['title_page'].match(thistoken['text']):
             state = 'title_page'
-        
+
         if state == 'title_page':
             if REGEX['title_page'].match(thistoken['text']):
                 colon_idx = thistoken['text'].find(':')
                 thistoken['type'] = thistoken['text'][:colon_idx].lower().replace(' ', '_')
                 thistoken['text'] = thistoken['text'][colon_idx + 1:].strip()
                 last_title_page_token = thistoken
+                keyformat = TITLE_PAGE_DISPLAY.get(thistoken['type'])
+                if keyformat:
+                    thistoken['index'] = keyformat['index']
+                    result['title_page'][keyformat['position']].append(thistoken)
+                    emptytitlepage = False
                 title_page_started = True
                 continue
             elif title_page_started and last_title_page_token:
                 last_title_page_token['text'] += ('\n' if last_title_page_token['text'] else '') + thistoken['text'].strip()
                 continue
-        
-        # Normal state parsing (lines 334-513)
+
+        # Normal state parsing
         if state == 'normal':
+            if REGEX['line_break'].match(thistoken['text']):
+                token_category = 'none'
+            elif result['properties']['firstTokenLine'] == float('inf'):
+                result['properties']['firstTokenLine'] = thistoken['line']
+
             scene_heading_match = REGEX['scene_heading'].match(thistoken['text'])
             if scene_heading_match:
                 thistoken['text'] = re.sub(r'^\.', '', thistoken['text'])
@@ -285,105 +423,188 @@ def parse(original_script, generate_html=False):
                 if scene_num_match:
                     thistoken['text'] = REGEX['scene_number'].sub('', thistoken['text']).strip()
                     thistoken['number'] = scene_num_match.group(1)
-                
+
+                cobj = {
+                    'text': thistoken['text'],
+                    'children': None,
+                    'range': {'start': {'line': thistoken['line'], 'character': 0}, 'end': {'line': thistoken['line'], 'character': len(thistoken['text'])}},
+                }
+                if current_depth == 0:
+                    cobj['id'] = '/' + str(thistoken['line'])
+                    result['properties']['structure'].append(cobj)
+                else:
+                    level = latest_section(current_depth)
+                    if level:
+                        cobj['id'] = level['id'] + '/' + str(thistoken['line'])
+                        level['children'].append(cobj)
+                    else:
+                        cobj['id'] = '/' + str(thistoken['line'])
+                        result['properties']['structure'].append(cobj)
+
+                update_previous_scene_length()
                 result['properties']['scenes'].append({
                     'scene': thistoken['number'],
                     'text': thistoken['text'],
                     'line': thistoken['line'],
+                    'actionLength': 0,
+                    'dialogueLength': 0,
                 })
+                result['properties']['sceneLines'].append(thistoken['line'])
+                result['properties']['sceneNames'].append(thistoken['text'])
+
+                location = parse_location_information(scene_heading_match)
+                if location:
+                    location_slug = slugify(location['name'])
+                    if location_slug in result['properties']['locations']:
+                        values = result['properties']['locations'][location_slug]
+                        if not any(it['scene_number'] == scene_number for it in values):
+                            values.append({'scene_number': scene_number, 'line': thistoken['line'], **location})
+                    else:
+                        result['properties']['locations'][location_slug] = [{'scene_number': scene_number, 'line': thistoken['line'], **location}]
+
                 scene_number += 1
-            
+
             elif thistoken['text'] and thistoken['text'][0] == '!':
                 thistoken['type'] = 'action'
                 thistoken['text'] = thistoken['text'][1:]
-            
+                process_action_block(thistoken)
+
             elif REGEX['centered'].match(thistoken['text']):
                 thistoken['type'] = 'centered'
-                thistoken['text'] = re.sub(r'>|(<)', '', thistoken['text']).strip()
-            
+                thistoken['text'] = re.sub(r'>|<', '', thistoken['text']).strip()
+
             elif REGEX['transition'].match(thistoken['text']):
                 thistoken['text'] = re.sub(r'^> ?', '', thistoken['text'])
                 thistoken['type'] = 'transition'
-            
+
             elif REGEX['synopsis'].match(thistoken['text']):
                 match = REGEX['synopsis'].match(thistoken['text'])
                 thistoken['text'] = match.group(1)
                 thistoken['type'] = 'synopsis' if thistoken['text'] else 'separator'
-            
+                level = latest_section_or_scene(current_depth + 1, lambda _: True)
+                if level:
+                    level['synopses'] = level.get('synopses', [])
+                    level['synopses'].append({'synopsis': thistoken['text'], 'line': thistoken['line']})
+
             elif REGEX['section'].match(thistoken['text']):
                 match = REGEX['section'].match(thistoken['text'])
                 thistoken['level'] = len(match.group(1))
                 thistoken['text'] = match.group(2)
                 thistoken['type'] = 'section'
+                cobj = {
+                    'text': thistoken['text'],
+                    'level': thistoken['level'],
+                    'children': [],
+                    'range': {'start': {'line': thistoken['line'], 'character': 0}, 'end': {'line': thistoken['line'], 'character': len(thistoken['text'])}},
+                    'section': True,
+                }
                 current_depth = thistoken['level']
-            
+                level = current_depth > 1 and latest_section_or_scene(current_depth, lambda t: t.get('section') and t.get('level', 0) < current_depth)
+                if current_depth == 1 or not level:
+                    cobj['id'] = '/' + str(thistoken['line'])
+                    result['properties']['structure'].append(cobj)
+                else:
+                    cobj['id'] = level['id'] + '/' + str(thistoken['line'])
+                    level['children'].append(cobj)
+
             elif REGEX['page_break'].match(thistoken['text']):
                 thistoken['text'] = ''
                 thistoken['type'] = 'page_break'
-            
-            elif (REGEX['character'].match(thistoken['text']) and 
-                  i != lines_length and i != lines_length - 1):
-                # Check next line for dialogue validation (line 443)
-                next_line = lines[i + 1] if i + 1 < lines_length else ''
-                if next_line.strip() == '' and next_line != '  ':
-                    thistoken['type'] = 'action'
-                else:
-                    state = 'dialogue'
-                    thistoken['type'] = 'character'
-                    thistoken['text'] = trim_character_force_symbol(thistoken['text'])
-                    
-                    if thistoken['text'].endswith('^'):
+
+            elif (REGEX['character'].match(thistoken['text']) and
+                  i != lines_length and i != lines_length - 1 and
+                  ((lines[i + 1].strip() == '') == (lines[i + 1] == '  '))):
+                state = 'dialogue'
+                thistoken['type'] = 'character'
+                thistoken['takeNumber'] = take_count
+                take_count += 1
+                thistoken['text'] = trim_character_force_symbol(thistoken['text'])
+
+                if thistoken['text'].endswith('^'):
+                    if cfg.get('use_dual_dialogue'):
                         state = 'dual_dialogue'
+                        dialogue_tokens = ['dialogue', 'character', 'parenthetical']
+                        while last_character_index < len(result['tokens']) and result['tokens'][last_character_index]['type'] in dialogue_tokens:
+                            result['tokens'][last_character_index]['dual'] = 'left'
+                            last_character_index += 1
+                        foundmatch = False
+                        temp_index = len(result['tokens']) - 1
+                        while not foundmatch:
+                            temp_index -= 1
+                            tok_type = result['tokens'][temp_index]['type']
+                            if tok_type == 'dialogue_end':
+                                result['tokens'].pop(temp_index)
+                                temp_index -= 1
+                            elif tok_type in ('separator', 'character', 'dialogue', 'parenthetical'):
+                                pass
+                            elif tok_type == 'dialogue_begin':
+                                result['tokens'][temp_index]['type'] = 'dual_dialogue_begin'
+                                foundmatch = True
+                            else:
+                                foundmatch = True
                         dual_right = True
                         thistoken['dual'] = 'right'
-                        thistoken['text'] = re.sub(r'\^$', '', thistoken['text'])
                     else:
                         push_token(create_token(None, None, None, None, 'dialogue_begin'))
-                    
-                    character = trim_character_extension(thistoken['text']).strip()
-                    previous_character = character
-                    last_character_index = len(result['tokens'])
-            
+                    thistoken['text'] = re.sub(r'\^$', '', thistoken['text'])
+                else:
+                    push_token(create_token(None, None, None, None, 'dialogue_begin'))
+
+                character = trim_character_extension(thistoken['text']).strip()
+                previous_character = character
+                if character in result['properties']['characters']:
+                    values = result['properties']['characters'][character]
+                    if scene_number not in values:
+                        values.append(scene_number)
+                else:
+                    result['properties']['characters'][character] = [scene_number]
+                last_character_index = len(result['tokens'])
+
             else:
                 thistoken['type'] = 'action'
-        
+                process_action_block(thistoken)
+
         else:
-            # Dialogue state (lines 516-527)
+            # Dialogue state
             if REGEX['parenthetical'].match(thistoken['text']):
                 thistoken['type'] = 'parenthetical'
             else:
                 thistoken['type'] = 'dialogue'
+                process_dialogue_block(thistoken)
                 thistoken['character'] = previous_character
-            
+
             if dual_right:
                 thistoken['dual'] = 'right'
-        
+
         last_was_separator = False
-        
+
         if token_category == 'script' and state != 'ignore':
             if thistoken['type'] in ('scene_heading', 'transition'):
                 thistoken['text'] = thistoken['text'].upper()
                 title_page_started = True
-            
+
             if thistoken['text'] and thistoken['text'][0] == '~':
                 thistoken['text'] = '*' + thistoken['text'][1:] + '*'
-            
+
             if thistoken['type'] not in ('action', 'dialogue'):
                 thistoken['text'] = thistoken['text'].strip()
-            
-            if not thistoken['ignore']:
+
+            if thistoken['ignore']:
+                ignored_last_token = True
+            else:
+                ignored_last_token = False
                 push_token(thistoken)
-    
-    # Close any open dialogue (lines 551-556)
+
+    # Close any open dialogue
     if state == 'dialogue':
         push_token(create_token(None, None, None, None, 'dialogue_end'))
     if state == 'dual_dialogue':
         push_token(create_token(None, None, None, None, 'dual_dialogue_end'))
-    
-    # Clean trailing separators (lines 745-747)
+
+    # Clean trailing separators
     while result['tokens'] and result['tokens'][-1]['type'] == 'separator':
         result['tokens'].pop()
-    
+
     return result
 
 
