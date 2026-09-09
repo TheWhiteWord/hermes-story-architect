@@ -1,0 +1,3297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Dashboard</title>
+
+<!-- vis-network from CDN (MIT/Apache 2.0) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<!-- D3.js for charts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<!-- DataTables standalone (no jQuery required) -->
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
+
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Fallback tokens for standalone preview — Hermes will override */
+  --foreground: #e8e8e8;
+  --muted-foreground: #8a8a8a;
+  --accent: #7b9cf0;
+  --border: rgba(255,255,255,0.1);
+  --card: rgba(255,255,255,0.04);
+  --background: #111;
+  /* Panel must always be opaque — not just var(--card) which is translucent */
+  --panel-bg: #181818;
+
+  /* Internal tokens */
+  --sidebar-w: 44px;
+  --sidebar-w-open: 180px;
+  --panel-w: 320px;
+  --radius: 6px;
+  --gap: 12px;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 13px;
+  --font-size-lg: 15px;
+  --tag-gap: 4px;
+
+  --role-protagonist: #7b9cf0;
+  --role-antagonist: #e07070;
+  --role-mentor: #b07be0;
+  --role-rival: #e0a86b;
+  --role-supporting: #6bbfb0;
+  --role-entity: #e06b9b;
+
+  --status-active: #6bbfb0;
+  --status-building: #e0a86b;
+  --status-resolved: var(--muted-foreground);
+}
+
+html, body {
+  height: 100%;
+  background: transparent;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ─── Layout Shell ─────────────────────────────────────────── */
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ─── Sidebar ──────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--gap) 0;
+  gap: 2px;
+  transition: width 0.18s ease;
+  overflow: hidden;
+  background: var(--card);
+  z-index: 10;
+}
+
+#sidebar.expanded { width: var(--sidebar-w-open); }
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  border-radius: 0;
+  transition: color 0.12s, background 0.12s;
+  width: 100%;
+  text-align: left;
+}
+.nav-btn:hover { color: var(--foreground); background: var(--card); }
+.nav-btn.active { color: var(--accent); }
+.nav-btn .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.nav-label { opacity: 0; transition: opacity 0.1s; pointer-events: none; }
+#sidebar.expanded .nav-label { opacity: 1; pointer-events: auto; }
+
+.nav-separator { height: 1px; background: var(--border); margin: 6px 10px; flex-shrink: 0; }
+
+.sidebar-toggle {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+}
+.sidebar-toggle:hover { color: var(--foreground); }
+
+/* ─── Main Content ─────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.view { display: none; flex-direction: column; height: 100%; }
+.view.active { display: flex; }
+
+/* ─── View Header ──────────────────────────────────────────── */
+.view-header {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.view-title {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--foreground);
+}
+.view-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+}
+.view-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ─── Graph View ───────────────────────────────────────────── */
+#graph-view .view-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#network-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Scenes View ──────────────────────────────────────────── */
+#scenes-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+}
+
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scene-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+}
+.scene-item:hover { background: var(--card); border-color: var(--border); }
+.scene-item.selected { background: var(--card); border-color: var(--accent); }
+
+.scene-number {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+  min-width: 24px;
+  flex-shrink: 0;
+}
+.scene-body { flex: 1; min-width: 0; }
+.scene-heading {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scene-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* ─── Story View ───────────────────────────────────────────── */
+#story-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap) 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.story-section-title {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.project-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.project-stat {
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.project-stat-value {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--foreground);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.project-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.project-logline {
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  line-height: 1.6;
+  grid-column: 1 / -1;
+  font-style: italic;
+}
+
+.plot-list { display: flex; flex-direction: column; gap: 6px; }
+.plot-item {
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+.plot-item:hover { border-color: var(--accent); }
+.plot-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.plot-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--foreground); }
+.plot-sentence { font-size: var(--font-size-xs); color: var(--muted-foreground); line-height: 1.5; }
+
+.risk-list { display: flex; flex-direction: column; gap: 4px; }
+.risk-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: var(--card);
+  border-left: 2px solid #e07070;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+/* ─── Tags & Chips ─────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.tag-scene { background: rgba(123,156,240,0.12); color: var(--accent); }
+.tag-location { background: rgba(107,191,176,0.12); color: #6bbfb0; }
+.tag-plot { background: rgba(176,123,224,0.12); color: #b07be0; }
+.tag-char { background: rgba(107,191,176,0.1); color: var(--muted-foreground); border: 1px solid var(--border); }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.status-badge.active { color: var(--status-active); }
+.status-badge.active::before { background: var(--status-active); }
+.status-badge.building { color: var(--status-building); }
+.status-badge.building::before { background: var(--status-building); }
+
+/* ─── Buttons ──────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: opacity 0.1s, background 0.1s;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+}
+.btn:hover { color: var(--foreground); }
+.btn-primary {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-hermes {
+  border-color: rgba(123,156,240,0.3);
+  color: var(--accent);
+}
+.btn-hermes:hover { background: rgba(123,156,240,0.1); }
+
+/* ─── Detail Panel ─────────────────────────────────────────── */
+#detail-panel {
+  width: 0;
+  flex-shrink: 0;
+  border-left: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Solid background — fallback ensures it's never transparent */
+  background: var(--panel-bg, #1a1a1a);
+  transition: width 0.2s ease, border-color 0.2s ease;
+  position: relative; /* flow element, not overlay */
+  z-index: 1;
+}
+#detail-panel.open {
+  width: var(--panel-w);
+  border-left: 1px solid var(--border);
+}
+/* Wide-screen: panel opens beside content */
+@media (min-width: 700px) {
+  #detail-panel { min-width: 0; }
+}
+/* Narrow: panel takes full width as a layer */
+@media (max-width: 699px) {
+  #detail-panel {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 0;
+    z-index: 20;
+  }
+  #detail-panel.open {
+    width: min(var(--panel-w), calc(100vw - var(--sidebar-w)));
+  }
+}
+
+.panel-header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.panel-title-block { flex: 1; min-width: 0; }
+.panel-entity-type {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  margin-bottom: 2px;
+}
+.panel-name {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-close {
+  background: none;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 2px;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.panel-close:hover { color: var(--foreground); }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-section-title {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.panel-text {
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  line-height: 1.6;
+}
+.panel-muted {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+
+.panel-tags { display: flex; flex-wrap: wrap; gap: var(--tag-gap); }
+
+.entity-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.1s, color 0.1s;
+}
+.entity-link:hover { border-color: var(--accent); color: var(--accent); }
+
+.panel-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.role-pip {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Loading & Empty States ───────────────────────────────── */
+#loading-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  background: transparent;
+}
+.loading-icon {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: var(--font-size-sm); color: var(--muted-foreground); }
+
+#error-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  padding: 32px;
+  text-align: center;
+}
+.error-title { font-size: var(--font-size-lg); font-weight: 500; color: var(--foreground); }
+.error-body { font-size: var(--font-size-sm); color: var(--muted-foreground); max-width: 280px; line-height: 1.6; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 6px;
+  text-align: center;
+}
+.empty-state-title { font-size: var(--font-size-base); color: var(--muted-foreground); }
+.empty-state-sub { font-size: var(--font-size-xs); color: var(--muted-foreground); opacity: 0.6; }
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ─── Search ───────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  height: 28px;
+  flex: 1;
+  max-width: 200px;
+}
+.search-bar input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--font-size-xs);
+}
+.search-bar input::placeholder { color: var(--muted-foreground); }
+
+/* ─── Entity List Views (locations, plots, worlds) ─────────── */
+.entity-list-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+}
+.entity-grid { display: flex; flex-direction: column; gap: 4px; }
+.entity-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.entity-card:hover { background: var(--card); border-color: var(--border); }
+.entity-card.selected { background: var(--card); border-color: var(--accent); }
+.entity-card-pip {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.entity-card-body { flex: 1; min-width: 0; }
+.entity-card-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--foreground); }
+.entity-card-sub { font-size: var(--font-size-xs); color: var(--muted-foreground); line-height: 1.5; margin-top: 2px; }
+.entity-card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+
+/* World rules */
+.world-rule {
+  padding: 5px 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.world-rule::before { content: '∙'; color: var(--accent); flex-shrink: 0; }
+
+/* Fountain scene content */
+.fountain-content {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: var(--font-size-xs);
+  line-height: 1.7;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* Relationship rows */
+.relationship-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.relationship-row:last-child { border-bottom: none; }
+.relationship-name { font-size: var(--font-size-sm); color: var(--foreground); font-weight: 500; flex-shrink: 0; }
+.relationship-label { font-size: var(--font-size-xs); color: var(--accent); flex-shrink: 0; }
+.relationship-feeling { font-size: var(--font-size-xs); color: var(--muted-foreground); flex: 1; min-width: 0; line-height: 1.4; }
+
+/* Knowledge list */
+.knowledge-item {
+  font-size: var(--font-size-xs); color: var(--muted-foreground);
+  padding: 4px 0; border-bottom: 1px solid var(--border);
+  line-height: 1.5; display: flex; gap: 6px;
+}
+.knowledge-item::before { content: '→'; opacity: 0.5; flex-shrink: 0; }
+.knowledge-item:last-child { border-bottom: none; }
+
+/* Setup/payoff rows in plot panel */
+.beat-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+.beat-row .beat-scene {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.beat-row:last-child { border-bottom: none; }
+
+/* Narrow layout */
+@media (max-width: 520px) {
+  .search-bar { display: none; }
+}
+
+/* ─── Script View ──────────────────────────────────────────── */
+#script-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--card);
+  padding: 0;
+}
+
+/* Screenplay page — scrollable document, no hard page breaks in v1 */
+.screenplay-doc {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+/* Title page block */
+.screenplay-title-page {
+  padding: 40px 0 60px;
+  display: grid;
+  grid-template-areas:
+    "tl tc tr"
+    ".  cc  ."
+    "bl .  br";
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  min-height: 300px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+.title-tl { grid-area: tl; }
+.title-tc { grid-area: tc; text-align: center; }
+.title-tr { grid-area: tr; text-align: right; }
+.title-cc { grid-area: cc; text-align: center; padding: 20px 0; }
+.title-cc .fountain-title { font-size: 16px; font-weight: bold; display: block; margin-bottom: 4px; }
+.title-bl { grid-area: bl; align-self: end; }
+.title-br { grid-area: br; text-align: right; align-self: end; }
+.title-meta { font-size: 10px; color: var(--muted-foreground); line-height: 1.7; }
+
+/* Page break indicator */
+.screenplay-page-break {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 24px 0 8px;
+  position: relative;
+}
+.screenplay-page-break::after {
+  content: attr(data-page);
+  position: absolute;
+  right: 0;
+  top: -8px;
+  font-size: 9px;
+  color: var(--muted-foreground);
+  font-family: inherit;
+  background: var(--card);
+  padding: 0 4px;
+}
+
+/* Fountain element styles */
+.fountain-scene-heading {
+  font-weight: bold;
+  color: var(--foreground);
+  margin: 20px 0 4px;
+  cursor: pointer;
+  display: block;
+}
+.fountain-scene-heading:hover { color: var(--accent); }
+.fountain-scene-heading .scene-num {
+  color: var(--muted-foreground);
+  font-weight: normal;
+  margin-right: 8px;
+}
+.fountain-action {
+  display: block;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+.fountain-character {
+  display: block;
+  margin-left: 35%;
+  margin-top: 8px;
+  font-weight: bold;
+  color: var(--foreground);
+}
+.fountain-parenthetical {
+  display: block;
+  margin-left: 28%;
+  color: var(--muted-foreground);
+}
+.fountain-dialogue {
+  display: block;
+  margin: 0 20% 8px 25%;
+  white-space: pre-wrap;
+}
+.fountain-transition {
+  display: block;
+  text-align: right;
+  margin: 12px 0;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+.fountain-centered {
+  display: block;
+  text-align: center;
+  margin: 8px 0;
+}
+.fountain-section {
+  display: block;
+  color: var(--accent);
+  font-weight: bold;
+  margin: 16px 0 4px;
+  font-family: inherit;
+}
+.fountain-synopsis {
+  display: block;
+  color: var(--muted-foreground);
+  font-style: italic;
+  margin-bottom: 4px;
+}
+.fountain-note { display: none; } /* Notes hidden in preview */
+.fountain-page-break { display: none; } /* handled separately */
+.fountain-empty { display: block; height: 0.6em; }
+
+/* Dual dialogue */
+.fountain-dual-dialogue {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+.fountain-dual-left, .fountain-dual-right { min-width: 0; }
+
+/* Script view empty state */
+.script-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+/* ─── Statistics Panel ─────────────────────────────────────── */
+#stats-panel {
+  width: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel-bg, #181818);
+  transition: width 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+#stats-panel.open {
+  width: var(--stats-panel-w, 360px);
+  border-left: 1px solid var(--border);
+}
+@media (max-width: 699px) {
+  #stats-panel {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 0;
+    z-index: 20;
+  }
+  #stats-panel.open {
+    width: min(360px, calc(100vw - var(--sidebar-w)));
+  }
+}
+
+/* Stats panel header */
+.stats-header {
+  padding: 12px 14px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.stats-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+.stats-title { font-size: var(--font-size-lg); font-weight: 500; color: var(--foreground); flex: 1; }
+.stats-close {
+  background: none; border: none; color: var(--muted-foreground);
+  cursor: pointer; padding: 2px; font-size: 16px; line-height: 1;
+}
+.stats-close:hover { color: var(--foreground); }
+
+/* Stats sub-nav tabs */
+.stats-subnav {
+  display: flex;
+  gap: 0;
+}
+.stats-tab {
+  flex: 1;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font: inherit;
+  transition: color 0.1s, border-color 0.1s;
+}
+.stats-tab:hover { color: var(--foreground); }
+.stats-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats body */
+.stats-body { flex: 1; overflow-y: auto; }
+.stats-group { display: none; padding: 14px; flex-direction: column; gap: 14px; }
+.stats-group.active { display: flex; }
+
+/* Stat grid — 2-col number blocks */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.stat-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.stat-block {
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stat-block-value {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--foreground);
+  line-height: 1;
+  margin-bottom: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-block-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+/* Duration summary text */
+.stat-summary {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-style: italic;
+}
+
+/* Section labels within stats groups */
+.stats-section-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: -4px;
+}
+
+/* Duration bars (type/time breakdown) */
+.duration-bar-group { display: flex; flex-direction: column; gap: 4px; }
+.duration-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+}
+.duration-bar-label { width: 56px; color: var(--muted-foreground); flex-shrink: 0; }
+.duration-bar-track {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.duration-bar-fill { height: 100%; border-radius: 3px; }
+.duration-bar-value { width: 40px; text-align: right; color: var(--muted-foreground); flex-shrink: 0; }
+
+/* D3 chart containers */
+.chart-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  padding: 8px 4px 4px;
+}
+.chart-container svg text { font-family: inherit; fill: var(--muted-foreground); }
+.chart-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+/* DataTables override — match dashboard theme */
+table.dataTable {
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  border-collapse: collapse;
+  width: 100% !important;
+}
+table.dataTable thead th {
+  background: var(--card);
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 8px;
+  font-weight: 500;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+table.dataTable tbody tr { border-bottom: 1px solid var(--border); }
+table.dataTable tbody td { padding: 5px 8px; }
+table.dataTable tbody tr:hover td { background: var(--card); }
+.dataTables_wrapper { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.dataTables_filter input {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  padding: 3px 6px;
+  font-size: var(--font-size-xs);
+  font: inherit;
+  outline: none;
+  margin-left: 4px;
+}
+.dataTables_length select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  padding: 2px 4px;
+  font: inherit;
+  font-size: var(--font-size-xs);
+}
+.dataTables_paginate .paginate_button {
+  padding: 2px 6px !important;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: var(--font-size-xs) !important;
+  color: var(--muted-foreground) !important;
+}
+.dataTables_paginate .paginate_button.current {
+  background: var(--accent) !important;
+  color: #111 !important;
+  border: none !important;
+}
+.dataTables_info { font-size: var(--font-size-xs); }
+.char-color-pip {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- Loading -->
+  <div id="loading-screen">
+    <div class="loading-icon"></div>
+    <div class="loading-text">Loading story index…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-screen">
+    <div class="error-title">No story index found</div>
+    <div class="error-body">
+      Place this file in your project root and make sure <code>.story/index.yaml</code> exists, or
+      use the button below to load a file manually.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-primary" onclick="loadFromFile()">Load index.yaml</button>
+      <button class="btn" onclick="loadSampleData()">Preview with sample data</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <button class="nav-btn active" data-view="graph" onclick="switchView('graph', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="2.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13.5" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="2.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="6.5" x2="3.5" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10.5" y1="6.5" x2="12.5" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="9.5" x2="3.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10.5" y1="9.5" x2="12.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Characters</span>
+    </button>
+
+    <button class="nav-btn" data-view="scenes" onclick="switchView('scenes', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="5" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5" y1="8.5" x2="11" y2="8.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5" y1="11" x2="8.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Scenes</span>
+    </button>
+
+    <button class="nav-btn" data-view="locations" onclick="switchView('locations', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M8 2a4 4 0 0 1 4 4c0 3-4 8-4 8S4 9 4 6a4 4 0 0 1 4-4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <circle cx="8" cy="6" r="1.5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Locations</span>
+    </button>
+
+    <button class="nav-btn" data-view="plots" onclick="switchView('plots', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M2 12 L5 7 L8 9 L11 4 L14 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="5" cy="7" r="1.2" fill="currentColor"/>
+        <circle cx="11" cy="4" r="1.2" fill="currentColor"/>
+      </svg>
+      <span class="nav-label">Plots</span>
+    </button>
+
+    <button class="nav-btn" data-view="worlds" onclick="switchView('worlds', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M2.5 8h11M8 2.5a8 6 0 0 1 0 11M8 2.5a8 6 0 0 0 0 11" stroke="currentColor" stroke-width="1.1"/>
+      </svg>
+      <span class="nav-label">Worlds</span>
+    </button>
+
+    <button class="nav-btn" data-view="story" onclick="switchView('story', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M3 8h10" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M8 3v5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span class="nav-label">Story</span>
+    </button>
+
+    <button class="nav-btn" data-view="script" onclick="switchView('script', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <rect x="3" y="1.5" width="10" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="5.5" y1="5" x2="10.5" y2="5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="5.5" y1="7.5" x2="10.5" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="5.5" y1="10" x2="8.5" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <span class="nav-label">Script</span>
+    </button>
+
+    <div class="nav-separator"></div>
+
+    <button class="nav-btn" onclick="refreshIndex()" title="Refresh index">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M13.5 2.5v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 8a6 6 0 0 1 10-4.47l1.5 2.97" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M2.5 13.5v-4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 8a6 6 0 0 1-10 4.47L2.5 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span class="nav-label">Refresh</span>
+    </button>
+
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </nav>
+
+  <!-- Main -->
+  <main id="main">
+
+    <!-- Graph View -->
+    <div class="view active" id="graph-view">
+      <div class="view-header">
+        <div class="view-title">Character web</div>
+        <div class="view-subtitle" id="graph-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="resetGraphLayout()" title="Reset layout">Reset</button>
+        </div>
+      </div>
+      <div class="view-body">
+        <div id="network-canvas"></div>
+        <div class="graph-legend" id="graph-legend"></div>
+      </div>
+    </div>
+
+    <!-- Scenes View -->
+    <div class="view" id="scenes-view">
+      <div class="view-header">
+        <div class="view-title">Scenes</div>
+        <div class="view-subtitle" id="scenes-subtitle">—</div>
+        <div class="view-header-actions">
+          <div class="search-bar">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><line x1="7" y1="7" x2="9" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <input type="text" placeholder="Filter scenes…" id="scene-search" oninput="filterScenes(this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="view-body">
+        <div class="scene-list" id="scene-list"></div>
+      </div>
+    </div>
+
+    <!-- Locations View -->
+    <div class="view entity-list-view" id="locations-view">
+      <div class="view-header">
+        <div class="view-title">Locations</div>
+        <div class="view-subtitle" id="locations-subtitle">—</div>
+      </div>
+      <div class="view-body">
+        <div class="entity-grid" id="location-list"></div>
+      </div>
+    </div>
+
+    <!-- Plots View -->
+    <div class="view entity-list-view" id="plots-view">
+      <div class="view-header">
+        <div class="view-title">Plots</div>
+        <div class="view-subtitle" id="plots-subtitle">—</div>
+      </div>
+      <div class="view-body">
+        <div class="entity-grid" id="plot-list"></div>
+      </div>
+    </div>
+
+    <!-- Worlds View -->
+    <div class="view entity-list-view" id="worlds-view">
+      <div class="view-header">
+        <div class="view-title">Worlds</div>
+        <div class="view-subtitle" id="worlds-subtitle">—</div>
+      </div>
+      <div class="view-body">
+        <div class="entity-grid" id="world-list"></div>
+      </div>
+    </div>
+
+    <!-- Story View -->
+    <div class="view" id="story-view">
+      <div class="view-header">
+        <div class="view-title" id="story-project-name">Story</div>
+        <div class="view-subtitle" id="story-subtitle">—</div>
+      </div>
+      <div class="view-body" id="story-body"></div>
+    </div>
+
+    <!-- Script View -->
+    <div class="view" id="script-view">
+      <div class="view-header">
+        <div class="view-title">Script</div>
+        <div class="view-subtitle" id="script-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn btn-hermes" onclick="openStatsPanel()" id="script-stats-btn" title="Screenplay statistics">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="7" width="2" height="4" rx="0.5" fill="currentColor"/>
+              <rect x="5" y="4" width="2" height="7" rx="0.5" fill="currentColor"/>
+              <rect x="9" y="1" width="2" height="10" rx="0.5" fill="currentColor"/>
+            </svg>
+            Statistics
+          </button>
+        </div>
+      </div>
+      <div class="view-body">
+        <div id="screenplay-container">
+          <div class="script-empty">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3">
+              <rect x="6" y="3" width="20" height="26" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="10" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="10" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="10" y1="18" x2="18" y2="18" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            <div>No screenplay loaded</div>
+            <div style="font-size:var(--font-size-xs);opacity:0.6">Place screenplay.fountain alongside this file, or ensure window.__SCREENPLAY_TEXT__ is set</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Statistics Panel (separate from entity detail panel) -->
+  <aside id="stats-panel">
+    <div class="stats-header">
+      <div class="stats-header-row">
+        <div class="stats-title">Statistics</div>
+        <button class="stats-close" onclick="closeStatsPanel()">✕</button>
+      </div>
+      <div class="stats-subnav">
+        <button class="stats-tab active" data-group="overview" onclick="switchStatsGroup('overview', this)">Overview</button>
+        <button class="stats-tab" data-group="characters" onclick="switchStatsGroup('characters', this)">Characters</button>
+        <button class="stats-tab" data-group="scenes" onclick="switchStatsGroup('scenes', this)">Scenes</button>
+      </div>
+    </div>
+    <div class="stats-body">
+
+      <!-- Overview group -->
+      <div class="stats-group active" id="stats-group-overview">
+        <div>
+          <div class="stats-section-label">Length</div>
+        </div>
+        <div class="stat-grid cols-3">
+          <div class="stat-block">
+            <div class="stat-block-value" id="lengthStats-pagesWhole">—</div>
+            <div class="stat-block-label">Pages</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="lengthStats-scenes">—</div>
+            <div class="stat-block-label">Scenes</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="lengthStats-words">—</div>
+            <div class="stat-block-label">Words</div>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-block">
+            <div class="stat-block-value" id="lengthStats-lines">—</div>
+            <div class="stat-block-label">Lines</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="lengthStats-characters">—</div>
+            <div class="stat-block-label">Characters</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-section-label">Duration</div>
+        </div>
+        <div class="stat-grid cols-3">
+          <div class="stat-block">
+            <div class="stat-block-value" id="durationStats-total">—</div>
+            <div class="stat-block-label">Total</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="durationStats-action">—</div>
+            <div class="stat-block-label">Action</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="durationStats-dialogue">—</div>
+            <div class="stat-block-label">Dialogue</div>
+          </div>
+        </div>
+        <div class="stat-summary" id="durationStats-summary">—</div>
+
+        <div>
+          <div class="stats-section-label">Action vs. Dialogue over screenplay</div>
+          <div class="chart-container" id="durationStats-lengthchart" style="height:80px;"></div>
+        </div>
+      </div>
+
+      <!-- Characters group -->
+      <div class="stats-group" id="stats-group-characters">
+        <div class="stat-grid">
+          <div class="stat-block">
+            <div class="stat-block-value" id="characterStats-count">—</div>
+            <div class="stat-block-label">Characters</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="characterStats-monologues">—</div>
+            <div class="stat-block-label">Monologues</div>
+          </div>
+        </div>
+        <div>
+          <div class="stats-section-label">Speaking time per character</div>
+          <div class="chart-container" id="characterStats-lengthchart" style="height:120px;"></div>
+        </div>
+        <div>
+          <div class="stats-section-label">Character detail</div>
+          <div style="overflow-x:auto;">
+            <table id="characterStats-table" style="width:100%">
+              <thead><tr>
+                <th>Name</th>
+                <th>Duration</th>
+                <th>Lines</th>
+                <th>Words</th>
+                <th>Monologues</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-hermes" data-hermes-send="Analyze the dialogue balance between characters in this screenplay. Which characters dominate? Are there any imbalances in speaking time?">Ask Hermes to analyze dialogue balance</button>
+        </div>
+      </div>
+
+      <!-- Scenes group -->
+      <div class="stats-group" id="stats-group-scenes">
+        <div class="stat-grid">
+          <div class="stat-block">
+            <div class="stat-block-value" id="sceneStats-count">—</div>
+            <div class="stat-block-label">Scenes</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block-value" id="locationStats-count">—</div>
+            <div class="stat-block-label">Locations</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-section-label">INT / EXT / Mixed</div>
+          <div class="duration-bar-group">
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Interior</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-type_int_bar" style="background:#7b9cf0"></div></div>
+              <span class="duration-bar-value" id="sceneprop-type_int">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Exterior</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-type_ext_bar" style="background:#6bbfb0"></div></div>
+              <span class="duration-bar-value" id="sceneprop-type_ext">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Mixed</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-type_mixed_bar" style="background:#e0a86b"></div></div>
+              <span class="duration-bar-value" id="sceneprop-type_mixed">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-section-label">Time of day</div>
+          <div class="duration-bar-group">
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Day</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-time_day_bar" style="background:#e0c96b"></div></div>
+              <span class="duration-bar-value" id="sceneprop-time_day">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Night</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-time_night_bar" style="background:#7b9cf0"></div></div>
+              <span class="duration-bar-value" id="sceneprop-time_night">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Morning</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-time_morning_bar" style="background:#e07070"></div></div>
+              <span class="duration-bar-value" id="sceneprop-time_morning">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Evening</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-time_evening_bar" style="background:#b07be0"></div></div>
+              <span class="duration-bar-value" id="sceneprop-time_evening">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Dawn</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-time_dawn_bar" style="background:#e06b9b"></div></div>
+              <span class="duration-bar-value" id="sceneprop-time_dawn">—</span>
+            </div>
+            <div class="duration-bar-row">
+              <span class="duration-bar-label">Dusk</span>
+              <div class="duration-bar-track"><div class="duration-bar-fill" id="sceneprop-time_dusk_bar" style="background:#6bbfb0"></div></div>
+              <span class="duration-bar-value" id="sceneprop-time_dusk">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-section-label">Scene barcode</div>
+          <div class="chart-container" id="sceneStats-timechart" style="height:60px;padding:6px 6px 4px;"></div>
+          <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+            <label style="font-size:var(--font-size-xs);color:var(--muted-foreground);display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="radio" name="barcode-mode" value="type" checked onchange="renderBarcodeChart(this.value)"> INT/EXT
+            </label>
+            <label style="font-size:var(--font-size-xs);color:var(--muted-foreground);display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="radio" name="barcode-mode" value="time"> Time of day
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-section-label">Locations</div>
+          <div style="overflow-x:auto;">
+            <table id="locationStats-table" style="width:100%">
+              <thead><tr>
+                <th>Location</th>
+                <th>Scenes</th>
+                <th>Type</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <button class="btn btn-hermes" data-hermes-send="Analyze the scene structure of this screenplay. Comment on pacing, INT/EXT balance, and time-of-day variety.">Ask Hermes about pacing</button>
+        </div>
+      </div>
+
+    </div><!-- /.stats-body -->
+  </aside>
+
+  <!-- Detail Panel (entity panels — unchanged) -->
+  <aside id="detail-panel">
+    <div class="panel-header">
+      <div class="panel-title-block">
+        <div class="panel-entity-type" id="panel-type">—</div>
+        <div class="panel-name" id="panel-name">—</div>
+      </div>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+    <div class="panel-footer" id="panel-footer"></div>
+  </aside>
+
+</div>
+
+<!-- Hidden file input for manual load -->
+<input type="file" id="file-input" accept=".yaml,.yml" style="display:none" onchange="handleFileLoad(this)">
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let story = null;
+let network = null;
+let sidebarExpanded = false;
+let currentView = 'graph';
+const INDEX_PATH = '.story/index.yaml';
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    const res = await fetch(INDEX_PATH);
+    if (!res.ok) throw new Error('not found');
+    const text = await res.text();
+    const data = jsyaml.load(text);
+    initStory(data);
+  } catch (e) {
+    showError();
+  }
+}
+
+function showError() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'flex';
+}
+
+function loadFromFile() {
+  document.getElementById('file-input').click();
+}
+
+function handleFileLoad(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = jsyaml.load(e.target.result);
+      document.getElementById('error-screen').style.display = 'none';
+      document.getElementById('loading-screen').style.display = 'flex';
+      initStory(data);
+    } catch(err) {
+      alert('Could not parse YAML: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function loadSampleData() {
+  // Sample data in the REAL backend schema (as per brief) — exercises the normaliser
+  const sample = {
+    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+    characters: [
+      {
+        id: "detective-oak", name: "Detective Oak", story_role: "Supporting",
+        one_sentence: "Homicide detective investigating the same cartel.",
+        sections: ["Personality","Background","Voice","Arc","Relationships"],
+        relationships: [{ id: "mara", feeling: "Wary respect — she's useful but unpredictable", label: "Partner" }],
+        scenes: [{ number: 2, heading: "INT. POLICE STATION - DAY" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
+        goals: { short: "Bring down the cartel's leadership.", long: "Redeem his failure to protect his last partner." }
+      },
+      {
+        id: "mara", name: "Mara Chen", story_role: "Protagonist", age: 34,
+        one_sentence: "Forensic accountant who finds her firm laundering cartel money.",
+        sections: ["Personality","Background","Voice","Greatest Fear","Secrets","Arc","Relationships","Goals"],
+        relationships: [
+          { id: "detective-oak", feeling: "Wary respect", label: "Partner" },
+          { id: "victor-hale", feeling: "Fear — he knows what she's found", label: "Boss" }
+        ],
+        scenes: [{ number: 1, heading: "INT. MARA'S APARTMENT - NIGHT" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
+        goals: { short: "Find the account number her brother left behind.", long: "Burn the cartel's financial network to the ground." },
+        knowledge: ["Her brother Daniel was murdered", "Victor Hale is the cartel's CFO"]
+      }
+    ],
+    locations: [
+      { id: "kitchen", name: "The Kitchen", one_sentence: "Commercial kitchen in a closed restaurant.", sections: ["Description","History","Scenes"], scenes: ["INT. KITCHEN - NIGHT"] }
+    ],
+    worlds: [
+      { id: "gilead", name: "Gilead", one_sentence: "Near-future city-state where water is privatized.", sections: ["Description","History","Conflict"], rules: ["Water rationing is enforced by biometric scanners.", "Off-grid water extraction is a capital offense.", "The police are funded by AquaCorp."] }
+    ],
+    plots: [
+      {
+        id: "brother-investigation", name: "Brother Investigation", status: "active",
+        one_sentence: "Mara follows her brother's account number into the cartel's network.",
+        setups: [{ scene: "INT. MARA'S APARTMENT - NIGHT", description: "" }, { scene: "INT. POLICE STATION - DAY", description: "" }],
+        payoffs: [{ scene: "INT. KITCHEN - NIGHT", description: "" }],
+        characters: ["mara", "detective-oak"],
+        sections: ["Summary","Obstacles","Stakes"]
+      }
+    ],
+    scenes: [
+      { heading: "INT. MARA'S APARTMENT - NIGHT", scene_number: null, characters: ["mara"], id: 1, locations: [] },
+      { heading: "INT. POLICE STATION - DAY", scene_number: null, characters: ["detective-oak"], id: 2, locations: [] },
+      { heading: "INT. KITCHEN - NIGHT", scene_number: null, characters: ["detective-oak","mara"], id: 3, locations: ["kitchen"] }
+    ],
+    story_memory: {
+      last_updated: "2026-09-06T14:30:00",
+      continuity_risks: ["Mara's skimming hasn't been discovered (ticking clock)", "Oak's investigation is off-books (if his captain finds out, he's burned)"],
+      summary: "Mara and Oak are allied but don't fully trust each other. Victor Hale is the cartel's CFO — Mara doesn't know yet."
+    }
+  };
+  document.getElementById('error-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  initStory(sample);
+}
+
+// ─── Normalise ─────────────────────────────────────────────────────────────────
+// Maps real backend schema → internal rendering schema.
+// Real schema differences:
+//   characters: story_role (not role), relationships[] (not related[]),
+//               goals.short/long (not goals_short/long), knowledge as string[]
+//   scenes: id as integer (string lookup needs String()), locations as id[] but
+//           also sometimes heading strings; characters array is id strings
+//   plots: setups/payoffs are [{scene, description}] objects (not strings)
+//   locations/worlds: scenes array contains heading strings (not ids)
+function normalise(data) {
+  const d = JSON.parse(JSON.stringify(data)); // deep clone
+
+  // Characters
+  (d.characters || []).forEach(c => {
+    // story_role → role
+    if (c.story_role && !c.role) c.role = c.story_role;
+    // relationships → related (keep both for panel)
+    if (c.relationships && !c.related) {
+      c.related = c.relationships.map(r => ({ id: r.id, label: r.label, feeling: r.feeling }));
+    }
+    // goals object → flat
+    if (c.goals && typeof c.goals === 'object') {
+      if (!c.goals_short) c.goals_short = c.goals.short;
+      if (!c.goals_long)  c.goals_long  = c.goals.long;
+    }
+    // knowledge: string[] → join for display (keep array for panel)
+    if (Array.isArray(c.knowledge)) {
+      c._knowledge_arr = c.knowledge;
+      c.knowledge = c.knowledge.join(' · ');
+    }
+    // scenes: [{number, heading}] → extract IDs or headings for lookup
+    if (Array.isArray(c.scenes) && c.scenes.length && typeof c.scenes[0] === 'object') {
+      c._scene_objs = c.scenes;
+      // map to scene IDs by matching headings
+      c.scenes = c.scenes.map(s => {
+        const found = (d.scenes || []).find(sc =>
+          String(sc.id) === String(s.number) ||
+          sc.heading === s.heading ||
+          (sc.heading || '').includes(s.heading || '__NOMATCH__')
+        );
+        return found ? String(found.id) : (s.heading || String(s.number));
+      });
+    } else {
+      // ensure they're strings for consistent lookup
+      c.scenes = (c.scenes || []).map(s => String(s));
+    }
+  });
+
+  // Scenes: ensure id is string, normalise character/location arrays
+  (d.scenes || []).forEach(s => {
+    s.id = String(s.id);
+    s.characters = (s.characters || []).map(String);
+    // locations: may be id strings or heading strings — keep as-is for lookup
+    s.locations = (s.locations || []);
+    s.plots = (s.plots || []);
+  });
+
+  // Plots: normalise setups/payoffs from [{scene, description}] → strings
+  (d.plots || []).forEach(pl => {
+    if (pl.setups && pl.setups.length && typeof pl.setups[0] === 'object') {
+      pl._setup_objs = pl.setups;
+      pl._payoff_objs = pl.payoffs || [];
+      // keep as objects — panel renderer handles both
+    }
+    pl.characters = (pl.characters || []).map(String);
+  });
+
+  // Locations: scenes may be heading strings — keep for cross-reference
+  (d.locations || []).forEach(loc => {
+    if (!loc._scene_headings && Array.isArray(loc.scenes)) {
+      loc._scene_headings = loc.scenes.filter(s => typeof s === 'string');
+    }
+  });
+
+  d.worlds = d.worlds || [];
+  d.story_memory = d.story_memory || {};
+
+  return d;
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+function initStory(data) {
+  story = normalise(data);
+  story.characters = story.characters || [];
+  story.locations  = story.locations  || [];
+  story.plots      = story.plots      || [];
+  story.scenes     = story.scenes     || [];
+  story.worlds     = story.worlds     || [];
+  story.story_memory = story.story_memory || {};
+
+  document.getElementById('loading-screen').style.display = 'none';
+
+  buildGraphView();
+  buildScenesView();
+  buildLocationsView();
+  buildPlotsView();
+  buildWorldsView();
+  buildStoryView();
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function switchView(view, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+  document.getElementById(view + '-view').classList.add('active');
+  btn.classList.add('active');
+  currentView = view;
+  closePanel();
+}
+
+function toggleSidebar() {
+  sidebarExpanded = !sidebarExpanded;
+  document.getElementById('sidebar').classList.toggle('expanded', sidebarExpanded);
+  const icon = document.querySelector('.sidebar-toggle svg path');
+  icon.setAttribute('d', sidebarExpanded ? 'M9 3l-4 4 4 4' : 'M5 3l4 4-4 4');
+}
+
+function refreshIndex() {
+  document.getElementById('loading-screen').style.display = 'flex';
+  if (network) { network.destroy(); network = null; }
+  setTimeout(boot, 50);
+}
+
+// ─── Role Colors ───────────────────────────────────────────────────────────────
+const ROLE_COLORS = {
+  'protagonist': '#7b9cf0',
+  'antagonist':  '#e07070',
+  'mentor':      '#b07be0',
+  'rival':       '#e0a86b',
+  'supporting':  '#6bbfb0',
+  'entity':      '#e06b9b',
+};
+
+function roleColor(role) {
+  if (!role) return '#8a8a8a';
+  const r = role.toLowerCase();
+  for (const [key, val] of Object.entries(ROLE_COLORS)) {
+    if (r.includes(key)) return val;
+  }
+  return '#8a8a8a';
+}
+
+function getRoleKey(role) {
+  if (!role) return 'other';
+  const r = role.toLowerCase();
+  for (const key of Object.keys(ROLE_COLORS)) {
+    if (r.includes(key)) return key;
+  }
+  return 'other';
+}
+
+// ─── Graph View ────────────────────────────────────────────────────────────────
+function buildGraphView() {
+  const chars = story.characters || [];
+  document.getElementById('graph-subtitle').textContent = chars.length + ' characters';
+
+  const fgColor = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#e8e8e8';
+  const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim() || '#8a8a8a';
+
+  const nodes = new vis.DataSet(chars.map(c => {
+    const role = c.role || c.story_role || '';
+    const col = roleColor(role);
+    return {
+      id: c.id,
+      label: c.name,
+      color: {
+        background: col + '22',
+        border: col,
+        highlight: { background: col + '44', border: col },
+        hover: { background: col + '33', border: col }
+      },
+      font: { color: fgColor, size: 12, face: 'inherit' },
+      borderWidth: 1.5,
+      borderWidthSelected: 2,
+      size: 22,
+      shape: 'dot',
+      title: role
+    };
+  }));
+
+  const edges = [];
+  const seen = new Set();
+  chars.forEach(c => {
+    (c.related || []).forEach(rel => {
+      if (!rel.id) return;
+      const key = [c.id, rel.id].sort().join('|');
+      if (!seen.has(key)) {
+        seen.add(key);
+        edges.push({
+          from: c.id,
+          to: rel.id,
+          label: rel.label || '',
+          color: { color: 'rgba(255,255,255,0.15)', highlight: 'rgba(255,255,255,0.4)' },
+          font: { color: mutedColor, size: 9, align: 'middle', strokeWidth: 0 },
+          width: 1,
+          smooth: { type: 'curvedCW', roundness: 0.2 }
+        });
+      }
+    });
+  });
+
+  const edgeDataSet = new vis.DataSet(edges);
+  const container = document.getElementById('network-canvas');
+
+  const options = {
+    nodes: { borderWidthSelected: 2 },
+    edges: { arrows: { to: { enabled: true, scaleFactor: 0.5 } } },
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.01, springLength: 120, springConstant: 0.08, damping: 0.4 }
+    },
+    interaction: { hover: true, tooltipDelay: 200, hideEdgesOnDrag: false },
+    layout: { randomSeed: 42 }
+  };
+
+  network = new vis.Network(container, { nodes, edges: edgeDataSet }, options);
+
+  network.on('click', params => {
+    if (params.nodes.length > 0) {
+      const charId = params.nodes[0];
+      const char = chars.find(c => c.id === charId);
+      if (char) showCharacterPanel(char);
+    }
+  });
+
+  // Legend
+  const legend = document.getElementById('graph-legend');
+  const seen_roles = new Set();
+  chars.forEach(c => seen_roles.add(getRoleKey(c.role)));
+  legend.innerHTML = [...seen_roles].map(role => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${ROLE_COLORS[role] || '#8a8a8a'}"></div>
+      <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>
+    </div>
+  `).join('');
+}
+
+function resetGraphLayout() {
+  if (network) {
+    network.setOptions({ physics: { enabled: true } });
+    setTimeout(() => network.setOptions({ physics: { enabled: false } }), 3000);
+  }
+}
+
+// ─── Scenes View ───────────────────────────────────────────────────────────────
+let allScenes = [];
+
+function buildScenesView() {
+  allScenes = story.scenes || [];
+  document.getElementById('scenes-subtitle').textContent = allScenes.length + ' scenes';
+  renderSceneList(allScenes);
+}
+
+// Helper: find location by id OR by heading string (backend sometimes uses headings)
+function findLocation(ref) {
+  return (story.locations || []).find(l =>
+    l.id === ref || l.id === String(ref) ||
+    (l._scene_headings || []).includes(ref) ||
+    l.name === ref
+  );
+}
+
+function renderSceneList(scenes) {
+  const list = document.getElementById('scene-list');
+  if (!scenes.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No scenes yet</div><div class="empty-state-sub">Scenes will appear here once added to the index.</div></div>';
+    return;
+  }
+  list.innerHTML = scenes.map((s, i) => {
+    const charTags = (s.characters || []).map(cid => {
+      const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+      return c ? `<span class="tag tag-char">${c.name}</span>` : '';
+    }).join('');
+    const locTags = (s.locations || []).map(lref => {
+      const l = findLocation(lref);
+      return l ? `<span class="tag tag-location">${l.name}</span>` : '';
+    }).join('');
+    const plotTags = (s.plots || []).map(pid => {
+      const p = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
+      return p ? `<span class="tag tag-plot">${p.name}</span>` : '';
+    }).join('');
+    const sceneNum = s.scene_number != null ? String(s.scene_number) : String(i + 1).padStart(2, '0');
+    return `
+      <div class="scene-item" data-id="${s.id}" onclick="showScenePanel('${s.id}')">
+        <div class="scene-number">${sceneNum}</div>
+        <div class="scene-body">
+          <div class="scene-heading">${s.heading || s.id}</div>
+          <div class="scene-meta">${charTags}${locTags}${plotTags}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterScenes(query) {
+  if (!query.trim()) { renderSceneList(allScenes); return; }
+  const q = query.toLowerCase();
+  const filtered = allScenes.filter(s => {
+    if ((s.heading || '').toLowerCase().includes(q)) return true;
+    if ((s.characters || []).some(cid => {
+      const c = (story.characters || []).find(x => x.id === cid);
+      return c && c.name.toLowerCase().includes(q);
+    })) return true;
+    if ((s.locations || []).some(lid => {
+      const l = (story.locations || []).find(x => x.id === lid);
+      return l && l.name.toLowerCase().includes(q);
+    })) return true;
+    return false;
+  });
+  renderSceneList(filtered);
+}
+
+// ─── Locations View ────────────────────────────────────────────────────────────
+function buildLocationsView() {
+  const locs = story.locations || [];
+  document.getElementById('locations-subtitle').textContent = locs.length + ' locations';
+  const list = document.getElementById('location-list');
+  if (!locs.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No locations</div></div>';
+    return;
+  }
+  list.innerHTML = locs.map(l => {
+    const sceneHeadings = (l._scene_headings || l.scenes || []);
+    const sceneTags = sceneHeadings.slice(0, 4).map(h =>
+      `<span class="tag tag-scene">${h}</span>`
+    ).join('');
+    return `
+      <div class="entity-card" data-id="${l.id}" onclick="showLocationPanel('${l.id}')">
+        <div class="entity-card-pip" style="background:#6bbfb0"></div>
+        <div class="entity-card-body">
+          <div class="entity-card-name">${l.name}</div>
+          <div class="entity-card-sub">${l.one_sentence || ''}</div>
+          ${sceneTags ? `<div class="entity-card-meta">${sceneTags}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Plots View ────────────────────────────────────────────────────────────────
+function buildPlotsView() {
+  const plots = story.plots || [];
+  document.getElementById('plots-subtitle').textContent = plots.length + ' threads';
+  const list = document.getElementById('plot-list');
+  if (!plots.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No plots</div></div>';
+    return;
+  }
+  list.innerHTML = plots.map(pl => {
+    const charTags = (pl.characters || []).map(cid => {
+      const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+      return c ? `<span class="tag tag-char">${c.name}</span>` : '';
+    }).join('');
+    return `
+      <div class="entity-card" data-id="${pl.id}" onclick="showPlotPanel('${pl.id}')">
+        <div class="entity-card-pip" style="background:#b07be0"></div>
+        <div class="entity-card-body">
+          <div class="entity-card-name" style="display:flex;align-items:center;gap:8px;">
+            ${pl.name}
+            <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
+          </div>
+          <div class="entity-card-sub">${pl.one_sentence || ''}</div>
+          ${charTags ? `<div class="entity-card-meta">${charTags}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Worlds View ───────────────────────────────────────────────────────────────
+function buildWorldsView() {
+  const worlds = story.worlds || [];
+  document.getElementById('worlds-subtitle').textContent = worlds.length + ' world' + (worlds.length !== 1 ? 's' : '');
+  const list = document.getElementById('world-list');
+  if (!worlds.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No worlds defined</div><div class="empty-state-sub">Add worlds to index.yaml to see them here.</div></div>';
+    return;
+  }
+  list.innerHTML = worlds.map(w => {
+    const ruleCount = (w.rules || []).length;
+    return `
+      <div class="entity-card" data-id="${w.id}" onclick="showWorldPanel('${w.id}')">
+        <div class="entity-card-pip" style="background:#e0a86b"></div>
+        <div class="entity-card-body">
+          <div class="entity-card-name">${w.name}</div>
+          <div class="entity-card-sub">${w.one_sentence || ''}</div>
+          ${ruleCount ? `<div class="entity-card-meta"><span class="tag tag-plot">${ruleCount} rule${ruleCount !== 1 ? 's' : ''}</span></div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Story View ────────────────────────────────────────────────────────────────
+function buildStoryView() {
+  const p = story.project || {};
+  const mem = story.story_memory || {};
+
+  document.getElementById('story-project-name').textContent = p.name || 'Story';
+  document.getElementById('story-subtitle').textContent = [p.genre, p.setting].filter(Boolean).join(' · ');
+
+  const body = document.getElementById('story-body');
+
+  // Project stats
+  const statsGrid = [
+    { v: p.scene_count     || (story.scenes     || []).length, l: 'Scenes' },
+    { v: p.character_count || (story.characters || []).length, l: 'Characters' },
+    { v: p.location_count  || (story.locations  || []).length || null, l: 'Locations' },
+    { v: p.world_count     || (story.worlds     || []).length || null, l: 'Worlds' },
+    { v: p.plot_count      || (story.plots      || []).length || null, l: 'Plots' },
+  ].filter(s => s.v != null && s.v > 0);
+
+  const statsHtml = `
+    <div>
+      <div class="story-section-title">Project</div>
+      <div class="project-card">
+        <div class="project-logline">${p.logline || ''}</div>
+        ${statsGrid.map(s => `<div class="project-stat"><div class="project-stat-value">${s.v}</div><div class="project-stat-label">${s.l}</div></div>`).join('')}
+      </div>
+    </div>`;
+
+  // Plots
+  const plots = story.plots || [];
+  const plotsHtml = plots.length ? `
+    <div>
+      <div class="story-section-title">Active plot threads</div>
+      <div class="plot-list">
+        ${plots.map(pl => `
+          <div class="plot-item" onclick="showPlotPanel('${pl.id}')">
+            <div class="plot-header">
+              <span class="plot-name">${pl.name}</span>
+              <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
+            </div>
+            <div class="plot-sentence">${pl.one_sentence || ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : '';
+
+  // Continuity risks
+  const risks = mem.continuity_risks || [];
+  const risksHtml = risks.length ? `
+    <div>
+      <div class="story-section-title">Continuity risks</div>
+      <div class="risk-list">
+        ${risks.map(r => `<div class="risk-item">${r}</div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // Hermes ask button
+  const hermesHtml = p.name ? `
+    <div style="padding-top:4px;">
+      <button class="btn btn-hermes" data-hermes-send="Give me an overview of ${p.name}.">Ask Hermes about this story</button>
+    </div>` : '';
+
+  body.innerHTML = statsHtml + plotsHtml + risksHtml + hermesHtml;
+}
+
+// ─── Detail Panel ──────────────────────────────────────────────────────────────
+function openPanel() { document.getElementById('detail-panel').classList.add('open'); }
+function closePanel() { document.getElementById('detail-panel').classList.remove('open'); }
+
+function showCharacterPanel(char) {
+  if (!char) return;
+  document.getElementById('panel-type').textContent = char.role || char.story_role || 'Character';
+  document.getElementById('panel-name').textContent = char.name;
+
+  // Scenes: char.scenes is normalised to an array of scene ids (strings)
+  const scenes = (char.scenes || []).map(sid => {
+    const s = (story.scenes || []).find(x => String(x.id) === String(sid));
+    return s
+      ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>`
+      : (sid ? `<span class="tag tag-scene">${sid}</span>` : '');
+  }).filter(Boolean).join('');
+
+  // Relationships: use related[] which normaliser mapped from relationships[]
+  const rels = (char.related || []).map(rel => {
+    const c = (story.characters || []).find(x => x.id === rel.id || String(x.id) === String(rel.id));
+    const nameEl = c
+      ? `<button class="relationship-name entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))">${c.name}</button>`
+      : `<span class="relationship-name">${rel.id}</span>`;
+    return `
+      <div class="relationship-row">
+        ${nameEl}
+        ${rel.label ? `<span class="relationship-label">${rel.label}</span>` : ''}
+        ${rel.feeling ? `<span class="relationship-feeling">— ${rel.feeling}</span>` : ''}
+      </div>`;
+  }).join('');
+
+  // Knowledge: may be array (_knowledge_arr) or string
+  const knowledgeArr = char._knowledge_arr || (char.knowledge ? [char.knowledge] : []);
+  const knowledgeHtml = knowledgeArr.length
+    ? knowledgeArr.map(k => `<div class="knowledge-item">${k}</div>`).join('')
+    : '';
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">In one sentence</div>
+      <div class="panel-text">${char.one_sentence || '—'}</div>
+    </div>
+    ${char.age ? `<div><div class="panel-section-title">Age</div><div class="panel-muted">${char.age}</div></div>` : ''}
+    ${char.goals_short ? `<div>
+      <div class="panel-section-title">Immediate goal</div>
+      <div class="panel-text">${char.goals_short}</div>
+    </div>` : ''}
+    ${char.goals_long ? `<div>
+      <div class="panel-section-title">Deeper goal</div>
+      <div class="panel-muted">${char.goals_long}</div>
+    </div>` : ''}
+    ${knowledgeHtml ? `<div>
+      <div class="panel-section-title">What they know</div>
+      ${knowledgeHtml}
+    </div>` : ''}
+    ${scenes ? `<div>
+      <div class="panel-section-title">Appears in</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+    ${rels ? `<div>
+      <div class="panel-section-title">Relationships</div>
+      ${rels}
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Tell me more about ${char.name}'s character development.">Ask Hermes about ${char.name}</button>
+  `;
+
+  openPanel();
+
+  if (network) {
+    network.selectNodes([char.id]);
+    network.focus(char.id, { scale: 1.2, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+  }
+}
+
+function showScenePanel(sceneId) {
+  const scene = (story.scenes || []).find(s => String(s.id) === String(sceneId));
+  if (!scene) return;
+
+  document.querySelectorAll('.scene-item').forEach(el => el.classList.remove('selected'));
+  const sceneEl = document.querySelector(`.scene-item[data-id="${sceneId}"]`);
+  if (sceneEl) sceneEl.classList.add('selected');
+
+  document.getElementById('panel-type').textContent = 'Scene';
+  document.getElementById('panel-name').textContent = scene.heading || scene.id;
+
+  const chars = (scene.characters || []).map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c
+      ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>`
+      : '';
+  }).filter(Boolean).join('');
+
+  const locs = (scene.locations || []).map(lref => {
+    const l = findLocation(lref);
+    return l ? `<button class="entity-link" onclick="showLocationPanel('${l.id}')">${l.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  // Plots: scene.plots may be empty (backend doesn't always populate from scene side)
+  // Also check reverse: which plots reference this scene's heading
+  let plotRefs = (scene.plots || []);
+  if (!plotRefs.length) {
+    const h = scene.heading || '';
+    plotRefs = (story.plots || [])
+      .filter(pl =>
+        (pl._setup_objs || []).some(su => su.scene === h) ||
+        (pl._payoff_objs || []).some(pa => pa.scene === h) ||
+        (pl.characters || []).some(cid =>
+          (scene.characters || []).includes(cid)
+        )
+      )
+      .map(pl => pl.id);
+  }
+  const plots = plotRefs.map(pid => {
+    const pl = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
+    return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${locs ? `<div>
+      <div class="panel-section-title">Location</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${locs}</div>
+    </div>` : ''}
+    ${plots ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plots}</div>
+    </div>` : ''}
+    <div>
+      <div class="panel-section-title">Scene content</div>
+      <div id="scene-content-area" class="panel-muted">Loading from screenplay.md…</div>
+    </div>
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="What happens in ${scene.heading || scene.id}?">Ask Hermes about this scene</button>
+  `;
+
+  openPanel();
+  loadSceneContent(scene);
+}
+
+// Cached screenplay text
+let _screenplayText = null;
+let _screenplayLoaded = false;
+
+async function loadSceneContent(scene) {
+  const area = document.getElementById('scene-content-area');
+  if (!area) return;
+
+  try {
+    if (!_screenplayLoaded) {
+      const res = await fetch('screenplay.md');
+      _screenplayLoaded = true;
+      if (!res.ok) throw new Error('not found');
+      _screenplayText = await res.text();
+    }
+    if (!_screenplayText) throw new Error('empty');
+
+    const heading = (scene.heading || '').trim();
+    const content = extractFountainScene(_screenplayText, heading);
+
+    if (content) {
+      area.innerHTML = '';
+      area.className = '';
+      const pre = document.createElement('pre');
+      pre.className = 'fountain-content';
+      pre.textContent = content;
+      area.appendChild(pre);
+    } else {
+      area.className = 'panel-muted';
+      area.textContent = 'Scene not found in screenplay.md.';
+    }
+  } catch(e) {
+    area.className = 'panel-muted';
+    area.textContent = 'screenplay.md not found — place it in the same directory as this file.';
+  }
+}
+
+// Extract scene from Fountain-format text.
+// Fountain scene headings: lines starting with INT./EXT./INT-EXT. etc., all caps
+function extractFountainScene(text, heading) {
+  const lines = text.split('\n');
+  const headingNorm = heading.toUpperCase().trim();
+
+  // Find starting line: exact match or partial match on the scene slug
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim().toUpperCase();
+    if (line === headingNorm || line.startsWith(headingNorm) || headingNorm.startsWith(line.replace(/\s*-\s*\w+\s*$/, ''))) {
+      startIdx = i;
+      break;
+    }
+    // also match if the line IS a scene heading and the scene id/heading matches
+    if (isFountainSceneHeading(lines[i].trim()) && line.includes(headingNorm.replace(/^(INT|EXT)\.?\s*/i, ''))) {
+      startIdx = i;
+      break;
+    }
+  }
+
+  if (startIdx === -1) return null;
+
+  // Collect lines until next scene heading or end
+  const result = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    if (i > startIdx && isFountainSceneHeading(lines[i].trim())) break;
+    result.push(lines[i]);
+    if (result.length > 80) { result.push('…'); break; } // cap at ~80 lines
+  }
+  return result.join('\n').trim();
+}
+
+function isFountainSceneHeading(line) {
+  return /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(line) && line === line.toUpperCase();
+}
+
+function showLocationPanel(locId) {
+  // Deselect all entity cards, select the one clicked
+  document.querySelectorAll('#location-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#location-list .entity-card[data-id="${locId}"]`);
+  if (card) card.classList.add('selected');
+
+  const loc = (story.locations || []).find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('panel-type').textContent = 'Location';
+  document.getElementById('panel-name').textContent = loc.name;
+
+  // Backend gives loc.scenes as heading strings; find scene objects by heading
+  const sceneRefs = loc._scene_headings || loc.scenes || [];
+  const scenes = sceneRefs.map(ref => {
+    const s = (story.scenes || []).find(x =>
+      x.heading === ref || String(x.id) === String(ref)
+    );
+    return s
+      ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>`
+      : `<span class="tag tag-scene">${ref}</span>`;
+  }).join('');
+
+  // Characters in this location (via their scenes)
+  const charIds = new Set();
+  sceneRefs.forEach(ref => {
+    const s = (story.scenes || []).find(x => x.heading === ref || String(x.id) === String(ref));
+    if (s) (s.characters || []).forEach(cid => charIds.add(cid));
+  });
+  const charLinks = [...charIds].map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  // World rules relevant to this location (from worlds array)
+  const sections = (loc.sections || []).join(', ');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Description</div>
+      <div class="panel-text">${loc.one_sentence || '—'}</div>
+    </div>
+    ${sections ? `<div><div class="panel-section-title">Sections</div><div class="panel-muted">${sections}</div></div>` : ''}
+    ${charLinks ? `<div>
+      <div class="panel-section-title">Characters here</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
+    </div>` : ''}
+    ${scenes ? `<div>
+      <div class="panel-section-title">Scenes set here</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Describe ${loc.name} and its role in the story.">Ask Hermes about this location</button>
+  `;
+
+  openPanel();
+}
+
+function showPlotPanel(plotId) {
+  document.querySelectorAll('#plot-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#plot-list .entity-card[data-id="${plotId}"]`);
+  if (card) card.classList.add('selected');
+
+  const plot = (story.plots || []).find(p => p.id === plotId || String(p.id) === String(plotId));
+  if (!plot) return;
+
+  document.getElementById('panel-type').textContent = 'Plot thread';
+  document.getElementById('panel-name').textContent = plot.name;
+
+  const chars = (plot.characters || []).map(cid => {
+    const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c
+      ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>`
+      : '';
+  }).filter(Boolean).join('');
+
+  // Setups/payoffs: may be string[] (old) or [{scene, description}] (new schema)
+  function renderBeats(arr) {
+    if (!arr || !arr.length) return '';
+    return arr.map(item => {
+      if (typeof item === 'string') {
+        return `<div class="beat-row">${item}</div>`;
+      }
+      // object: {scene, description}
+      const sceneObj = (story.scenes || []).find(s => s.heading === item.scene || String(s.id) === String(item.scene));
+      const sceneLink = sceneObj
+        ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${item.scene}</span>`
+        : (item.scene ? `<span class="beat-scene">${item.scene}</span>` : '');
+      return `<div class="beat-row">${sceneLink}${item.description ? `<span>${item.description}</span>` : ''}</div>`;
+    }).join('');
+  }
+
+  const setupObjs = plot._setup_objs || plot.setups || [];
+  const payoffObjs = plot._payoff_objs || plot.payoffs || [];
+  const setupsHtml = renderBeats(setupObjs);
+  const payoffsHtml = renderBeats(payoffObjs);
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Thread</div>
+      <div class="panel-text">${plot.one_sentence || '—'}</div>
+    </div>
+    <div><span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span></div>
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters involved</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${setupsHtml ? `<div>
+      <div class="panel-section-title">Setups</div>
+      ${setupsHtml}
+    </div>` : ''}
+    ${payoffsHtml ? `<div>
+      <div class="panel-section-title">Payoffs</div>
+      ${payoffsHtml}
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  openPanel();
+}
+
+function showWorldPanel(worldId) {
+  document.querySelectorAll('#world-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#world-list .entity-card[data-id="${worldId}"]`);
+  if (card) card.classList.add('selected');
+
+  const world = (story.worlds || []).find(w => w.id === worldId);
+  if (!world) return;
+
+  document.getElementById('panel-type').textContent = 'World';
+  document.getElementById('panel-name').textContent = world.name;
+
+  const rules = (world.rules || []).map(r =>
+    `<div class="world-rule">${r}</div>`
+  ).join('');
+
+  const sections = (world.sections || []).join(', ');
+
+  // Plots in this world
+  const worldPlots = (story.plots || []).filter(pl =>
+    (pl.worlds || []).includes(worldId) ||
+    (pl.world === worldId)
+  );
+  const plotLinks = worldPlots.map(pl =>
+    `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>`
+  ).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Setting</div>
+      <div class="panel-text">${world.one_sentence || '—'}</div>
+    </div>
+    ${sections ? `<div><div class="panel-section-title">Sections</div><div class="panel-muted">${sections}</div></div>` : ''}
+    ${rules ? `<div>
+      <div class="panel-section-title">Rules</div>
+      ${rules}
+    </div>` : ''}
+    ${plotLinks ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plotLinks}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  openPanel();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCRIPT VIEW & STATISTICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Fountain Tokeniser (client-side minimal port) ─────────────────────────────
+// A faithful enough port of afterwriting-parser / BF fountain_lexer for the
+// statistics we need. Not a full spec implementation — covers the 95% case.
+
+const FOUNTAIN_RULES = {
+  title_page: /^(title|credit|author|authors|source|status|draft date|date|contact|copyright|notes)\s*:/im,
+  scene_heading: /^((?:INT|EXT|EST|INT\.\/EXT|INT\/EXT|I\/E)[. ].*|[^a-z\n]*(?:DAY|NIGHT|MORNING|EVENING|DAWN|DUSK|CONTINUOUS|LATER|MOMENTS LATER|THE END)[^a-z\n]*)$/m,
+  transition: /^(?:FADE (?:TO BLACK|OUT)|CUT TO|SMASH CUT|JUMP CUT|DISSOLVE TO|MATCH CUT|FADE IN):?\s*$/m,
+  centered: /^>[^<\n]+<$/m,
+  action: /^[^!#\n].*/m,
+  character: /^[ \t]*[A-Z][A-Z0-9 '\-()]+[ \t]*(?:\(.*\))?[ \t]*$/m,
+  parenthetical: /^\(.*\)$/m,
+  note: /^\[{2}[\s\S]*?\]{2}$/m,
+  section: /^(#{1,6})\s*(.*)/,
+  synopsis: /^=\s*(.*)/,
+  page_break: /^={3,}\s*$/,
+  boneyard_open: /\/\*/,
+  boneyard_close: /\*\//,
+};
+
+function tokeniseFountain(text) {
+  if (!text) return { tokens: [], titlePage: {}, stats: null };
+
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const tokens = [];
+  let inBoneyard = false;
+  let inTitlePage = true;
+  let titlePageRaw = {};
+  let lastKey = null;
+  let i = 0;
+
+  // ── Title page ──
+  while (i < lines.length && inTitlePage) {
+    const line = lines[i];
+    if (line.trim() === '' && i > 0) {
+      // blank line ends title page if we've seen any title keys
+      if (Object.keys(titlePageRaw).length > 0) { i++; break; }
+    }
+    const tpMatch = line.match(/^([A-Za-z ]+):\s*(.*)/);
+    if (tpMatch) {
+      lastKey = tpMatch[1].toLowerCase().trim();
+      titlePageRaw[lastKey] = tpMatch[2].trim();
+    } else if (lastKey && line.match(/^\s+/)) {
+      titlePageRaw[lastKey] += '\n' + line.trim();
+    } else {
+      inTitlePage = false;
+      break;
+    }
+    i++;
+  }
+
+  // If no title page keys found, restart from 0
+  if (Object.keys(titlePageRaw).length === 0) { i = 0; }
+
+  // ── Body ──
+  let sceneNumber = 0;
+  let lastCharacter = null;
+  let inDialogue = false;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const raw = line;
+
+    // Boneyard
+    if (FOUNTAIN_RULES.boneyard_open.test(line)) { inBoneyard = true; }
+    if (inBoneyard) {
+      if (FOUNTAIN_RULES.boneyard_close.test(line)) inBoneyard = false;
+      i++; continue;
+    }
+
+    // Note [[...]]
+    if (line.startsWith('[[')) {
+      tokens.push({ type: 'note', text: line, line: i });
+      i++; continue;
+    }
+
+    // Page break ===
+    if (FOUNTAIN_RULES.page_break.test(line)) {
+      tokens.push({ type: 'page_break', text: '', line: i });
+      inDialogue = false; i++; continue;
+    }
+
+    // Section # ## ###
+    const sectionM = line.match(FOUNTAIN_RULES.section);
+    if (sectionM) {
+      tokens.push({ type: 'section', level: sectionM[1].length, text: sectionM[2], line: i });
+      inDialogue = false; i++; continue;
+    }
+
+    // Synopsis = 
+    const synopsisM = line.match(FOUNTAIN_RULES.synopsis);
+    if (synopsisM) {
+      tokens.push({ type: 'synopsis', text: synopsisM[1], line: i });
+      inDialogue = false; i++; continue;
+    }
+
+    // Empty line
+    if (line.trim() === '') {
+      tokens.push({ type: 'empty', text: '', line: i });
+      inDialogue = false; i++; continue;
+    }
+
+    // Centered > text <
+    if (FOUNTAIN_RULES.centered.test(line)) {
+      tokens.push({ type: 'centered', text: line.slice(1, -1).trim(), line: i });
+      i++; continue;
+    }
+
+    // Transition
+    if (FOUNTAIN_RULES.transition.test(line.trim()) || line.trim().endsWith(':') && line.trim() === line.trim().toUpperCase() && line.trim().length > 3) {
+      // confirm it's a transition (right-aligned slug or forced)
+      if (line.startsWith('>') || FOUNTAIN_RULES.transition.test(line.trim())) {
+        const txt = line.startsWith('>') ? line.slice(1).trim() : line.trim();
+        tokens.push({ type: 'transition', text: txt, line: i });
+        inDialogue = false; i++; continue;
+      }
+    }
+
+    // Scene heading — starts with INT/EXT/EST or forced !
+    const forcedScene = line.startsWith('.');
+    const sceneHeadingTest = forcedScene
+      ? true
+      : /^(INT|EXT|EST|INT\.\/EXT|INT\/EXT|I\/E)[. ]/i.test(line.trim());
+    if (sceneHeadingTest) {
+      sceneNumber++;
+      const heading = forcedScene ? line.slice(1) : line.trim();
+      // Parse location type and time
+      const locType = getSceneLocationType(heading);
+      const locTime = getSceneTimeOfDay(heading);
+      tokens.push({
+        type: 'scene_heading', text: heading, line: i,
+        number: sceneNumber, locType, locTime
+      });
+      inDialogue = false; i++; continue;
+    }
+
+    // Parenthetical (only in dialogue context)
+    if (inDialogue && /^\(.*\)$/.test(line.trim())) {
+      tokens.push({ type: 'parenthetical', text: line.trim(), line: i, character: lastCharacter });
+      i++; continue;
+    }
+
+    // Character cue — all caps, optional (extension), after blank line
+    const prevToken = tokens[tokens.length - 1];
+    const prevIsEmpty = !prevToken || prevToken.type === 'empty' || prevToken.type === 'scene_heading';
+    const nextLine = lines[i + 1];
+    const charTest = line.trim() === line.trim().toUpperCase()
+      && line.trim().length > 0
+      && !/[a-z]/.test(line.trim())
+      && nextLine !== undefined && nextLine.trim() !== '';
+    if (prevIsEmpty && charTest) {
+      const charName = line.trim().replace(/\s*\(.*\)\s*$/, '').trim();
+      const isDual = line.trim().endsWith('^');
+      lastCharacter = charName.replace(/\s*\^\s*$/, '');
+      tokens.push({ type: 'character', text: line.trim(), character: lastCharacter, line: i, dual: isDual });
+      inDialogue = true; i++; continue;
+    }
+
+    // Dialogue (if we're in dialogue context)
+    if (inDialogue) {
+      // estimate time: ~100 words/min
+      const words = line.trim().split(/\s+/).filter(Boolean).length;
+      const time = (words / 100) * 60;
+      tokens.push({ type: 'dialogue', text: line.trim(), line: i, character: lastCharacter, time });
+      i++; continue;
+    }
+
+    // Forced action !
+    if (line.startsWith('!')) {
+      tokens.push({ type: 'action', text: line.slice(1), line: i });
+      i++; continue;
+    }
+
+    // Default: action
+    tokens.push({ type: 'action', text: raw, line: i });
+    i++;
+  }
+
+  return { tokens, titlePage: titlePageRaw };
+}
+
+function getSceneLocationType(heading) {
+  const h = heading.toUpperCase().trim();
+  if (/^INT\.?\/EXT\.?|^I\/E/i.test(h)) return 'mixed';
+  if (/^INT\.?/i.test(h)) return 'int';
+  if (/^EXT\.?/i.test(h)) return 'ext';
+  return 'other';
+}
+
+function getSceneTimeOfDay(heading) {
+  const h = heading.toUpperCase();
+  const timeMap = {
+    'DAWN': 'dawn', 'MORNING': 'morning', 'DAY': 'day',
+    'AFTERNOON': 'day', 'EVENING': 'evening', 'DUSK': 'dusk',
+    'NIGHT': 'night', 'CONTINUOUS': 'continuous', 'LATER': 'later',
+    'MOMENTS LATER': 'later'
+  };
+  for (const [key, val] of Object.entries(timeMap)) {
+    if (h.includes(key)) return val;
+  }
+  return 'unspecified';
+}
+
+// Hash-based HSL color (BF's wordToColor equivalent)
+function wordToColor(word) {
+  let hash = 0;
+  for (let i = 0; i < word.length; i++) {
+    hash = word.charCodeAt(i) + ((hash << 5) - hash);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 55%, 60%)`;
+}
+
+// Format seconds as H:MM:SS or M:SS
+function fmtDuration(sec) {
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtDurationShort(sec) {
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
+
+// ─── Statistics Computation ─────────────────────────────────────────────────────
+let _computedStats = null;
+let _parsedTokens = null;
+
+function computeStats(text) {
+  if (!text) return null;
+  const { tokens, titlePage } = tokeniseFountain(text);
+  _parsedTokens = tokens;
+
+  const lines = text.split('\n');
+  const nonEmptyLines = lines.filter(l => /\S/.test(l));
+  const words = text.split(/\s+/).filter(Boolean);
+  const lineCount = lines.length;
+  const pageCount = Math.max(1, lineCount / 52);
+
+  // Duration: action lines ~200 words/min, dialogue already has time on tokens
+  let lengthAction = 0;
+  let lengthDialogue = 0;
+  tokens.forEach(t => {
+    if (t.type === 'action') {
+      const w = t.text.split(/\s+/).filter(Boolean).length;
+      lengthAction += (w / 200) * 60;
+    }
+    if (t.type === 'dialogue') {
+      lengthDialogue += (t.time || 0);
+    }
+  });
+
+  // Per-character stats
+  const charMap = {};
+  tokens.forEach(t => {
+    if (t.type === 'dialogue' && t.character) {
+      const name = t.character;
+      if (!charMap[name]) charMap[name] = { name, color: wordToColor(name), speakingParts: 0, secondsSpoken: 0, wordsSpoken: 0, monologues: 0 };
+      charMap[name].speakingParts++;
+      charMap[name].secondsSpoken += (t.time || 0);
+      charMap[name].wordsSpoken += t.text.split(/\s+/).filter(Boolean).length;
+      if ((t.time || 0) > 30) charMap[name].monologues++;
+    }
+  });
+  const charStats = Object.values(charMap).sort((a, b) => b.secondsSpoken - a.secondsSpoken);
+
+  // Scene stats
+  const sceneTokens = tokens.filter(t => t.type === 'scene_heading');
+  const locationMap = {};
+  sceneTokens.forEach(t => {
+    // Extract location slug (everything between the INT./EXT. prefix and the dash+time)
+    const slug = t.text.replace(/^(INT\.?\/EXT\.?|INT\.?|EXT\.?|EST\.?|I\/E)[. ]*/i, '').replace(/\s*[-—]\s*(DAY|NIGHT|MORNING|EVENING|DAWN|DUSK|CONTINUOUS|LATER|MOMENTS LATER).*$/i, '').trim();
+    if (!locationMap[slug]) locationMap[slug] = { name: slug, color: wordToColor(slug), scene_numbers: [], times_of_day: new Set(), interior_exterior: new Set() };
+    locationMap[slug].scene_numbers.push(t.number);
+    locationMap[slug].times_of_day.add(t.locTime);
+    locationMap[slug].interior_exterior.add(t.locType);
+  });
+
+  const locations = Object.values(locationMap).map(l => ({
+    ...l,
+    times_of_day: [...l.times_of_day].filter(t => t !== 'unspecified' && t !== 'continuous' && t !== 'later'),
+    interior_exterior: [...l.interior_exterior],
+    number_of_scenes: l.scene_numbers.length
+  })).sort((a, b) => b.number_of_scenes - a.number_of_scenes);
+
+  // Type/time breakdowns (by scene count)
+  const typeCounts = { int: 0, ext: 0, mixed: 0, other: 0 };
+  const timeCounts = { dawn: 0, morning: 0, day: 0, evening: 0, dusk: 0, night: 0, unspecified: 0 };
+  sceneTokens.forEach(t => {
+    typeCounts[t.locType] = (typeCounts[t.locType] || 0) + 1;
+    timeCounts[t.locTime] = (timeCounts[t.locTime] || 0) + 1;
+  });
+
+  // Duration line chart data — bucket tokens into ~20 segments
+  const BUCKETS = 20;
+  const bucketSize = Math.max(1, Math.ceil(tokens.length / BUCKETS));
+  const durationChart = { action: [], dialogue: [] };
+  for (let b = 0; b < BUCKETS; b++) {
+    const start = b * bucketSize;
+    const end = Math.min(tokens.length, (b + 1) * bucketSize);
+    const slice = tokens.slice(start, end);
+    let a = 0, d = 0;
+    slice.forEach(t => {
+      if (t.type === 'action') a += (t.text.split(/\s+/).filter(Boolean).length / 200) * 60;
+      if (t.type === 'dialogue') d += (t.time || 0);
+    });
+    durationChart.action.push(a);
+    durationChart.dialogue.push(d);
+  }
+
+  // Total monologues
+  const totalMonologues = charStats.reduce((sum, c) => sum + c.monologues, 0);
+
+  return {
+    text,
+    tokens,
+    titlePage,
+    lengthStats: {
+      words: words.length,
+      characters: text.length,
+      characterswithoutwhitespace: text.replace(/\s/g, '').length,
+      lines: lineCount,
+      lineswithoutwhitespace: nonEmptyLines.length,
+      pages: pageCount,
+      pagesWhole: Math.floor(pageCount),
+      pagesFractional: Math.round((pageCount % 1) * 8), // eighths
+      pagesReal: Math.ceil(pageCount),
+      scenes: sceneTokens.length,
+    },
+    durationStats: {
+      total: lengthAction + lengthDialogue,
+      action: lengthAction,
+      dialogue: lengthDialogue,
+      lengthchart_action: durationChart.action,
+      lengthchart_dialogue: durationChart.dialogue,
+    },
+    characterStats: {
+      characters: charStats,
+      characterCount: charStats.length,
+      monologues: totalMonologues,
+    },
+    locationStats: {
+      locationsCount: locations.length,
+      locations,
+    },
+    sceneStats: {
+      scenes: sceneTokens,
+      typeCounts,
+      timeCounts,
+    },
+  };
+}
+
+// ─── Script View ────────────────────────────────────────────────────────────────
+let _scriptBuilt = false;
+
+function buildScriptView() {
+  const text = (typeof window.__SCREENPLAY_TEXT__ !== 'undefined' && window.__SCREENPLAY_TEXT__)
+    || _screenplayText;
+
+  const container = document.getElementById('screenplay-container');
+  const subtitle = document.getElementById('script-subtitle');
+
+  if (!text || text.trim().length === 0) {
+    container.innerHTML = `<div class="script-empty">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3">
+        <rect x="6" y="3" width="20" height="26" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="10" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10" y1="18" x2="18" y2="18" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <div>No screenplay loaded</div>
+      <div style="font-size:var(--font-size-xs);opacity:0.6">Ensure window.__SCREENPLAY_TEXT__ is set or screenplay.fountain is loaded</div>
+    </div>`;
+    return;
+  }
+
+  _computedStats = computeStats(text);
+  const { tokens, titlePage } = _computedStats;
+  const sceneCount = _computedStats.lengthStats.scenes;
+  const pages = _computedStats.lengthStats.pagesWhole;
+  subtitle.textContent = `${pages} p · ${sceneCount} scenes`;
+
+  // Build HTML
+  const doc = document.createElement('div');
+  doc.className = 'screenplay-doc';
+
+  // Title page
+  if (titlePage && Object.keys(titlePage).length > 0) {
+    const tp = document.createElement('div');
+    tp.className = 'screenplay-title-page';
+    const titleVal = titlePage['title'] || titlePage['Title'] || '';
+    const authorVal = titlePage['author'] || titlePage['authors'] || titlePage['credit'] || '';
+    const dateVal = titlePage['date'] || titlePage['draft date'] || '';
+    const contactVal = titlePage['contact'] || '';
+    const sourceVal = titlePage['source'] || '';
+    tp.innerHTML = `
+      <div class="title-tl title-meta">${contactVal ? contactVal.replace(/\n/g, '<br>') : ''}</div>
+      <div class="title-tc"></div>
+      <div class="title-tr title-meta">${dateVal || ''}</div>
+      <div class="title-cc">
+        <span class="fountain-title">${titleVal}</span>
+        <span class="title-meta">${authorVal ? 'Written by<br>' + authorVal : ''}</span>
+        <span class="title-meta">${sourceVal ? '<br>' + sourceVal : ''}</span>
+      </div>
+      <div class="title-bl title-meta"></div>
+      <div class="title-br title-meta"></div>
+    `;
+    doc.appendChild(tp);
+  }
+
+  // Render tokens
+  let pageNum = 1;
+  let linesSinceBreak = 0;
+  let inDual = false;
+  let dualLeft = null;
+
+  for (let idx = 0; idx < tokens.length; idx++) {
+    const t = tokens[idx];
+
+    // Soft page break every ~52 lines
+    linesSinceBreak++;
+    if (linesSinceBreak >= 52 && t.type === 'scene_heading') {
+      pageNum++;
+      const br = document.createElement('hr');
+      br.className = 'screenplay-page-break';
+      br.setAttribute('data-page', `p. ${pageNum}`);
+      doc.appendChild(br);
+      linesSinceBreak = 0;
+    }
+
+    let el;
+    switch (t.type) {
+      case 'scene_heading':
+        el = document.createElement('span');
+        el.className = 'fountain-scene-heading';
+        el.innerHTML = `<span class="scene-num">${t.number}.</span>${escHtml(t.text)}`;
+        el.addEventListener('click', () => {
+          // Jump to scene panel
+          const sceneObj = (story && story.scenes || []).find(s =>
+            (s.heading || '').toUpperCase().trim() === t.text.toUpperCase().trim()
+          );
+          if (sceneObj) showScenePanel(sceneObj.id);
+        });
+        break;
+      case 'action':
+        el = document.createElement('span');
+        el.className = 'fountain-action';
+        el.textContent = t.text;
+        break;
+      case 'character':
+        el = document.createElement('span');
+        el.className = 'fountain-character';
+        el.textContent = t.text;
+        break;
+      case 'parenthetical':
+        el = document.createElement('span');
+        el.className = 'fountain-parenthetical';
+        el.textContent = t.text;
+        break;
+      case 'dialogue':
+        el = document.createElement('span');
+        el.className = 'fountain-dialogue';
+        el.textContent = t.text;
+        break;
+      case 'transition':
+        el = document.createElement('span');
+        el.className = 'fountain-transition';
+        el.textContent = t.text;
+        break;
+      case 'centered':
+        el = document.createElement('span');
+        el.className = 'fountain-centered';
+        el.textContent = t.text;
+        break;
+      case 'section':
+        el = document.createElement('span');
+        el.className = 'fountain-section';
+        el.textContent = '#'.repeat(t.level) + ' ' + t.text;
+        break;
+      case 'synopsis':
+        el = document.createElement('span');
+        el.className = 'fountain-synopsis';
+        el.textContent = '= ' + t.text;
+        break;
+      case 'empty':
+        el = document.createElement('span');
+        el.className = 'fountain-empty';
+        break;
+      case 'page_break':
+        pageNum++;
+        el = document.createElement('hr');
+        el.className = 'screenplay-page-break';
+        el.setAttribute('data-page', `p. ${pageNum}`);
+        linesSinceBreak = 0;
+        break;
+      default:
+        continue;
+    }
+    if (el) doc.appendChild(el);
+  }
+
+  container.innerHTML = '';
+  container.appendChild(doc);
+  _scriptBuilt = true;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Statistics Panel Controls ──────────────────────────────────────────────────
+function openStatsPanel() {
+  // Ensure script is built & stats computed
+  if (!_scriptBuilt) buildScriptView();
+  if (!_computedStats) {
+    const text = (typeof window.__SCREENPLAY_TEXT__ !== 'undefined' && window.__SCREENPLAY_TEXT__) || _screenplayText;
+    if (text) _computedStats = computeStats(text);
+  }
+  if (!_computedStats) return;
+
+  populateStats(_computedStats);
+  document.getElementById('stats-panel').classList.add('open');
+  // close entity panel if open
+  closePanel();
+}
+
+function closeStatsPanel() {
+  document.getElementById('stats-panel').classList.remove('open');
+}
+
+function switchStatsGroup(group, btn) {
+  document.querySelectorAll('.stats-group').forEach(g => g.classList.remove('active'));
+  document.querySelectorAll('.stats-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('stats-group-' + group).classList.add('active');
+  btn.classList.add('active');
+
+  // Re-render charts in newly visible group (D3 needs visible container)
+  if (group === 'overview') renderDurationChart(_computedStats);
+  if (group === 'characters') renderCharacterChart(_computedStats);
+  if (group === 'scenes') {
+    const mode = document.querySelector('input[name="barcode-mode"]:checked');
+    renderBarcodeChart(mode ? mode.value : 'type');
+  }
+}
+
+// ─── Populate Statistics ────────────────────────────────────────────────────────
+let _charTableInstance = null;
+let _locTableInstance = null;
+
+function populateStats(stats) {
+  const ls = stats.lengthStats;
+  const ds = stats.durationStats;
+  const cs = stats.characterStats;
+  const locs = stats.locationStats;
+  const ss = stats.sceneStats;
+
+  // ── Overview ──
+  setText('lengthStats-pagesWhole', ls.pagesWhole);
+  setText('lengthStats-scenes', ls.scenes);
+  setText('lengthStats-words', ls.words.toLocaleString());
+  setText('lengthStats-lines', ls.lines.toLocaleString());
+  setText('lengthStats-characters', ls.characters.toLocaleString());
+  setText('durationStats-total', fmtDurationShort(ds.total));
+  setText('durationStats-action', fmtDurationShort(ds.action));
+  setText('durationStats-dialogue', fmtDurationShort(ds.dialogue));
+
+  // Duration summary
+  const totalMin = Math.round(ds.total / 60);
+  const actionPct = ds.total > 0 ? Math.round((ds.action / ds.total) * 100) : 0;
+  const lengthDesc = totalMin < 60 ? 'a short film' : totalMin < 90 ? 'an hour-long film' : totalMin < 120 ? 'a feature film' : 'an epic feature';
+  const balanceDesc = actionPct > 65 ? 'action-heavy' : actionPct < 35 ? 'dialogue-heavy' : 'balanced';
+  setText('durationStats-summary', `The screenplay is the length of ${lengthDesc}. It is ${balanceDesc} (${actionPct}% action).`);
+
+  // ── Characters ──
+  setText('characterStats-count', cs.characterCount);
+  setText('characterStats-monologues', cs.monologues);
+
+  // Character table
+  const charTbody = document.querySelector('#characterStats-table tbody');
+  charTbody.innerHTML = cs.characters.map(c => `
+    <tr>
+      <td><span class="char-color-pip" style="background:${c.color}"></span>${escHtml(c.name)}</td>
+      <td>${fmtDuration(c.secondsSpoken)}</td>
+      <td>${c.speakingParts}</td>
+      <td>${c.wordsSpoken}</td>
+      <td>${c.monologues}</td>
+    </tr>
+  `).join('');
+
+  if (_charTableInstance) { _charTableInstance.destroy(); _charTableInstance = null; }
+  try {
+    _charTableInstance = new DataTable('#characterStats-table', {
+      pageLength: 5, lengthMenu: [5, 10, 25],
+      order: [[1, 'desc']],
+      columnDefs: [{ targets: [1], type: 'string' }],
+    });
+  } catch(e) { /* DataTables not loaded yet */ }
+
+  // ── Scenes ──
+  setText('sceneStats-count', ss.scenes.length);
+  setText('locationStats-count', locs.locationsCount);
+
+  // Type bars
+  const totalScenes = ss.scenes.length || 1;
+  setBar('sceneprop-type_int', ss.typeCounts.int, totalScenes);
+  setBar('sceneprop-type_ext', ss.typeCounts.ext, totalScenes);
+  setBar('sceneprop-type_mixed', ss.typeCounts.mixed, totalScenes);
+
+  // Time bars
+  const timeTotal = Object.values(ss.timeCounts).reduce((a, b) => a + b, 0) || 1;
+  setBar('sceneprop-time_day', ss.timeCounts.day, timeTotal);
+  setBar('sceneprop-time_night', ss.timeCounts.night, timeTotal);
+  setBar('sceneprop-time_morning', ss.timeCounts.morning, timeTotal);
+  setBar('sceneprop-time_evening', ss.timeCounts.evening, timeTotal);
+  setBar('sceneprop-time_dawn', ss.timeCounts.dawn, timeTotal);
+  setBar('sceneprop-time_dusk', ss.timeCounts.dusk, timeTotal);
+
+  // Location table
+  const locTbody = document.querySelector('#locationStats-table tbody');
+  locTbody.innerHTML = locs.locations.map(l => `
+    <tr>
+      <td><span class="char-color-pip" style="background:${l.color}"></span>${escHtml(l.name)}</td>
+      <td>${l.number_of_scenes}</td>
+      <td>${l.interior_exterior.join('/').toUpperCase() || '—'}</td>
+    </tr>
+  `).join('');
+
+  if (_locTableInstance) { _locTableInstance.destroy(); _locTableInstance = null; }
+  try {
+    _locTableInstance = new DataTable('#locationStats-table', {
+      pageLength: 5, lengthMenu: [5, 10, 25],
+      order: [[1, 'desc']],
+    });
+  } catch(e) {}
+
+  // Charts (drawn after a tick so DOM is visible)
+  setTimeout(() => {
+    renderDurationChart(stats);
+    renderCharacterChart(stats);
+    renderBarcodeChart('type');
+  }, 50);
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setBar(id, count, total) {
+  const pct = Math.round((count / total) * 100);
+  const valueEl = document.getElementById(id);
+  const barEl = document.getElementById(id + '_bar');
+  if (valueEl) valueEl.textContent = count + ' (' + pct + '%)';
+  if (barEl) barEl.style.width = pct + '%';
+}
+
+// ─── D3 Charts ─────────────────────────────────────────────────────────────────
+function renderDurationChart(stats) {
+  const container = document.getElementById('durationStats-lengthchart');
+  if (!container || !window.d3) return;
+  container.innerHTML = '';
+
+  const actionData = stats.durationStats.lengthchart_action;
+  const dialogueData = stats.durationStats.lengthchart_dialogue;
+  if (!actionData || !actionData.length) return;
+
+  const W = container.clientWidth || 300;
+  const H = container.clientHeight || 70;
+  const margin = { top: 6, right: 8, bottom: 16, left: 28 };
+  const w = W - margin.left - margin.right;
+  const h = H - margin.top - margin.bottom;
+
+  const svg = d3.select(container).append('svg')
+    .attr('width', W).attr('height', H);
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleLinear().domain([0, actionData.length - 1]).range([0, w]);
+  const maxY = d3.max([...actionData, ...dialogueData]) || 1;
+  const y = d3.scaleLinear().domain([0, maxY]).range([h, 0]);
+
+  const lineAction = d3.line().x((d, i) => x(i)).y(d => y(d)).curve(d3.curveCatmullRom);
+  const lineDialogue = d3.line().x((d, i) => x(i)).y(d => y(d)).curve(d3.curveCatmullRom);
+
+  // Area fills
+  const areaAction = d3.area().x((d, i) => x(i)).y0(h).y1(d => y(d)).curve(d3.curveCatmullRom);
+  const areaDialogue = d3.area().x((d, i) => x(i)).y0(h).y1(d => y(d)).curve(d3.curveCatmullRom);
+
+  g.append('path').datum(actionData).attr('d', areaAction).attr('fill', 'rgba(123,156,240,0.12)');
+  g.append('path').datum(dialogueData).attr('d', areaDialogue).attr('fill', 'rgba(107,191,176,0.12)');
+  g.append('path').datum(actionData).attr('d', lineAction).attr('fill', 'none').attr('stroke', '#7b9cf0').attr('stroke-width', 1.5);
+  g.append('path').datum(dialogueData).attr('d', lineDialogue).attr('fill', 'none').attr('stroke', '#6bbfb0').attr('stroke-width', 1.5);
+
+  // Axes
+  g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(5).tickFormat(i => `${Math.round((i / actionData.length) * 100)}%`))
+    .selectAll('text').style('font-size', '9px');
+  g.append('g').call(d3.axisLeft(y).ticks(3).tickFormat(d => fmtDurationShort(d)))
+    .selectAll('text').style('font-size', '9px');
+  g.selectAll('.domain,.tick line').attr('stroke', 'rgba(255,255,255,0.15)');
+
+  // Legend
+  const leg = svg.append('g').attr('transform', `translate(${margin.left + w - 80}, ${margin.top})`);
+  leg.append('circle').attr('cx', 5).attr('cy', 5).attr('r', 4).attr('fill', '#7b9cf0');
+  leg.append('text').attr('x', 12).attr('y', 9).text('Action').style('font-size', '8px');
+  leg.append('circle').attr('cx', 5).attr('cy', 18).attr('r', 4).attr('fill', '#6bbfb0');
+  leg.append('text').attr('x', 12).attr('y', 22).text('Dialogue').style('font-size', '8px');
+}
+
+function renderCharacterChart(stats) {
+  const container = document.getElementById('characterStats-lengthchart');
+  if (!container || !window.d3) return;
+  container.innerHTML = '';
+
+  const chars = stats.characterStats.characters.slice(0, 8); // top 8
+  if (!chars.length) return;
+
+  const W = container.clientWidth || 300;
+  const H = container.clientHeight || 110;
+  const margin = { top: 8, right: 8, bottom: 20, left: 60 };
+  const w = W - margin.left - margin.right;
+  const h = H - margin.top - margin.bottom;
+
+  const svg = d3.select(container).append('svg').attr('width', W).attr('height', H);
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const maxSec = d3.max(chars, c => c.secondsSpoken) || 1;
+  const x = d3.scaleLinear().domain([0, maxSec]).range([0, w]);
+  const y = d3.scaleBand().domain(chars.map(c => c.name)).range([0, h]).padding(0.25);
+
+  g.selectAll('.bar')
+    .data(chars).enter().append('rect')
+    .attr('x', 0).attr('y', d => y(d.name))
+    .attr('height', y.bandwidth())
+    .attr('width', d => x(d.secondsSpoken))
+    .attr('fill', d => d.color)
+    .attr('rx', 2);
+
+  g.append('g').call(d3.axisLeft(y).tickSize(0))
+    .selectAll('text').style('font-size', '9px').attr('dx', '-3');
+  g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(4).tickFormat(d => fmtDurationShort(d)))
+    .selectAll('text').style('font-size', '9px');
+  g.selectAll('.domain,.tick line').attr('stroke', 'rgba(255,255,255,0.15)');
+}
+
+let _barcodeData = null;
+function renderBarcodeChart(mode) {
+  const container = document.getElementById('sceneStats-timechart');
+  if (!container || !window.d3 || !_computedStats) return;
+  container.innerHTML = '';
+
+  const scenes = _computedStats.sceneStats.scenes;
+  if (!scenes.length) return;
+
+  const TYPE_COLORS = { int: '#7b9cf0', ext: '#6bbfb0', mixed: '#e0a86b', other: '#8a8a8a' };
+  const TIME_COLORS = { dawn: '#e06b9b', morning: '#e07070', day: '#e0c96b', evening: '#b07be0', dusk: '#6bbfb0', night: '#7b9cf0', continuous: '#8a8a8a', later: '#8a8a8a', unspecified: '#444' };
+
+  const W = container.clientWidth || 300;
+  const H = container.clientHeight || 50;
+  const padding = 3;
+  const barW = Math.max(2, (W - padding * 2) / scenes.length);
+
+  const svg = d3.select(container).append('svg').attr('width', W).attr('height', H);
+  svg.selectAll('.bar')
+    .data(scenes).enter().append('rect')
+    .attr('x', (d, i) => padding + i * barW)
+    .attr('y', 0)
+    .attr('width', Math.max(1, barW - 0.5))
+    .attr('height', H)
+    .attr('fill', d => mode === 'type' ? (TYPE_COLORS[d.locType] || '#8a8a8a') : (TIME_COLORS[d.locTime] || '#8a8a8a'))
+    .attr('rx', 1)
+    .append('title').text(d => d.text);
+}
+
+// ─── Switch view: build script on first visit ───────────────────────────────────
+const _origSwitchView = switchView;
+// Wrap switchView to trigger script build when navigating to Script tab
+function switchView(view, btn) {
+  _origSwitchView(view, btn);
+  if (view === 'script' && !_scriptBuilt) {
+    // Try to load screenplay if not yet loaded
+    if (_screenplayLoaded && _screenplayText) {
+      buildScriptView();
+    } else if (!_screenplayLoaded) {
+      _loadScreenplayThenBuildScript();
+    }
+  }
+  // Close stats panel when leaving script view
+  if (view !== 'script') closeStatsPanel();
+}
+
+async function _loadScreenplayThenBuildScript() {
+  // Try window.__SCREENPLAY_TEXT__ first (injected by backend)
+  if (typeof window.__SCREENPLAY_TEXT__ !== 'undefined' && window.__SCREENPLAY_TEXT__) {
+    _screenplayText = window.__SCREENPLAY_TEXT__;
+    _screenplayLoaded = true;
+    buildScriptView();
+    return;
+  }
+  // Fallback: fetch from disk
+  try {
+    const res = await fetch('screenplay.fountain');
+    if (res.ok) { _screenplayText = await res.text(); _screenplayLoaded = true; buildScriptView(); return; }
+  } catch(e) {}
+  try {
+    const res = await fetch('screenplay.md');
+    if (res.ok) { _screenplayText = await res.text(); _screenplayLoaded = true; buildScriptView(); return; }
+  } catch(e) {}
+  _screenplayLoaded = true;
+  buildScriptView(); // will show empty state
+}
+
+// ─── Start ─────────────────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>
