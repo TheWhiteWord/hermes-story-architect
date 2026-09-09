@@ -1687,8 +1687,14 @@ function showScenePanel(sceneId) {
     return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
   }).filter(Boolean).join('');
 
-  // Scene content: pre-rendered HTML with CSS classes
-  const contentHtml = scene.content_html || `<pre class="fountain-content">${scene.content}</pre>`;
+  // Scene content: extract from injected screenplay text
+  let contentHtml = '';
+  if (window.__SCREENPLAY_TEXT__) {
+    const content = extractFountainScene(window.__SCREENPLAY_TEXT__, (scene.heading || '').trim());
+    contentHtml = content ? `<pre class="fountain-content">${content}</pre>` : '<div class="panel-muted">Scene not found in screenplay.</div>';
+  } else {
+    contentHtml = `<pre class="fountain-content">${scene.content || 'No content available.'}</pre>`;
+  }
 
   document.getElementById('panel-body').innerHTML = `
     ${chars ? `<div>
