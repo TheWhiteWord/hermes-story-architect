@@ -534,7 +534,9 @@ def parse(original_script, cfg=None, generate_html=False):
                             temp_index -= 1
                             tok_type = result['tokens'][temp_index]['type']
                             if tok_type == 'dialogue_end':
-                                result['tokens'].pop(temp_index)
+                                # BF uses splice(temp_index) which removes ALL tokens from here onwards
+                                # This also removes the separator pushed for the empty line between speakers
+                                result['tokens'] = result['tokens'][:temp_index]
                                 temp_index -= 1
                             elif tok_type in ('separator', 'character', 'dialogue', 'parenthetical'):
                                 pass
