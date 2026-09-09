@@ -417,6 +417,47 @@ class TestSceneExtraction:
         assert len(dual_begin) >= 1
 
 
+# ---- Duration Tests ----
+
+class TestDuration:
+    def test_dialogue_duration_calculated(self, save_the_children_fountain):
+        """Test that dialogue tokens have time set."""
+        tokens = tokenize(save_the_children_fountain)
+        dialogue_tokens = [t for t in tokens if t["type"] == "dialogue"]
+        for t in dialogue_tokens:
+            assert "time" in t, f"Dialogue token missing time: {t}"
+            assert t["time"] is not None, f"Dialogue token time is None: {t}"
+            assert t["time"] >= 0, f"Dialogue token time negative: {t}"
+
+    def test_action_duration_calculated(self, save_the_children_fountain):
+        """Test that action tokens have time set."""
+        tokens = tokenize(save_the_children_fountain)
+        action_tokens = [t for t in tokens if t["type"] == "action"]
+        for t in action_tokens:
+            assert "time" in t, f"Action token missing time: {t}"
+            assert t["time"] is not None, f"Action token time is None: {t}"
+            assert t["time"] >= 0, f"Action token time negative: {t}"
+
+    def test_totals_match_expected(self, save_the_children_fountain, expected_output):
+        """Test that total action and dialogue duration match expected output."""
+        result = parse(save_the_children_fountain)
+        # Compare with tolerance for floating point
+        assert abs(result["lengthAction"] - expected_output["lengthAction"]) < 0.01, \
+            f"Action length mismatch: {result['lengthAction']} != {expected_output['lengthAction']}"
+        assert abs(result["lengthDialogue"] - expected_output["lengthDialogue"]) < 0.01, \
+            f"Dialogue length mismatch: {result['lengthDialogue']} != {expected_output['lengthDialogue']}"
+
+    def test_scene_durations(self, save_the_children_fountain, expected_output):
+        """Test that per-scene action/dialogue durations match expected output."""
+        result = parse(save_the_children_fountain)
+        for i, scene in enumerate(result["properties"]["scenes"]):
+            expected_scene = expected_output["properties"]["scenes"][i]
+            assert abs(scene["actionLength"] - expected_scene["actionLength"]) < 0.01, \
+                f"Scene {i} action length mismatch: {scene['actionLength']} != {expected_scene['actionLength']}"
+            assert abs(scene["dialogueLength"] - expected_scene["dialogueLength"]) < 0.01, \
+                f"Scene {i} dialogue length mismatch: {scene['dialogueLength']} != {expected_scene['dialogueLength']}"
+
+
 
 
 # ---- HTML Rendering Tests ----

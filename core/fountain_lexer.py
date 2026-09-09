@@ -307,12 +307,13 @@ def parse(original_script, cfg=None, generate_html=False):
         duration = 0
         sanitized = re.sub(r'[^\w]', '', text)
         duration += (len(sanitized) / 3) * 0.1945548
-        punct = re.findall(r'(\.|\?|\!|\:) |(\, )', text)
+        # JS: dialogue.match(/(\.|\?|\!|\:) |(\, )/g) returns full match strings
+        # JS uses punct[0].length * 0.75 + punct[1].length * 0.3 (first=period, second=comma)
+        punct = re.findall(r'(?:\.|\?|\!|\:) |\, ', text)
         if punct:
-            if punct[0][0]:
-                duration += 0.75 * len([p for p in punct if p[0]])
-            if punct[0][1]:
-                duration += 0.3 * len([p for p in punct if p[1]])
+            duration += 0.75 * len(punct[0])
+            if len(punct) > 1:
+                duration += 0.3 * len(punct[1])
         return duration
 
     def process_dialogue_block(token):
