@@ -1163,8 +1163,8 @@ function normalise(data) {
   (d.scenes || []).forEach(s => {
     s.id = String(s.id);
     s.characters = (s.characters || []).map(String);
-    // locations: may be id strings or heading strings — keep as-is for lookup
-    s.locations = (s.locations || []);
+    // locations: normalize from location (string) or locations (array)
+    s.locations = normalizeLocs(s.locations || s.location);
     s.plots = (s.plots || []);
   });
 
