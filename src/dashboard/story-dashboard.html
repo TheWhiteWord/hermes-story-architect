@@ -1385,7 +1385,7 @@ function renderSceneList(scenes) {
       const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
       return c ? `<span class="tag tag-char">${c.name}</span>` : '';
     }).join('');
-    const locTags = (s.locations || []).map(lref => {
+    const locTags = normalizeLocs(s.locations || s.location).map(lref => {
       const l = findLocation(lref);
       return l ? `<span class="tag tag-location">${l.name}</span>` : '';
     }).join('');
@@ -1415,8 +1415,8 @@ function filterScenes(query) {
       const c = (story.characters || []).find(x => x.id === cid);
       return c && c.name.toLowerCase().includes(q);
     })) return true;
-    if ((s.locations || []).some(lid => {
-      const l = (story.locations || []).find(x => x.id === lid);
+    if (normalizeLocs(s.locations || s.location).some(lid => {
+      const l = findLocation(lid);
       return l && l.name.toLowerCase().includes(q);
     })) return true;
     return false;
@@ -1662,7 +1662,7 @@ function showScenePanel(sceneId) {
       : '';
   }).filter(Boolean).join('');
 
-  const locs = (scene.locations || []).map(lref => {
+  const locs = normalizeLocs(scene.locations || scene.location).map(lref => {
     const l = findLocation(lref);
     return l ? `<button class="entity-link" onclick="showLocationPanel('${l.id}')">${l.name}</button>` : '';
   }).filter(Boolean).join('');
