@@ -1765,9 +1765,23 @@ function extractFountainScene(text, heading) {
   const headingNorm = heading.toUpperCase().trim();
 
   // Find starting line: exact match on the full heading
+  // Skip lines inside boneyard blocks (/* ... */)
   let startIdx = -1;
+  let inBoneyard = false;
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim().toUpperCase();
+    const raw = lines[i];
+    const line = raw.trim().toUpperCase();
+
+    // Track boneyard state
+    if (inBoneyard) {
+      if (line.includes('*/')) inBoneyard = false;
+      continue;
+    }
+    if (line.startsWith('/*')) {
+      if (!line.includes('*/')) inBoneyard = true;
+      continue;
+    }
+
     if (line === headingNorm) {
       startIdx = i;
       break;
