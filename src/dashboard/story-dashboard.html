@@ -1786,6 +1786,11 @@ function extractFountainScene(text, heading) {
       startIdx = i;
       break;
     }
+    // Also match forced scene headings (line ".OPENING TITLES" matches heading "OPENING TITLES")
+    if (line.startsWith('.') && line.slice(1) === headingNorm) {
+      startIdx = i;
+      break;
+    }
     // Also match if heading has parenthetical suffix (e.g. "INT. X - DAY (400 YEARS EARLIER)")
     // and the screenplay line matches without the suffix
     const baseHeading = headingNorm.replace(/\s*\(.*\)\s*$/, '').trim();
@@ -1797,19 +1802,44 @@ function extractFountainScene(text, heading) {
 
   if (startIdx === -1) return null;
 
-  // Collect lines until next scene heading or end
+  // Collect lines until next scene heading, page break, or section — skip boneyard
   const result = [];
+  let inBoneyard = false;
   for (let i = startIdx; i < lines.length; i++) {
-    if (i > startIdx && isFountainSceneHeading(lines[i].trim())) break;
-    result.push(lines[i]);
+    const raw = lines[i];
+    const line = raw.trim().toUpperCase();
+
+    if (i > startIdx) {
+      // Stop at next scene heading (standard or forced), page break, or section
+      if (isFountainSceneHeading(raw.trim()) || isForcedSceneHeading(raw.trim())) break;
+      if (/^===$/.test(raw.trim())) break;
+      if (/^#{1,3}\s/.test(raw.trim())) break;
+    }
+
+    // Skip boneyard blocks in content too
+    if (inBoneyard) {
+      if (line.includes('*/')) inBoneyard = false;
+      continue;
+    }
+    if (line.startsWith('/*')) {
+      if (!line.includes('*/')) inBoneyard = true;
+      continue;
+    }
+
+    result.push(raw);
     if (result.length > 80) { result.push('…'); break; } // cap at ~80 lines
   }
   return result.join('\n').trim();
 }
 
 function isFountainSceneHeading(line) {
-  // Scene headings start with INT./EXT. etc. — allow parenthetical suffixes like "(400 YEARS EARLIER)"
+  // Scene headings start with INT./EXT. etc.
   return /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+/i.test(line);
+}
+
+function isForcedSceneHeading(line) {
+  // Forced scene headings start with a dot (e.g. ".OPENING TITLES")
+  return /^\.[A-Z]/.test(line);
 }
 
 function showLocationPanel(locId) {
