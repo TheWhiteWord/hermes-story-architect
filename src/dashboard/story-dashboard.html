@@ -1694,13 +1694,13 @@ function showScenePanel(sceneId) {
     return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
   }).filter(Boolean).join('');
 
-  // Scene content: extract from injected screenplay text
+  // Scene content: extract and format with screenplay CSS classes
   let contentHtml = '';
   if (window.__SCREENPLAY_TEXT__) {
     const content = extractFountainScene(window.__SCREENPLAY_TEXT__, (scene.heading || '').trim());
-    contentHtml = content ? `<pre class="fountain-content">${content}</pre>` : '<div class="panel-muted">Scene not found in screenplay.</div>';
+    contentHtml = content ? formatFountainScene(content) : '<div class="panel-muted">Scene not found in screenplay.</div>';
   } else {
-    contentHtml = `<pre class="fountain-content">${scene.content || 'No content available.'}</pre>`;
+    contentHtml = `<div class="screenplay-content">${scene.content || 'No content available.'}</div>`;
   }
 
   document.getElementById('panel-body').innerHTML = `
@@ -1765,7 +1765,64 @@ async function loadSceneContent(scene) {
   }
 }
 
-// Extract scene from Fountain-format text.
+// Format raw fountain text into HTML with screenplay CSS classes
+function formatFountainScene(text) {
+  const lines = text.split('\n');
+  let html = '<div class="screenplay-content">';
+  let prevType = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    const upper = trimmed.toUpperCase();
+
+    // Skip empty lines
+    if (!trimmed) {
+      html += '<br>';
+      continue;
+    }
+
+    // Classify line
+    let type = 'action';
+    let cls = 'fountain-action';
+
+    if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+/i.test(trimmed)) {
+      type = 'scene_heading';
+      cls = 'fountain-scene_heading';
+    } else if (/^\.[A-Z]/.test(trimmed)) {
+      type = 'scene_heading';
+      cls = 'fountain-scene_heading';
+    } else if (/^(CUT TO:|FADE TO BLACK\.|FADE OUT\.|SMASH CUT TO:|DISSOLVE TO:)/i.test(trimmed)) {
+      type = 'transition';
+      cls = 'fountain-transition';
+    } else if (/^>.+<$/.test(trimmed)) {
+      type = 'centered';
+      cls = 'fountain-centered';
+    } else if (/^~/.test(trimmed)) {
+      type = 'lyric';
+      cls = 'fountain-lyric';
+    } else if (/^\(.*\)$/.test(trimmed) && prevType === 'character') {
+      type = 'parenthetical';
+      cls = 'fountain-parenthetical';
+    } else if (/^[A-Z][A-Z\s]+$/.test(upper) && trimmed.length > 1) {
+      type = 'character';
+      cls = 'fountain-character';
+    } else if (prevType === 'character' || prevType === 'parenthetical') {
+      type = 'dialogue';
+      cls = 'fountain-dialogue';
+    }
+
+    html += `<div class="${cls}">${escapeHtml(line).replace(/^ /g, '&nbsp;')}</div>`;
+    prevType = type;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 // Fountain scene headings: lines starting with INT./EXT./INT-EXT. etc.
 function extractFountainScene(text, heading) {
   const lines = text.split('\n');
