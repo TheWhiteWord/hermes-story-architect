@@ -40,15 +40,35 @@ def handler(args: dict, **kwargs) -> str:
     if not dashboard_src.exists():
         return json.dumps({"error": "Dashboard file not found in plugin"})
 
+    screenplay_css_src = dashboard_src.parent / "screenplay.css"
+    if not screenplay_css_src.exists():
+        return json.dumps({"error": "Screenplay CSS file not found in plugin"})
+
     # Read index.yaml, convert to JSON, inject inline — avoids fetch('file://') which Electron blocks
     yaml_data = yaml.safe_load(index_path.read_text(encoding="utf-8"))
     html = dashboard_src.read_text(encoding="utf-8")
+    css = screenplay_css_src.read_text(encoding="utf-8")
+
+    # Replace the external CSS link with inline CSS (so it works from any location)
+    html = html.replace(
+        '<link rel="stylesheet" href="screenplay.css">',
+        f"<style>\n{css}\n</style>"
+    )
 
     injection = f"window.__STORY_DATA__ = {json.dumps(yaml_data)};"
     html = html.replace(
         "// ─── Boot ─────────────────────────────────────────────────────────────────────",
         injection + "\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
     )
+
+    # Inject screenplay text the same way — fetch('file://') is blocked in Electron
+    screenplay_path = project_path / "screenplay.fountain"
+    if screenplay_path.exists():
+        screenplay_text = screenplay_path.read_text(encoding="utf-8")
+        html = html.replace(
+            "// ─── Boot ─────────────────────────────────────────────────────────────────────",
+            f'window.__SCREENPLAY_TEXT__ = {json.dumps(screenplay_text)};\n// ─── Boot ─────────────────────────────────────────────────────────────────────',
+        )
 
     # Name temp file after the story title
     project_name = (yaml_data.get("project", {}).get("name") or project).strip()

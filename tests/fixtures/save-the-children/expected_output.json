@@ -1,0 +1,2213 @@
+{
+  "title_page": {
+    "tl": [],
+    "tc": [],
+    "tr": [],
+    "cc": [
+      {
+        "text": "_**SAVE THE CHILDREN**_\n_**FULL RETIRED**_",
+        "type": "title",
+        "start": 0,
+        "end": 33,
+        "line": 0,
+        "ignore": false,
+        "index": 0,
+        "takeNumber": -1,
+        "original_line": 1
+      },
+      {
+        "text": "Written by",
+        "type": "credit",
+        "start": 63,
+        "end": 83,
+        "line": 2,
+        "ignore": false,
+        "index": 1,
+        "takeNumber": -1,
+        "original_line": 3
+      },
+      {
+        "text": "TWW",
+        "type": "author",
+        "start": 84,
+        "end": 97,
+        "line": 3,
+        "ignore": false,
+        "index": 2,
+        "takeNumber": -1,
+        "original_line": 4
+      },
+      {
+        "text": "Story by TWW",
+        "type": "source",
+        "start": 98,
+        "end": 120,
+        "line": 4,
+        "ignore": false,
+        "index": 4,
+        "takeNumber": -1,
+        "original_line": 5
+      }
+    ],
+    "bl": [
+      {
+        "text": "2026 TWW",
+        "type": "copyright",
+        "start": 169,
+        "end": 188,
+        "line": 7,
+        "ignore": false,
+        "index": 1,
+        "takeNumber": -1,
+        "original_line": 8
+      }
+    ],
+    "br": [
+      {
+        "text": "1/20/2012",
+        "type": "draft_date",
+        "start": 121,
+        "end": 142,
+        "line": 5,
+        "ignore": false,
+        "index": 2,
+        "takeNumber": -1,
+        "original_line": 6
+      },
+      {
+        "text": "tww@example.com",
+        "type": "contact",
+        "start": 143,
+        "end": 168,
+        "line": 6,
+        "ignore": false,
+        "index": 3,
+        "takeNumber": -1,
+        "original_line": 7
+      }
+    ],
+    "hidden": []
+  },
+  "tokens": [
+    {
+      "text": "",
+      "type": "separator",
+      "start": 189,
+      "end": 189,
+      "line": 8,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 9
+    },
+    {
+      "text": "tl: Top left text",
+      "type": "action",
+      "start": 190,
+      "end": 207,
+      "line": 9,
+      "ignore": false,
+      "time": 0.85,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 10
+    },
+    {
+      "text": "tc: Top center text",
+      "type": "action",
+      "start": 208,
+      "end": 227,
+      "line": 10,
+      "ignore": false,
+      "time": 0.95,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 11
+    },
+    {
+      "text": "tr: Top right text",
+      "type": "action",
+      "start": 228,
+      "end": 246,
+      "line": 11,
+      "ignore": false,
+      "time": 0.9,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 12
+    },
+    {
+      "text": "cc: Center text",
+      "type": "action",
+      "start": 247,
+      "end": 262,
+      "line": 12,
+      "ignore": false,
+      "time": 0.75,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 13
+    },
+    {
+      "text": "bl: Bottom left text",
+      "type": "action",
+      "start": 263,
+      "end": 283,
+      "line": 13,
+      "ignore": false,
+      "time": 1,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 14
+    },
+    {
+      "text": "br: Bottom right text",
+      "type": "action",
+      "start": 284,
+      "end": 305,
+      "line": 14,
+      "ignore": false,
+      "time": 1.05,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 15
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 306,
+      "end": 306,
+      "line": 15,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 16
+    },
+    {
+      "text": "Act I",
+      "type": "section",
+      "start": 307,
+      "end": 314,
+      "line": 16,
+      "ignore": false,
+      "level": 1,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 17
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 315,
+      "end": 315,
+      "line": 17,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 18
+    },
+    {
+      "text": "A young person fights to escape an oppressive system — unaware that the rebellion itself is the inherited memory of the last scientists who built the world that imprisoned them.",
+      "type": "synopsis",
+      "start": 316,
+      "end": 495,
+      "line": 18,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 19
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 496,
+      "end": 496,
+      "line": 19,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 20
+    },
+    {
+      "text": "Sequence A",
+      "type": "section",
+      "start": 497,
+      "end": 510,
+      "line": 20,
+      "ignore": false,
+      "level": 2,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 21
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 511,
+      "end": 511,
+      "line": 21,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 22
+    },
+    {
+      "text": "EXT. THE INSTITUTE - DAY",
+      "type": "scene_heading",
+      "start": 512,
+      "end": 536,
+      "line": 22,
+      "ignore": false,
+      "number": "1",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 23
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 537,
+      "end": 537,
+      "line": 23,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 24
+    },
+    {
+      "text": "A vast decaying building. Nature reclaims the walls. ",
+      "type": "action",
+      "start": 538,
+      "end": 634,
+      "line": 24,
+      "ignore": false,
+      "time": 2.65,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 25
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 635,
+      "end": 635,
+      "line": 25,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 26
+    },
+    {
+      "text": "INT. CENTRAL ROOM - DAY",
+      "type": "scene_heading",
+      "start": 636,
+      "end": 659,
+      "line": 26,
+      "ignore": false,
+      "number": "2",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 27
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 660,
+      "end": 660,
+      "line": 27,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 28
+    },
+    {
+      "text": "KAEL (15, intense) stares at a wall of pale light.",
+      "type": "action",
+      "start": 661,
+      "end": 711,
+      "line": 28,
+      "ignore": false,
+      "time": 2.5,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 29
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 712,
+      "end": 712,
+      "line": 29,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 30
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "KAEL",
+      "type": "character",
+      "start": 713,
+      "end": 717,
+      "line": 30,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 1,
+      "original_line": 31
+    },
+    {
+      "text": "Something's wrong. Everything arrives too perfectly.",
+      "type": "dialogue",
+      "start": 718,
+      "end": 770,
+      "line": 31,
+      "ignore": false,
+      "time": 4.3534704,
+      "character": "KAEL",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 32
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 771,
+      "end": 771,
+      "line": 32,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 33
+    },
+    {
+      "text": "MIRA (15, warm) enters behind them.",
+      "type": "action",
+      "start": 772,
+      "end": 807,
+      "line": 33,
+      "ignore": false,
+      "time": 1.75,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 34
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 808,
+      "end": 808,
+      "line": 34,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 35
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "MIRA",
+      "type": "character",
+      "start": 809,
+      "end": 813,
+      "line": 35,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 2,
+      "original_line": 36
+    },
+    {
+      "text": "You're feeling it too?",
+      "type": "dialogue",
+      "start": 814,
+      "end": 836,
+      "line": 36,
+      "ignore": false,
+      "time": 1.1024772,
+      "character": "MIRA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 37
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 837,
+      "end": 837,
+      "line": 37,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 38
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "KAEL",
+      "type": "character",
+      "start": 838,
+      "end": 842,
+      "line": 38,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 3,
+      "original_line": 39
+    },
+    {
+      "text": "(chosen)",
+      "type": "parenthetical",
+      "start": 843,
+      "end": 851,
+      "line": 39,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 40
+    },
+    {
+      "text": "I was meant to find this.",
+      "type": "dialogue",
+      "start": 852,
+      "end": 877,
+      "line": 40,
+      "ignore": false,
+      "time": 1.2321803999999998,
+      "character": "KAEL",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 41
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 878,
+      "end": 878,
+      "line": 41,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 42
+    },
+    {
+      "text": "*Singing in the darkness~*",
+      "type": "action",
+      "start": 879,
+      "end": 904,
+      "line": 42,
+      "ignore": false,
+      "time": 1.25,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 43
+    },
+    {
+      "text": "*A lullaby for the lost~*",
+      "type": "action",
+      "start": 905,
+      "end": 929,
+      "line": 43,
+      "ignore": false,
+      "time": 1.2,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 44
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 930,
+      "end": 930,
+      "line": 44,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 45
+    },
+    {
+      "text": "Scene Group 1",
+      "type": "section",
+      "start": 931,
+      "end": 948,
+      "line": 45,
+      "ignore": false,
+      "level": 3,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 46
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 949,
+      "end": 949,
+      "line": 46,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 47
+    },
+    {
+      "text": "EXT. THE GARDEN - NIGHT",
+      "type": "scene_heading",
+      "start": 950,
+      "end": 973,
+      "line": 47,
+      "ignore": false,
+      "number": "3",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 48
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 974,
+      "end": 974,
+      "line": 48,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 49
+    },
+    {
+      "text": "Kael walks through simulated moonlight. The grass feels real. ",
+      "type": "action",
+      "start": 975,
+      "end": 1070,
+      "line": 49,
+      "ignore": false,
+      "time": 3.1,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 50
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1071,
+      "end": 1071,
+      "line": 50,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 51
+    },
+    {
+      "text": "INT. THE CORE - DAY (400 YEARS EARLIER)",
+      "type": "scene_heading",
+      "start": 1072,
+      "end": 1111,
+      "line": 51,
+      "ignore": false,
+      "number": "4",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 52
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1112,
+      "end": 1112,
+      "line": 52,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 53
+    },
+    {
+      "text": "DR. ELENA VOSS (42, exhausted) works at a terminal. MARCUS CHEN (38, empathetic) enters.",
+      "type": "action",
+      "start": 1113,
+      "end": 1201,
+      "line": 53,
+      "ignore": false,
+      "time": 4.4,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 54
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1202,
+      "end": 1202,
+      "line": 54,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 55
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "MARCUS",
+      "type": "character",
+      "start": 1203,
+      "end": 1209,
+      "line": 55,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 4,
+      "original_line": 56
+    },
+    {
+      "text": "They're at the gates. They want in.",
+      "type": "dialogue",
+      "start": 1210,
+      "end": 1245,
+      "line": 56,
+      "ignore": false,
+      "time": 3.1861416,
+      "character": "MARCUS",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 57
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1246,
+      "end": 1246,
+      "line": 57,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 58
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "ELENA",
+      "type": "character",
+      "start": 1247,
+      "end": 1252,
+      "line": 58,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 5,
+      "original_line": 59
+    },
+    {
+      "text": "The project is too fragile. We can't compromise.",
+      "type": "dialogue",
+      "start": 1253,
+      "end": 1301,
+      "line": 59,
+      "ignore": false,
+      "time": 3.9643607999999997,
+      "character": "ELENA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 60
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1302,
+      "end": 1302,
+      "line": 60,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 61
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "MARCUS",
+      "type": "character",
+      "start": 1303,
+      "end": 1309,
+      "line": 61,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 6,
+      "original_line": 62
+    },
+    {
+      "text": "They're dying, Elena. We all are.",
+      "type": "dialogue",
+      "start": 1310,
+      "end": 1343,
+      "line": 62,
+      "ignore": false,
+      "time": 3.6564384000000003,
+      "character": "MARCUS",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 63
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1344,
+      "end": 1344,
+      "line": 63,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 64
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "ELENA",
+      "type": "character",
+      "start": 1345,
+      "end": 1350,
+      "line": 64,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 7,
+      "original_line": 65
+    },
+    {
+      "text": "(almost to herself)",
+      "type": "parenthetical",
+      "start": 1351,
+      "end": 1370,
+      "line": 65,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 66
+    },
+    {
+      "text": "The truth would kill them.",
+      "type": "dialogue",
+      "start": 1371,
+      "end": 1397,
+      "line": 66,
+      "ignore": false,
+      "time": 1.3618836,
+      "character": "ELENA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 67
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1398,
+      "end": 1398,
+      "line": 67,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 68
+    },
+    {
+      "text": "EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)",
+      "type": "scene_heading",
+      "start": 1399,
+      "end": 1445,
+      "line": 68,
+      "ignore": false,
+      "number": "5",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 69
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1446,
+      "end": 1446,
+      "line": 69,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 70
+    },
+    {
+      "text": "Outsiders gather. Desperate. Hopeful.",
+      "type": "action",
+      "start": 1447,
+      "end": 1484,
+      "line": 70,
+      "ignore": false,
+      "time": 1.85,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 71
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1485,
+      "end": 1485,
+      "line": 71,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 72
+    },
+    {
+      "text": "INT. CENTRAL ROOM - NIGHT",
+      "type": "scene_heading",
+      "start": 1486,
+      "end": 1511,
+      "line": 72,
+      "ignore": false,
+      "number": "6",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 73
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1512,
+      "end": 1512,
+      "line": 73,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 74
+    },
+    {
+      "text": "Kael stands before the door. The Administrator's voice echoes.",
+      "type": "action",
+      "start": 1513,
+      "end": 1575,
+      "line": 74,
+      "ignore": false,
+      "time": 3.1,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 75
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1576,
+      "end": 1576,
+      "line": 75,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 76
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "ADMINISTRATOR (V.O.)",
+      "type": "character",
+      "start": 1577,
+      "end": 1597,
+      "line": 76,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 8,
+      "original_line": 77
+    },
+    {
+      "text": "You don't understand what you'd be entering.",
+      "type": "dialogue",
+      "start": 1598,
+      "end": 1642,
+      "line": 77,
+      "ignore": false,
+      "time": 2.269806,
+      "character": "ADMINISTRATOR (V.O.)",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 78
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1643,
+      "end": 1643,
+      "line": 78,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 79
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "KAEL",
+      "type": "character",
+      "start": 1644,
+      "end": 1648,
+      "line": 79,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 9,
+      "original_line": 80
+    },
+    {
+      "text": "I understand I was chosen.",
+      "type": "dialogue",
+      "start": 1649,
+      "end": 1675,
+      "line": 80,
+      "ignore": false,
+      "time": 1.3618836,
+      "character": "KAEL",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 81
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1676,
+      "end": 1676,
+      "line": 81,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 82
+    },
+    {
+      "text": "The door opens.",
+      "type": "action",
+      "start": 1677,
+      "end": 1692,
+      "line": 82,
+      "ignore": false,
+      "time": 0.75,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 83
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1693,
+      "end": 1693,
+      "line": 83,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 84
+    },
+    {
+      "text": "CUT TO:",
+      "type": "transition",
+      "start": 1694,
+      "end": 1717,
+      "line": 84,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 85
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1718,
+      "end": 1718,
+      "line": 85,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 86
+    },
+    {
+      "text": "OPENING TITLES",
+      "type": "scene_heading",
+      "start": 1719,
+      "end": 1734,
+      "line": 86,
+      "ignore": false,
+      "number": "7",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 87
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1735,
+      "end": 1735,
+      "line": 87,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 88
+    },
+    {
+      "text": "THE END",
+      "type": "centered",
+      "start": 1736,
+      "end": 1747,
+      "line": 88,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 89
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1748,
+      "end": 1748,
+      "line": 89,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 90
+    },
+    {
+      "text": "",
+      "type": "page_break",
+      "start": 1749,
+      "end": 1752,
+      "line": 90,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 91
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1753,
+      "end": 1753,
+      "line": 91,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 92
+    },
+    {
+      "text": "Act II",
+      "type": "section",
+      "start": 1754,
+      "end": 1762,
+      "line": 92,
+      "ignore": false,
+      "level": 1,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 93
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1763,
+      "end": 1763,
+      "line": 93,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 94
+    },
+    {
+      "text": "The children discover the truth about their world.",
+      "type": "synopsis",
+      "start": 1764,
+      "end": 1816,
+      "line": 94,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 95
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1817,
+      "end": 1817,
+      "line": 95,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 96
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1818,
+      "end": 1818,
+      "line": 96,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 97
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1819,
+      "end": 1819,
+      "line": 97,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 98
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1820,
+      "end": 1820,
+      "line": 98,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 99
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1821,
+      "end": 1821,
+      "line": 99,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 100
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1822,
+      "end": 1822,
+      "line": 100,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 101
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1823,
+      "end": 1823,
+      "line": 101,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 102
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1824,
+      "end": 1824,
+      "line": 102,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 103
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1825,
+      "end": 1825,
+      "line": 103,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 104
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1826,
+      "end": 1826,
+      "line": 104,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 105
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1827,
+      "end": 1827,
+      "line": 105,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 106
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1828,
+      "end": 1828,
+      "line": 106,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 107
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1829,
+      "end": 1829,
+      "line": 107,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 108
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1830,
+      "end": 1830,
+      "line": 108,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 109
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1831,
+      "end": 1831,
+      "line": 109,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 110
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1832,
+      "end": 1832,
+      "line": 110,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 111
+    },
+    {
+      "text": "INT. THE CORE - DAY",
+      "type": "scene_heading",
+      "start": 1878,
+      "end": 1897,
+      "line": 113,
+      "ignore": false,
+      "number": "8",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 114
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1898,
+      "end": 1898,
+      "line": 114,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 115
+    },
+    {
+      "text": "Kael and Mira stand before the terminal. Elena's ghost flickers.",
+      "type": "action",
+      "start": 1899,
+      "end": 1963,
+      "line": 115,
+      "ignore": false,
+      "time": 3.2,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 116
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 1964,
+      "end": 1964,
+      "line": 116,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 117
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "ELENA",
+      "type": "character",
+      "start": 1965,
+      "end": 1970,
+      "line": 117,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 10,
+      "original_line": 118
+    },
+    {
+      "text": "You were never meant to escape.",
+      "type": "dialogue",
+      "start": 1971,
+      "end": 2002,
+      "line": 118,
+      "ignore": false,
+      "time": 1.6212900000000001,
+      "character": "ELENA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 119
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2003,
+      "end": 2003,
+      "line": 119,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 120
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "MIRA",
+      "type": "character",
+      "start": 2004,
+      "end": 2008,
+      "line": 120,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 11,
+      "original_line": 121
+    },
+    {
+      "text": "Then why show us the door?",
+      "type": "dialogue",
+      "start": 2009,
+      "end": 2035,
+      "line": 121,
+      "ignore": false,
+      "time": 1.297032,
+      "character": "MIRA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 122
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2036,
+      "end": 2036,
+      "line": 122,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 123
+    },
+    {
+      "type": "dialogue_begin",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "ELENA",
+      "type": "character",
+      "start": 2037,
+      "end": 2042,
+      "line": 123,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": 12,
+      "original_line": 124
+    },
+    {
+      "text": "Because the door was always open.",
+      "type": "dialogue",
+      "start": 2043,
+      "end": 2076,
+      "line": 124,
+      "ignore": false,
+      "time": 1.7509932,
+      "character": "ELENA",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 125
+    },
+    {
+      "type": "dialogue_end",
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2077,
+      "end": 2077,
+      "line": 125,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 126
+    },
+    {
+      "text": "SMASH CUT TO:",
+      "type": "transition",
+      "start": 2078,
+      "end": 2107,
+      "line": 126,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 127
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2108,
+      "end": 2108,
+      "line": 127,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 128
+    },
+    {
+      "text": "EXT. THE INSTITUTE - DAY",
+      "type": "scene_heading",
+      "start": 2109,
+      "end": 2133,
+      "line": 128,
+      "ignore": false,
+      "number": "9",
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 129
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2134,
+      "end": 2134,
+      "line": 129,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 130
+    },
+    {
+      "text": "The building crumbles. The children emerge into the real world.",
+      "type": "action",
+      "start": 2135,
+      "end": 2198,
+      "line": 130,
+      "ignore": false,
+      "time": 3.15,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 131
+    },
+    {
+      "text": "",
+      "type": "separator",
+      "start": 2199,
+      "end": 2199,
+      "line": 131,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 132
+    },
+    {
+      "text": "FADE OUT.",
+      "type": "transition",
+      "start": 2200,
+      "end": 2225,
+      "line": 132,
+      "ignore": false,
+      "index": -1,
+      "takeNumber": -1,
+      "original_line": 133
+    }
+  ],
+  "scriptHtml": "",
+  "titleHtml": "",
+  "lengthAction": 34.400000000000006,
+  "lengthDialogue": 27.157957199999995,
+  "tokenLines": {
+    "8": 0,
+    "9": 1,
+    "10": 2,
+    "11": 3,
+    "12": 4,
+    "13": 5,
+    "14": 6,
+    "15": 7,
+    "16": 8,
+    "17": 9,
+    "18": 10,
+    "19": 11,
+    "20": 12,
+    "21": 13,
+    "22": 14,
+    "23": 15,
+    "24": 16,
+    "25": 17,
+    "26": 18,
+    "27": 19,
+    "28": 20,
+    "29": 21,
+    "30": 23,
+    "31": 24,
+    "32": 26,
+    "33": 27,
+    "34": 28,
+    "35": 30,
+    "36": 31,
+    "37": 33,
+    "38": 35,
+    "39": 36,
+    "40": 37,
+    "41": 39,
+    "42": 40,
+    "43": 41,
+    "44": 42,
+    "45": 43,
+    "46": 44,
+    "47": 45,
+    "48": 46,
+    "49": 47,
+    "50": 48,
+    "51": 49,
+    "52": 50,
+    "53": 51,
+    "54": 52,
+    "55": 54,
+    "56": 55,
+    "57": 57,
+    "58": 59,
+    "59": 60,
+    "60": 62,
+    "61": 64,
+    "62": 65,
+    "63": 67,
+    "64": 69,
+    "65": 70,
+    "66": 71,
+    "67": 73,
+    "68": 74,
+    "69": 75,
+    "70": 76,
+    "71": 77,
+    "72": 78,
+    "73": 79,
+    "74": 80,
+    "75": 81,
+    "76": 83,
+    "77": 84,
+    "78": 86,
+    "79": 88,
+    "80": 89,
+    "81": 91,
+    "82": 92,
+    "83": 93,
+    "84": 94,
+    "85": 95,
+    "86": 96,
+    "87": 97,
+    "88": 98,
+    "89": 99,
+    "90": 100,
+    "91": 101,
+    "92": 102,
+    "93": 103,
+    "94": 104,
+    "95": 105,
+    "96": 106,
+    "97": 107,
+    "98": 108,
+    "99": 109,
+    "100": 110,
+    "101": 111,
+    "102": 112,
+    "103": 113,
+    "104": 114,
+    "105": 115,
+    "106": 116,
+    "107": 117,
+    "108": 118,
+    "109": 119,
+    "110": 120,
+    "113": 121,
+    "114": 122,
+    "115": 123,
+    "116": 124,
+    "117": 126,
+    "118": 127,
+    "119": 129,
+    "120": 131,
+    "121": 132,
+    "122": 134,
+    "123": 136,
+    "124": 137,
+    "125": 139,
+    "126": 140,
+    "127": 141,
+    "128": 142,
+    "129": 143,
+    "130": 144,
+    "131": 145,
+    "132": 146,
+    "133": 147
+  },
+  "parseTime": 1788913127662,
+  "properties": {
+    "sceneLines": [
+      22,
+      26,
+      47,
+      51,
+      68,
+      72,
+      86,
+      113,
+      128
+    ],
+    "scenes": [
+      {
+        "scene": "1",
+        "text": "EXT. THE INSTITUTE - DAY",
+        "line": 22,
+        "actionLength": 2.6499999999999995,
+        "dialogueLength": 0
+      },
+      {
+        "scene": "2",
+        "text": "INT. CENTRAL ROOM - DAY",
+        "line": 26,
+        "actionLength": 6.699999999999999,
+        "dialogueLength": 6.688128
+      },
+      {
+        "scene": "3",
+        "text": "EXT. THE GARDEN - NIGHT",
+        "line": 47,
+        "actionLength": 3.1000000000000014,
+        "dialogueLength": 0
+      },
+      {
+        "scene": "4",
+        "text": "INT. THE CORE - DAY (400 YEARS EARLIER)",
+        "line": 51,
+        "actionLength": 4.400000000000002,
+        "dialogueLength": 12.168824399999998
+      },
+      {
+        "scene": "5",
+        "text": "EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)",
+        "line": 68,
+        "actionLength": 1.8500000000000014,
+        "dialogueLength": 0
+      },
+      {
+        "scene": "6",
+        "text": "INT. CENTRAL ROOM - NIGHT",
+        "line": 72,
+        "actionLength": 3.8500000000000014,
+        "dialogueLength": 3.631689599999998
+      },
+      {
+        "scene": "7",
+        "text": "OPENING TITLES",
+        "line": 86,
+        "actionLength": 0,
+        "dialogueLength": 0
+      },
+      {
+        "scene": "8",
+        "text": "INT. THE CORE - DAY",
+        "line": 113,
+        "actionLength": 3.1999999999999993,
+        "dialogueLength": 4.6693152
+      },
+      {
+        "scene": "9",
+        "text": "EXT. THE INSTITUTE - DAY",
+        "line": 128,
+        "actionLength": 0,
+        "dialogueLength": 0
+      }
+    ],
+    "sceneNames": [
+      "EXT. THE INSTITUTE - DAY",
+      "INT. CENTRAL ROOM - DAY",
+      "EXT. THE GARDEN - NIGHT",
+      "INT. THE CORE - DAY (400 YEARS EARLIER)",
+      "EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)",
+      "INT. CENTRAL ROOM - NIGHT",
+      "OPENING TITLES",
+      "INT. THE CORE - DAY",
+      "EXT. THE INSTITUTE - DAY"
+    ],
+    "titleKeys": [],
+    "firstTokenLine": 9,
+    "fontLine": -1,
+    "lengthAction": 0,
+    "lengthDialogue": 0,
+    "characters": {
+      "KAEL": [
+        3,
+        7
+      ],
+      "MIRA": [
+        3,
+        9
+      ],
+      "MARCUS": [
+        5
+      ],
+      "ELENA": [
+        5,
+        9
+      ],
+      "ADMINISTRATOR (V.O.)": [
+        7
+      ]
+    },
+    "locations": {
+      "the-institute": [
+        {
+          "scene_number": 1,
+          "line": 22,
+          "name": "THE INSTITUTE",
+          "interior": false,
+          "exterior": true,
+          "time_of_day": "DAY"
+        },
+        {
+          "scene_number": 5,
+          "line": 68,
+          "name": "THE INSTITUTE",
+          "interior": false,
+          "exterior": true,
+          "time_of_day": "NIGHT (400 YEARS EARLIER)"
+        },
+        {
+          "scene_number": 9,
+          "line": 128,
+          "name": "THE INSTITUTE",
+          "interior": false,
+          "exterior": true,
+          "time_of_day": "DAY"
+        }
+      ],
+      "central-room": [
+        {
+          "scene_number": 2,
+          "line": 26,
+          "name": "CENTRAL ROOM",
+          "interior": true,
+          "exterior": false,
+          "time_of_day": "DAY"
+        },
+        {
+          "scene_number": 6,
+          "line": 72,
+          "name": "CENTRAL ROOM",
+          "interior": true,
+          "exterior": false,
+          "time_of_day": "NIGHT"
+        }
+      ],
+      "the-garden": [
+        {
+          "scene_number": 3,
+          "line": 47,
+          "name": "THE GARDEN",
+          "interior": false,
+          "exterior": true,
+          "time_of_day": "NIGHT"
+        }
+      ],
+      "the-core": [
+        {
+          "scene_number": 4,
+          "line": 51,
+          "name": "THE CORE",
+          "interior": true,
+          "exterior": false,
+          "time_of_day": "DAY (400 YEARS EARLIER)"
+        },
+        {
+          "scene_number": 8,
+          "line": 113,
+          "name": "THE CORE",
+          "interior": true,
+          "exterior": false,
+          "time_of_day": "DAY"
+        }
+      ],
+      "opening-titles": [
+        {
+          "scene_number": 7,
+          "line": 86,
+          "name": "OPENING TITLES",
+          "interior": false,
+          "exterior": false,
+          "time_of_day": ""
+        }
+      ]
+    },
+    "structure": [
+      {
+        "text": "Act I",
+        "level": 1,
+        "children": [
+          {
+            "text": "Sequence A",
+            "level": 2,
+            "children": [
+              {
+                "text": "EXT. THE INSTITUTE - DAY",
+                "children": null,
+                "range": {
+                  "start": {
+                    "line": 22,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 22,
+                    "character": 24
+                  }
+                },
+                "id": "/16/20/22",
+                "notes": [
+                  {
+                    "note": "This is a writer's note about the scene",
+                    "line": 24
+                  }
+                ]
+              },
+              {
+                "text": "INT. CENTRAL ROOM - DAY",
+                "children": null,
+                "range": {
+                  "start": {
+                    "line": 26,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 26,
+                    "character": 23
+                  }
+                },
+                "id": "/16/20/26"
+              },
+              {
+                "text": "Scene Group 1",
+                "level": 3,
+                "children": [
+                  {
+                    "text": "EXT. THE GARDEN - NIGHT",
+                    "children": null,
+                    "range": {
+                      "start": {
+                        "line": 47,
+                        "character": 0
+                      },
+                      "end": {
+                        "line": 47,
+                        "character": 23
+                      }
+                    },
+                    "id": "/16/20/45/47",
+                    "notes": [
+                      {
+                        "note": "Another note about the garden",
+                        "line": 49
+                      }
+                    ]
+                  },
+                  {
+                    "text": "INT. THE CORE - DAY (400 YEARS EARLIER)",
+                    "children": null,
+                    "range": {
+                      "start": {
+                        "line": 51,
+                        "character": 0
+                      },
+                      "end": {
+                        "line": 51,
+                        "character": 39
+                      }
+                    },
+                    "id": "/16/20/45/51"
+                  },
+                  {
+                    "text": "EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)",
+                    "children": null,
+                    "range": {
+                      "start": {
+                        "line": 68,
+                        "character": 0
+                      },
+                      "end": {
+                        "line": 68,
+                        "character": 46
+                      }
+                    },
+                    "id": "/16/20/45/68"
+                  },
+                  {
+                    "text": "INT. CENTRAL ROOM - NIGHT",
+                    "children": null,
+                    "range": {
+                      "start": {
+                        "line": 72,
+                        "character": 0
+                      },
+                      "end": {
+                        "line": 72,
+                        "character": 25
+                      }
+                    },
+                    "id": "/16/20/45/72"
+                  },
+                  {
+                    "text": "OPENING TITLES",
+                    "children": null,
+                    "range": {
+                      "start": {
+                        "line": 86,
+                        "character": 0
+                      },
+                      "end": {
+                        "line": 86,
+                        "character": 14
+                      }
+                    },
+                    "id": "/16/20/45/86"
+                  }
+                ],
+                "range": {
+                  "start": {
+                    "line": 45,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 45,
+                    "character": 13
+                  }
+                },
+                "section": true,
+                "id": "/16/20/45"
+              }
+            ],
+            "range": {
+              "start": {
+                "line": 20,
+                "character": 0
+              },
+              "end": {
+                "line": 20,
+                "character": 10
+              }
+            },
+            "section": true,
+            "id": "/16/20"
+          }
+        ],
+        "range": {
+          "start": {
+            "line": 16,
+            "character": 0
+          },
+          "end": {
+            "line": 16,
+            "character": 5
+          }
+        },
+        "section": true,
+        "id": "/16",
+        "synopses": [
+          {
+            "synopsis": "A young person fights to escape an oppressive system — unaware that the rebellion itself is the inherited memory of the last scientists who built the world that imprisoned them.",
+            "line": 18
+          }
+        ]
+      },
+      {
+        "text": "Act II",
+        "level": 1,
+        "children": [
+          {
+            "text": "INT. THE CORE - DAY",
+            "children": null,
+            "range": {
+              "start": {
+                "line": 113,
+                "character": 0
+              },
+              "end": {
+                "line": 113,
+                "character": 19
+              }
+            },
+            "id": "/92/113"
+          },
+          {
+            "text": "EXT. THE INSTITUTE - DAY",
+            "children": null,
+            "range": {
+              "start": {
+                "line": 128,
+                "character": 0
+              },
+              "end": {
+                "line": 128,
+                "character": 24
+              }
+            },
+            "id": "/92/128"
+          }
+        ],
+        "range": {
+          "start": {
+            "line": 92,
+            "character": 0
+          },
+          "end": {
+            "line": 92,
+            "character": 6
+          }
+        },
+        "section": true,
+        "id": "/92",
+        "synopses": [
+          {
+            "synopsis": "The children discover the truth about their world.",
+            "line": 94
+          }
+        ],
+        "notes": [
+          {
+            "note": "This is a writer's note about the scene",
+            "line": 111
+          }
+        ]
+      }
+    ]
+  }
+}

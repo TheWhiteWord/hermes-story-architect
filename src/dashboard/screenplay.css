@@ -1,0 +1,164 @@
+/* Better Fountain screenplay presentation — ported from preview.html */
+/* Token styling for proper screenplay formatting */
+
+/* Base screenplay font and spacing */
+.screenplay-content {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    line-height: 107.5%;
+    color: var(--foreground);
+    white-space: pre-wrap;
+}
+
+/* Scene headings */
+.fountain-scene_heading {
+    font-weight: bold;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+/* Transitions */
+.fountain-transition {
+    text-align: right;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: bold;
+}
+
+/* Character names */
+.fountain-character {
+    margin-left: 3.5in;
+    margin-top: 1em;
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+/* Parentheticals */
+.fountain-parenthetical {
+    margin-left: 3.0in;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Dialogue */
+.fountain-dialogue {
+    margin-left: 2.5in;
+    margin-right: 1.0in;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Action/description */
+.fountain-action {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Centered text */
+.fountain-centered {
+    text-align: center;
+    width: 92.5%;
+    display: block;
+}
+
+/* Sections */
+.fountain-section {
+    opacity: 0.2;
+    margin-left: -30px;
+    font-weight: bold;
+}
+
+/* Synopses */
+.fountain-synopsis {
+    opacity: 0.4;
+    font-style: italic;
+    margin-left: -20px;
+}
+
+/* Notes */
+.fountain-note {
+    opacity: 0.5;
+    font-style: italic;
+}
+
+/* Boneyard */
+.fountain-boneyard {
+    opacity: 0.5;
+    font-style: italic;
+}
+
+/* Lyrics */
+.fountain-lyric {
+    font-style: italic;
+}
+
+/* Page breaks */
+.fountain-page-break {
+    text-align: center;
+    margin: 2em 0;
+    border-top: 1px solid var(--border);
+    padding-top: 1em;
+}
+
+/* Dual dialogue container */
+.dual-dialogue {
+    margin: 2em 0 0.9em 2%;
+    width: 95%;
+    overflow: hidden;
+}
+
+.dual-dialogue .dialogue-left {
+    display: inline-block;
+    margin: 0;
+    width: 45%;
+    vertical-align: top;
+}
+
+.dual-dialogue .dialogue-right {
+    display: inline-block;
+    margin: 0;
+    width: 45%;
+    float: right;
+    vertical-align: top;
+}
+
+/* Inline formatting */
+.fountain-dialogue span.italic,
+.fountain-action span.italic {
+    font-style: italic;
+}
+
+.fountain-dialogue span.bold,
+.fountain-action span.bold {
+    font-weight: 700;
+}
+
+.fountain-dialogue span.underline,
+.fountain-action span.underline {
+    text-decoration: underline;
+}
+
+/* Scene numbers */
+.scene-number-left {
+    position: relative;
+}
+
+.scene-number-left::before {
+    opacity: 0.4;
+    content: attr(data-scene-number);
+    font-weight: 700;
+    left: -45px;
+    position: absolute;
+}
+
+.scene-number-right {
+    position: relative;
+}
+
+.scene-number-right::after {
+    opacity: 0.4;
+    content: attr(data-scene-number);
+    font-weight: 700;
+    right: -45px;
+    position: absolute;
+}

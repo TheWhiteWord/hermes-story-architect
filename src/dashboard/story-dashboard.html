@@ -9,6 +9,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
+<!-- Better Fountain screenplay styling -->
+<link rel="stylesheet" href="screenplay.css">
+
 <style>
 /* ─── Reset & Base ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -649,6 +652,98 @@ html, body {
   padding: 10px 12px;
   max-height: 280px;
   overflow-y: auto;
+}
+
+/* Fountain token classes for formatted display */
+.fountain-scene_heading {
+  font-weight: 600;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  color: var(--foreground);
+}
+
+.fountain-character {
+  margin-left: 30%;
+  margin-top: 8px;
+  color: var(--foreground);
+}
+.fountain-character.left {
+  margin-left: 0;
+  margin-right: 50%;
+  text-align: left;
+}
+.fountain-character.right {
+  margin-left: 50%;
+  margin-right: 0;
+  text-align: left;
+}
+
+.fountain-dialogue {
+  margin-left: 20%;
+  margin-right: 10%;
+  color: var(--foreground);
+}
+.fountain-dialogue.left {
+  margin-left: 5%;
+  margin-right: 50%;
+}
+.fountain-dialogue.right {
+  margin-left: 50%;
+  margin-right: 5%;
+}
+
+.fountain-parenthetical {
+  margin-left: 25%;
+  color: var(--foreground);
+}
+
+.fountain-action {
+  margin-top: 4px;
+  color: var(--foreground);
+}
+
+.fountain-transition {
+  text-align: right;
+  margin-top: 8px;
+  color: var(--muted-foreground);
+}
+
+.fountain-section {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.fountain-synopsis {
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.fountain-note {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.fountain-note::before { content: '[[ '; }
+.fountain-note::after { content: ' ]]'; }
+
+.fountain-boneyard {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.fountain-lyric {
+  font-style: italic;
+  color: var(--foreground);
+}
+
+.fountain-centered {
+  text-align: center;
+  color: var(--foreground);
+}
+
+.fountain-page-break {
+  text-align: center;
+  color: var(--muted-foreground);
+  margin: 16px 0;
 }
 
 /* Relationship rows */
@@ -1592,7 +1687,14 @@ function showScenePanel(sceneId) {
     return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
   }).filter(Boolean).join('');
 
+  // Scene content: pre-rendered HTML with CSS classes
+  const contentHtml = scene.content_html || `<pre class="fountain-content">${scene.content}</pre>`;
+
   document.getElementById('panel-body').innerHTML = `
+    ${scene.one_sentence ? `<div>
+      <div class="panel-section-title">Summary</div>
+      <div class="panel-text">${scene.one_sentence}</div>
+    </div>` : ''}
     ${chars ? `<div>
       <div class="panel-section-title">Characters</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
@@ -1607,7 +1709,7 @@ function showScenePanel(sceneId) {
     </div>` : ''}
     <div>
       <div class="panel-section-title">Scene content</div>
-      <div id="scene-content-area" class="panel-muted">Loading from screenplay.md…</div>
+      ${contentHtml}
     </div>
   `;
 
@@ -1616,7 +1718,6 @@ function showScenePanel(sceneId) {
   `;
 
   openPanel();
-  loadSceneContent(scene);
 }
 
 // Cached screenplay text
@@ -1628,11 +1729,10 @@ async function loadSceneContent(scene) {
   if (!area) return;
 
   try {
-    if (!_screenplayLoaded) {
-      const res = await fetch('screenplay.md');
+    // Use injected screenplay text (fetch('file://') is blocked in Electron)
+    if (window.__SCREENPLAY_TEXT__ && !_screenplayLoaded) {
+      _screenplayText = window.__SCREENPLAY_TEXT__;
       _screenplayLoaded = true;
-      if (!res.ok) throw new Error('not found');
-      _screenplayText = await res.text();
     }
     if (!_screenplayText) throw new Error('empty');
 
@@ -1648,30 +1748,32 @@ async function loadSceneContent(scene) {
       area.appendChild(pre);
     } else {
       area.className = 'panel-muted';
-      area.textContent = 'Scene not found in screenplay.md.';
+      area.textContent = 'Scene not found in screenplay.fountain.';
     }
   } catch(e) {
     area.className = 'panel-muted';
-    area.textContent = 'screenplay.md not found — place it in the same directory as this file.';
+    area.textContent = 'screenplay.fountain not found — place it in the same directory as this file.';
   }
 }
 
 // Extract scene from Fountain-format text.
-// Fountain scene headings: lines starting with INT./EXT./INT-EXT. etc., all caps
+// Fountain scene headings: lines starting with INT./EXT./INT-EXT. etc.
 function extractFountainScene(text, heading) {
   const lines = text.split('\n');
   const headingNorm = heading.toUpperCase().trim();
 
-  // Find starting line: exact match or partial match on the scene slug
+  // Find starting line: exact match on the full heading
   let startIdx = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim().toUpperCase();
-    if (line === headingNorm || line.startsWith(headingNorm) || headingNorm.startsWith(line.replace(/\s*-\s*\w+\s*$/, ''))) {
+    if (line === headingNorm) {
       startIdx = i;
       break;
     }
-    // also match if the line IS a scene heading and the scene id/heading matches
-    if (isFountainSceneHeading(lines[i].trim()) && line.includes(headingNorm.replace(/^(INT|EXT)\.?\s*/i, ''))) {
+    // Also match if heading has parenthetical suffix (e.g. "INT. X - DAY (400 YEARS EARLIER)")
+    // and the screenplay line matches without the suffix
+    const baseHeading = headingNorm.replace(/\s*\(.*\)\s*$/, '').trim();
+    if (line === baseHeading) {
       startIdx = i;
       break;
     }
@@ -1690,7 +1792,8 @@ function extractFountainScene(text, heading) {
 }
 
 function isFountainSceneHeading(line) {
-  return /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(line) && line === line.toUpperCase();
+  // Scene headings start with INT./EXT. etc. — allow parenthetical suffixes like "(400 YEARS EARLIER)"
+  return /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+/i.test(line);
 }
 
 function showLocationPanel(locId) {

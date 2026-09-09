@@ -1,0 +1,2248 @@
+project:
+  id: project
+  name: Save the Children
+  genre: Sci-fi drama
+  setting: The Institute — a decaying research facility, 400 years apart
+  logline: In a world where humanity survives only as consciousness inside a machine,
+    a young person fights to escape an oppressive system — unaware that the rebellion
+    itself, the system, and every feeling of purpose they have ever known are the
+    inherited memories of the last scientists who built the world that imprisoned
+    them.
+  status: active
+  sections: []
+  scene_count: 9
+  character_count: 6
+  location_count: 2
+  world_count: 2
+  plot_count: 2
+characters:
+- id: dr-elena-voss
+  name: Dr. Elena Voss
+  one_sentence: Lead scientist on Project Save the Children — chose to preserve the
+    minds even knowing the bodies would never come.
+  story_role: Supporting
+  sections:
+  - Personality
+  - Background
+  - Voice
+  - Greatest Fear
+  - Secrets
+  - Arc
+  - Relationships
+  - Goals
+  scenes:
+  - number: 4
+    heading: INT. THE CORE - DAY (400 YEARS EARLIER)
+  - number: 8
+    heading: INT. THE CORE - DAY
+- id: kael
+  name: Kael
+  one_sentence: A young person inside The I who begins to feel the system is wrong.
+  story_role: Protagonist
+  sections:
+  - Personality
+  - Background
+  - Voice
+  - Greatest Fear
+  - Secrets
+  - Arc
+  - Relationships
+  - Goals
+  scenes:
+  - number: 2
+    heading: INT. CENTRAL ROOM - DAY
+  - number: 6
+    heading: INT. CENTRAL ROOM - NIGHT
+- id: marcus-chen
+  name: Marcus Chen
+  one_sentence: Elena's colleague — believes the outsiders should be included, even
+    at the cost of the project.
+  story_role: Supporting
+  sections:
+  - Personality
+  - Background
+  - Voice
+  - Greatest Fear
+  - Secrets
+  - Arc
+  - Relationships
+  - Goals
+  scenes:
+  - number: 4
+    heading: INT. THE CORE - DAY (400 YEARS EARLIER)
+- id: mira
+  name: Mira
+  one_sentence: Kael's closest friend — believes in the feeling before believing in
+    the cause.
+  story_role: Supporting
+  sections:
+  - Personality
+  - Background
+  - Voice
+  - Greatest Fear
+  - Secrets
+  - Arc
+  - Relationships
+  - Goals
+  scenes:
+  - number: 2
+    heading: INT. CENTRAL ROOM - DAY
+  - number: 8
+    heading: INT. THE CORE - DAY
+- id: the-administrator
+  name: The Administrator
+  one_sentence: The face of the Institute's control — theatrical, precise, almost
+    too perfect an opponent.
+  story_role: Antagonist
+  sections:
+  - Personality
+  - Background
+  - Voice
+  - Greatest Fear
+  - Secrets
+  - Arc
+  - Relationships
+  - Goals
+  scenes:
+  - number: 6
+    heading: INT. CENTRAL ROOM - NIGHT
+- id: the-outsider
+  name: The Outsider
+  one_sentence: A dying human outside the Institute walls — represents what the children
+    could become if they breach the door.
+  story_role: Supporting
+  sections:
+  - Personality
+  - Background
+  - Voice
+  - Greatest Fear
+  - Secrets
+  - Arc
+  - Relationships
+  - Goals
+locations:
+- id: the-central-room
+  name: The Central Room
+  one_sentence: The heart of the Institute — where children believe freedom waits
+    beyond the door.
+  sections:
+  - Description
+  - History
+  - Scenes
+- id: the-garden
+  name: The Garden
+  one_sentence: A simulated outdoor space where Kael dreams — the only place that
+    feels real.
+  sections:
+  - Description
+  - History
+  - Scenes
+worlds:
+- id: the-i
+  name: The I
+  one_sentence: A simulation environment where developing consciousness forms.
+  sections:
+  - Description
+  - History
+  - Conflict
+- id: the-real-world
+  name: The Real World
+  one_sentence: 400 years after the Institute went silent — green, vast, indifferent.
+  sections:
+  - Description
+  - History
+  - Conflict
+plots:
+- id: the-resistance
+  name: The Resistance
+  one_sentence: Kael and Mira organize the children to breach the Central Room.
+  status: active
+  sections:
+  - Summary
+  - Obstacles
+  - Stakes
+  setups: []
+  payoffs: []
+- id: the-scientists-last-stand
+  name: The Scientists' Last Stand
+  one_sentence: 400 years earlier, the scientists race to complete Project Save the
+    Children as the outsiders gather.
+  status: active
+  sections:
+  - Summary
+  - Obstacles
+  - Stakes
+  setups: []
+  payoffs: []
+scenes:
+- heading: EXT. THE INSTITUTE - DAY
+  number: '1'
+  characters: []
+  location: ''
+  one_sentence: A vast decaying building. Nature reclaims the walls.
+  content: 'EXT. THE INSTITUTE - DAY
+
+    A vast decaying building. Nature reclaims the walls.'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 1
+  locations: []
+- heading: INT. CENTRAL ROOM - DAY
+  number: '2'
+  characters:
+  - kael
+  - mira
+  location: ''
+  one_sentence: KAEL (15, intense) stares at a wall of pale light.
+  content: 'INT. CENTRAL ROOM - DAY
+
+    KAEL (15, intense) stares at a wall of pale light.
+
+    KAEL
+
+    Something''s wrong. Everything arrives too perfectly.
+
+    MIRA (15, warm) enters behind them.
+
+    MIRA
+
+    You''re feeling it too?
+
+    KAEL
+
+    (chosen)
+
+    I was meant to find this.
+
+    *Singing in the darkness~*
+
+    *A lullaby for the lost~*'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 2
+  locations: []
+- heading: EXT. THE GARDEN - NIGHT
+  number: '3'
+  characters: []
+  location: ''
+  one_sentence: Kael walks through simulated moonlight. The grass feels real.
+  content: 'EXT. THE GARDEN - NIGHT
+
+    Kael walks through simulated moonlight. The grass feels real.'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 3
+  locations: []
+- heading: INT. THE CORE - DAY (400 YEARS EARLIER)
+  number: '4'
+  characters:
+  - marcus-chen
+  - dr-elena-voss
+  location: ''
+  one_sentence: DR. ELENA VOSS (42, exhausted) works at a terminal. MARCUS CHEN (38,
+    empathetic) enters.
+  content: 'INT. THE CORE - DAY (400 YEARS EARLIER)
+
+    DR. ELENA VOSS (42, exhausted) works at a terminal. MARCUS CHEN (38, empathetic)
+    enters.
+
+    MARCUS
+
+    They''re at the gates. They want in.
+
+    ELENA
+
+    The project is too fragile. We can''t compromise.
+
+    MARCUS
+
+    They''re dying, Elena. We all are.
+
+    ELENA
+
+    (almost to herself)
+
+    The truth would kill them.'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 4
+  locations: []
+- heading: EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)
+  number: '5'
+  characters: []
+  location: ''
+  one_sentence: Outsiders gather. Desperate. Hopeful.
+  content: 'EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)
+
+    Outsiders gather. Desperate. Hopeful.'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 5
+  locations: []
+- heading: INT. CENTRAL ROOM - NIGHT
+  number: '6'
+  characters:
+  - the-administrator
+  - kael
+  location: ''
+  one_sentence: Kael stands before the door. The Administrator's voice echoes.
+  content: 'INT. CENTRAL ROOM - NIGHT
+
+    Kael stands before the door. The Administrator''s voice echoes.
+
+    ADMINISTRATOR (V.O.)
+
+    You don''t understand what you''d be entering.
+
+    KAEL
+
+    I understand I was chosen.
+
+    The door opens.
+
+    CUT TO:'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 6
+  locations: []
+- heading: OPENING TITLES
+  number: '7'
+  characters: []
+  location: ''
+  one_sentence: '[[This is a writer''s note about the scene]]'
+  content: 'OPENING TITLES
+
+    THE END
+
+    Act II
+
+    The children discover the truth about their world.
+
+    [[This is a writer''s note about the scene]]'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 7
+  locations: []
+- heading: INT. THE CORE - DAY
+  number: '8'
+  characters:
+  - dr-elena-voss
+  - mira
+  location: ''
+  one_sentence: Kael and Mira stand before the terminal. Elena's ghost flickers.
+  content: 'INT. THE CORE - DAY
+
+    Kael and Mira stand before the terminal. Elena''s ghost flickers.
+
+    ELENA
+
+    You were never meant to escape.
+
+    MIRA
+
+    Then why show us the door?
+
+    ELENA
+
+    Because the door was always open.
+
+    SMASH CUT TO:'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 8
+  locations: []
+- heading: EXT. THE INSTITUTE - DAY
+  number: '9'
+  characters: []
+  location: ''
+  one_sentence: The building crumbles. The children emerge into the real world.
+  content: 'EXT. THE INSTITUTE - DAY
+
+    The building crumbles. The children emerge into the real world.
+
+    FADE OUT.'
+  content_html: '<h3 data-scenenumber="1">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">A vast decaying building. Nature reclaims the walls.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="2">INT. CENTRAL ROOM - DAY</h3>
+
+    <p><span class="haseditorline">KAEL (15, intense) stares at a wall of pale light.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>Something''s wrong. Everything arrives too perfectly.</p>
+
+    </div>
+
+    <p><span class="haseditorline">MIRA (15, warm) enters behind them.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>You''re feeling it too?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p class="parenthetical">(chosen)</p>
+
+    <p>I was meant to find this.</p>
+
+    </div>
+
+    <p><span class="haseditorline">*Singing in the darkness~*</span>
+
+
+    <span class="haseditorline">*A lullaby for the lost~*</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="3">EXT. THE GARDEN - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael walks through simulated moonlight. The grass
+    feels real.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="4">INT. THE CORE - DAY (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">DR. ELENA VOSS (42, exhausted) works at a terminal.
+    MARCUS CHEN (38, empathetic) enters.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re at the gates. They want in.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>The project is too fragile. We can''t compromise.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MARCUS</h4>
+
+    <p>They''re dying, Elena. We all are.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p class="parenthetical">(almost to herself)</p>
+
+    <p>The truth would kill them.</p>
+
+    </div>
+
+    <h3 data-scenenumber="5">EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)</h3>
+
+    <p><span class="haseditorline">Outsiders gather. Desperate. Hopeful.</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="6">INT. CENTRAL ROOM - NIGHT</h3>
+
+    <p><span class="haseditorline">Kael stands before the door. The Administrator''s
+    voice echoes.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ADMINISTRATOR (V.O.)</h4>
+
+    <p>You don''t understand what you''d be entering.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>KAEL</h4>
+
+    <p>I understand I was chosen.</p>
+
+    </div>
+
+    <p><span class="haseditorline">The door opens.</span>
+
+    </p>
+
+    </p>
+
+    <h2>CUT TO:</h2>
+
+    <h3 data-scenenumber="7">OPENING TITLES</h3>
+
+    <p><span class="haseditorline centered">THE END</span>
+
+    </p>
+
+    </p>
+
+    <hr />
+
+    <p><span class="haseditorline">[[This is a writer''s note about the scene]]</span>
+
+    </p>
+
+    </p>
+
+    <h3 data-scenenumber="8">INT. THE CORE - DAY</h3>
+
+    <p><span class="haseditorline">Kael and Mira stand before the terminal. Elena''s
+    ghost flickers.</span>
+
+    </p>
+
+    </p>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>You were never meant to escape.</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>MIRA</h4>
+
+    <p>Then why show us the door?</p>
+
+    </div>
+
+    <div class="dialogue">
+
+    <h4>ELENA</h4>
+
+    <p>Because the door was always open.</p>
+
+    </div>
+
+    <h2>SMASH CUT TO:</h2>
+
+    <h3 data-scenenumber="9">EXT. THE INSTITUTE - DAY</h3>
+
+    <p><span class="haseditorline">The building crumbles. The children emerge into
+    the real world.</span>
+
+    </p>
+
+    </p>
+
+    <h2>FADE OUT.</h2>'
+  id: 9
+  locations: []

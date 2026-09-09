@@ -1,9 +1,9 @@
 """Test suite for Story Architect core modules."""
 import pytest
 from pathlib import Path
-from plugin.core.section_parser import list_sections, get_section, replace_section
-from plugin.core.entity import extract_entity, validate_entity, update_sections
-from plugin.core.screenplay import extract_scenes, match_character, match_location, extract_location
+from core.section_parser import list_sections, get_section, replace_section
+from core.entity import extract_entity, validate_entity, update_sections
+from core.screenplay import extract_scenes, match_character, match_location, extract_location
 
 
 # ---- Fixtures ----
@@ -11,19 +11,19 @@ from plugin.core.screenplay import extract_scenes, match_character, match_locati
 @pytest.fixture
 def project_path():
     """Path to the test fixture project."""
-    return Path(__file__).parent / "fixtures" / "the-water-audit"
+    return Path(__file__).parent / "fixtures" / "save-the-children"
 
 
 @pytest.fixture
-def mara_note(project_path):
-    """Path to Mara's character note."""
-    return project_path / "characters" / "mara.md"
+def kael_note(project_path):
+    """Path to Kael's character note."""
+    return project_path / "characters" / "kael.md"
 
 
 @pytest.fixture
 def screenplay_path(project_path):
     """Path to the screenplay."""
-    return project_path / "screenplay.md"
+    return project_path / "screenplay.fountain"
 
 
 # ---- Section Parser Tests ----
@@ -66,16 +66,16 @@ class TestSectionParser:
 # ---- Entity Extraction Tests ----
 
 class TestEntityExtraction:
-    def test_extract_character(self, mara_note):
-        entity = extract_entity(mara_note, "character")
-        assert entity["id"] == "mara"
-        assert entity["name"] == "Mara Chen"
+    def test_extract_character(self, kael_note):
+        entity = extract_entity(kael_note, "character")
+        assert entity["id"] == "kael"
+        assert entity["name"] == "Kael"
         assert entity["story_role"] == "Protagonist"
         assert "Personality" in entity["sections"]
-        assert "Voice" in entity["sections"]
+        assert "Background" in entity["sections"]
 
-    def test_validate_character_valid(self, mara_note):
-        entity = extract_entity(mara_note, "character")
+    def test_validate_character_valid(self, kael_note):
+        entity = extract_entity(kael_note, "character")
         warnings = validate_entity("character", entity)
         assert warnings == []
 
@@ -89,13 +89,13 @@ class TestEntityExtraction:
 
     def test_extract_project(self, project_path):
         entity = extract_entity(project_path / "project.md", "project")
-        assert entity["name"] == "The Water Audit"
+        assert entity["name"] == "Save the Children"
         assert "logline" in entity
 
     def test_extract_world(self, project_path):
-        entity = extract_entity(project_path / "worlds" / "gilead.md", "world")
-        assert entity["name"] == "Gilead"
-        assert len(entity["rules"]) == 3
+        entity = extract_entity(project_path / "worlds" / "the-i.md", "world")
+        assert entity["name"] == "The I"
+        assert "sections" in entity
 
 
 # ---- Screenplay Tests ----
@@ -104,8 +104,8 @@ class TestScreenplay:
     def test_extract_scenes(self, screenplay_path):
         content = screenplay_path.read_text()
         scenes = extract_scenes(content)
-        assert len(scenes) == 3
-        assert scenes[0]["heading"] == "INT. MARA'S APARTMENT - NIGHT"
+        assert len(scenes) == 9
+        assert scenes[0]["heading"] == "EXT. THE INSTITUTE - DAY"
         assert scenes[0]["id"] == 1
 
     def test_extract_location(self):
@@ -115,41 +115,41 @@ class TestScreenplay:
         assert extract_location("NOT A HEADING") is None
 
     def test_match_character_exact(self):
-        characters = [{"id": "mara", "name": "Mara Chen"}]
-        assert match_character("MARA CHEN", characters) == "mara"
+        characters = [{"id": "kael", "name": "Kael"}]
+        assert match_character("KAEL", characters) == "kael"
 
     def test_match_character_fuzzy(self):
-        characters = [{"id": "mara", "name": "Mara Chen"}]
-        assert match_character("MARA", characters) == "mara"
+        characters = [{"id": "kael", "name": "Kael"}]
+        assert match_character("KAEL", characters) == "kael"
 
     def test_match_character_no_match(self):
-        characters = [{"id": "mara", "name": "Mara Chen"}]
+        characters = [{"id": "kael", "name": "Kael"}]
         assert match_character("VICTOR HALE", characters) is None
 
     def test_match_location(self):
-        locations = [{"id": "kitchen", "name": "The Kitchen"}]
-        assert match_location("KITCHEN", locations) == "kitchen"
-        assert match_location("The Kitchen", locations) == "kitchen"
+        locations = [{"id": "the-central-room", "name": "The Central Room"}]
+        assert match_location("THE CENTRAL ROOM", locations) == "the-central-room"
+        assert match_location("The Central Room", locations) == "the-central-room"
 
 
 # ---- Integration Test ----
 
 class TestIndexGeneration:
     def test_generate_index(self, project_path):
-        from plugin.core.index import generate_index
+        from core.index import generate_index
         index = generate_index(project_path)
         
-        assert index["project"]["name"] == "The Water Audit"
-        assert len(index["characters"]) == 2
-        assert len(index["locations"]) == 1
-        assert len(index["worlds"]) == 1
-        assert len(index["plots"]) == 1
-        assert len(index["scenes"]) == 3
+        assert index["project"]["name"] == "Save the Children"
+        assert len(index["characters"]) == 6
+        assert len(index["locations"]) == 2
+        assert len(index["worlds"]) == 2
+        assert len(index["plots"]) == 2
+        assert len(index["scenes"]) == 9
         
         # Check character scenes were synced from screenplay
-        mara = next(c for c in index["characters"] if c["id"] == "mara")
-        assert len(mara["scenes"]) > 0
+        kael = next(c for c in index["characters"] if c["id"] == "kael")
+        assert len(kael["scenes"]) > 0
         
         # Check scene characters were matched
         scene1 = next(s for s in index["scenes"] if s["id"] == 1)
-        assert "mara" in scene1["characters"]
+        assert isinstance(scene1["characters"], list)

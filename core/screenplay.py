@@ -1,6 +1,10 @@
-"""Screenplay integration — Fountain parsing via screenplay-tools."""
+"""Screenplay integration — Fountain parsing via Better Fountain port.
+
+Single source of truth — no screenplay-tools dependency.
+"""
 import re
 from .constants import FUZZY_THRESHOLD
+from .fountain_lexer import parse as fountain_parse, tokens_to_html, trim_character_extension
 
 LOCATION_RE = re.compile(
     r'^(?:INT\.|EXT\.|EST\.|INT\./EXT\.|I/E\.)\s+(.+?)(?:\s*-\s*(?:DAY|NIGHT|DUSK|DAWN|LATER|CONTINUOUS|MOMENTS LATER))?$'
@@ -8,35 +12,46 @@ LOCATION_RE = re.compile(
 
 
 def extract_scenes(screenplay_content: str) -> list[dict]:
-    """Extract scenes from screenplay content using screenplay-tools."""
-    from screenplay_tools.fountain.parser import Parser
-    
-    parser = Parser()
-    parser.add_text(screenplay_content)
-    script = parser.script
+    """Extract scenes from Fountain content using our Better Fountain port."""
+    result = fountain_parse(screenplay_content)
     scenes = []
-    current_scene = None
+    current = None
     
-    for element in script.elements:
-        if element.type.value == "HEADING":
-            if current_scene:
-                scenes.append(current_scene)
-            current_scene = {
-                "heading": element.text,
-                "scene_number": getattr(element, "scene_number", ""),
-                "characters": [],
-                "location": extract_location(element.text),
+    for token in result['tokens']:
+        if token['type'] == 'scene_heading':
+            if current:
+                scenes.append(current)
+            current = {
+                'heading': token.get('text') or '',
+                'number': token.get('number'),
+                'characters': [],
+                'location': '',
+                'one_sentence': '',
+                'content': token.get('text') or '',
+                'content_html': '',
             }
-        elif element.type.value == "CHARACTER" and current_scene:
-            name = element.name if hasattr(element, 'name') else ""
-            if name and name not in current_scene["characters"]:
-                current_scene["characters"].append(name)
+        elif current is not None:
+            text = token.get('text') or ''
+            if text:
+                current['content'] += '\n' + text
+            
+            if token['type'] == 'character':
+                name = (token.get('character') or '').strip()
+                if not name:
+                    name = trim_character_extension(text).strip()
+                if name and name not in current['characters']:
+                    current['characters'].append(name)
+            elif token['type'] == 'action' and not current['one_sentence']:
+                stripped = text.strip()
+                if stripped:
+                    current['one_sentence'] = stripped
     
-    if current_scene:
-        scenes.append(current_scene)
+    if current:
+        scenes.append(current)
     
     for i, scene in enumerate(scenes, 1):
-        scene["id"] = i
+        scene['id'] = i
+        scene['content_html'] = tokens_to_html(result['tokens'])
     
     return scenes
 
@@ -51,19 +66,16 @@ def match_character(name: str, characters: list[dict]) -> str | None:
     """Match dialogue character name to character slug."""
     from rapidfuzz import fuzz, process
     
-    slug_to_name = {c["id"]: c["name"] for c in characters}
+    slug_to_name = {c['id']: c['name'] for c in characters}
     
-    # Exact match (case-insensitive)
     for slug, char_name in slug_to_name.items():
         if name.lower() == char_name.lower():
             return slug
     
-    # Check if cue is contained in name or vice versa (handles "MARA" vs "Mara Chen")
     for slug, char_name in slug_to_name.items():
         if name.lower() in char_name.lower() or char_name.lower() in name.lower():
             return slug
     
-    # Fuzzy match with token_set_ratio (handles partial matches better)
     result = process.extractOne(name, slug_to_name.values(), scorer=fuzz.token_set_ratio)
     if result and result[1] >= FUZZY_THRESHOLD:
         matched_name = result[0]
@@ -81,19 +93,16 @@ def match_location(heading_location: str, locations: list[dict]) -> str | None:
     if not heading_location:
         return None
     
-    slug_to_name = {l["id"]: l["name"] for l in locations}
+    slug_to_name = {l['id']: l['name'] for l in locations}
     
-    # Exact match
     for slug, loc_name in slug_to_name.items():
         if heading_location.lower() == loc_name.lower():
             return slug
     
-    # Check if one contains the other (handles "KITCHEN" vs "The Kitchen")
     for slug, loc_name in slug_to_name.items():
         if heading_location.lower() in loc_name.lower() or loc_name.lower() in heading_location.lower():
             return slug
     
-    # Fuzzy match with token_set_ratio
     result = process.extractOne(heading_location, slug_to_name.values(), scorer=fuzz.token_set_ratio)
     if result and result[1] >= FUZZY_THRESHOLD:
         matched_name = result[0]

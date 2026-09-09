@@ -62,6 +62,13 @@ Five action types: edit_note, edit_screenplay, create_entity, delete_entity, upd
 
 For detailed procedures, see `references/action-types.md`.
 
+## Fountain Format
+
+When writing or editing screenplays, follow Fountain syntax conventions so
+the screenplay parses correctly and renders properly in the dashboard.
+
+For complete formatting rules, see `references/screenplay-format.md`.
+
 ## Continuity Checks
 
 Before applying edits, self-audit against: character knowledge, timeline,

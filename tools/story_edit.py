@@ -122,27 +122,29 @@ def _edit_note(project_path: Path, target: dict, changes: list, summary: str) ->
 
 
 def _edit_screenplay(project_path: Path, changes: list, summary: str) -> str:
-    """Edit screenplay.md."""
+    """Edit screenplay.fountain."""
     from ..core.screenplay import extract_scenes
-    from screenplay_tools.fountain.parser import Parser
-    from screenplay_tools.fountain.writer import Writer
+    from ..core.fountain_lexer import tokenize
     
-    screenplay_path = project_path / "screenplay.md"
+    screenplay_path = project_path / "screenplay.fountain"
     if not screenplay_path.exists():
-        return json.dumps({"error": "screenplay.md not found"})
+        return json.dumps({"error": "screenplay.fountain not found"})
     
     content = screenplay_path.read_text()
-    parser = Parser()
-    parser.add_text(content)
-    script = parser.script
+    tokens = tokenize(content)
     
-    # Apply changes (simplified — full implementation would modify script.elements)
+    # Apply changes (simplified — full implementation would modify tokens)
     for change in changes:
         # TODO: implement screenplay editing logic
         pass
     
-    writer = Writer()
-    new_content = writer.write(script)
+    # Reconstruct fountain text from tokens
+    lines = []
+    for token in tokens:
+        if token['type'] not in ('separator', 'dialogue_begin', 'dialogue_end', 'dual_dialogue_begin', 'dual_dialogue_end'):
+            lines.append(token['text'])
+    
+    new_content = '\n'.join(lines)
     screenplay_path.write_text(new_content)
     
     return json.dumps({

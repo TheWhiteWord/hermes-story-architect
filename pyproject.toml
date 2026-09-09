@@ -12,8 +12,8 @@ license = {text = "MIT"}
 dependencies = [
     "rapidfuzz>=3.0",
     "python-frontmatter>=1.0",
-    "screenplay-tools>=0.0.10",
     "pyyaml>=6.0",
+    "regex>=2026.0",
 ]
 
 [project.optional-dependencies]

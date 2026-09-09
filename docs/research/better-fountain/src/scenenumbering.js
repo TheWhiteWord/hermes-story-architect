@@ -1,0 +1,211 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.StandardSceneNumberingSchema = exports.makeSceneNumberingSchema = exports.generateSceneNumbers = exports.SceneNumberingSchemas = void 0;
+const diff = require("diff");
+var SceneNumberingSchemas;
+(function (SceneNumberingSchemas) {
+    SceneNumberingSchemas[SceneNumberingSchemas["Standard"] = 0] = "Standard";
+})(SceneNumberingSchemas = exports.SceneNumberingSchemas || (exports.SceneNumberingSchemas = {}));
+;
+function generateSceneNumbers(currentSceneNumbers, schema) {
+    try {
+        schema = schema || makeSceneNumberingSchema(SceneNumberingSchemas.Standard);
+        const used = schema.deduceUsedNumbers(currentSceneNumbers.filter(v => v));
+        const alignment = expandChanges(diff.diffArrays(used, currentSceneNumbers));
+        const findNextKnownNumber = function (start, direction) {
+            var i = start;
+            while (true) {
+                i += direction;
+                if (i < 0)
+                    return null;
+                if (i >= alignment.length)
+                    return null;
+                if (!alignment[i].added && !alignment[i].removed)
+                    return alignment[i].value[0];
+            }
+        };
+        var previous;
+        return alignment
+            .map((alignmentPair, i) => {
+            if (alignmentPair.removed)
+                return null;
+            if (!alignmentPair.added) {
+                // keep existing scene number
+                previous = alignmentPair.value[0];
+                return previous;
+            }
+            // calculate unknown scene number
+            const left = previous || findNextKnownNumber(i, -1);
+            const right = findNextKnownNumber(i, 1);
+            const inserted = right == null ? schema.getNext(used) /*
+                    */
+                : left == null ? schema.getPrevious(used) /*
+                */
+                    : schema.getInBetween(left, right, used);
+            used.push(inserted);
+            previous = inserted;
+            return inserted;
+        })
+            .filter(v => v);
+    }
+    catch (e) {
+        console.error(e);
+    }
+    return null;
+}
+exports.generateSceneNumbers = generateSceneNumbers;
+function makeSceneNumberingSchema(_schemaType) {
+    // future Schemas could be selectable in the settings
+    return new StandardSceneNumberingSchema();
+}
+exports.makeSceneNumberingSchema = makeSceneNumberingSchema;
+// turns a Change like
+// {count:2,values:['a','b']} into 
+// [{values:['a']},{values:['b']}]
+// because I want to iterate on them individually
+function expandChanges(changes) {
+    const result = [];
+    while (changes.length > 0) {
+        const change = changes.shift();
+        while (change.count-- > 1) {
+            const copy = Object.assign({}, change);
+            copy.value = [];
+            copy.value.push(change.value.shift());
+            result.push(copy);
+        }
+        result.push(change);
+    }
+    return result;
+}
+/** Base class for anything that behaves like a series of non-negative number
+ *      i.e. 2 < 3 < 3.1 < 3.2 < 3.2.1
+ *   derived classes need only determine how this series is displayed
+ */
+class NumericSeriesSceneNumberingSchema {
+    constructor() {
+        // return the next number bigger than what's in @used
+        this.getNext = (used) => {
+            if (used.length == 0)
+                return "1";
+            const valids = used.filter(v => v).map(v => this.toNumeric(v));
+            const last = valids.sort(NumericSeriesSceneNumberingSchema.compareNumeric)[valids.length - 1];
+            return (last[0] + 1).toString();
+        };
+        // return the next number smaller than what's in @used
+        this.getPrevious = (used) => {
+            if (used.length == 0)
+                return "1";
+            const valids = used.filter(v => v).map(v => this.toNumeric(v));
+            const first = valids.sort(NumericSeriesSceneNumberingSchema.compareNumeric)[0];
+            const newbie = first[0] - 1;
+            if (newbie > 0)
+                return this.toDisplay([newbie]);
+            return this.getInBetween("0", this.toDisplay(first));
+        };
+    }
+    compare(a, b) {
+        const nA = this.toNumeric(a);
+        const nB = this.toNumeric(b);
+        return NumericSeriesSceneNumberingSchema.compareNumeric(nA, nB);
+    }
+    // if a screenplay has "3", it must have used "1" and "2" at some point
+    deduceUsedNumbers(existing) {
+        var result = [];
+        existing.forEach(s => {
+            result.push(s);
+            const vals = this.toNumeric(s);
+            while (vals.length > 0) {
+                const index = vals.length - 1;
+                while (vals[index] > 0) {
+                    result.push(this.toDisplay(vals));
+                    vals[index] = vals[index] - 1;
+                }
+                vals.pop();
+                result = result.filter(onlyUnique);
+            }
+        });
+        return result.filter(onlyUnique).sort((a, b) => this.compare(a, b));
+        function onlyUnique(value, index, self) {
+            return self.indexOf(value) === index;
+        }
+    }
+    // a scene inserted between [3] and [4] is [3,1] (think "3.1" or "A3")
+    getInBetween(a, b, except) {
+        try {
+            const left = this.toNumeric(a);
+            const right = this.toNumeric(b);
+            // check a,b are already in order
+            if (NumericSeriesSceneNumberingSchema.compareNumeric(left, right) >= 0)
+                return "?";
+            for (var index = 0; index < 100; index++) {
+                const mid = left.slice();
+                while (mid.length <= index)
+                    mid.push(0);
+                while (mid.length - 1 > index)
+                    mid.pop();
+                mid[index]++;
+                const serial = this.toDisplay(mid);
+                if (NumericSeriesSceneNumberingSchema.compareNumeric(mid, right) < 0) {
+                    if (!except || !except.includes(serial))
+                        return serial;
+                    return this.getInBetween(a, serial, except);
+                }
+            }
+        }
+        catch (_a) { }
+        return "?";
+    }
+    // numeric form is used because it's more intuitive to us coders.
+    // [2,1,1] < [2,1,2] < [2,2] < [3] 
+    static compareNumeric(a, b) {
+        const min = Math.min(a.length, b.length);
+        for (var i = 0; i < min; i++) {
+            const fromA = a[i];
+            const fromB = b[i];
+            var comparison = fromA - fromB;
+            if (comparison != 0)
+                return comparison;
+        }
+        if (a.length > min)
+            return 1;
+        if (b.length > min)
+            return -1;
+        return 0;
+    }
+    canParse(s) {
+        try {
+            return this.toNumeric(s) != null;
+        }
+        catch (_a) { }
+        return false;
+    }
+}
+/** inspired by https://johnaugust.com/2007/renumbering
+ */
+class StandardSceneNumberingSchema extends NumericSeriesSceneNumberingSchema {
+    constructor() {
+        super(...arguments);
+        this.toNumeric = function (s) {
+            const format = s.match(/^([A-Z0]*)(0|[1-9]\d*)$/);
+            if (!format)
+                return null;
+            const letters = format[1];
+            const digits = format[2];
+            const result = [];
+            // letters and leading zeros
+            result.push(...Array.from(letters).map(char => char == '0' ? 0 : char.charCodeAt(0) - 64));
+            // positives
+            if (digits)
+                result.push(+digits);
+            return result.reverse();
+        };
+        this.toDisplay = function (n) {
+            const m = n.slice();
+            const first = m.shift();
+            const letters = m.reverse().map(num => num == 0 ? '0' : String.fromCharCode(num + 64));
+            return letters.join("") + (first >= 0 ? first.toString() : "0".repeat(1 - first));
+        };
+    }
+}
+exports.StandardSceneNumberingSchema = StandardSceneNumberingSchema;
+//# sourceMappingURL=scenenumbering.js.map

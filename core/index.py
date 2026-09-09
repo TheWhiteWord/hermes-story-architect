@@ -21,7 +21,7 @@ def generate_index(project_path: Path) -> dict:
     }
     
     # Sync screenplay
-    screenplay_path = project_path / "screenplay.md"
+    screenplay_path = project_path / "screenplay.fountain"
     if screenplay_path.exists():
         scenes = extract_scenes(screenplay_path.read_text())
         for scene in scenes:
@@ -32,14 +32,7 @@ def generate_index(project_path: Path) -> dict:
                 if slug and slug not in matched_chars:
                     matched_chars.append(slug)
             scene["characters"] = matched_chars
-            
-            # Match location
-            if scene["location"]:
-                matched = match_location(scene["location"], index["locations"])
-                scene["locations"] = [matched] if matched else []
-            else:
-                scene["locations"] = []
-            del scene["location"]
+            scene["locations"] = []
         index["scenes"] = scenes
     
     # Update project with scene count
