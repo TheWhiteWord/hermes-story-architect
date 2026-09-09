@@ -154,12 +154,18 @@ plots:
   name: The Resistance
   one_sentence: Kael and Mira organize the children to breach the Central Room.
   status: active
+  setups:
+  - scene: INT. CENTRAL ROOM - DAY
+    description: ''
+  - scene: INT. CENTRAL ROOM - NIGHT
+    description: ''
+  payoffs:
+  - scene: INT. THE CORE - DAY
+    description: ''
   sections:
   - Summary
   - Obstacles
   - Stakes
-  setups: []
-  payoffs: []
 - id: the-scientists-last-stand
   name: The Scientists' Last Stand
   one_sentence: 400 years earlier, the scientists race to complete Project Save the
