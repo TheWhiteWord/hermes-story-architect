@@ -26,7 +26,6 @@ def extract_scenes(screenplay_content: str) -> list[dict]:
                 'number': token.get('number'),
                 'characters': [],
                 'location': '',
-                'one_sentence': '',
                 'content': token.get('text') or '',
                 'content_html': '',
             }
@@ -41,10 +40,6 @@ def extract_scenes(screenplay_content: str) -> list[dict]:
                     name = trim_character_extension(text).strip()
                 if name and name not in current['characters']:
                     current['characters'].append(name)
-            elif token['type'] == 'action' and not current['one_sentence']:
-                stripped = text.strip()
-                if stripped:
-                    current['one_sentence'] = stripped
     
     if current:
         scenes.append(current)

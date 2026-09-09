@@ -1691,10 +1691,6 @@ function showScenePanel(sceneId) {
   const contentHtml = scene.content_html || `<pre class="fountain-content">${scene.content}</pre>`;
 
   document.getElementById('panel-body').innerHTML = `
-    ${scene.one_sentence ? `<div>
-      <div class="panel-section-title">Summary</div>
-      <div class="panel-text">${scene.one_sentence}</div>
-    </div>` : ''}
     ${chars ? `<div>
       <div class="panel-section-title">Characters</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>

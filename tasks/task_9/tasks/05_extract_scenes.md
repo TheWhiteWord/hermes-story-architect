@@ -18,7 +18,6 @@
     "number": "1",                    # Scene number (string)
     "characters": ["KAEL", "MIRA"],   # Unique character names (extensions stripped)
     "location": "",                   # Parsed location (from parse_location)
-    "one_sentence": "",               # First action line
     "content": "...",                 # Raw fountain text (preserves formatting)
     "content_html": "...",            # Tokenized HTML with CSS classes
 }
@@ -38,5 +37,4 @@ All tests must pass.
 - `content` is the raw text of the scene (heading + all tokens until next heading)
 - `content_html` is the HTML rendering of all tokens (via `tokens_to_html`)
 - `characters` are extracted from `character` tokens, with extensions stripped
-- `one_sentence` is the first `action` token's text
 - `extract_scene_content` returns just the text content for a specific scene

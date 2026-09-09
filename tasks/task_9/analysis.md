@@ -199,7 +199,9 @@ if (level) {
 
 ---
 
-## Verdict
+## Verdict (SUPERSEEDED — see below)
+
+> **This verdict was written before we had `expected_output.json`. It is preserved for historical context but is no longer the recommended approach.**
 
 **The port is ~40% faithful.** It has the right skeleton — regex patterns, token structure, state machine shape, classification order. But it's missing the majority of the functionality that makes Better Fountain useful:
 
@@ -212,4 +214,26 @@ if (level) {
 
 The `parse_location_information` bug alone would produce wrong data for every scene heading.
 
-**Recommendation:** Not worth fixing incrementally. The missing 60% is tightly coupled — you can't add HTML generation without structure tracking, which needs `latestSectionOrScene`, which needs `StructToken`, which needs the full rewrite anyway. Start from the JS line-by-line and port it completely.
+~~**Recommendation:** Not worth fixing incrementally. The missing 60% is tightly coupled — you can't add HTML generation without structure tracking, which needs `latestSectionOrScene`, which needs `StructToken`, which needs the full rewrite anyway. Start from the JS line-by-line and port it completely.~~
+
+---
+
+## Superseded Verdict (with expected_output.json)
+
+> **This is the current recommendation.**
+
+Once `tests/fixtures/save-the-children/expected_output.json` was generated (by running the actual Better Fountain parser via Node.js), the calculus changed completely. You no longer need to understand the JS source to verify faithfulness — you just make the Python output match the JSON, layer by layer, verified at each step.
+
+**Incremental fixing is now viable.** The reference oracle (`expected_output.json`) lets you:
+
+1. Fix `parse_location_information` → verify location data matches JSON
+2. Fix boneyard state caching → verify token types match JSON
+3. Fix dual dialogue lookback → verify `dual` fields match JSON
+4. Add duration calculation → verify `time` fields match JSON
+5. Add HTML generation → verify HTML structure matches expected output
+
+Each fix is independently verifiable against the JSON. You don't need to understand the JS source — just make the Python output match.
+
+**The detailed breakdown above is still accurate** — every bug, every missing function, every incomplete feature is correctly identified. The only thing that changed is the recommended approach: fix incrementally, verify against `expected_output.json`, don't rewrite from scratch.
+
+**See `tasks/task_9/plan.md` and `tasks/task_9/tasks/` for the execution plan.**

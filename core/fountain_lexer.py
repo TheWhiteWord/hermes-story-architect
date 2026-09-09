@@ -11,7 +11,7 @@ REGEX = {
     'title_page': re.compile(r'(title|credit|author[s]?|source|notes|draft date|date|watermark|contact( info)?|revision|copyright|font|tl|tc|tr|cc|br|bl|header|footer)\:.*', re.IGNORECASE),
     'section': re.compile(r'^[ \t]*(#+)(?: *)(.*)'),
     'synopsis': re.compile(r'^[ \t]*(?:\=(?!\=+))(.*)'),
-    'scene_heading': re.compile(r'^[ \t]*([.](?![.])|(?:[*]{0,3}_?)(?:int|ext|est|int[.]?\/ext|i[.]?\/e)[. ])(.+?)(#[-.0-9a-z]+#)?$', re.IGNORECASE),
+    'scene_heading': re.compile(r'^[ \t]*([.](?![.])|(?:[*]{0,3}_?)(?:int[.]?\/ext|int[.]?\/e|ext|est|int|i[.]?\/e)[. ])(.+?)(#[-.0-9a-z]+#)?$', re.IGNORECASE),
     'scene_number': re.compile(r'#(.+)#'),
     'transition': re.compile(r'^[ \t]*((?:FADE (?:TO BLACK|OUT)|CUT TO BLACK)\.|.+ TO\:|^TO\:)$'),
     'dialogue': re.compile(r'^[ \t]*(\*_+[^\p{Ll}\p{Lo}\p{So}\r\n]*)(\^?)?(?:\n(?!\n+))([\s\S]+)', re.UNICODE),
@@ -21,7 +21,7 @@ REGEX = {
     'centered': re.compile(r'^[ \t]*(?:> *)(.+)(?: *<)(\n.+)*'),
     'page_break': re.compile(r'^\={3,}$'),
     'line_break': re.compile(r'^ {2}$'),
-    'note_inline': re.compile(r'(?:\[{2}(?!\[+))([\s\S]+?)(?:\]]{2}(?!\[+))'),
+    'note_inline': re.compile(r'(?:\[\[(?!\[))([\s\S]+?)(?:\]\](?!\[))'),
     'emphasis': re.compile(r'( _|\*{1,3}|_\*{1,3}|\*{1,3}_)(.+)( _|\*{1,3}|_\*{1,3}|\*{1,3}_)'),
     'bold_italic_underline': re.compile(r'(_{1}\*{3}(?=.+\*{3}_{1})|\*{3}_{1}(?=.+_{1}\*{3}))(.+?)(\*{3}_{1}|_{1}\*{3})'),
     'bold_underline': re.compile(r'(_{1}\*{2}(?=.+\*{2}_{1})|\*{2}_{1}(?=.+_{1}\*{2}))(.+?)(\*{2}_{1}|_{1}\*{2})'),
@@ -33,6 +33,21 @@ REGEX = {
     'lyric': re.compile(r'^(\~.+)'),
     'underline': re.compile(r'(_{1}(?=.+_{1}))(.+?)(_{1})'),
 }
+
+# ─── Module-level regex aliases ───
+
+CHARACTER_RE = REGEX['character']
+SCENE_HEADING_RE = REGEX['scene_heading']
+TRANSITION_RE = REGEX['transition']
+SECTION_RE = REGEX['section']
+SYNOPSIS_RE = REGEX['synopsis']
+PARENTHETICAL_RE = REGEX['parenthetical']
+CENTERED_RE = REGEX['centered']
+PAGE_BREAK_RE = REGEX['page_break']
+LYRIC_RE = REGEX['lyric']
+NOTE_INLINE_RE = REGEX['note_inline']
+BONEYARD_START_RE = re.compile(r'/\*')
+BONEYARD_END_RE = re.compile(r'\*/')
 
 # ─── Token creation (from token.js lines 4-66) ───
 
@@ -76,14 +91,73 @@ def parse_location_information(match):
     """Parse regex match into location info."""
     if match and len(match.groups()) >= 3:
         location_text = match.group(2)
-        split = re.search(r'[-–—−](.*)', location_text)
+        split = re.search(r'(.*)[-–—−](.*)', location_text)
         return {
             'name': split.group(1).strip() if split else location_text.strip(),
             'interior': 'I' in match.group(1),
             'exterior': 'EX' in match.group(1) or 'E.' in match.group(1),
-            'time_of_day': split.group(1).strip() if split else '',
+            'time_of_day': split.group(2).strip() if split else '',
         }
     return None
+
+
+def classify_line(line, prev_type=None):
+    """Classify a single line without full state machine."""
+    stripped = line.strip()
+    if stripped == '':
+        return 'separator'
+    if SCENE_HEADING_RE.match(stripped):
+        return 'scene_heading'
+    if TRANSITION_RE.match(stripped):
+        return 'transition'
+    if SECTION_RE.match(stripped):
+        return 'section'
+    if SYNOPSIS_RE.match(stripped):
+        return 'synopsis'
+    if CENTERED_RE.match(stripped):
+        return 'centered'
+    if PAGE_BREAK_RE.match(stripped):
+        return 'page_break'
+    if LYRIC_RE.match(stripped):
+        return 'lyric'
+    if CHARACTER_RE.match(stripped):
+        return 'character'
+    if prev_type == 'character':
+        if PARENTHETICAL_RE.match(stripped):
+            return 'parenthetical'
+        return 'dialogue'
+    return 'action'
+
+
+def parse_location(heading):
+    """Parse scene heading string into location info. Returns None if not a heading."""
+    match = SCENE_HEADING_RE.match(heading)
+    if not match:
+        return None
+    return parse_location_information(match)
+
+
+def tokenize(script):
+    """Parse Fountain screenplay and return token list."""
+    return parse(script)['tokens']
+
+
+def extract_scene_content(fountain, scene_index):
+    """Extract raw content for a scene by index."""
+    tokens = tokenize(fountain)
+    scenes = [t for t in tokens if t['type'] == 'scene_heading']
+    if scene_index >= len(scenes):
+        return ''
+    start_line = scenes[scene_index]['line']
+    end_line = scenes[scene_index + 1]['line'] if scene_index + 1 < len(scenes) else float('inf')
+    lines = fountain.split('\n')
+    return '\n'.join(lines[start_line:end_line])
+
+
+def fountain_to_html(fountain):
+    """Convert Fountain text to HTML."""
+    tokens = tokenize(fountain)
+    return tokens_to_html(tokens)
 
 
 # ─── Main parser (from afterwriting-parser.js lines 126-749) ───
@@ -328,7 +402,6 @@ def extract_scenes(screenplay_content):
                 'number': token['number'],
                 'characters': [],
                 'location': '',
-                'one_sentence': '',
                 'content': token['text'],
                 'content_html': '',
             }
@@ -341,10 +414,6 @@ def extract_scenes(screenplay_content):
                     name = trim_character_extension(token['text']).strip()
                 if name and name not in current['characters']:
                     current['characters'].append(name)
-            elif token['type'] == 'action' and not current['one_sentence']:
-                stripped = token['text'].strip()
-                if stripped:
-                    current['one_sentence'] = stripped
     
     if current:
         scenes.append(current)

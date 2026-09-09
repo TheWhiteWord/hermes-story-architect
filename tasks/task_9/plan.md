@@ -42,7 +42,7 @@ Porting everything BF produces and then "finding the right place in the UI" late
 | Consumer | Needs from lexer |
 |----------|------------------|
 | `core/index.py` | scenes (heading, characters, locations), character scenes |
-| `core/screenplay.py` | scenes (heading, characters, one_sentence, content, content_html) |
+| `core/screenplay.py` | scenes (heading, characters, content, content_html) |
 | Dashboard | content_html (tokenized HTML for rendering) |
 
 **Required output:**

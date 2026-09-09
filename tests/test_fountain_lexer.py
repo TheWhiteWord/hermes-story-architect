@@ -34,13 +34,6 @@ def save_the_children_fountain():
     return path.read_text()
 
 
-@pytest.fixture
-def the_water_audit_fountain():
-    """Load the Save the Children screenplay."""
-    path = Path(__file__).parent / "fixtures" / "save-the-children" / "screenplay.fountain"
-    return path.read_text()
-
-
 # ---- Character Extension Tests ----
 
 class TestCharacterExtension:
@@ -289,21 +282,21 @@ class TestTokenization:
         page_breaks = [t for t in tokens if t["type"] == "page_break"]
         assert len(page_breaks) == 1
 
-    def test_the_water_audit_scenes(self, the_water_audit_fountain):
-        tokens = tokenize(the_water_audit_fountain)
+    def test_save_the_children_scenes_2(self, save_the_children_fountain):
+        tokens = tokenize(save_the_children_fountain)
         scenes = [t for t in tokens if t["type"] == "scene_heading"]
         assert len(scenes) == 9
 
-    def test_the_water_audit_characters(self, the_water_audit_fountain):
-        tokens = tokenize(the_water_audit_fountain)
+    def test_save_the_children_characters(self, save_the_children_fountain):
+        tokens = tokenize(save_the_children_fountain)
         characters = [t for t in tokens if t["type"] == "character"]
         names = [t["character_name"] for t in characters]
         assert "KAEL" in names
         assert "MIRA" in names
         assert "MARCUS" in names
 
-    def test_character_extension_stripped(self, the_water_audit_fountain):
-        tokens = tokenize(the_water_audit_fountain)
+    def test_character_extension_stripped(self, save_the_children_fountain):
+        tokens = tokenize(save_the_children_fountain)
         characters = [t for t in tokens if t["type"] == "character"]
         for char in characters:
             assert "(" not in char["character_name"]
@@ -313,30 +306,25 @@ class TestTokenization:
 # ---- Scene Extraction Tests ----
 
 class TestSceneExtraction:
-    def test_extract_scene_content(self, the_water_audit_fountain):
-        content = extract_scene_content(the_water_audit_fountain, 0)
+    def test_extract_scene_content(self, save_the_children_fountain):
+        content = extract_scene_content(save_the_children_fountain, 0)
         assert "EXT. THE INSTITUTE - DAY" in content
         assert "KAEL" in content
 
-    def test_extract_all_scenes(self, the_water_audit_fountain):
+    def test_extract_all_scenes(self, save_the_children_fountain):
         from core.screenplay import extract_scenes
-        scenes = extract_scenes(the_water_audit_fountain)
+        scenes = extract_scenes(save_the_children_fountain)
         assert len(scenes) == 9
         assert scenes[0]["heading"] == "EXT. THE INSTITUTE - DAY"
         assert scenes[1]["heading"] == "INT. CENTRAL ROOM - DAY"
         assert scenes[2]["heading"] == "EXT. THE GARDEN - NIGHT"
 
-    def test_scene_characters(self, the_water_audit_fountain):
+    def test_scene_characters(self, save_the_children_fountain):
         from core.screenplay import extract_scenes
-        scenes = extract_scenes(the_water_audit_fountain)
+        scenes = extract_scenes(save_the_children_fountain)
         assert "KAEL" in scenes[0]["characters"]
         assert "MIRA" in scenes[1]["characters"]
         assert "MARCUS" in scenes[1]["characters"]
-
-    def test_scene_one_sentence(self, the_water_audit_fountain):
-        from core.screenplay import extract_scenes
-        scenes = extract_scenes(the_water_audit_fountain)
-        assert scenes[0]["one_sentence"] == "A vast decaying building. Nature reclaims the walls."
 
 
 # ---- HTML Rendering Tests ----
