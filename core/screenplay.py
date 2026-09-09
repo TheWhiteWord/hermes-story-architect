@@ -37,7 +37,7 @@ def extract_scenes(screenplay_content: str) -> list[dict]:
             if token['type'] == 'character':
                 name = (token.get('character') or '').strip()
                 if not name:
-                    name = trim_character_extension(text).strip()
+                    name = text  # Use raw text (preserves extensions like (V.O.))
                 if name and name not in current['characters']:
                     current['characters'].append(name)
     

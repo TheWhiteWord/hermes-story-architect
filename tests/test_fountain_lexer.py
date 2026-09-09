@@ -62,7 +62,9 @@ class TestCharacterExtension:
         assert trim_character_extension("KAEL (on the radio)") == "KAEL"
 
     def test_with_caret(self):
-        assert trim_character_extension("STEEL ^") == "STEEL"
+        # Note: BF regex only strips ^ when preceded by (extension)
+        # "STEEL ^" has no (, so ^ is NOT stripped by BF
+        assert trim_character_extension("STEEL ^") == "STEEL ^"
 
     def test_with_extension_and_caret(self):
         assert trim_character_extension("STEEL (CONT'D) ^") == "STEEL"
