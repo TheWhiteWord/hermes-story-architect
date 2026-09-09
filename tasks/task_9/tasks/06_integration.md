@@ -64,3 +64,37 @@ if slug:
 ```
 
 This ensures the index properly connects scenes to locations, not just characters.
+
+---
+
+## Final Report
+
+**Status: COMPLETE — Gate GREEN**
+
+### Gate Result
+```
+python -m pytest tests/test_fountain_lexer.py::TestIndexIntegration tests/test_core.py -v
+============================== 20 passed in 0.06s ==============================
+```
+
+Full suite: **97/97 passed**.
+
+### Changes Made
+
+The gate already passed at task start — the integration between lexer, `screenplay.py`, and `index.py` was functional. The task noted one gap: `match_location()` was imported but never called, leaving `scene["location"]` always empty.
+
+**`core/screenplay.py`** — `extract_scenes()` now populates `scene["location"]` by calling `extract_location()` on the scene heading:
+```python
+'location': extract_location(token.get('text') or '') or '',
+```
+
+**`core/index.py`** — wired up `match_location()` to match the extracted location string to a location slug (same pattern as character matching):
+```python
+loc_slug = match_location(scene.get("location", ""), index["locations"]) if scene.get("location") else ""
+```
+
+### What Was Skipped
+
+- No new tests added — existing tests cover the integration path.
+- No new abstractions — reused existing `match_location()` and `extract_location()`.
+- No changes to `test_core.py` — it already passes with the new lexer.

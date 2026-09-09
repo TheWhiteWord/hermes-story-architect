@@ -25,7 +25,7 @@ def extract_scenes(screenplay_content: str) -> list[dict]:
                 'heading': token.get('text') or '',
                 'number': token.get('number'),
                 'characters': [],
-                'location': '',
+                'location': extract_location(token.get('text') or '') or '',
                 'content': token.get('text') or '',
                 'content_html': '',
             }

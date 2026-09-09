@@ -32,13 +32,15 @@ def generate_index(project_path: Path) -> dict:
                 slug = match_character(char_name, index["characters"])
                 if slug and slug not in matched_chars:
                     matched_chars.append(slug)
+            # Match location
+            loc_slug = match_location(scene.get("location", ""), index["locations"]) if scene.get("location") else ""
             # Only keep what the index needs (summary graph, not full content)
             scenes.append({
                 "id": scene["id"],
                 "heading": scene["heading"],
                 "number": scene["number"],
                 "characters": matched_chars,
-                "location": "",
+                "location": loc_slug or "",
             })
         index["scenes"] = scenes
     
