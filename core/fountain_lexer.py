@@ -175,9 +175,9 @@ def extract_scene_content(fountain, scene_index):
     scenes = [t for t in tokens if t['type'] == 'scene_heading']
     if scene_index >= len(scenes):
         return ''
-    start_line = scenes[scene_index]['line']
-    end_line = scenes[scene_index + 1]['line'] if scene_index + 1 < len(scenes) else float('inf')
     lines = fountain.split('\n')
+    start_line = scenes[scene_index]['line']
+    end_line = scenes[scene_index + 1]['line'] if scene_index + 1 < len(scenes) else len(lines)
     return '\n'.join(lines[start_line:end_line])
 
 

@@ -39,3 +39,37 @@ All tests must pass.
 - Scene 6 (OPENING TITLES) includes centered text `THE END` and page break
 - Scene 7 includes dual dialogue (`MIRA ^`)
 - All 9 scenes are tested — ensure your implementation handles all content types
+
+---
+
+## Final Report
+
+### Status: ✅ COMPLETED
+
+### Changes Made
+
+**File:** `core/fountain_lexer.py`
+
+**Fix:** `extract_scene_content()` — replaced `float('inf')` with `len(lines)` as the end slice index for the last scene. `float('inf')` is not a valid Python slice index and raised `TypeError` when accessing scene 8 (the final scene).
+
+```python
+# Before
+end_line = scenes[scene_index + 1]['line'] if scene_index + 1 < len(scenes) else float('inf')
+
+# After
+end_line = scenes[scene_index + 1]['line'] if scene_index + 1 < len(scenes) else len(lines)
+```
+
+### Test Results
+
+| Test | Result |
+|------|--------|
+| `TestSceneExtraction` (4 tests) | ✅ 4/4 passed |
+| `test_fountain_lexer.py` (78 tests) | ✅ 78/78 passed |
+| `test_core.py` (19 tests) | ✅ 19/19 passed |
+
+### Notes
+
+- `extract_scenes()` in `core/screenplay.py` already worked correctly — no changes needed.
+- The bug only manifested on the last scene (index 8) because `float('inf')` was only used as the fallback when `scene_index + 1 >= len(scenes)`.
+- All 9 scenes verified: headings, characters, dual dialogue, transitions, centered text, page break, and inline notes all handled correctly.
