@@ -3,10 +3,13 @@ name: The Resistance
 one_sentence: Kael and Mira organize the children to breach the Central Room.
 status: active
 setups:
-  - "INT. CENTRAL ROOM - DAY"
-  - "INT. CENTRAL ROOM - NIGHT"
+  - number: '2'
+    heading: INT. CENTRAL ROOM - DAY
+  - number: '6'
+    heading: INT. CENTRAL ROOM - NIGHT
 payoffs:
-  - "INT. THE CORE - DAY"
+  - number: '8'
+    heading: INT. THE CORE - DAY
 ---
 
 ## Summary

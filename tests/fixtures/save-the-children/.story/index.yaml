@@ -155,12 +155,18 @@ plots:
   one_sentence: Kael and Mira organize the children to breach the Central Room.
   status: active
   setups:
-  - scene: INT. CENTRAL ROOM - DAY
+  - scene:
+      number: '2'
+      heading: INT. CENTRAL ROOM - DAY
     description: ''
-  - scene: INT. CENTRAL ROOM - NIGHT
+  - scene:
+      number: '6'
+      heading: INT. CENTRAL ROOM - NIGHT
     description: ''
   payoffs:
-  - scene: INT. THE CORE - DAY
+  - scene:
+      number: '8'
+      heading: INT. THE CORE - DAY
     description: ''
   sections:
   - Summary
