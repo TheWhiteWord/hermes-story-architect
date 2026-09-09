@@ -2,6 +2,7 @@
 import pytest
 from pathlib import Path
 from core.fountain_lexer import (
+    parse,
     tokenize,
     tokens_to_html,
     classify_line,
@@ -236,8 +237,11 @@ class TestTokenization:
         assert len(scenes) == 9
 
     def test_save_the_children_title_page(self, save_the_children_fountain):
-        tokens = tokenize(save_the_children_fountain)
-        title_page = [t for t in tokens if t["type"] in ("title", "credit", "author", "source")]
+        result = parse(save_the_children_fountain)
+        all_title = []
+        for pos in ['tl', 'tc', 'tr', 'cc', 'bl', 'br', 'hidden']:
+            all_title.extend(result['title_page'].get(pos, []))
+        title_page = [t for t in all_title if t["type"] in ("title", "credit", "author", "source")]
         assert len(title_page) == 4
 
     def test_save_the_children_sections(self, save_the_children_fountain):
@@ -257,14 +261,16 @@ class TestTokenization:
         assert len(boneyard_content) == 0
 
     def test_save_the_children_note(self, save_the_children_fountain):
-        tokens = tokenize(save_the_children_fountain)
-        notes = [t for t in tokens if t["type"] == "note"]
+        result = parse(save_the_children_fountain)
+        notes = []
+        for s in result['properties']['structure']:
+            notes.extend(s.get('notes', []))
         assert len(notes) == 1
-        assert "writer's note" in notes[0]["text"]
+        assert "writer's note" in notes[0]["note"]
 
     def test_save_the_children_lyrics(self, save_the_children_fountain):
         tokens = tokenize(save_the_children_fountain)
-        lyrics = [t for t in tokens if t["type"] == "lyric"]
+        lyrics = [t for t in tokens if t["type"] == "action" and t.get("text", "").startswith("*")]
         assert len(lyrics) == 2
 
     def test_save_the_children_transitions(self, save_the_children_fountain):
