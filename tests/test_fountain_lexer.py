@@ -352,27 +352,69 @@ class TestTokenization:
 
 class TestSceneExtraction:
     def test_extract_scene_content(self, save_the_children_fountain):
-        # Test scene 0
+        # Test scene 0 (action + note, no chars)
         content = extract_scene_content(save_the_children_fountain, 0)
         assert "EXT. THE INSTITUTE - DAY" in content
         assert "A vast decaying building" in content
+        assert "[[This is a writer's note about the scene]]" in content
         
-        # Test scene 1
+        # Test scene 1 (chars + dialogue + parenthetical)
         content = extract_scene_content(save_the_children_fountain, 1)
         assert "INT. CENTRAL ROOM - DAY" in content
         assert "KAEL" in content
         assert "MIRA" in content
+        assert "Something's wrong" in content
+        assert "You're feeling it too?" in content
+        assert "(chosen)" in content
         
-        # Test scene 2
+        # Test scene 2 (action + note, no chars)
         content = extract_scene_content(save_the_children_fountain, 2)
         assert "EXT. THE GARDEN - NIGHT" in content
         assert "Kael walks through simulated moonlight" in content
+        assert "[[Another note about the garden]]" in content
         
-        # Test scene 3
+        # Test scene 3 (chars + dialogue + parenthetical)
         content = extract_scene_content(save_the_children_fountain, 3)
         assert "INT. THE CORE - DAY (400 YEARS EARLIER)" in content
         assert "MARCUS" in content
         assert "ELENA" in content
+        assert "They're at the gates" in content
+        assert "The project is too fragile" in content
+        assert "(almost to herself)" in content
+        
+        # Test scene 4 (action only, no transition)
+        content = extract_scene_content(save_the_children_fountain, 4)
+        assert "EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)" in content
+        assert "Outsiders gather" in content
+        
+        # Test scene 5 (chars + dialogue + transition)
+        content = extract_scene_content(save_the_children_fountain, 5)
+        assert "INT. CENTRAL ROOM - NIGHT" in content
+        assert "ADMINISTRATOR (V.O.)" in content
+        assert "KAEL" in content
+        assert "You don't understand" in content
+        assert "I understand I was chosen" in content
+        assert "CUT TO:" in content
+        
+        # Test scene 6 (centered + page break)
+        content = extract_scene_content(save_the_children_fountain, 6)
+        assert "OPENING TITLES" in content
+        assert "THE END" in content
+        
+        # Test scene 7 (chars + dual dialogue + transition)
+        content = extract_scene_content(save_the_children_fountain, 7)
+        assert "INT. THE CORE - DAY" in content
+        assert "ELENA" in content
+        assert "MIRA" in content
+        assert "You were never meant to escape" in content
+        assert "Then why show us the door?" in content
+        assert "SMASH CUT TO:" in content
+        
+        # Test scene 8 (action + transition)
+        content = extract_scene_content(save_the_children_fountain, 8)
+        assert "EXT. THE INSTITUTE - DAY" in content
+        assert "The building crumbles" in content
+        assert "FADE OUT." in content
 
     def test_extract_all_scenes(self, save_the_children_fountain):
         from core.screenplay import extract_scenes

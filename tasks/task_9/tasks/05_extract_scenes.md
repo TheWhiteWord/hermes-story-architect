@@ -38,3 +38,4 @@ All tests must pass.
 - `extract_scene_content` returns the full raw text for a specific scene (heading + all tokens until next heading)
 - Scene 6 (OPENING TITLES) includes centered text `THE END` and page break
 - Scene 7 includes dual dialogue (`MIRA ^`)
+- All 9 scenes are tested — ensure your implementation handles all content types
