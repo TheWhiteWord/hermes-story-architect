@@ -1804,7 +1804,6 @@ function extractFountainScene(text, heading) {
 
   // Collect lines until next scene heading, page break, or section — skip boneyard
   const result = [];
-  let inBoneyard = false;
   for (let i = startIdx; i < lines.length; i++) {
     const raw = lines[i];
     const line = raw.trim().toUpperCase();
