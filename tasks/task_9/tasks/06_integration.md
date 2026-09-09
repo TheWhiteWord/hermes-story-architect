@@ -49,3 +49,18 @@ The parser produces rich output. `index.py` is a **minimal consumer** — it onl
 | Notes | ❌ No |
 
 **This is expected.** The index is a summary graph, not a full document store. The rich content is available via `extract_scenes()` for other consumers (dashboard, editor) to use. The integration test verifies the pipeline works, not that every data point is consumed.
+
+## Location Matching
+
+`match_location()` exists in `screenplay.py` and is tested in `test_core.py`, but `index.py` doesn't call it. The location field is always empty.
+
+**This is a gap.** The integration task should wire up location matching:
+
+```python
+# In index.py, after character matching:
+slug = match_location(scene["location"], index["locations"])
+if slug:
+    scene["location"] = slug
+```
+
+This ensures the index properly connects scenes to locations, not just characters.
