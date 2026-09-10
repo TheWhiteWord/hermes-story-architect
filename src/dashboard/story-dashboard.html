@@ -2812,13 +2812,13 @@ function openStatsPanel() {
   closePanel();
 
   // Re-render the active chart in case it was first rendered while hidden
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     const activeGroup = document.querySelector('.stats-group.active');
     if (activeGroup) {
       const id = activeGroup.id.replace('stats-group-', '');
       _renderChartsForGroup(id);
     }
-  }, 50);
+  });
 }
 
 function closeStatsPanel() {
@@ -2831,15 +2831,18 @@ function switchStatsGroup(group, btn) {
   document.getElementById('stats-group-' + group).classList.add('active');
   btn.classList.add('active');
   // Charts must be drawn into a visible container
-  setTimeout(() => _renderChartsForGroup(group), 30);
+  requestAnimationFrame(() => _renderChartsForGroup(group));
 }
 
 function _renderChartsForGroup(group) {
   const stats = window.__SCREENPLAY_STATS__;
   if (!stats) return;
-  if (group === 'overview')    renderDurationChart(stats);
-  if (group === 'characters')  renderCharacterChart(stats);
-  if (group === 'scenes')      renderBarcodeChart(_currentBarcodeMode);
+  // requestAnimationFrame ensures layout has settled before reading dimensions
+  requestAnimationFrame(() => {
+    if (group === 'overview')    renderDurationChart(stats);
+    if (group === 'characters')  renderCharacterChart(stats);
+    if (group === 'scenes')      renderBarcodeChart(_currentBarcodeMode);
+  });
 }
 
 // ─── Populate all stat elements ─────────────────────────────────────────────────
@@ -2933,7 +2936,37 @@ function populateStats(stats) {
 }
 
 // ─── D3 Charts ─────────────────────────────────────────────────────────────────
+let _chartObservers = {};
+
+function _ensureChartRendered(containerId, renderFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  // Clean up previous observer for this container
+  if (_chartObservers[containerId]) {
+    _chartObservers[containerId].disconnect();
+    delete _chartObservers[containerId];
+  }
+  // Render immediately
+  renderFn();
+  // Observe resize — re-render when container reaches final size (after CSS transition)
+  const ro = new ResizeObserver(entries => {
+    for (const entry of entries) {
+      if (entry.contentRect.width > 0) {
+        renderFn();
+      }
+    }
+  });
+  ro.observe(container);
+  _chartObservers[containerId] = ro;
+}
+
 function renderDurationChart(stats) {
+  _ensureChartRendered('durationStats-lengthchart', () => {
+    _renderDurationChart(stats);
+  });
+}
+
+function _renderDurationChart(stats) {
   const container = document.getElementById('durationStats-lengthchart');
   if (!container || !window.d3) return;
   container.innerHTML = '';
