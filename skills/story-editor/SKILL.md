@@ -36,8 +36,23 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 
 Same as story-loader: create folder + run `story_index`. Then use `story_create` for entities.
 
-## Quick Reference
+## Entity Frontmatter
 
+When creating or editing entities (characters, locations, worlds, plots), the
+frontmatter must follow the expected schema so the index generator and dashboard
+can process them correctly.
+
+For complete field descriptions and YAML examples, see the shared reference:
+`references/index-format.md`.
+
+### Quick Reference
+| Entity | Key Frontmatter Fields |
+| --- | --- |
+| Character | `name`, `role` (Protagonist/Antagonist/Supporting/Minor/Cameo), `one_sentence`, `sections`, `related` (id + feeling), `goals_short`, `goals_long`, `knowledge` |
+| Location | `name`, `one_sentence`, `sections`, `scenes` (number + heading) |
+| World | `name`, `one_sentence`, `sections`, `rules` |
+| Plot | `name`, `status` (active/resolved/abandoned), `setups[]` (number, heading, description), `payoffs[]` (number, heading, description), `characters`, `sections`, `one_sentence` |
+## Quick Reference
 | Action | Tool | Core Module |
 |--------|------|-------------|
 | Edit entity | story_edit (action: edit_note) | section_parser, entity |

@@ -126,6 +126,11 @@ locations:
   - Description
   - History
   - Scenes
+  scenes:
+  - number: 2
+    heading: INT. CENTRAL ROOM - DAY
+  - number: 6
+    heading: INT. CENTRAL ROOM - NIGHT
 - id: the-garden
   name: The Garden
   one_sentence: A simulated outdoor space where Kael dreams — the only place that
@@ -134,6 +139,9 @@ locations:
   - Description
   - History
   - Scenes
+  scenes:
+  - number: 3
+    heading: EXT. THE GARDEN - NIGHT
 worlds:
 - id: the-i
   name: The I
@@ -158,16 +166,19 @@ plots:
   - scene:
       number: '2'
       heading: INT. CENTRAL ROOM - DAY
-    description: ''
+      description: Kael discovers the door isn't locked — it was never locked.
+    description: Kael discovers the door isn't locked — it was never locked.
   - scene:
       number: '6'
       heading: INT. CENTRAL ROOM - NIGHT
-    description: ''
+      description: The Administrator makes its final offer. Kael refuses.
+    description: The Administrator makes its final offer. Kael refuses.
   payoffs:
   - scene:
       number: '8'
       heading: INT. THE CORE - DAY
-    description: ''
+      description: The children emerge into the real world for the first time.
+    description: The children emerge into the real world for the first time.
   sections:
   - Summary
   - Obstacles
@@ -195,12 +206,12 @@ scenes:
   characters:
   - kael
   - mira
-  location: ''
+  location: the-central-room
 - id: 3
   heading: EXT. THE GARDEN - NIGHT
   number: '3'
   characters: []
-  location: ''
+  location: the-garden
 - id: 4
   heading: INT. THE CORE - DAY (400 YEARS EARLIER)
   number: '4'
@@ -218,7 +229,7 @@ scenes:
   number: '6'
   characters:
   - kael
-  location: ''
+  location: the-central-room
 - id: 7
   heading: OPENING TITLES
   number: '7'
