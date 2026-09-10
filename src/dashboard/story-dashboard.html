@@ -785,6 +785,12 @@ html, body {
   color: var(--accent);
   margin-bottom: 2px;
 }
+.beat-row .beat-desc {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  font-style: italic;
+}
 .beat-row:last-child { border-bottom: none; }
 
 /* Narrow layout */
@@ -2533,7 +2539,7 @@ function showPlotPanel(plotId) {
       const sceneLink = sceneObj
         ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${sceneName}</span>`
         : `<span class="beat-scene">${sceneName}</span>`;
-      return `<div class="beat-row">${sceneLink}${item.description ? `<span>${item.description}</span>` : ''}</div>`;
+      return `<div class="beat-row">${sceneLink}${item.description ? `<span class="beat-desc">${item.description}</span>` : ''}</div>`;
     }).join('');
   }
 

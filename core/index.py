@@ -83,14 +83,14 @@ def _enrich_relationships(index: dict) -> None:
 
 
 def _enrich_plots(index: dict) -> None:
-    """Add descriptions to plot setups/payoffs (initially empty)."""
+    """Add descriptions to plot setups/payoffs (preserve from frontmatter or default empty)."""
     for plot in index.get("plots", []):
         plot["setups"] = [
-            {"scene": s, "description": ""} 
+            {"scene": s, "description": s.get("description", "")} if isinstance(s, dict) else {"scene": s, "description": ""}
             for s in plot.get("setups", [])
         ]
         plot["payoffs"] = [
-            {"scene": p, "description": ""} 
+            {"scene": p, "description": p.get("description", "")} if isinstance(p, dict) else {"scene": p, "description": ""}
             for p in plot.get("payoffs", [])
         ]
 

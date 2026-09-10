@@ -159,11 +159,35 @@ story_memory:
 | `id` | string | Slug |
 | `name` | string | Display name |
 | `status` | string | active/resolved/abandoned |
-| `setups` | object[] | Scene references where plot is established |
-| `payoffs` | object[] | Scene references where plot resolves |
+| `setups` | object[] | Scene references where plot is established (see below) |
+| `payoffs` | object[] | Scene references where plot resolves (see below) |
 | `characters` | string[] | Character slugs |
 | `sections` | string[] | Available `##` headings |
 | `one_sentence` | string | Index label |
+
+#### Plot Scene Reference
+
+Setups and payoffs reference scenes with optional descriptions:
+
+```yaml
+setups:
+  - number: '2'
+    heading: INT. CENTRAL ROOM - DAY
+    description: Kael discovers the door isn't locked — it was never locked.
+  - number: '6'
+    heading: INT. CENTRAL ROOM - NIGHT
+    description: The Administrator makes its final offer. Kael refuses.
+payoffs:
+  - number: '8'
+    heading: INT. THE CORE - DAY
+    description: The children emerge into the real world for the first time.
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `number` | string | yes | Scene number (from Fountain or index) |
+| `heading` | string | yes | Scene heading (matches screenplay) |
+| `description` | string | no | What happens at this scene in the plot thread |
 
 ### Story Memory
 

@@ -5,11 +5,14 @@ status: active
 setups:
   - number: '2'
     heading: INT. CENTRAL ROOM - DAY
+    description: Kael discovers the door isn't locked — it was never locked.
   - number: '6'
     heading: INT. CENTRAL ROOM - NIGHT
+    description: The Administrator makes its final offer. Kael refuses.
 payoffs:
   - number: '8'
     heading: INT. THE CORE - DAY
+    description: The children emerge into the real world for the first time.
 ---
 
 ## Summary
