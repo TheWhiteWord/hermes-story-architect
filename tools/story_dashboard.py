@@ -1,5 +1,6 @@
 """story_dashboard tool — open project dashboard in preview pane."""
 import json
+import re
 from pathlib import Path
 
 SCHEMA = {
@@ -22,9 +23,9 @@ def _compute_screenplay_stats(screenplay_text):
     Returns None on any error — dashboard still works without stats.
     """
     try:
-        from ..core.fountain_lexer import parse as fountain_parse
+        from ..core.fountain_lexer import parse as fountain_parse, tokens_to_html
     except ImportError:
-        from core.fountain_lexer import parse as fountain_parse
+        from core.fountain_lexer import parse as fountain_parse, tokens_to_html
 
     parsed = fountain_parse(screenplay_text)
     tokens = parsed.get('tokens', [])
@@ -165,7 +166,10 @@ def _compute_screenplay_stats(screenplay_text):
     title_page = parsed.get('title_page', {'tl': [], 'tc': [], 'tr': [], 'cc': [], 'bl': [], 'br': []})
 
     # ── Pre-rendered HTML ──
-    script_html = parsed.get('scriptHtml', '')
+    # Filter out title page custom field tokens (tl:, tc:, etc.) — they appear
+    # in both title_page dict and tokens list as action tokens
+    script_tokens = [t for t in tokens if t.get('text') and not re.match(r'^(tl|tc|tr|cc|bl|br):\s', t.get('text', ''))]
+    script_html = tokens_to_html(script_tokens)
 
     return {
         'lengthStats': length_stats,
