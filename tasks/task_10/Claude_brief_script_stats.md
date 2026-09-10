@@ -1,351 +1,225 @@
-# Task 10: Full Script Preview & Screenplay Statistics
+# Task 10 v2: Script View + Statistics Panel — Refined Brief
 
-> Brief for the UI agent — design a new Script view (main tab) and a Statistics panel (detail panel) for the Story Architect dashboard.
+> Brief for UI agent. Replace previous version. Based on lessons learned from first attempt.
 
 ---
 
 ## Goal
 
-Add **two new UI elements** to the Story Architect dashboard (`src/dashboard/story-dashboard.html`):
+Add two new UI elements to the **current** Story Architect dashboard:
 
-1. **"Script" tab** — A main sidebar tab that renders the entire screenplay in a formatted, scrollable preview (like Better Fountain's "Live Preview").
-2. **"Statistics" panel** — A detail panel (slides in from the right, like the entity panels) that shows comprehensive screenplay analytics. **Opened from the Script tab**, not from the sidebar.
-
----
-
-## Architecture Overview
-
-### Current Dashboard Structure
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ Sidebar    │  Main Content                              │
-│            │                                             │
-│ ● Story    │  ┌─────────────────────────────────────┐   │
-│ ● Graph    │  │  .view (active)                     │   │
-│ ● Scenes   │  │    .view-header                     │   │
-│ ● Locations│  │    .view-body                       │   │
-│ ● Plots    │  │                                     │   │
-│ ● Worlds   │  └─────────────────────────────────────┘   │
-│ ─ ─ ─ ─ ─ │                                             │
-│ ↻ Refresh  │                          ┌─────────────┐   │
-│ ⇄ Toggle   │                          │ Detail Panel│   │
-│            │                          │ (slides in) │   │
-└─────────────────────────────────────────────────────────┘
-```
-
-### What We're Adding
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ Sidebar    │  Script View          │  Statistics Panel  │
-│            │                       │  (detail panel)    │
-│ ● Story    │  ┌──────────────────┐ │  ┌──────────────┐  │
-│ ● Graph    │  │  .view-header    │ │  │ Overview     │  │
-│ ● Scenes   │  │  [Stats button]──┼─┼──│ Characters   │  │
-│ ● Locations│  │  .view-body      │ │  │ Scenes       │  │
-│ ● Plots    │  │  (formatted      │ │  │              │  │
-│ ● Worlds   │  │   screenplay)    │ │  └──────────────┘  │
-│ ● Script ← NEW                                         │
-│ ─ ─ ─ ─ ─ │                       │                    │
-│ ↻ Refresh  │                       │                    │
-└─────────────────────────────────────────────────────────┘
-```
+1. **"Script" tab** — Sidebar tab that renders the full screenplay as a formatted, scrollable document
+2. **"Statistics" panel** — Detail panel (slides in from right) showing screenplay analytics, opened from the Script tab header
 
 ---
 
-## Reference: How Better Fountain Does It
+## The File You're Working From
 
-We ported Better Fountain's parser (`core/fountain_lexer.py` is a faithful port of `afterwriting-parser.js`). BF has two webviews that are our reference:
+**Target file**: `src/dashboard/story-dashboard.html` (current, ~2081 lines)
 
-### Live Preview (`webviews/src/preview.html`)
-- Renders the full screenplay as **formatted pages** (Courier Prime font, US Letter/A4, proper margins)
-- Scene headings bold, dialogue indented, dual dialogue side-by-side, transitions right-aligned
-- Title page rendered as a grid (top-left, top-center, top-right, center, bottom-left, bottom-right)
-- Page breaks create new pages; page numbers in footer
-
-### Statistics Panel (`webviews/src/stats.html` + `stats.js`)
-A **sidebar-navigated** panel with 3 groups:
-
-| Group | What it shows |
-|-------|---------------|
-| **Overview** | Length (pages, scenes, words, characters, lines), Duration (total/action/dialogue), Duration line chart (action vs dialogue over screenplay length) |
-| **Characters** | Character count, monologues, complexity (readability median), Per-character duration line chart, Sortable table (name, duration, lines, words, complexity, monologues) |
-| **Scenes** | Scene count, location count, INT/EXT/MIXED breakdown, time-of-day breakdown, Scene barcode chart (colored bars by type/time), Location table (name, scenes, time, INT/EXT) |
-
-**Charts use D3.js** (line charts, barcode charts). Tables use DataTables (jQuery plugin).
+Read this file before producing output. The previous attempt was based on an older version and diverged from our current code. The current file has:
+- Sidebar order: Story → Characters → Scenes → Locations → Plots → Worlds → Script (NEW)
+- External `screenplay.css` link for fountain formatting
+- `window.__STORY_DATA__` injection for index data
+- `window.__SCREENPLAY_TEXT__` injection for screenplay text
+- Existing `#detail-panel` for entity panels (characters, scenes, locations, plots, worlds)
+- `showScenePanel()`, `showCharacterPanel()`, `showLocationPanel()`, `showPlotPanel()`, `showWorldPanel()` functions
+- `formatFountainScene()` and `extractFountainScene()` for scene detail panel content
 
 ---
 
-## Current Dashboard State (What Already Exists)
+## What Already Exists (Do NOT Duplicate)
 
-The dashboard already has screenplay support — don't duplicate it:
+### screenplay.css (External Stylesheet)
+Our `screenplay.css` already provides all fountain formatting with **underscore** class names:
 
-### Already Present in `story-dashboard.html`
+```css
+.fountain-scene_heading    /* bold, 1.5em top margin */
+.fountain-action           /* full width, no indent */
+.fountain-character        /* 3.5in left margin, top margin */
+.fountain-parenthetical    /* 3.0in left margin */
+.fountain-dialogue         /* 2.5in left, 1.0in right margin */
+.fountain-transition       /* right-aligned, bold */
+.fountain-centered         /* 92.5% width, centered */
+.fountain-section          /* 0.2 opacity, -30px left, bold */
+.fountain-synopsis         /* 0.4 opacity, italic, -20px left */
+.fountain-note             /* 0.5 opacity, italic */
+.fountain-page-break       /* centered, top border, 2em margin */
+.fountain-boneyard         /* 0.5 opacity, italic */
+.fountain-lyric            /* italic */
+```
 
-| Feature | Location | Status |
-|---------|----------|--------|
-| Screenplay CSS classes | Lines 657-747 (in `<style>`) | ✅ Complete |
-| `formatFountainScene()` | JS function | ✅ Classifies lines into fountain types |
-| `extractFountainScene()` | JS function | ✅ Extracts scene by heading |
-| `window.__SCREENPLAY_TEXT__` | Injected by `story_dashboard.py` | ✅ Full screenplay text available |
-| Detail panel (`#detail-panel`) | Lines 395-522 | ✅ Slides in from right |
-| Entity panel functions | `showCharacterPanel()`, `showScenePanel()`, etc. | ✅ Pattern to follow |
+**Do NOT create new CSS for these classes.** Use screenplay.css as-is. If you need additional classes for Script view structure (document container, title page grid, page break indicators), name them with `.screenplay-` prefix to avoid conflicts.
 
-### What the Dashboard Already Loads
+### fountain_lexer.py (Python Parser)
+Our tokenizer runs **server-side** in `story_dashboard.py`. It produces tokens with:
+- `type`: scene_heading, character, dialogue, parenthetical, action, transition, centered, section, synopsis, page_break, separator, dual_dialogue_begin/end, dialogue_begin/end
+- `text`: the line content
+- `character`: character name (for dialogue tokens)
+- `time`: duration in seconds (for dialogue/action tokens)
+- `number`: scene number (for scene_heading tokens)
+- `dual`: "left"/"right" (for dual dialogue tokens)
+- `level`: section depth (for section tokens)
 
+Stats are pre-computed server-side and injected as `window.__SCREENPLAY_STATS__`. Do NOT write a JS tokenizer.
+
+### Data Injection Pipeline
 ```javascript
-// Injected by story_dashboard.py (lines 58-71):
+// Injected by story_dashboard.py:
 window.__STORY_DATA__ = { /* index.yaml as JSON */ };
 window.__SCREENPLAY_TEXT__ = "/* full screenplay.fountain text */";
+window.__SCREENPLAY_STATS__ = { /* pre-computed stats from fountain_lexer.parse() */ };
+```
+
+The stats object structure:
+```javascript
+window.__SCREENPLAY_STATS__ = {
+  lengthStats: { pagesWhole, scenes, words, characters, lines },
+  durationStats: { total, action, dialogue, lengthchart_action: [...], lengthchart_dialogue: [...] },
+  characterStats: { characterCount, monologues, characters: [{ name, color, speakingParts, secondsSpoken, wordsSpoken, monologues }] },
+  locationStats: { locationsCount, locations: [{ name, color, number_of_scenes, times_of_day, interior_exterior }] },
+  sceneStats: { scenes: [{ text, number, locType, locTime }], typeCounts: { int, ext, mixed }, timeCounts: { day, night, ... } },
+  titlePage: { tl: [], tc: [], tr: [], cc: [], bl: [], br: [] },
+  scriptHtml: "<h3 class=\"fountain-scene_heading\">...</h3>..." // pre-rendered screenplay HTML from tokens_to_html()
+};
 ```
 
 ---
 
-## What Data We Already Have
+## Architecture Decisions (Locked — Do Not Change)
 
-Our parser (`core/fountain_lexer.py`) already produces all the raw data needed. Here's the mapping:
-
-### From `parse()` result:
-
-| Field | Type | What it is |
-|-------|------|------------|
-| `tokens` | `list[dict]` | All tokens with `type`, `text`, `line`, `time`, `character`, `number`, `dual`, `level` |
-| `lengthAction` | `float` | Total action duration (seconds) |
-| `lengthDialogue` | `float` | Total dialogue duration (seconds) |
-| `properties.scenes` | `list[dict]` | `{scene, text, line, actionLength, dialogueLength}` |
-| `properties.sceneLines` | `list[int]` | Line numbers where scenes start |
-| `properties.sceneNames` | `list[str]` | Scene heading texts |
-| `properties.characters` | `dict[str, list[int]]` | Character name → [scene_numbers] |
-| `properties.locations` | `dict[str, list[dict]]` | Location slug → [{scene_number, line, name, interior, exterior, time_of_day}] |
-| `properties.structure` | `list[dict]` | Hierarchical structure (sections with children, scenes) |
-| `title_page` | `dict` | {tl, tc, tr, cc, bl, br, hidden} — title page tokens |
-
-### From `calculate_dialogue_duration(text)`:
-Already ported. Returns seconds (float).
-
-### From `tokens_to_html(tokens)`:
-Already ported. Returns HTML string with `fountain-{type}` CSS classes.
+| Decision | What It Means |
+|----------|---------------|
+| Server-side stats | Stats are pre-computed in Python, injected as JSON. Do NOT compute stats in JS. |
+| screenplay.css | Use our existing CSS for fountain formatting. Do NOT redefine fountain classes. |
+| Separate stats panel | `#stats-panel` is a separate `<aside>` from `#detail-panel`. Entity panels remain functional while stats panel is open. |
+| Server-side tokenization | Script view rendering uses `window.__SCREENPLAY_STATS__.scriptHtml` (pre-rendered). No client-side tokenizer. |
+| Lazy build | Script view is built on first tab visit, not at boot. |
+| Scene heading click | Clicking a scene heading in the Script view calls `showScenePanel(sceneId)` with the matched scene ID. |
+| 52 lines/page | Soft page breaks inserted every ~52 lines at scene heading boundaries. |
+| D3.js for charts | Action-vs-dialogue line chart, character speaking time bar chart, scene barcode. |
+| Stats panel width | `--stats-panel-w: 360px` (wider than `#detail-panel` at 320px). |
 
 ---
 
-## What We DON'T HAVE Yet (Gaps to Compute)
+## What to Produce
 
-These are **not** in the parser yet, but are trivial to compute from the raw text + tokens:
+### HTML to Add
 
-| Stat | How to compute | BF reference |
-|------|---------------|--------------|
-| **Word count** | `len(text.split())` on raw screenplay | `getWordCount()` |
-| **Character count** | `len(text)` | `getCharacterCount()` |
-| **Character count (no whitespace)** | `len(re.sub(r'\s', '', text))` | `getCharacterCountWithoutWhitespace()` |
-| **Line count** | `text.count('\n')` | `getLineCount()` |
-| **Line count (no whitespace)** | Count lines matching `/\S/` | `getLineCountWithoutWhitespace()` |
-| **Page count** | Estimate: `max(1, line_count / 52)` (52 lines/page is standard) or use PDF | `pdf.pagecount` |
-| **Pages (real)** | Same estimate, or count page breaks + 1 | `pdf.pagecountReal` |
-| **Is monologue** | `seconds > 30` | `isMonologue()` |
-| **Per-character stats** | Iterate tokens, group by `character`, count speaking parts, sum `time`, count words | `createCharacterStatistics()` |
-| **Scene type (INT/EXT/MIXED)** | Parse scene heading regex group 1 | `locationtype()` |
-| **Scene time-of-day** | Parse scene heading after dash | `locationtime()` |
-| **Duration by scene property** | Sum `actionLength + dialogueLength` per scene, bucket by type/time | `getLengthChart()` |
-| **Character color** | Hash-based HSL from name | `wordToColor()` |
-| **Location color** | Hash-based HSL from slug | `wordToColor()` |
-| **Readability / complexity** | Optional — requires `readability-scores` Python port. Can be omitted in v1. | `readabilityScores()` |
-| **PDF page map** | Optional — requires PDF generation. Can be omitted in v1. | `pdfstats.linemap` |
+1. **Script sidebar button** — Insert between Worlds button and separator. SVG icon: document with lines.
 
----
+2. **`#script-view` div** — New `.view` with:
+   - `.view-header` containing title "Script", subtitle (page/scene count), and "Statistics" button
+   - `.view-body` containing `#screenplay-container` (empty state + rendered screenplay)
 
-## Design Requirements
+3. **`#stats-panel` aside** — After `</main>`, before `#detail-panel`. Structure:
+   - Header with title + close button
+   - 3-tab subnav: Overview / Characters / Scenes
+   - `.stats-body` with 3 `.stats-group` divs (`.active` on first)
 
-### Script Tab (Main View)
+### CSS to Add
 
-**Purpose**: Show the full screenplay formatted like a real screenplay.
+Add to the `<style>` block in story-dashboard.html. **Do NOT redefine existing fountain classes.**
 
-**Integration**:
-- Add a new sidebar button **"Script"** (after Worlds, before the separator)
-- Create a new `#script-view` div (like `#story-view`, `#scenes-view`, etc.)
-- When active, it shows the formatted screenplay in `.view-body`
+**New classes needed** (use `.screenplay-` prefix for structural elements):
+- `.screenplay-doc` — max-width 680px, centered, Courier font, padding
+- `.screenplay-title-page` — CSS grid for title page (tl/tc/tr/cc/bl/br areas)
+- `.title-tl`, `.title-tc`, `.title-tr`, `.title-cc`, `.title-bl`, `.title-br` — grid areas
+- `.screenplay-page-break` — dashed border + page number pseudo-element
+- `.scene-num` — muted scene number prefix
+- `.fountain-dual-dialogue` — grid for dual dialogue side-by-side
+- `.script-empty` — centered empty state
 
-**Rendering approach**:
-- Use `formatFountainScene()` output (already exists) or equivalent
-- Style with screenplay conventions: Courier-style font, scene headings bold, dialogue indented, dual dialogue side-by-side
-- The dashboard already has fountain CSS classes (lines 657-747) — reuse them
-- **Page-based layout** (like BF) is nice-to-have; a single scrollable document is acceptable for v1
-- Title page rendered separately at top (if present)
+**Stats panel classes** (from your previous output, keep these):
+- `#stats-panel` — sliding panel, 360px when open, responsive overlay on narrow screens
+- `.stats-header`, `.stats-title`, `.stats-close`, `.stats-subnav`, `.stats-tab`, `.stats-group`
+- `.stat-grid`, `.stat-block`, `.stat-block-value`, `.stat-block-label`
+- `.duration-bar-group`, `.duration-bar-row`, `.duration-bar-label`, `.duration-bar-track`, `.duration-bar-fill`, `.duration-bar-value`
+- `.chart-container` — background, border, padding for D3 charts
+- `.stats-section-label` — uppercase muted labels
 
-**Header actions**:
-- A **"Statistics" button** in `.view-header-actions` that opens the Statistics panel (see below)
+**DataTables** — If you need sortable/filterable tables, you can use DataTables standalone CDN. But investigate whether plain HTML tables with click-sort would suffice for ~5-20 rows.
 
-**Data source**: `window.__SCREENPLAY_TEXT__` (already loaded by dashboard).
+### JS to Add
 
-### Statistics Panel (Detail Panel)
+1. **`openStatsPanel()`** — Build script if not yet built, then open `#stats-panel`
+2. **`closeStatsPanel()`** — Close `#stats-panel`
+3. **`switchStatsGroup(group, btn)`** — Switch tab + re-render D3 charts (charts need visible container)
+4. **`buildScriptView()`** — Lazy-build on first Script tab visit. Uses `window.__SCREENPLAY_STATS__.scriptHtml` or falls back to empty state.
+5. **`populateStats(stats)`** — Fill text content for all stat elements, initialize tables
+6. **D3 chart functions** — `renderDurationChart()`, `renderCharacterChart()`, `renderBarcodeChart(mode)`
+7. **Wrap `switchView`** — After original definition, add: if view === 'script' and !_scriptBuilt, call buildScriptView(); if view !== 'script', closeStatsPanel()
 
-**Purpose**: Show comprehensive screenplay analytics.
+### Scene Heading Click Matching
 
-**Integration**:
-- **NOT a sidebar tab** — opens as a detail panel (like entity panels)
-- Opened from the Script view's header button
-- Reuses `#detail-panel` structure (or creates a new panel div with same styling)
-- **3 sub-groups**: Overview, Characters, Scenes (sidebar-navigated, like BF)
-
-**Data to display** (grouped):
-
-#### Overview Group
-| Stat | Element ID | Source |
-|------|-----------|--------|
-| Pages (whole) | `lengthStats-pagesWhole` | `max(1, line_count / 52)` |
-| Pages (fractional) | `lengthStats-pagesFractional` | Eighths remainder |
-| Pages (printed) | `lengthStats-pagesReal` | Same as whole for v1 |
-| Scenes | `lengthStats-scenes` | `len(properties.scenes)` |
-| Words | `lengthStats-words` | `len(text.split())` |
-| Characters | `lengthStats-characters` | `len(text)` |
-| Characters (no spaces) | `lengthStats-characterswithoutwhitespace` | `len(re.sub(r'\s', '', text))` |
-| Lines | `lengthStats-lines` | `text.count('\n')` |
-| Lines (no spaces) | `lengthStats-lineswithoutwhitespace` | Count non-empty lines |
-| Duration (total) | `durationStats-total` | `lengthAction + lengthDialogue` |
-| Duration (action) | `durationStats-action` | `lengthAction` |
-| Duration (dialogue) | `durationStats-dialogue` | `lengthDialogue` |
-| Duration chart | `durationStats-lengthchart` | Line chart: action vs dialogue over lines |
-
-**Duration summary text** (like BF): Generate a human-readable summary:
-> "The screenplay is the length of a feature film. It is action-heavy (65% of the runtime)."
-
-#### Characters Group
-| Stat | Element ID | Source |
-|------|-----------|--------|
-| Character count | `characterStats-count` | `len(properties.characters)` |
-| Monologues | `characterStats-monologues` | Count dialogues > 30s |
-| Complexity | `characterStats-complexity` | Median readability (optional, omit in v1) |
-| Character duration chart | `characterStats-lengthchart` | Per-character line chart |
-| Character table | `characterStats-table` | Sortable table |
-
-**Character table columns**: Name, Duration (seconds → HH:MM:SS), Lines (speaking parts), Words, Complexity (optional), Monologues
-
-**Per-character data** (computed from tokens):
-- `name`: character name
-- `color`: hash-based HSL from name
-- `speakingParts`: count of dialogue blocks
-- `secondsSpoken`: sum of `time` for all dialogue tokens
-- `wordsSpoken`: word count of all dialogue
-- `monologues`: count of dialogues > 30s
-- `averageComplexity`: optional
-
-#### Scenes Group
-| Stat | Element ID | Source |
-|------|-----------|--------|
-| Scene count | `sceneStats-count` | `len(properties.scenes)` |
-| Location count | `locationStats-count` | `len(properties.locations)` |
-| INT duration | `sceneprop-type_int` | Sum scene durations |
-| EXT duration | `sceneprop-type_ext` | Sum scene durations |
-| MIXED duration | `sceneprop-type_mixed` | Sum scene durations |
-| DAWN duration | `sceneprop-time_dawn` | Sum scene durations |
-| MORNING duration | `sceneprop-time_morning` | Sum scene durations |
-| DAY duration | `sceneprop-time_day` | Sum scene durations |
-| EVENING duration | `sceneprop-time_evening` | Sum scene durations |
-| DUSK duration | `sceneprop-time_dusk` | Sum scene durations |
-| NIGHT duration | `sceneprop-time_night` | Sum scene durations |
-| Scene summary | `durationStats-scenesummary` | Human-readable text |
-| Scene barcode chart | `sceneStats-timechart` | Colored bars by type/time |
-| Location table | `locationStats-table` | Sortable table |
-
-**Location table columns**: Name, Number of Scenes, Time of Day, INT/EXT
-
-**Scene barcode chart**: Each scene is a colored bar. Color by INT/EXT/MIXED or by time-of-day. X-axis = line number, Y-axis = scene type/time.
-
----
-
-## Naming Conventions
-
-Match Better Fountain's stat field names exactly (they're already the de facto standard):
+In `buildScriptView()`, wire up click handlers on `.fountain-scene_heading` elements. Match screenplay headings to `story.scenes[]` by:
 
 ```javascript
-// Top-level structure
-{
-  lengthStats: { words, characters, characterswithoutwhitespace, lines, lineswithoutwhitespace, pages, pagesreal, scenes },
-  durationStats: { total, action, dialogue, durationBySceneProp, lengthchart_action, lengthchart_dialogue, characters, scenes, characternames, monologues },
-  characterStats: { characters: [{name, color, speakingParts, secondsSpoken, averageComplexity, monologues, wordsSpoken}], complexity, characterCount, monologues },
-  locationStats: { locationsCount, locations: [{name, color, scene_numbers, scene_lines, number_of_scenes, times_of_day, interior_exterior}] },
-  structure: [...],
-  pdfmap: "{...}"  // JSON string, optional
-}
+const heading = element.textContent.toUpperCase().trim().replace(/\s*\(.*\)\s*$/, '');
+const scene = story.scenes.find(s => s.heading.toUpperCase().trim().replace(/\s*\(.*\)\s*$/, '') === heading);
+if (scene) showScenePanel(scene.id);
 ```
 
-**Element IDs** (for the HTML):
-- `lengthStats-words`, `lengthStats-characters`, `lengthStats-lines`, `lengthStats-scenes`, `lengthStats-pagesWhole`, `lengthStats-pagesFractional`, `lengthStats-pagesReal`, `lengthStats-characterswithoutwhitespace`, `lengthStats-lineswithoutwhitespace`
-- `durationStats-total`, `durationStats-action`, `durationStats-dialogue`, `durationStats-summary`, `durationStats-lengthchart`, `durationStats-scenesummary`
-- `characterStats-count`, `characterStats-monologues`, `characterStats-complexity`, `characterStats-lengthchart`, `characterStats-table`
+Handle parenthetical suffixes like "(400 YEARS EARLIER)" by stripping before comparison.
+
+---
+
+## Element IDs (Preserved from Brief)
+
+All stat elements need these IDs for JS targeting:
+
+- `lengthStats-pagesWhole`, `lengthStats-scenes`, `lengthStats-words`, `lengthStats-lines`, `lengthStats-characters`
+- `durationStats-total`, `durationStats-action`, `durationStats-dialogue`, `durationStats-summary`, `durationStats-lengthchart`
+- `characterStats-count`, `characterStats-monologues`, `characterStats-lengthchart`, `characterStats-table`
 - `sceneStats-count`, `locationStats-count`, `sceneStats-timechart`, `locationStats-table`
 - `sceneprop-type_int`, `sceneprop-type_ext`, `sceneprop-type_mixed`
-- `sceneprop-time_dawn`, `sceneprop-time_morning`, `sceneprop-time_day`, `sceneprop-time_evening`, `sceneprop-time_dusk`, `sceneprop-time_night`
+- `sceneprop-time_day`, `sceneprop-time_night`, `sceneprop-time_morning`, `sceneprop-time_evening`, `sceneprop-time_dawn`, `sceneprop-time_dusk`
+
+Each `_bar` suffixed ID corresponds to a `.duration-bar-fill` div for the colored bar.
 
 ---
 
 ## Technical Constraints
 
-1. **Single HTML file** — Add to `src/dashboard/story-dashboard.html` (no build step)
-2. **CDN libraries** — Can load D3.js and DataTables from CDN (like vis-network already is)
-3. **Hermes conventions** — Use CSS variables, `data-hermes-send`, transparent background, app font
-4. **Data loading** — The dashboard already loads `screenplay.md` via `window.__SCREENPLAY_TEXT__`. Parse it client-side (the parser is in Python, but the statistics can be computed from the raw text + a client-side tokenization, OR we can pre-compute stats server-side and embed them)
-5. **No Python in the browser** — The statistics computation must happen either:
-   - **Client-side**: Tokenize the Fountain text in JS (we can port the minimal tokenization needed)
-   - **Server-side**: Pre-compute stats when loading the project, embed as JSON in the HTML
-   - **Hybrid**: Load `screenplay.md`, compute stats in JS, render
-
-**Recommended approach**: Client-side computation. The dashboard already loads `screenplay.md`. Add a JS function that:
-1. Reads the Fountain text
-2. Computes all statistics (word count, line count, duration, per-character, per-scene)
-3. Renders the Script tab (formatted HTML) and Statistics tab (charts + tables)
-
-This keeps the architecture simple — no server round-trip needed.
+- Single HTML file (no build step)
+- CDN libraries allowed (D3.js, DataTables standalone)
+- Hermes CSS variables (`--foreground`, `--muted-foreground`, `--accent`, `--border`, `--card`, `--panel-bg`, `--radius`)
+- Transparent background on body
+- No jQuery (use vanilla JS or standalone CDN libs)
+- Works in Hermes Electron preview pane (test CDN availability)
 
 ---
 
-## What to Hand the UI Agent
+## Deliverables
 
-This document provides:
-1. **Reference** — How Better Fountain does it (what to emulate)
-2. **Data mapping** — What our parser already provides vs. what needs computing
-3. **Naming conventions** — Exact field names and element IDs to use
-4. **Layout structure** — Script tab (main view) + Statistics panel (detail panel with 3 sub-groups)
-5. **Technical constraints** — Single HTML, CDN libs, Hermes conventions, client-side computation
-6. **Gaps identified** — What stats need new computation logic
-7. **Existing patterns** — The dashboard already has screenplay formatting, detail panel, and entity panels to follow
+1. **Updated `story-dashboard.html`** — Current file + your additions
+2. **New CSS** — Add to `<style>` block (screenplay-structural + stats-panel classes only)
+3. **New JS** — Add to `<script>` block (script view builder, stats panel controls, D3 charts, switchView wrapper)
+4. **CDN links** — Add to `<head>` (D3.js, DataTables standalone if needed)
 
-The UI agent should produce:
-- Updated `src/dashboard/story-dashboard.html` with:
-  - New "Script" sidebar button
-  - New `#script-view` div (formatted screenplay)
-  - New `#statistics-panel` detail panel (or reuse `#detail-panel`)
-  - Embedded CSS (using Hermes variables, reusing existing fountain classes)
-  - Embedded JS for:
-    - Fountain tokenization (minimal, for statistics)
-    - Statistics computation
-    - Script rendering (formatted screenplay)
-    - Charts (D3.js) and tables (DataTables)
-- "Ask Hermes" buttons where appropriate (e.g., "Analyze character arc", "Check pacing")
+Do NOT include: inline fountain CSS (we have screenplay.css), tokenizer JS (server-side), sidebar order changes (Story-first stays), `switchView` replacement (wrap instead).
 
 ---
 
-## Out of Scope (For Later)
+## Out of Scope
 
-- PDF page map (requires PDF generation)
-- Readability scores (requires `readability-scores` Python port)
-- Live sync with editor (we don't have an editor)
+- PDF page map
+- Readability scores
+- Live sync with editor
 - Export to PDF/HTML
-- Scene content editing
-- Collaborative features
+- **Script content editing** — Read-only preview in v1. Do NOT add editable textareas, save buttons, or edit-related UI. Editing is a separate feature.
+- Full dual-dialogue pairing (capture in tokens, simplified rendering acceptable)
 
 ---
 
 ## Success Criteria
 
-- [ ] Script tab renders the full screenplay with proper formatting
-- [ ] Statistics panel opens from Script tab header (not sidebar)
-- [ ] Statistics panel shows Overview, Characters, Scenes sub-groups
-- [ ] All stats match what Better Fountain computes (where data is available)
-- [ ] Charts render correctly (line chart, barcode chart)
-- [ ] Tables are sortable and filterable
-- [ ] Responsive in narrow preview pane (~400-600px)
-- [ ] Uses Hermes CSS variables for theming
-- [ ] No build step — single HTML file with CDN libs
-- [ ] Reuses existing fountain CSS classes (no duplication)
-- [ ] Reuses existing detail panel pattern (slide-in from right)
+- Script tab renders formatted screenplay using screenplay.css (Courier, bold headings, indented dialogue, right-aligned transitions)
+- Clicking scene heading opens entity panel for that scene
+- Statistics panel opens from Script tab header
+- 3 sub-groups (Overview / Characters / Scenes) with tab navigation
+- Charts render (line chart, bar chart, barcode)
+- Tables are sortable (DataTable or hand-rolled)
+- Responsive in narrow preview pane (~400px)
+- Uses Hermes CSS variables
+- No build step — single HTML file
