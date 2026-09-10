@@ -850,10 +850,10 @@ html, body {
 }
 
 /* Scene number prefix inside scene heading */
-.scene-num {
+.screenplay-doc .fountain-scene_heading::before {
+  content: attr(data-scenenumber) ". ";
   opacity: 0.4;
   font-weight: normal;
-  margin-right: 8px;
 }
 
 /* Clickable scene headings in the script view */
@@ -2279,29 +2279,33 @@ function formatFountainScene(text) {
       continue;
     }
 
-    // Classify line
+    // Extract inline notes [[...]] from any line type
+    const noteMatch = trimmed.match(/\[\[(.*?)\]\]/);
+    const cleanText = trimmed.replace(/\[\[.*?\]\]/, '').trim();
+
+    // Classify line (use clean text for classification)
     let type = 'action';
     let cls = 'fountain-action';
 
-    if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+/i.test(trimmed)) {
+    if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+/i.test(cleanText)) {
       type = 'scene_heading';
       cls = 'fountain-scene_heading';
-    } else if (/^\.[A-Z]/.test(trimmed)) {
+    } else if (/^\.[A-Z]/.test(cleanText)) {
       type = 'scene_heading';
       cls = 'fountain-scene_heading';
-    } else if (/^(CUT TO:|FADE TO BLACK\.|FADE OUT\.|SMASH CUT TO:|DISSOLVE TO:)/i.test(trimmed)) {
+    } else if (/^(CUT TO:|FADE TO BLACK\.|FADE OUT\.|SMASH CUT TO:|DISSOLVE TO:)/i.test(cleanText)) {
       type = 'transition';
       cls = 'fountain-transition';
-    } else if (/^>.+<$/.test(trimmed)) {
+    } else if (/^>.+<$/.test(cleanText)) {
       type = 'centered';
       cls = 'fountain-centered';
-    } else if (/^~/.test(trimmed)) {
+    } else if (/^~/.test(cleanText)) {
       type = 'lyric';
       cls = 'fountain-lyric';
-    } else if (/^\(.*\)$/.test(trimmed) && prevType === 'character') {
+    } else if (/^\(.*\)$/.test(cleanText) && prevType === 'character') {
       type = 'parenthetical';
       cls = 'fountain-parenthetical';
-    } else if (/^[A-Z][A-Z\s]+$/.test(upper) && trimmed.length > 1) {
+    } else if (/^[A-Z][A-Z\s]+$/.test(cleanText.toUpperCase()) && cleanText.length > 1) {
       type = 'character';
       cls = 'fountain-character';
     } else if (prevType === 'character' || prevType === 'parenthetical') {
@@ -2309,7 +2313,16 @@ function formatFountainScene(text) {
       cls = 'fountain-dialogue';
     }
 
-    html += `<div class="${cls}">${escapeHtml(line).replace(/^ /g, '&nbsp;')}</div>`;
+    // Render line content (without note markers) if there's text left
+    if (cleanText) {
+      html += `<div class="${cls}">${escapeHtml(cleanText).replace(/^ /g, '&nbsp;')}</div>`;
+    }
+
+    // Render note on its own line
+    if (noteMatch) {
+      html += `<p class="fountain-note">${escapeHtml(noteMatch[1].trim())}</p>`;
+    }
+
     prevType = type;
   }
 
