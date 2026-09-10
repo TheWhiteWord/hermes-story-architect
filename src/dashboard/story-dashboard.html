@@ -2075,17 +2075,31 @@ function buildStoryView() {
 function openPanel() { document.getElementById('detail-panel').classList.add('open'); }
 function closePanel() { document.getElementById('detail-panel').classList.remove('open'); }
 
+// ─── Sections Renderer ───────────────────────────────────────────────────────
+function renderSectionsHtml(entityType, slug) {
+  const data = (window.__SECTIONS__ && window.__SECTIONS__[entityType] && window.__SECTIONS__[entityType][slug]);
+  if (!data) return '';
+  return Object.entries(data).map(([name, content]) => `
+    <div>
+      <div class="panel-section-title">${name}</div>
+      <div class="panel-text">${escapeHtml(content).replace(/\n/g, '<br>')}</div>
+    </div>
+  `).join('');
+}
+
 function showCharacterPanel(char) {
-  if (!char) return;
   document.getElementById('panel-type').textContent = char.role || char.story_role || 'Character';
   document.getElementById('panel-name').textContent = char.name;
 
   // Scenes: char.scenes is normalised to an array of scene ids (strings)
   const scenes = (char.scenes || []).map(sid => {
     const s = (story.scenes || []).find(x => String(x.id) === String(sid));
-    return s
-      ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>`
-      : (sid ? `<span class="tag tag-scene">${sid}</span>` : '');
+    if (s) {
+      const num = s.number != null ? String(s.number) : '';
+      const label = num ? `${num}. ${s.heading || s.id}` : (s.heading || s.id);
+      return `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${label}</span>`;
+    }
+    return sid ? `<span class="tag tag-scene">${sid}</span>` : '';
   }).filter(Boolean).join('');
 
   // Relationships: use related[] which normaliser mapped from relationships[]
@@ -2134,6 +2148,7 @@ function showCharacterPanel(char) {
       <div class="panel-section-title">Relationships</div>
       ${rels}
     </div>` : ''}
+    ${renderSectionsHtml('character', char.id)}
   `;
 
   document.getElementById('panel-footer').innerHTML = `
@@ -2433,9 +2448,12 @@ function showLocationPanel(locId) {
     const s = (story.scenes || []).find(x =>
       x.heading === ref || String(x.id) === String(ref)
     );
-    return s
-      ? `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${s.heading || s.id}</span>`
-      : `<span class="tag tag-scene">${ref}</span>`;
+    if (s) {
+      const num = s.number != null ? String(s.number) : '';
+      const label = num ? `${num}. ${s.heading || s.id}` : (s.heading || s.id);
+      return `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${label}</span>`;
+    }
+    return `<span class="tag tag-scene">${ref}</span>`;
   }).join('');
 
   // Characters in this location (via their scenes)
@@ -2449,23 +2467,20 @@ function showLocationPanel(locId) {
     return c ? `<button class="entity-link" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${roleColor(c.role)}">${c.name}</button>` : '';
   }).filter(Boolean).join('');
 
-  // World rules relevant to this location (from worlds array)
-  const sections = (loc.sections || []).join(', ');
-
   document.getElementById('panel-body').innerHTML = `
     <div>
-      <div class="panel-section-title">Description</div>
+      <div class="panel-section-title">In one sentence</div>
       <div class="panel-text">${loc.one_sentence || '—'}</div>
     </div>
-    ${sections ? `<div><div class="panel-section-title">Sections</div><div class="panel-muted">${sections}</div></div>` : ''}
     ${charLinks ? `<div>
       <div class="panel-section-title">Characters here</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
     </div>` : ''}
     ${scenes ? `<div>
-      <div class="panel-section-title">Scenes set here</div>
+      <div class="panel-section-title">Appears in</div>
       <div class="panel-tags">${scenes}</div>
     </div>` : ''}
+    ${renderSectionsHtml('location', loc.id)}
   `;
 
   document.getElementById('panel-footer').innerHTML = `
@@ -2500,11 +2515,16 @@ function showPlotPanel(plotId) {
       if (typeof item === 'string') {
         return `<div class="beat-row">${item}</div>`;
       }
-      // object: {scene, description}
-      const sceneObj = (story.scenes || []).find(s => s.heading === item.scene || String(s.id) === String(item.scene));
+      // Extract scene name — handle double-wrapped objects from index enrichment
+      let sceneName = item.scene;
+      if (typeof sceneName === 'object' && sceneName !== null) {
+        sceneName = sceneName.heading || sceneName.scene || '';
+      }
+      if (!sceneName) return '';
+      const sceneObj = (story.scenes || []).find(s => s.heading === sceneName || String(s.id) === String(sceneName));
       const sceneLink = sceneObj
-        ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${item.scene}</span>`
-        : (item.scene ? `<span class="beat-scene">${item.scene}</span>` : '');
+        ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${sceneName}</span>`
+        : `<span class="beat-scene">${sceneName}</span>`;
       return `<div class="beat-row">${sceneLink}${item.description ? `<span>${item.description}</span>` : ''}</div>`;
     }).join('');
   }
@@ -2532,6 +2552,7 @@ function showPlotPanel(plotId) {
       <div class="panel-section-title">Payoffs</div>
       ${payoffsHtml}
     </div>` : ''}
+    ${renderSectionsHtml('plot', plot.id)}
   `;
 
   document.getElementById('panel-footer').innerHTML = '';
@@ -2566,10 +2587,9 @@ function showWorldPanel(worldId) {
 
   document.getElementById('panel-body').innerHTML = `
     <div>
-      <div class="panel-section-title">Setting</div>
+      <div class="panel-section-title">In one sentence</div>
       <div class="panel-text">${world.one_sentence || '—'}</div>
     </div>
-    ${sections ? `<div><div class="panel-section-title">Sections</div><div class="panel-muted">${sections}</div></div>` : ''}
     ${rules ? `<div>
       <div class="panel-section-title">Rules</div>
       ${rules}
@@ -2578,6 +2598,7 @@ function showWorldPanel(worldId) {
       <div class="panel-section-title">Plot threads</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${plotLinks}</div>
     </div>` : ''}
+    ${renderSectionsHtml('world', world.id)}
   `;
 
   document.getElementById('panel-footer').innerHTML = '';

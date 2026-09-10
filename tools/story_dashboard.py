@@ -16,6 +16,52 @@ SCHEMA = {
 }
 
 
+def _extract_sections(yaml_data, project_path):
+    """Extract section content from notes for dashboard injection.
+
+    Returns {entity_type: {slug: {section_name: section_content}}}.
+    Skips missing notes gracefully — dashboard still works without sections.
+    """
+    import frontmatter
+    from ..core.section_parser import get_section
+    from ..core.constants import ENTITY_FOLDERS
+
+    sections_dict = {}
+    # Index uses plural keys, but we normalise to singular for the frontend
+    PLURAL_TO_SINGULAR = {'characters': 'character', 'locations': 'location', 'worlds': 'world', 'plots': 'plot'}
+    for plural_key, singular_key in PLURAL_TO_SINGULAR.items():
+        folder = ENTITY_FOLDERS[singular_key]
+        entities = yaml_data.get(plural_key, [])
+        type_dict = {}
+        for entity in entities:
+            slug = entity.get("id")
+            if not slug or not entity.get("sections"):
+                continue
+            note_path = project_path / folder / f"{slug}.md"
+            if not note_path.exists():
+                continue
+            try:
+                post = frontmatter.load(note_path)
+                body = post.content
+                sec_dict = {}
+                for sec_name in entity["sections"]:
+                    content = get_section(body, sec_name)
+                    if content:
+                        # Strip "## Heading\n" prefix — keep body only
+                        if content.startswith("## "):
+                            nl = content.find("\n")
+                            if nl != -1:
+                                content = content[nl + 1:]
+                        sec_dict[sec_name] = content
+                if sec_dict:
+                    type_dict[slug] = sec_dict
+            except Exception:
+                continue  # Skip broken notes
+        if type_dict:
+            sections_dict[singular_key] = type_dict
+    return sections_dict
+
+
 def _compute_screenplay_stats(screenplay_text):
     """Compute screenplay statistics from fountain text using fountain_lexer.
 
@@ -256,6 +302,18 @@ def handler(args: dict, **kwargs) -> str:
         "// ─── Boot ─────────────────────────────────────────────────────────────────────",
         injection + "\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
     )
+
+    # Inject section content from notes — panels render on open
+    try:
+        sections_data = _extract_sections(yaml_data, project_path)
+        if sections_data:
+            sections_json = json.dumps(sections_data)
+            html = html.replace(
+                "// ─── Boot ─────────────────────────────────────────────────────────────────────",
+                f"window.__SECTIONS__ = {sections_json};\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
+            )
+    except Exception:
+        pass  # Dashboard still works without sections
 
     # Inject screenplay text the same way — fetch('file://') is blocked in Electron
     screenplay_path = project_path / "screenplay.fountain"

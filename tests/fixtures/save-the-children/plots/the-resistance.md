@@ -14,8 +14,14 @@ payoffs:
 
 ## Summary
 
+Kael's growing awareness of the system's wrongness becomes a quiet revolution. What begins as private questions becomes shared doubt, and shared doubt becomes organized resistance. The children must decide: accept the world as it is, or risk everything to find what's beyond the door.
 
 ## Obstacles
 
+- The Administrator controls every system — meals, light, access. Resistance means going without.
+- Not all children want to leave. Some prefer the certainty of the known to the terror of the unknown.
+- Kael's own doubt: what if the wrongness is in them, not the system?
 
 ## Stakes
+
+If they fail, the children remain in a dying system — safe but stagnant, alive but not living. If they succeed, they step into a world that was never designed for them, with no guarantee of survival. The door opens both ways.

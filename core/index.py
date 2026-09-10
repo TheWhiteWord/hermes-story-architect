@@ -112,8 +112,9 @@ def _parse_entities(folder: Path, entity_type: str) -> list[dict]:
 
 
 def _enrich_from_screenplay(index: dict) -> None:
-    """Update character scenes from screenplay data."""
+    """Update character and location scenes from screenplay data."""
     char_scenes = {c["id"]: [] for c in index["characters"]}
+    loc_scenes = {l["id"]: [] for l in index["locations"]}
     for scene in index.get("scenes", []):
         for char_id in scene["characters"]:
             if char_id in char_scenes:
@@ -121,9 +122,18 @@ def _enrich_from_screenplay(index: dict) -> None:
                     "number": scene["id"],
                     "heading": scene["heading"],
                 })
+        loc_id = scene.get("location", "")
+        if loc_id and loc_id in loc_scenes:
+            loc_scenes[loc_id].append({
+                "number": scene["id"],
+                "heading": scene["heading"],
+            })
     for char in index["characters"]:
         if char_scenes.get(char["id"]):
             char["scenes"] = char_scenes[char["id"]]
+    for loc in index["locations"]:
+        if loc_scenes.get(loc["id"]):
+            loc["scenes"] = loc_scenes[loc["id"]]
 
 
 def _validate_index(index: dict) -> None:
