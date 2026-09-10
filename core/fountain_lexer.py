@@ -659,13 +659,29 @@ def tokens_to_html(tokens):
         text = token.get('text', '')
         ignore = token.get('ignore', False)
 
+
         if t in ('action', 'centered') and not ignore:
+            # Strip emphasis markers and extract inline notes [[...]]
+            notes = REGEX['note_inline'].findall(text)
+            clean = REGEX['note_inline'].sub('', text)
+            clean = re.sub(r'_{1,3}|\*{1,3}', '', clean)
+            clean = clean.strip()
             classes = f'fountain-{t}'
-            if not isaction:
-                html.append(f'<p><span class="{classes}">{text}</span>')
+            if notes:
+                # Render action text, then notes after
+                if not isaction:
+                    html.append(f'<p><span class="{classes}">{clean}</span>')
+                else:
+                    html.append(f'<span class="{classes}">{clean}</span>')
+                isaction = True
+                for note in notes:
+                    html.append(f'<p class="fountain-note">{note.strip()}</p>')
             else:
-                html.append(f'<span class="{classes}">{text}</span>')
-            isaction = True
+                if not isaction:
+                    html.append(f'<p><span class="{classes}">{clean}</span>')
+                else:
+                    html.append(f'<span class="{classes}">{clean}</span>')
+                isaction = True
         elif t == 'separator' and isaction:
             html.append('</p>')
             isaction = False

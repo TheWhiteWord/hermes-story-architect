@@ -164,6 +164,11 @@ def _compute_screenplay_stats(screenplay_text):
 
     # ── Title page ──
     title_page = parsed.get('title_page', {'tl': [], 'tc': [], 'tr': [], 'cc': [], 'bl': [], 'br': []})
+    # Strip emphasis markers from title page token text
+    for pos in title_page:
+        for tok in title_page[pos]:
+            if isinstance(tok, dict) and tok.get('text'):
+                tok['text'] = re.sub(r'\*{1,3}|_{1,3}', '', tok['text'])
 
     # ── Pre-rendered HTML ──
     # Filter out title page custom field tokens (tl:, tc:, etc.) — they appear
