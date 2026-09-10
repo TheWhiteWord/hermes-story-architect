@@ -2456,6 +2456,14 @@ function showLocationPanel(locId) {
     return `<span class="tag tag-scene">${ref}</span>`;
   }).join('');
 
+  // Find scenes that reference this location for "Appears in" section
+  const appearScenes = (story.scenes || []).filter(s => s.location === loc.id);
+  const appearsIn = appearScenes.map(s => {
+    const num = s.number != null ? String(s.number) : '';
+    const label = num ? `${num}. ${s.heading || s.id}` : (s.heading || s.id);
+    return `<span class="tag tag-scene" style="cursor:pointer" onclick="showScenePanel('${s.id}')">${label}</span>`;
+  }).join('');
+
   // Characters in this location (via their scenes)
   const charIds = new Set();
   sceneRefs.forEach(ref => {
@@ -2476,9 +2484,9 @@ function showLocationPanel(locId) {
       <div class="panel-section-title">Characters here</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
     </div>` : ''}
-    ${scenes ? `<div>
+    ${appearsIn ? `<div>
       <div class="panel-section-title">Appears in</div>
-      <div class="panel-tags">${scenes}</div>
+      <div class="panel-tags">${appearsIn}</div>
     </div>` : ''}
     ${renderSectionsHtml('location', loc.id)}
   `;
