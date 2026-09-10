@@ -797,12 +797,14 @@ html, body {
   flex: 1;
   overflow-y: auto;
   background: var(--card);
+  display: flex;
+  justify-content: center;
 }
 
 /* Screenplay document wrapper — structural only, fountain classes come from screenplay.css */
 .screenplay-doc {
   max-width: 680px;
-  margin: 0 auto;
+  width: 100%;
   padding: 24px 40px 60px;
 }
 
@@ -1272,39 +1274,39 @@ html, body {
       </div>
     </div>
 
-  </main>
-
-  <!-- Script View -->
-  <div class="view" id="script-view">
-    <div class="view-header">
-      <div class="view-title">Script</div>
-      <div class="view-subtitle" id="script-subtitle">—</div>
-      <div class="view-header-actions">
-        <button class="btn btn-hermes" onclick="openStatsPanel()">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <rect x="1" y="7" width="2" height="4" rx="0.5" fill="currentColor"/>
-            <rect x="5" y="4" width="2" height="7" rx="0.5" fill="currentColor"/>
-            <rect x="9" y="1" width="2" height="10" rx="0.5" fill="currentColor"/>
-          </svg>
-          Statistics
-        </button>
+    <!-- Script View -->
+    <div class="view" id="script-view">
+      <div class="view-header">
+        <div class="view-title">Script</div>
+        <div class="view-subtitle" id="script-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn btn-hermes" onclick="openStatsPanel()">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="7" width="2" height="4" rx="0.5" fill="currentColor"/>
+              <rect x="5" y="4" width="2" height="7" rx="0.5" fill="currentColor"/>
+              <rect x="9" y="1" width="2" height="10" rx="0.5" fill="currentColor"/>
+            </svg>
+            Statistics
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="view-body">
-      <div id="screenplay-container">
-        <div class="script-empty">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <rect x="6" y="3" width="20" height="26" rx="2" stroke="currentColor" stroke-width="1.5"/>
-            <line x1="10" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="1.2"/>
-            <line x1="10" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.2"/>
-            <line x1="10" y1="18" x2="18" y2="18" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          <div>No screenplay loaded</div>
-          <div style="font-size:var(--font-size-xs);opacity:0.6">Ensure <code>window.__SCREENPLAY_TEXT__</code> is injected by the backend</div>
+      <div class="view-body">
+        <div id="screenplay-container">
+          <div class="script-empty">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <rect x="6" y="3" width="20" height="26" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="10" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="10" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="10" y1="18" x2="18" y2="18" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            <div>No screenplay loaded</div>
+            <div style="font-size:var(--font-size-xs);opacity:0.6">Ensure <code>window.__SCREENPLAY_TEXT__</code> is injected by the backend</div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+
+  </main>
 
   <!-- Statistics Panel (separate aside — entity panels remain independent) -->
   <aside id="stats-panel">
