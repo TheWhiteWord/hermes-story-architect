@@ -133,6 +133,25 @@ scenes:
 | `payoffs` | object[] | Beats where plot resolves: `scene` (heading) + `number` (id) + `description` |
 | `sections` | string[] | Available `##` headings |
 
+#### Plot Beat Format
+
+> **Note frontmatter** uses `{number, heading, description}`. The index normalizes
+> `heading` → `scene` but keeps both `number` and `description`.
+
+```yaml
+# In plot note frontmatter:
+setups:
+  - number: 2
+    heading: INT. CENTRAL ROOM - DAY
+    description: What happens at this beat
+
+# In index.yaml (normalized):
+setups:
+  - scene: INT. CENTRAL ROOM - DAY
+    number: 2
+    description: What happens at this beat
+```
+
 ### Scene
 > **Derived from screenplay** — scenes are extracted from `screenplay.fountain`, not from notes. No scene notes exist.
 
