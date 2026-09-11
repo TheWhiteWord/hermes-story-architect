@@ -38,20 +38,21 @@ Same as story-loader: create folder + run `story_index`. Then use `story_create`
 
 ## Entity Frontmatter
 
-When creating or editing entities (characters, locations, worlds, plots), the
-frontmatter must follow the expected schema so the index generator and dashboard
-can process them correctly.
+When creating or editing entities, `story_create` auto-fills all expected fields with empty
+defaults — so a new character with only `name` still gets `relationships`, `goals_short`, etc.
 
-For complete field descriptions and YAML examples, see the shared reference:
-`references/index-format.md`.
+Load `references/index-format.md` when you need:
+- The full list of fields for an entity type
+- Sub-field structure (e.g. plot setups/payoffs use `{heading, number, description}`)
+- To understand which fields are **frontmatter** (LLM-editable) vs **code** (derived)
 
 ### Quick Reference
 | Entity | Key Frontmatter Fields |
 | --- | --- |
-| Character | `name`, `role` (Protagonist/Antagonist/Supporting/Minor/Cameo), `one_sentence`, `sections`, `related` (id + feeling), `goals_short`, `goals_long`, `knowledge` |
-| Location | `name`, `one_sentence`, `sections`, `scenes` (number + heading) |
-| World | `name`, `one_sentence`, `sections`, `rules` |
-| Plot | `name`, `status` (active/resolved/abandoned), `setups[]` (number, heading, description), `payoffs[]` (number, heading, description), `characters`, `sections`, `one_sentence` |
+| Character | `name`, `story_role`, `one_sentence`, `relationships` ({id, label, feeling}), `goals_short`, `goals_long`, `knowledge` |
+| Location | `name`, `one_sentence` |
+| World | `name`, `one_sentence`, `rules` |
+| Plot | `name`, `status`, `setups` ({heading, number, description}), `payoffs` ({heading, number, description}), `characters`, `one_sentence` |
 ## Quick Reference
 | Action | Tool | Core Module |
 |--------|------|-------------|

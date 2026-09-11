@@ -66,7 +66,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - Index: `.story/index.yaml` (always-loaded graph)
 - Memory: `.story/memory.md` (continuity map)
 - Match: fuzzy on slug + name, threshold 40
-- Schema: `references/index-format.md` (full field descriptions)
+- 
 
 ## Pitfalls
 
@@ -74,7 +74,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - **Missing index**: run `story_index` first, then retry
 - **Malformed index**: warn but continue with valid sections
 - **No memory file**: not required; skip if absent
-- **Schema drift**: when creating/editing entities, always check `references/index-format.md` for the expected frontmatter
+- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only when you need the full field list or sub-field structure (e.g. plot setups/payoffs need `{heading, number, description}`).
 
 ## Verification
 
