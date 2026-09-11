@@ -83,13 +83,14 @@ one_sentence: <Single sentence description>
 
 ## Plot
 
-### Current frontmatter
+### Current frontmatter (updated)
 ```yaml
 name: <Plot Name>
 one_sentence: <Single sentence description>
 status: <active|resolved|abandoned>
+characters: [<char-slug>, ...]    # who drives the plot (frontmatter-only)
 setups:
-  - number: <scene number>    # stored as string in notes
+  - number: <scene number>
     heading: <scene heading>
     description: <what happens>
 payoffs:
@@ -104,18 +105,19 @@ payoffs:
 | `name` | ✅ | ✅ | — | ✅ | OK |
 | `one_sentence` | ✅ | ✅ | — | ✅ | OK |
 | `status` | ✅ | ✅ | ✅ validated | — | OK |
-| `setups` | object[] | ✅ | ✅ enriches descriptions | ✅ normalizes from `[{scene, desc}]` | **KEY MISMATCH**: dashboard expects `scene`, notes have `heading` |
-| `payoffs` | object[] | ✅ | ✅ enriches descriptions | ✅ same issue | **KEY MISMATCH** |
-| `characters` | `string[]` | ❌ | ❌ not enriched | — | **MISSING** |
+| `setups` | object[] | ✅ | ✅ `_normalize_beat` → `{scene, description}` | ✅ | **FIXED**: backend maps `heading`→`scene` so dashboard gets plain strings |
+| `payoffs` | object[] | ✅ | ✅ same as setups | ✅ | **FIXED** |
+| `characters` | `string[]` | ✅ | ✅ preserved from frontmatter | ✅ renders as tags | **FIXED**: frontmatter-only, not derived from scenes |
 
-### Naming issues
-1. **`heading` vs `scene` in setups/payoffs**: Dashboard line 1676 normalizes `setups` from `[{scene, description}]` format. But notes store `{number, heading, description}`. The dashboard's hardcoded demo data (line 1595) uses `scene` as the key. **The `scene` key in dashboard should be renamed to `heading`** to match notes, OR notes should use `scene`. Since `heading` is more descriptive and matches the screenplay convention, **rename dashboard's `scene` → `heading`**.
-2. **`number` type**: Notes store `number: '2'` (string). Design implies numeric. **Enforce numeric in frontmatter and dashboard** (or explicitly string — but design says `number`).
-3. **`characters` missing**: Design expects `characters: string[]` for plots. No code populates it. The index generator has no `_enrich_plot_characters()`. Either populate it from screenplay analysis or remove from design.
+### Naming issues (resolved)
+1. ~~**`heading` vs `scene`**~~ — **FIXED**. Backend `_normalize_beat` maps note `heading` to dashboard's `scene` key. Dashboard no longer aliases `_setup_objs`/`_payoff_objs`. One consistent shape: `{scene: <heading>, description: <text>}`.
+2. **`number` type** — Notes store `number: '2'` (string). Design implies numeric. *Cosmetic — left as-is, not causing complexity.*
+3. ~~**`characters` missing**~~ — **FIXED**. `characters` added to plot frontmatter. `_enrich_plots` no longer derives characters from screenplay scenes (scenes may have passersby not involved in the plot). Frontmatter is the single source of truth.
 
 ### Critical fields
 - `status` — validated, used by dashboard filter
 - `setups`/`payoffs` — core plot structure, dashboard renders as beat board
+- `characters` — who drives the plot, rendered as tags on plot cards
 - `one_sentence` — required, displayed in dashboard
 
 ---
@@ -156,16 +158,16 @@ status: <active|abandoned|archived>  # not in design
 
 ## Summary of Required Fixes
 
-| # | Issue | Where | Action |
-|---|-------|-------|--------|
-| 1 | `story_role` vs `role` | Design doc | Design: rename `role` → `story_role` (match code) |
-| 2 | `related` vs `relationships` | Dashboard JS | Dashboard: rename `relationships` → `related` (match design) |
-| 3 | `goals` missing from notes | Notes | Add `goals_short`, `goals_long` to character frontmatter |
-| 4 | `knowledge` missing from notes | Notes | Add `knowledge: string[]` to character frontmatter |
-| 5 | `related` missing from notes | Notes | Add `related: [{id, label, feeling}]` to character frontmatter |
-| 6 | `setups`/`payoffs` key `scene` vs `heading` | Dashboard JS | Dashboard: rename `scene` → `heading` in setup/payoff normalization |
-| 7 | `number` type in setups/payoffs | Notes + dashboard | Enforce numeric type (or string-escape, but be consistent) |
-| 8 | `characters` missing from plots | Notes + index.py | Add `characters: string[]` to plot frontmatter; enrich in `_enrich_plots()` |
-| 9 | `rules` missing from worlds | Notes | Add `rules: string[]` to world frontmatter |
-| 10 | `location_count` extra in index | index.py | Remove or document in design |
-| 11 | `age` in dashboard demo | Dashboard HTML | Remove (undocumented) |
+| # | Issue | Where | Action | Status |
+|---|-------|-------|--------|--------|
+| 1 | `story_role` vs `role` | Design doc | Design: rename `role` → `story_role` (match code) | ⏳ pending |
+| 2 | `related` vs `relationships` | Dashboard JS | Dashboard: rename `relationships` → `related` (match design) | ⏳ pending |
+| 3 | `goals` missing from notes | Notes | Add `goals_short`, `goals_long` to character frontmatter | ⏳ pending |
+| 4 | `knowledge` missing from notes | Notes | Add `knowledge: string[]` to character frontmatter | ⏳ pending |
+| 5 | `related` missing from notes | Notes | Add `related: [{id, label, feeling}]` to character frontmatter | ⏳ pending |
+| 6 | `setups`/`payoffs` key `scene` vs `heading` | Dashboard JS | Backend `_normalize_beat` maps `heading`→`scene`; dashboard reads plain strings | ✅ **FIXED** |
+| 7 | `number` type in setups/payoffs | Notes + dashboard | Enforce numeric type (or string-escape, but be consistent) | ⏳ cosmetic, left as-is |
+| 8 | `characters` missing from plots | Notes + index.py | `characters` added to frontmatter; preserved as-is from frontmatter | ✅ **FIXED** |
+| 9 | `rules` missing from worlds | Notes | Add `rules: string[]` to world frontmatter | ⏳ pending |
+| 10 | `location_count` extra in index | index.py | Remove or document in design | ⏳ pending |
+| 11 | `age` in dashboard demo | Dashboard HTML | Remove (undocumented) | ⏳ pending |
