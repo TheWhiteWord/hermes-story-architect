@@ -2,6 +2,11 @@
 
 > Full YAML schema for `.story/index.yaml` — the always-loaded project graph.
 > Field names match the code exactly. Descriptions are minimal.
+>
+> **Source column:**
+> - **frontmatter** — LLM domain. Can be set/edited via `story_create` or `story_edit`.
+> - **code** — Derived/calculated by the index generator or screenplay analysis. Do not modify directly.
+> - **filename** — Pre-established from the note's filename. Do not modify.
 
 ---
 
@@ -76,76 +81,76 @@ scenes:
 ## Field Descriptions
 
 ### Project
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Slug (from folder name) |
-| `name` | string | Display name |
-| `logline` | string | One-sentence summary |
-| `genre` | string | Story genre |
-| `setting` | string | Primary setting |
-| `status` | string | active/abandoned/archived |
-| `sections` | string[] | Available `##` headings |
-| `scene_count` | number | Derived from screenplay |
-| `character_count` | number | Derived from notes |
-| `location_count` | number | Derived from notes |
-| `world_count` | number | Derived from notes |
-| `plot_count` | number | Derived from notes |
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Slug (from folder name) | filename |
+| `name` | string | Display name | frontmatter |
+| `logline` | string | One-sentence summary | frontmatter |
+| `genre` | string | Story genre | frontmatter |
+| `setting` | string | Primary setting | frontmatter |
+| `status` | string | One of: active, abandoned, archived | frontmatter |
+| `sections` | string[] | Available `##` headings | code |
+| `scene_count` | number | Total scenes | code |
+| `character_count` | number | Total characters | code |
+| `location_count` | number | Total locations | code |
+| `world_count` | number | Total worlds | code |
+| `plot_count` | number | Total plots | code |
 
 ### Character
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Slug (from filename) |
-| `name` | string | Display name |
-| `story_role` | string | Protagonist/Antagonist/Supporting/Minor/Cameo |
-| `one_sentence` | string | Index label |
-| `sections` | string[] | Available `##` headings |
-| `scenes` | object[] | Scene references: `number` + `heading` |
-| `relationships` | object[] | Relationships: `id` + `label` + `feeling` |
-| `goals_short` | string | Short-term goal |
-| `goals_long` | string | Long-term goal |
-| `knowledge` | string[] | Facts the character knows |
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Slug (from filename) | filename |
+| `name` | string | Display name | frontmatter |
+| `story_role` | string | One of: Protagonist, Antagonist, Supporting, Minor, Cameo | frontmatter |
+| `one_sentence` | string | One-sentence summary for index label | frontmatter |
+| `sections` | string[] | Available `##` headings | code |
+| `scenes` | object[] | Scene references: `number` + `heading` | code |
+| `relationships` | object[] | Unidirectional. Each: {id, label, feeling} | frontmatter |
+| `goals_short` | string | Short-term goal | frontmatter |
+| `goals_long` | string | Long-term goal | frontmatter |
+| `knowledge` | string[] | Facts the character knows | frontmatter |
 
 ### Location
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Slug |
-| `name` | string | Display name |
-| `one_sentence` | string | Index label |
-| `sections` | string[] | Available `##` headings |
-| `scenes` | object[] | Scene references: `number` + `heading` |
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Slug (from filename) | filename |
+| `name` | string | Display name | frontmatter |
+| `one_sentence` | string | One-sentence summary for index label | frontmatter |
+| `sections` | string[] | Available `##` headings | code |
+| `scenes` | object[] | Scene references: `number` + `heading` | code |
 
 ### World
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Slug |
-| `name` | string | Display name |
-| `one_sentence` | string | Index label |
-| `sections` | string[] | Available `##` headings |
-| `rules` | string[] | World rules (from frontmatter) |
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Slug (from filename) | filename |
+| `name` | string | Display name | frontmatter |
+| `one_sentence` | string | One-sentence summary for index label | frontmatter |
+| `sections` | string[] | Available `##` headings | code |
+| `rules` | string[] | World rules | frontmatter |
 
 ### Plot
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Slug |
-| `name` | string | Display name |
-| `one_sentence` | string | Index label |
-| `status` | string | active/resolved/abandoned |
-| `characters` | string[] | Character slugs (frontmatter-only) |
-| `setups` | object[] | Scenes where plot is established: `heading` + `number` (id) + `description` |
-| `payoffs` | object[] | Scenes where plot resolves: `heading` + `number` (id) + `description` |
-| `sections` | string[] | Available `##` headings |
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Slug (from filename) | filename |
+| `name` | string | Display name | frontmatter |
+| `one_sentence` | string | One-sentence summary for index label | frontmatter |
+| `status` | string | One of: active, resolved, abandoned | frontmatter |
+| `characters` | string[] | Character slugs (frontmatter-only) | frontmatter |
+| `setups` | object[] | Scenes where plot is established: `heading` + `number` (id) + `description` | frontmatter |
+| `payoffs` | object[] | Scenes where plot resolves: `heading` + `number` (id) + `description` | frontmatter |
+| `sections` | string[] | Available `##` headings | code |
 
 ### Scene
 > **Derived from screenplay** — scenes are extracted from `screenplay.fountain`, not from notes. No scene notes exist.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | number | Sequential (regenerated on each index update) |
-| `heading` | string | Fountain heading |
-| `number` | number | Sequential (from screenplay order) |
-| `characters` | string[] | Character slugs (matched from screenplay) |
-| `location` | string | Location slug (matched from screenplay) |
-| `plots` | string[] | Plot slugs (from plot setups/payoffs referencing this scene) |
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | number | Sequential (regenerated on each index update) | code |
+| `heading` | string | Fountain heading | code |
+| `number` | number | Sequential (from screenplay order) | code |
+| `characters` | string[] | Character slugs (matched from screenplay) | code |
+| `location` | string | Location slug (matched from screenplay) | code |
+| `plots` | string[] | Plot slugs (from plot setups/payoffs reverse lookup) | code |
 
 ---
 
