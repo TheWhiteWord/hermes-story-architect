@@ -1,9 +1,16 @@
 """Hermes Story Architect — plugin entry point."""
 import json
+import sys
 from pathlib import Path
+
+# Ensure repo root is on sys.path so core/ and tools/ are importable
+_REPO_ROOT = Path(__file__).parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from core.config import load_plugin_config
 
-_SKILL_DIR = Path(__file__).parent / "skills"
+_SKILL_DIR = _REPO_ROOT / "skills"
 
 
 def _requirements_met() -> bool:
