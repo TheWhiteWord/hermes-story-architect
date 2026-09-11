@@ -86,11 +86,11 @@ def _enrich_relationships(index: dict) -> None:
 
 
 def _enrich_plots(index: dict) -> None:
-    """Normalize plot setups/payoffs to {scene: heading, description: text}.
+    """Normalize plot setups/payoffs to {heading, number, description}.
     plot.characters is frontmatter-only — scenes may contain passersby."""
     for plot in index.get("plots", []):
-        plot["setups"] = [_normalize_beat(s) for s in plot.get("setups", [])]
-        plot["payoffs"] = [_normalize_beat(p) for p in plot.get("payoffs", [])]
+        plot["setups"] = [_normalize_plot_beat(s) for s in plot.get("setups", [])]
+        plot["payoffs"] = [_normalize_plot_beat(p) for p in plot.get("payoffs", [])]
         if "characters" not in plot:
             plot["characters"] = []
 
@@ -108,7 +108,7 @@ def _enrich_scenes_with_plots(index: dict) -> None:
                     scene["plots"].append(plot["id"])
 
 
-def _normalize_beat(beat):
+def _normalize_plot_beat(beat):
     """Pass through {heading, number, description} from note frontmatter."""
     if isinstance(beat, dict):
         number = beat.get("number")
