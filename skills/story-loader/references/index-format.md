@@ -129,8 +129,8 @@ scenes:
 | `one_sentence` | string | Index label |
 | `status` | string | active/resolved/abandoned |
 | `characters` | string[] | Character slugs (frontmatter-only) |
-| `setups` | object[] | Beats where plot is established: `scene` (heading) + `description` |
-| `payoffs` | object[] | Beats where plot resolves: `scene` (heading) + `description` |
+| `setups` | object[] | Beats where plot is established: `scene` (heading) + `number` (id) + `description` |
+| `payoffs` | object[] | Beats where plot resolves: `scene` (heading) + `number` (id) + `description` |
 | `sections` | string[] | Available `##` headings |
 
 ### Scene

@@ -109,11 +109,17 @@ def _enrich_scenes_with_plots(index: dict) -> None:
 
 
 def _normalize_beat(beat):
-    """Extract {scene, description} from note format {number, heading, description}."""
+    """Extract {scene, number, description} from note format {number, heading, description}."""
     if isinstance(beat, dict):
         heading = beat.get("heading") or beat.get("scene") or ""
-        return {"scene": str(heading), "description": beat.get("description", "")}
-    return {"scene": str(beat), "description": ""}
+        number = beat.get("number")
+        if number is not None:
+            try:
+                number = int(number)
+            except (ValueError, TypeError):
+                number = None
+        return {"scene": str(heading), "number": number, "description": beat.get("description", "")}
+    return {"scene": str(beat), "number": None, "description": ""}
 
 
 def _parse_entities(folder: Path, entity_type: str) -> list[dict]:
