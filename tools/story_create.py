@@ -32,6 +32,17 @@ def _build_schema() -> dict:
             field_schema["default"] = info["default"]
         if not info.get("optional", True):
             field_schema["required"] = True
+        # For list types with sub-fields (setups, payoffs), document items structure
+        if info["type"] == "list" and field in ("setups", "payoffs"):
+            field_schema["items"] = {
+                "type": "object",
+                "description": "Scene reference with heading, scene number (id), and description of what happens",
+                "properties": {
+                    "heading": {"type": "string", "description": "Fountain scene heading (e.g. INT. SERVER ROOM - NIGHT)"},
+                    "number": {"type": "number", "description": "Sequential scene id (1, 2, 3...)"},
+                    "description": {"type": "string", "description": "What happens at this scene"},
+                },
+            }
         frontmatter_props[field] = field_schema
 
     return {
@@ -115,8 +126,12 @@ def handler(args: dict, **kwargs) -> str:
         index_path = project_path / ".story" / "index.yaml"
         index = generate_index(project_path)
         write_index(index, index_path)
-    except Exception:
-        pass
+    except Exception as e:
+        return json.dumps({
+            "success": True,
+            "message": f"Created {entity_type}: {slug} (index refresh failed: {e})",
+            "file": str(file_path)
+        })
 
     return json.dumps({
         "success": True,
