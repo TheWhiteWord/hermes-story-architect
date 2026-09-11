@@ -126,6 +126,7 @@ def handler(args: dict, **kwargs) -> str:
     try:
         from core.index import generate_index, write_index
         index_path = project_path / ".story" / "index.yaml"
+        index_path.parent.mkdir(exist_ok=True)
         index = generate_index(project_path)
         write_index(index, index_path)
     except Exception as e:
