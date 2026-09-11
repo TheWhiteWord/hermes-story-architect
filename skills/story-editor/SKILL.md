@@ -1,7 +1,7 @@
 ---
 name: story-editor
 description: "Edit story entities, screenplay, and memory with review loop."
-version: 0.1.0
+version: 0.2.0
 author: TWW, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -32,58 +32,63 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 - Index in context
 - Relevant sections retrieved (story_retrieve)
 
-## Creating a New Project
+## Tools Available
 
-Same as story-loader: create folder + run `story_index`. Then use `story_create` for entities.
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `story_retrieve` | Get specific sections from a note | `entity_type`, `slug`, `sections` (list of section names, or `['all']`) |
+| `story_edit` | Propose and apply edits | `action`, `target`, `changes`, `summary` |
+| `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
+| `story_index` | Regenerate the project index | `project` |
+| `story_search` | Search across all project notes | `query` |
+| `story_dashboard` | Open the dashboard in preview | `project` |
 
-## Entity Frontmatter
+### story_edit Actions
 
-When creating or editing entities, `story_create` auto-fills all expected fields with empty
-defaults — so a new character with only `name` still gets `relationships`, `goals_short`, etc.
+| Action | What it does |
+|--------|--------------|
+| `edit_note` | Edit an entity note's frontmatter or body sections |
+| `edit_screenplay` | Edit the screenplay.fountain file |
+| `create_entity` | Create a new entity note |
+| `delete_entity` | Move entity to `_recycle-bin/` |
+| `update_story_memory` | Update `.story/memory.md` |
 
-Load `references/index-format.md` when you need:
-- The full list of fields for an entity type
-- Sub-field structure (e.g. plot setups/payoffs use `{heading, number, description}`)
-- To understand which fields are **frontmatter** (LLM-editable) vs **code** (derived)
+### story_edit Changes Shape
 
-### Quick Reference
+For `edit_note`, each change object has:
+- `type`: `"body_section"` or `"frontmatter"`
+- For `"body_section"`: `section` (name), `new` (content)
+- For `"frontmatter"`: `field` (name), `value` (new value)
+
+## Procedure
+
+1. **Understand** — what entity, what change
+2. **Retrieve** — get relevant sections via `story_retrieve`
+3. **Formulate** — build the edit (action type + changes + continuity checks)
+4. **Present** — show the proposed edit in chat, wait for approval
+5. **Apply** — call `story_edit` on approval
+6. **Index** — call `story_index` to regenerate the index
+7. **Confirm** — report what changed
+
+## Entity Creation
+
+When creating entities, `story_create` auto-fills all expected fields with empty
+defaults. A character with only `name` still gets `relationships`, `goals_short`, etc.
+
+The tool schema documents each field's type and description. Load
+`references/index-format.md` only if you need:
+- The full field list for an entity type
+- Sub-field structure (plot setups/payoffs use `{heading, number, description}`)
+- To distinguish **frontmatter** (LLM-editable) vs **code** (derived) fields
+
+### Entity Quick Reference
+
 | Entity | Key Frontmatter Fields |
 | --- | --- |
 | Character | `name`, `story_role`, `one_sentence`, `relationships` ({id, label, feeling}), `goals_short`, `goals_long`, `knowledge` |
 | Location | `name`, `one_sentence` |
 | World | `name`, `one_sentence`, `rules` |
 | Plot | `name`, `status`, `setups` ({heading, number, description}), `payoffs` ({heading, number, description}), `characters`, `one_sentence` |
-## Quick Reference
-| Action | Tool | Core Module |
-|--------|------|-------------|
-| Edit entity | story_edit (action: edit_note) | section_parser, entity |
-| Edit screenplay | story_edit (action: edit_screenplay) | screenplay (Parser/Writer) |
-| Create entity | story_create | entity, frontmatter |
-| Delete entity | story_edit (action: delete_entity) | entity |
-| Update memory | story_edit (action: update_story_memory) | screenplay, entity |
-
-## Procedure
-
-1. Understand the request (what entity, what change)
-2. Retrieve relevant sections (story_retrieve)
-3. Formulate proposal (action type + changes + continuity checks)
-4. Present for approval (formatted in chat)
-5. On approval: apply edit via core modules
-6. Update index (story_index)
-7. Confirm changes to user
-
-## Action Types
-
-Five action types: edit_note, edit_screenplay, create_entity, delete_entity, update_story_memory.
-
-For detailed procedures, see `references/action-types.md`.
-
-## Fountain Format
-
-When writing or editing screenplays, follow Fountain syntax conventions so
-the screenplay parses correctly and renders properly in the dashboard.
-
-For complete formatting rules, see `references/screenplay-format.md`.
 
 ## Continuity Checks
 

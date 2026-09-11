@@ -1,7 +1,7 @@
 ---
 name: story-loader
 description: "Load a story project's index and memory into context. Also use to start new projects."
-version: 0.1.0
+version: 0.2.0
 author: TWW, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -32,6 +32,15 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - Project exists at `<vault>/projects/<slug>/`
 - Index generated (`.story/index.yaml`) — run `story_index` if missing
 
+## Tools Available
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `story_load` | Load project index and memory | `project` (slug or name) |
+| `story_index` | Regenerate the project index | `project` |
+| `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
+| `story_dashboard` | Open the dashboard in preview | `project` |
+
 ## Creating a New Project
 
 1. Create the project folder: `mkdir -p <vault>/projects/<slug>/`
@@ -44,17 +53,17 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 
 ## Procedure
 
-1. **Resolve project**: match user input to a project folder
+1. **Resolve project** — match user input to a project folder
    - Try exact slug match first: `<vault>/projects/<input>/`
    - Try fuzzy match on slug + project name (rapidfuzz, threshold 40)
    - If multiple matches: list them, ask user to pick
    - If no match: suggest similar, then list all available projects
 
-2. **Read index**: `read_file(<project>/.story/index.yaml)` into context
+2. **Read index** — `read_file(<project>/.story/index.yaml)` into context
 
-3. **Read memory**: `read_file(<project>/.story/memory.md)` into context
+3. **Read memory** — `read_file(<project>/.story/memory.md)` into context
 
-4. **Confirm**: report loaded project:
+4. **Confirm** — report loaded project:
    ```
    Loaded <name> — <scenes> scenes, <characters> characters, <locations> locations, <plots> plots.
    Logline: <logline>
@@ -66,7 +75,6 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - Index: `.story/index.yaml` (always-loaded graph)
 - Memory: `.story/memory.md` (continuity map)
 - Match: fuzzy on slug + name, threshold 40
-- 
 
 ## Pitfalls
 
@@ -74,7 +82,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - **Missing index**: run `story_index` first, then retry
 - **Malformed index**: warn but continue with valid sections
 - **No memory file**: not required; skip if absent
-- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only when you need the full field list or sub-field structure (e.g. plot setups/payoffs need `{heading, number, description}`).
+- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only if you need the full field list or sub-field structure (e.g. plot setups/payoffs need `{heading, number, description}`)
 
 ## Verification
 
