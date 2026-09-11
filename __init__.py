@@ -94,16 +94,23 @@ def register(ctx) -> None:
         emoji="📊",
     )
 
-    # Auto-open preview pane when story_dashboard succeeds
-    def auto_open_dashboard(*, tool_name, result, **kwargs):
-        if tool_name != "story_dashboard":
+    # Auto-refresh dashboard after any data-modifying action
+    def auto_refresh_dashboard(*, tool_name, result, **kwargs):
+        if tool_name not in ("story_dashboard", "story_edit", "story_create", "story_index"):
             return
         try:
             data = json.loads(result)
-            url = data.get("dashboard_url")
-            if url:
-                ctx.dispatch_tool("desktop_preview", {"action": "open", "url": url})
+            # For story_dashboard, just open the existing URL
+            if tool_name == "story_dashboard":
+                url = data.get("dashboard_url")
+                if url:
+                    ctx.dispatch_tool("desktop_preview", {"action": "open", "url": url})
+            # For data-modifying tools, regenerate dashboard then open
+            elif data.get("success") and "error" not in data:
+                project = kwargs.get("args", {}).get("project", "")
+                if project:
+                    ctx.dispatch_tool("story_dashboard", {"project": project})
         except Exception:
             pass
 
-    ctx.register_hook("post_tool_call", auto_open_dashboard)
+    ctx.register_hook("post_tool_call", auto_refresh_dashboard)
