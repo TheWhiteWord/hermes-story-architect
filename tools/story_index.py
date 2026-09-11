@@ -1,7 +1,7 @@
 """story_index tool — regenerate project index."""
 import json
 from pathlib import Path
-from ..core.index import generate_index, write_index
+from core.index import generate_index, write_index
 
 SCHEMA = {
     "type": "object",
@@ -17,8 +17,8 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Regenerate project index."""
-    from .. import load_plugin_config
-    from .story_resolve import resolve_project
+    from core.config import load_plugin_config
+    from tools.story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()

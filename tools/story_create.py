@@ -1,7 +1,7 @@
 """story_create tool — create new entities."""
 import json
 from pathlib import Path
-from ..core.constants import ENTITY_FOLDERS, REQUIRED_FIELDS
+from core.constants import ENTITY_FOLDERS, REQUIRED_FIELDS, ENTITY_SCHEMAS
 
 SCHEMA = {
     "type": "object",
@@ -26,8 +26,8 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Create new entity note."""
-    from .. import load_plugin_config
-    from .story_resolve import resolve_project
+    from core.config import load_plugin_config
+    from tools.story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
@@ -52,9 +52,11 @@ def handler(args: dict, **kwargs) -> str:
     if file_path.exists():
         return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
     
-    # Generate frontmatter
+    # Generate frontmatter — merge over schema defaults so all fields are present
     import frontmatter
-    post = frontmatter.Post("", **frontmatter_data)
+    schema = ENTITY_SCHEMAS.get(entity_type, {})
+    merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+    post = frontmatter.Post("", **merged)
     
     # Add standard sections based on entity type
     sections = _get_standard_sections(entity_type)
@@ -70,7 +72,7 @@ def handler(args: dict, **kwargs) -> str:
 
     # Refresh index so story_load reflects changes immediately
     try:
-        from ..core.index import generate_index, write_index
+        from core.index import generate_index, write_index
         index_path = project_path / ".story" / "index.yaml"
         index = generate_index(project_path)
         write_index(index, index_path)

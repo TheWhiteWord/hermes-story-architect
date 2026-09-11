@@ -1,6 +1,6 @@
 """story_load tool — load a project's index and memory into context."""
 from pathlib import Path
-from ..core.index import generate_index
+from core.index import generate_index
 
 SCHEMA = {
     "type": "object",
@@ -17,9 +17,9 @@ SCHEMA = {
 def handler(args: dict, **kwargs) -> str:
     """Load project index and memory into context."""
     import json
-    from .. import load_plugin_config
+    from core.config import load_plugin_config
     from rapidfuzz import fuzz, process
-    from .story_resolve import resolve_project
+    from tools.story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()

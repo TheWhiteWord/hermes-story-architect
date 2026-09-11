@@ -1,7 +1,7 @@
 """Project resolution — fuzzy match user input to project folder."""
 from pathlib import Path
 from rapidfuzz import fuzz, process
-from ..core.constants import FUZZY_THRESHOLD
+from core.constants import FUZZY_THRESHOLD
 
 
 def resolve_project(user_input: str, vault_path: Path) -> Path:

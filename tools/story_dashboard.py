@@ -23,8 +23,8 @@ def _extract_sections(yaml_data, project_path):
     Skips missing notes gracefully — dashboard still works without sections.
     """
     import frontmatter
-    from ..core.section_parser import get_section
-    from ..core.constants import ENTITY_FOLDERS
+    from core.section_parser import get_section
+    from core.constants import ENTITY_FOLDERS
 
     sections_dict = {}
     # Index uses plural keys, but we normalise to singular for the frontend
@@ -69,7 +69,7 @@ def _compute_screenplay_stats(screenplay_text):
     Returns None on any error — dashboard still works without stats.
     """
     try:
-        from ..core.fountain_lexer import parse as fountain_parse, tokens_to_html
+        from core.fountain_lexer import parse as fountain_parse, tokens_to_html
     except ImportError:
         from core.fountain_lexer import parse as fountain_parse, tokens_to_html
 
@@ -262,8 +262,8 @@ def handler(args: dict, **kwargs) -> str:
     import tempfile
     import yaml
 
-    from .. import load_plugin_config
-    from .story_resolve import resolve_project
+    from core.config import load_plugin_config
+    from tools.story_resolve import resolve_project
 
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
@@ -280,7 +280,7 @@ def handler(args: dict, **kwargs) -> str:
 
     # Regenerate index so dashboard reflects latest note data
     try:
-        from ..core.index import generate_index, write_index
+        from core.index import generate_index, write_index
         index = generate_index(project_path)
         write_index(index, index_path)
     except Exception:

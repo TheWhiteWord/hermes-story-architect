@@ -1,5 +1,6 @@
 """Test suite for Story Architect core modules."""
 import pytest
+import json
 from pathlib import Path
 from core.section_parser import list_sections, get_section, replace_section
 from core.entity import extract_entity, validate_entity, update_sections
@@ -130,6 +131,154 @@ class TestScreenplay:
         locations = [{"id": "the-central-room", "name": "The Central Room"}]
         assert match_location("THE CENTRAL ROOM", locations) == "the-central-room"
         assert match_location("The Central Room", locations) == "the-central-room"
+
+
+# ---- Note Creation Tests ----
+
+def _make_minimal_project(tmp):
+    """Create a minimal project structure for testing."""
+    project_path = Path(tmp) / "test-project"
+    project_path.mkdir()
+    (project_path / "characters").mkdir(parents=True)
+    (project_path / "locations").mkdir(parents=True)
+    (project_path / "worlds").mkdir(parents=True)
+    (project_path / "plots").mkdir(parents=True)
+    (project_path / ".story").mkdir(parents=True)
+    (project_path / "project.md").write_text("---\nname: Test\n---\n")
+    return project_path
+
+
+class TestNoteCreation:
+    """Tests for note creation standardization — all fields present, body sections auto-generated."""
+
+    def test_create_character_has_all_fields(self, tmp_path):
+        """Creating a character with minimal fields should still produce all fields."""
+        from tools.story_create import handler as create_handler
+
+        project_path = _make_minimal_project(tmp_path)
+
+        args = {
+            "entity_type": "character",
+            "slug": "test-char",
+            "project": str(project_path),
+            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
+        }
+        result = json.loads(create_handler(args))
+        assert result["success"] == True
+
+        note_path = project_path / "characters" / "test-char.md"
+        import frontmatter as fm
+        post = fm.load(note_path)
+
+        # All schema fields should be present
+        assert "name" in post.metadata
+        assert "story_role" in post.metadata
+        assert "one_sentence" in post.metadata
+        assert "relationships" in post.metadata
+        assert "goals_short" in post.metadata
+        assert "goals_long" in post.metadata
+        assert "knowledge" in post.metadata
+
+        # Provided values should be preserved
+        assert post.metadata["name"] == "Test Char"
+        assert post.metadata["story_role"] == "Protagonist"
+
+        # Missing fields should be empty defaults
+        assert post.metadata["one_sentence"] == ""
+        assert post.metadata["relationships"] == []
+        assert post.metadata["goals_short"] == ""
+        assert post.metadata["goals_long"] == ""
+        assert post.metadata["knowledge"] == []
+
+    def test_create_character_has_all_sections(self, tmp_path):
+        """Creating a character should produce all standard body sections."""
+        from tools.story_create import handler as create_handler
+
+        project_path = _make_minimal_project(tmp_path)
+
+        args = {
+            "entity_type": "character",
+            "slug": "test-char",
+            "project": str(project_path),
+            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
+        }
+        result = json.loads(create_handler(args))
+        assert result["success"] == True
+
+        note_path = project_path / "characters" / "test-char.md"
+        import frontmatter as fm
+        post = fm.load(note_path)
+
+        # All standard sections should be present
+        body = post.content
+        assert "## Personality" in body
+        assert "## Background" in body
+        assert "## Voice" in body
+        assert "## Greatest Fear" in body
+        assert "## Secrets" in body
+        assert "## Arc" in body
+        assert "## Relationships" in body
+        assert "## Goals" in body
+
+    def test_create_plot_has_all_fields(self, tmp_path):
+        """Creating a plot with minimal fields should produce all fields."""
+        from tools.story_create import handler as create_handler
+
+        project_path = _make_minimal_project(tmp_path)
+
+        args = {
+            "entity_type": "plot",
+            "slug": "test-plot",
+            "project": str(project_path),
+            "frontmatter": {"name": "Test Plot"}
+        }
+        result = json.loads(create_handler(args))
+        assert result["success"] == True
+
+        note_path = project_path / "plots" / "test-plot.md"
+        import frontmatter as fm
+        post = fm.load(note_path)
+
+        # All plot schema fields should be present
+        assert "name" in post.metadata
+        assert "one_sentence" in post.metadata
+        assert "status" in post.metadata
+        assert "characters" in post.metadata
+        assert "setups" in post.metadata
+        assert "payoffs" in post.metadata
+
+        # Provided values preserved
+        assert post.metadata["name"] == "Test Plot"
+
+        # Defaults filled in
+        assert post.metadata["status"] == "active"
+        assert post.metadata["characters"] == []
+        assert post.metadata["setups"] == []
+        assert post.metadata["payoffs"] == []
+
+    def test_create_plot_has_all_sections(self, tmp_path):
+        """Creating a plot should produce all standard body sections."""
+        from tools.story_create import handler as create_handler
+
+        project_path = _make_minimal_project(tmp_path)
+
+        args = {
+            "entity_type": "plot",
+            "slug": "test-plot",
+            "project": str(project_path),
+            "frontmatter": {"name": "Test Plot"}
+        }
+        result = json.loads(create_handler(args))
+        assert result["success"] == True
+
+        note_path = project_path / "plots" / "test-plot.md"
+        import frontmatter as fm
+        post = fm.load(note_path)
+
+        body = post.content
+        assert "## Summary" in body
+        assert "## Obstacles" in body
+        assert "## Stakes" in body
 
 
 # ---- Integration Test ----

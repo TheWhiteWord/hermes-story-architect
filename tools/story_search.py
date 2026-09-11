@@ -1,7 +1,7 @@
 """story_search tool — search within a project."""
 import json
 from pathlib import Path
-from ..core.constants import ENTITY_FOLDERS
+from core.constants import ENTITY_FOLDERS
 
 SCHEMA = {
     "type": "object",
@@ -21,8 +21,8 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Search across project notes."""
-    from .. import load_plugin_config
-    from .story_resolve import resolve_project
+    from core.config import load_plugin_config
+    from tools.story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()

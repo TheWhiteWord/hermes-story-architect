@@ -2,8 +2,8 @@
 import json
 import frontmatter
 from pathlib import Path
-from ..core.constants import ENTITY_FOLDERS
-from ..core.section_parser import get_section, list_sections
+from core.constants import ENTITY_FOLDERS
+from core.section_parser import get_section, list_sections
 
 SCHEMA = {
     "type": "object",
@@ -33,8 +33,8 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Retrieve specific sections from a story note."""
-    from .. import load_plugin_config
-    from .story_resolve import resolve_project
+    from core.config import load_plugin_config
+    from tools.story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()

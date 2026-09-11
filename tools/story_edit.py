@@ -1,8 +1,8 @@
 """story_edit tool — propose and apply edits (action protocol)."""
 import json
 from pathlib import Path
-from ..core.constants import ENTITY_FOLDERS
-from ..core.section_parser import replace_section
+from core.constants import ENTITY_FOLDERS, ENTITY_SCHEMAS
+from core.section_parser import replace_section
 
 SCHEMA = {
     "type": "object",
@@ -35,8 +35,8 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Apply edit to project note."""
-    from .. import load_plugin_config
-    from .story_resolve import resolve_project
+    from core.config import load_plugin_config
+    from tools.story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
@@ -75,7 +75,7 @@ def handler(args: dict, **kwargs) -> str:
 def _refresh_index(project_path: Path) -> None:
     """Refresh the index file to reflect changes."""
     try:
-        from ..core.index import generate_index, write_index
+        from core.index import generate_index, write_index
         index_path = project_path / ".story" / "index.yaml"
         index = generate_index(project_path)
         write_index(index, index_path)
@@ -123,8 +123,8 @@ def _edit_note(project_path: Path, target: dict, changes: list, summary: str) ->
 
 def _edit_screenplay(project_path: Path, changes: list, summary: str) -> str:
     """Edit screenplay.fountain."""
-    from ..core.screenplay import extract_scenes
-    from ..core.fountain_lexer import tokenize
+    from core.screenplay import extract_scenes
+    from core.fountain_lexer import tokenize
     
     screenplay_path = project_path / "screenplay.fountain"
     if not screenplay_path.exists():
@@ -197,8 +197,10 @@ def _create_entity(project_path: Path, target: dict, changes: list, summary: str
     if file_path.exists():
         return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
 
-    # Generate frontmatter
-    post = frontmatter.Post("", **frontmatter_data)
+    # Generate frontmatter — merge over schema defaults so all fields are present
+    schema = ENTITY_SCHEMAS.get(entity_type, {})
+    merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+    post = frontmatter.Post("", **merged)
 
     # Add standard sections based on entity type
     sections = _get_standard_sections(entity_type)

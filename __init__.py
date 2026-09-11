@@ -1,21 +1,9 @@
 """Hermes Story Architect — plugin entry point."""
 import json
 from pathlib import Path
-from hermes_constants import get_hermes_home
+from core.config import load_plugin_config
 
 _SKILL_DIR = Path(__file__).parent / "skills"
-
-
-def load_plugin_config() -> dict:
-    """Load plugin config from Hermes config.yaml."""
-    import yaml
-    path = get_hermes_home() / "config.yaml"
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception:
-        return {}
-    block = data.get("story_architect")
-    return block if isinstance(block, dict) else {}
 
 
 def _requirements_met() -> bool:

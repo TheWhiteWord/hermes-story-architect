@@ -101,7 +101,7 @@ class TestDashboardIntegration:
     def test_fountain_parse_imported(self):
         """fountain_parse is imported in story_dashboard.py."""
         src = Path("tools/story_dashboard.py").read_text()
-        assert 'from ..core.fountain_lexer import parse as fountain_parse' in src
+        assert 'from core.fountain_lexer import parse as fountain_parse' in src
 
     def test_screenplay_stats_computation(self):
         """Stats computation produces expected structure."""
