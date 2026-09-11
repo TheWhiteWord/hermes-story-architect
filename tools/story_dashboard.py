@@ -278,6 +278,14 @@ def handler(args: dict, **kwargs) -> str:
     if not index_path.exists():
         return json.dumps({"error": "Index not found. Run story_index first."})
 
+    # Regenerate index so dashboard reflects latest note data
+    try:
+        from ..core.index import generate_index, write_index
+        index = generate_index(project_path)
+        write_index(index, index_path)
+    except Exception:
+        pass  # Use existing index if regeneration fails
+
     dashboard_src = Path(__file__).parent.parent / "src" / "dashboard" / "story-dashboard.html"
     if not dashboard_src.exists():
         return json.dumps({"error": "Dashboard file not found in plugin"})
