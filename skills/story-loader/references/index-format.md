@@ -29,6 +29,7 @@ characters:
         heading: "INT. MARA'S APARTMENT - NIGHT"
     related:
       - id: detective-oak
+        label: Partner
         feeling: Wary respect
     goals_short: "Find the account number."
     goals_long: "Burn the network."
@@ -180,11 +181,16 @@ Relationships are **unidirectional** — each character lists their own:
 # characters/mara.md
 related:
   - id: detective-oak
+    label: Partner
     feeling: Wary respect
+  - id: victor-hale
+    label: Boss
+    feeling: Fear — he knows what she's found 
 
 # characters/detective-oak.md
 related:
   - id: mara
+    label: Partner
     feeling: Wary respect — she's useful but unpredictable
 ```
 

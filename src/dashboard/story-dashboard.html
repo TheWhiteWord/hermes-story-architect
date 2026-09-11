@@ -1621,7 +1621,7 @@ function loadSampleData() {
 //               goals.short/long (not goals_short/long), knowledge as string[]
 //   scenes: id as integer (string lookup needs String()), locations as id[] but
 //           also sometimes heading strings; characters array is id strings
-//   plots: setups/payoffs are [{scene, description}] objects (not strings)
+//   plots: setups/payoffs are [{scene: heading, description}] objects (backend-normalized)
 //   locations/worlds: scenes array contains heading strings (not ids)
 function normalise(data) {
   const d = JSON.parse(JSON.stringify(data)); // deep clone
@@ -1671,13 +1671,8 @@ function normalise(data) {
     s.plots = (s.plots || []);
   });
 
-  // Plots: normalise setups/payoffs from [{scene, description}] → strings
+  // Plots: setups/payoffs already normalized by backend to [{scene, description}]
   (d.plots || []).forEach(pl => {
-    if (pl.setups && pl.setups.length && typeof pl.setups[0] === 'object') {
-      pl._setup_objs = pl.setups;
-      pl._payoff_objs = pl.payoffs || [];
-      // keep as objects — panel renderer handles both
-    }
     pl.characters = (pl.characters || []).map(String);
   });
 
@@ -2199,8 +2194,8 @@ function showScenePanel(sceneId) {
     const h = scene.heading || '';
     plotRefs = (story.plots || [])
       .filter(pl =>
-        (pl._setup_objs || []).some(su => su.scene === h) ||
-        (pl._payoff_objs || []).some(pa => pa.scene === h) ||
+        (pl.setups || []).some(su => su.scene === h) ||
+        (pl.payoffs || []).some(pa => pa.scene === h) ||
         (pl.characters || []).some(cid =>
           (scene.characters || []).includes(cid)
         )
@@ -2522,29 +2517,34 @@ function showPlotPanel(plotId) {
       : '';
   }).filter(Boolean).join('');
 
-  // Setups/payoffs: may be string[] (old) or [{scene, description}] (new schema)
+  // Setups/payoffs: backend normalizes to [{scene: heading, description}]
   function renderBeats(arr) {
     if (!arr || !arr.length) return '';
     return arr.map(item => {
       if (typeof item === 'string') {
         return `<div class="beat-row">${item}</div>`;
       }
-      // Extract scene name — handle double-wrapped objects from index enrichment
       let sceneName = item.scene;
       if (typeof sceneName === 'object' && sceneName !== null) {
         sceneName = sceneName.heading || sceneName.scene || '';
       }
       if (!sceneName) return '';
-      const sceneObj = (story.scenes || []).find(s => s.heading === sceneName || String(s.id) === String(sceneName));
+      // Match by heading, id, or number
+      const sceneNum = item.number != null ? String(item.number) : '';
+      const sceneObj = (story.scenes || []).find(s =>
+        s.heading === sceneName || String(s.id) === String(sceneName) || (sceneNum && s.number != null && String(s.number) === sceneNum)
+      );
+      // Resolve number to display
+      const displayNum = sceneNum || (sceneObj && sceneObj.number != null ? String(sceneObj.number) : '');
       const sceneLink = sceneObj
-        ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${sceneName}</span>`
-        : `<span class="beat-scene">${sceneName}</span>`;
+        ? `<span class="beat-scene" onclick="showScenePanel('${sceneObj.id}')" style="cursor:pointer">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`
+        : `<span class="beat-scene">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`;
       return `<div class="beat-row">${sceneLink}${item.description ? `<span class="beat-desc">${item.description}</span>` : ''}</div>`;
     }).join('');
   }
 
-  const setupObjs = plot._setup_objs || plot.setups || [];
-  const payoffObjs = plot._payoff_objs || plot.payoffs || [];
+  const setupObjs = plot.setups || [];
+  const payoffObjs = plot.payoffs || [];
   const setupsHtml = renderBeats(setupObjs);
   const payoffsHtml = renderBeats(payoffObjs);
 

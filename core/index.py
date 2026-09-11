@@ -83,16 +83,18 @@ def _enrich_relationships(index: dict) -> None:
 
 
 def _enrich_plots(index: dict) -> None:
-    """Add descriptions to plot setups/payoffs (preserve from frontmatter or default empty)."""
+    """Normalize plot setups/payoffs to {scene: heading, description: text}."""
     for plot in index.get("plots", []):
-        plot["setups"] = [
-            {"scene": s, "description": s.get("description", "")} if isinstance(s, dict) else {"scene": s, "description": ""}
-            for s in plot.get("setups", [])
-        ]
-        plot["payoffs"] = [
-            {"scene": p, "description": p.get("description", "")} if isinstance(p, dict) else {"scene": p, "description": ""}
-            for p in plot.get("payoffs", [])
-        ]
+        plot["setups"] = [_normalize_beat(s) for s in plot.get("setups", [])]
+        plot["payoffs"] = [_normalize_beat(p) for p in plot.get("payoffs", [])]
+
+
+def _normalize_beat(beat):
+    """Extract {scene, description} from note format {number, heading, description}."""
+    if isinstance(beat, dict):
+        heading = beat.get("heading") or beat.get("scene") or ""
+        return {"scene": str(heading), "description": beat.get("description", "")}
+    return {"scene": str(beat), "description": ""}
 
 
 def _parse_entities(folder: Path, entity_type: str) -> list[dict]:
