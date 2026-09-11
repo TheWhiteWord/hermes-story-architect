@@ -57,7 +57,7 @@ ENTITY_SCHEMAS = {
         "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary for index label"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
-        "setups": {"type": "list", "default": [], "optional": False, "description": "Scenes where plot is established", "sub_fields": {"heading": "Fountain scene heading (e.g. INT. SERVER ROOM - NIGHT)", "number": "Sequential scene id (1, 2, 3...)", "description": "What happens at this scene"}},
+        "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"heading": "Fountain scene heading (e.g. INT. SERVER ROOM - NIGHT)", "number": "Sequential scene id (1, 2, 3...)", "description": "What happens at this scene"}},
         "payoffs": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"heading": "Fountain scene heading (e.g. INT. SERVER ROOM - NIGHT)", "number": "Sequential scene id (1, 2, 3...)", "description": "What happens at this scene"}},
     },
     "project": {

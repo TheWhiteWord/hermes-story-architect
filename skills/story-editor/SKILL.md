@@ -79,12 +79,12 @@ defaults. A character with only `name` still gets `relationships`, `goals_short`
 - `name` — display name for the entity
 - `story_role` (character) — role in the story (Protagonist/Antagonist/Supporting/Minor/Cameo)
 - `one_sentence` — one-line summary for index labels
-- `setups` (plot) — at least one setup makes the plot visible in the dashboard
+- `status` (plot/project) — defaults to `active` if omitted
 
 **Optional fields** (can be filled as the story develops):
 - `relationships`, `goals_short`, `goals_long`, `knowledge` (character)
 - `rules` (world)
-- `characters`, `payoffs`, `status` (plot)
+- `setups`, `payoffs`, `characters`, `status` (plot)
 - `genre`, `setting`, `status` (project)
 
 The tool schema documents each field's type and description. Load
