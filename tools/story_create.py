@@ -3,25 +3,61 @@ import json
 from pathlib import Path
 from core.constants import ENTITY_FOLDERS, REQUIRED_FIELDS, ENTITY_SCHEMAS
 
-SCHEMA = {
-    "type": "object",
-    "properties": {
-        "entity_type": {
-            "type": "string",
-            "enum": ["character", "location", "world", "plot"],
-            "description": "Type of entity to create"
-        },
-        "slug": {
-            "type": "string",
-            "description": "Entity slug (unique identifier)"
-        },
-        "frontmatter": {
-            "type": "object",
-            "description": "Frontmatter fields"
+
+def _build_schema() -> dict:
+    """Build JSON schema with field-level descriptions from ENTITY_SCHEMAS."""
+    # Collect all unique fields across all entity types
+    all_fields: dict[str, dict] = {}
+    for entity_type, fields in ENTITY_SCHEMAS.items():
+        for field, meta in fields.items():
+            if field not in all_fields:
+                all_fields[field] = {
+                    "type": meta["type"],
+                    "description": meta["description"],
+                    "default": meta["default"],
+                    "_entity_types": [entity_type],
+                }
+            else:
+                all_fields[field]["_entity_types"].append(entity_type)
+
+    # Build frontmatter properties
+    frontmatter_props = {}
+    for field, info in all_fields.items():
+        field_schema = {
+            "type": info["type"],
+            "description": f"{info['description']} (used by: {', '.join(info['_entity_types'])})",
         }
-    },
-    "required": ["entity_type", "slug", "project", "frontmatter"]
-}
+        if info.get("default") != "":
+            field_schema["default"] = info["default"]
+        frontmatter_props[field] = field_schema
+
+    return {
+        "type": "object",
+        "properties": {
+            "entity_type": {
+                "type": "string",
+                "enum": ["character", "location", "world", "plot"],
+                "description": "Type of entity to create",
+            },
+            "slug": {
+                "type": "string",
+                "description": "Entity slug (unique identifier, used as filename)",
+            },
+            "project": {
+                "type": "string",
+                "description": "Project slug or path",
+            },
+            "frontmatter": {
+                "type": "object",
+                "description": "Frontmatter fields. Only include fields relevant to your entity type.",
+                "properties": frontmatter_props,
+            },
+        },
+        "required": ["entity_type", "slug", "project", "frontmatter"],
+    }
+
+
+SCHEMA = _build_schema()
 
 
 def handler(args: dict, **kwargs) -> str:
