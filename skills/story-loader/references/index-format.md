@@ -98,6 +98,10 @@ scenes:
 | `one_sentence` | string | Index label |
 | `sections` | string[] | Available `##` headings |
 | `scenes` | object[] | Scene references: `number` + `heading` |
+| `relationships` | object[] | Relationships: `id` + `label` + `feeling` |
+| `goals_short` | string | Short-term goal |
+| `goals_long` | string | Long-term goal |
+| `knowledge` | string[] | Facts the character knows |
 
 ### Location
 | Field | Type | Description |
