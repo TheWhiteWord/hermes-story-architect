@@ -183,3 +183,13 @@ def write_index(index: dict, output_path: Path) -> None:
     """Write index to YAML."""
     with open(output_path, 'w') as f:
         yaml.dump(index, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+
+def refresh_index(project_path: Path) -> None:
+    """Regenerate and write the index for a project.
+    Ensures .story/ directory exists before writing.
+    Raises exceptions on failure so callers can handle/report."""
+    index_path = project_path / ".story" / "index.yaml"
+    index_path.parent.mkdir(exist_ok=True)
+    index = generate_index(project_path)
+    write_index(index, index_path)

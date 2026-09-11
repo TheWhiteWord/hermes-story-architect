@@ -53,34 +53,35 @@ def handler(args: dict, **kwargs) -> str:
         return json.dumps({"error": str(e)})
     
     if action == "edit_note":
-        return _edit_note(project_path, target, changes, summary)
+        result = _edit_note(project_path, target, changes, summary)
     elif action == "edit_screenplay":
         return _edit_screenplay(project_path, changes, summary)
     elif action == "delete_entity":
-        return _delete_entity(project_path, target, summary)
+        result = _delete_entity(project_path, target, summary)
     elif action == "create_entity":
         result = _create_entity(project_path, target, changes, summary)
-        if '"success": true' in result:
-            _refresh_index(project_path)
-        return result
     elif action == "update_story_memory":
         result = _update_story_memory(project_path, changes, summary)
-        if '"success": true' in result:
-            _refresh_index(project_path)
-        return result
     else:
         return json.dumps({"error": f"Unknown action: {action}"})
 
+    # Refresh index so story_load reflects changes
+    try:
+        _refresh_index(project_path)
+    except Exception as e:
+        # Report failure but don't override the original result
+        if '"success": true' in result:
+            result = result.replace('"success": true', f'"success": true, "index_warning": "{e}"')
+
+    return result
+
 
 def _refresh_index(project_path: Path) -> None:
-    """Refresh the index file to reflect changes."""
-    try:
-        from core.index import generate_index, write_index
-        index_path = project_path / ".story" / "index.yaml"
-        index = generate_index(project_path)
-        write_index(index, index_path)
-    except Exception:
-        pass  # Don't fail the operation if index refresh fails
+    """Refresh the index file to reflect changes.
+    Ensures .story/ directory exists before writing.
+    Raises exceptions on failure."""
+    from core.index import refresh_index
+    refresh_index(project_path)
 
 
 def _edit_note(project_path: Path, target: dict, changes: list, summary: str) -> str:
@@ -110,9 +111,6 @@ def _edit_note(project_path: Path, target: dict, changes: list, summary: str) ->
 
     with open(file_path, 'w') as f:
         frontmatter.dump(post, f)
-
-    # Refresh index so story_load reflects changes immediately
-    _refresh_index(project_path)
 
     return json.dumps({
         "success": True,
@@ -173,9 +171,6 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
     # Move file
     dest = recycle_bin / f"{slug}.md"
     shutil.move(str(file_path), str(dest))
-
-    # Refresh index so story_load reflects changes immediately
-    _refresh_index(project_path)
 
     return json.dumps({
         "success": True,

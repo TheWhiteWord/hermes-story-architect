@@ -124,11 +124,8 @@ def handler(args: dict, **kwargs) -> str:
 
     # Refresh index so story_load reflects changes immediately
     try:
-        from core.index import generate_index, write_index
-        index_path = project_path / ".story" / "index.yaml"
-        index_path.parent.mkdir(exist_ok=True)
-        index = generate_index(project_path)
-        write_index(index, index_path)
+        from core.index import refresh_index
+        refresh_index(project_path)
     except Exception as e:
         return json.dumps({
             "success": True,
