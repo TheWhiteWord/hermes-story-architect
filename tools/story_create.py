@@ -18,6 +18,9 @@ def _build_schema() -> dict:
                     "optional": meta.get("optional", True),
                     "_entity_types": [entity_type],
                 }
+                # Carry over sub_fields if present
+                if "sub_fields" in meta:
+                    all_fields[field]["sub_fields"] = meta["sub_fields"]
             else:
                 all_fields[field]["_entity_types"].append(entity_type)
 
@@ -32,15 +35,14 @@ def _build_schema() -> dict:
             field_schema["default"] = info["default"]
         if not info.get("optional", True):
             field_schema["required"] = True
-        # For list types with sub-fields (setups, payoffs), document items structure
-        if info["type"] == "list" and field in ("setups", "payoffs"):
+        # For list types with sub-fields, document items structure
+        if info["type"] == "list" and "sub_fields" in info:
             field_schema["items"] = {
                 "type": "object",
-                "description": "Scene reference with heading, scene number (id), and description of what happens",
+                "description": info["description"] + ". Sub-fields: " + ", ".join(info["sub_fields"].keys()),
                 "properties": {
-                    "heading": {"type": "string", "description": "Fountain scene heading (e.g. INT. SERVER ROOM - NIGHT)"},
-                    "number": {"type": "number", "description": "Sequential scene id (1, 2, 3...)"},
-                    "description": {"type": "string", "description": "What happens at this scene"},
+                    k: {"type": "number" if k == "number" else "string", "description": v}
+                    for k, v in info["sub_fields"].items()
                 },
             }
         frontmatter_props[field] = field_schema
