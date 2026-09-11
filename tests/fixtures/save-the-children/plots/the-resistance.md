@@ -2,6 +2,7 @@
 name: The Resistance
 one_sentence: Kael and Mira organize the children to breach the Central Room.
 status: active
+characters: [kael, mira]
 setups:
   - number: '2'
     heading: INT. CENTRAL ROOM - DAY
