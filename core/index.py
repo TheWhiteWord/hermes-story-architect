@@ -89,8 +89,8 @@ def _enrich_plots(index: dict) -> None:
     """Normalize plot setups/payoffs to {heading, number, description}.
     plot.characters is frontmatter-only — scenes may contain passersby."""
     for plot in index.get("plots", []):
-        plot["setups"] = [_normalize_plot_beat(s) for s in plot.get("setups", [])]
-        plot["payoffs"] = [_normalize_plot_beat(p) for p in plot.get("payoffs", [])]
+        plot["setups"] = [_normalize_plot_scene(s) for s in plot.get("setups", [])]
+        plot["payoffs"] = [_normalize_plot_scene(p) for p in plot.get("payoffs", [])]
         if "characters" not in plot:
             plot["characters"] = []
 
@@ -108,17 +108,17 @@ def _enrich_scenes_with_plots(index: dict) -> None:
                     scene["plots"].append(plot["id"])
 
 
-def _normalize_plot_beat(beat):
+def _normalize_plot_scene(scene_ref):
     """Pass through {heading, number, description} from note frontmatter."""
-    if isinstance(beat, dict):
-        number = beat.get("number")
+    if isinstance(scene_ref, dict):
+        number = scene_ref.get("number")
         if number is not None:
             try:
                 number = int(number)
             except (ValueError, TypeError):
                 number = None
-        return {"heading": beat.get("heading", ""), "number": number, "description": beat.get("description", "")}
-    return {"heading": str(beat), "number": None, "description": ""}
+        return {"heading": scene_ref.get("heading", ""), "number": number, "description": scene_ref.get("description", "")}
+    return {"heading": str(scene_ref), "number": None, "description": ""}
 
 
 def _parse_entities(folder: Path, entity_type: str) -> list[dict]:
