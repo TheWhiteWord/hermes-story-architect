@@ -22,7 +22,7 @@ SCHEMA = {
 def handler(args: dict, **kwargs) -> str:
     """Search across project notes."""
     from core.config import load_plugin_config
-    from tools.story_resolve import resolve_project
+    from .story_resolve import resolve_project
     
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
