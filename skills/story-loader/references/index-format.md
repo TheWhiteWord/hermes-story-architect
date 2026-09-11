@@ -134,13 +134,15 @@ scenes:
 | `sections` | string[] | Available `##` headings |
 
 ### Scene
+> **Derived from screenplay** — scenes are extracted from `screenplay.fountain`, not from notes. No scene notes exist.
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | number | Sequential (regenerated on each index update) |
 | `heading` | string | Fountain heading |
 | `number` | number | Sequential (from screenplay order) |
-| `characters` | string[] | Character slugs |
-| `location` | string | Location slug |
+| `characters` | string[] | Character slugs (matched from screenplay) |
+| `location` | string | Location slug (matched from screenplay) |
 
 ---
 
