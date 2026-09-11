@@ -83,10 +83,18 @@ def _enrich_relationships(index: dict) -> None:
 
 
 def _enrich_plots(index: dict) -> None:
-    """Normalize plot setups/payoffs to {scene: heading, description: text}."""
+    """Normalize plot setups/payoffs to {scene: heading, description: text}.
+    Populate plot.characters from screenplay characters in those scenes."""
+    scenes_by_heading = {s["heading"]: s for s in index.get("scenes", [])}
     for plot in index.get("plots", []):
         plot["setups"] = [_normalize_beat(s) for s in plot.get("setups", [])]
         plot["payoffs"] = [_normalize_beat(p) for p in plot.get("payoffs", [])]
+        char_ids = set(plot.get("characters", []))
+        for beat in plot["setups"] + plot["payoffs"]:
+            scene = scenes_by_heading.get(beat["scene"])
+            if scene:
+                char_ids.update(scene.get("characters", []))
+        plot["characters"] = sorted(char_ids)
 
 
 def _normalize_beat(beat):
