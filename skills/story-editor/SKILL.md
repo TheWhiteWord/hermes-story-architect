@@ -75,6 +75,18 @@ For `edit_note`, each change object has:
 When creating entities, `story_create` auto-fills all expected fields with empty
 defaults. A character with only `name` still gets `relationships`, `goals_short`, etc.
 
+**Required fields** (should be filled for a useful note):
+- `name` — display name for the entity
+- `story_role` (character) — role in the story (Protagonist/Antagonist/Supporting/Minor/Cameo)
+- `one_sentence` — one-line summary for index labels
+- `setups` (plot) — at least one setup makes the plot visible in the dashboard
+
+**Optional fields** (can be filled as the story develops):
+- `relationships`, `goals_short`, `goals_long`, `knowledge` (character)
+- `rules` (world)
+- `characters`, `payoffs`, `status` (plot)
+- `genre`, `setting`, `status` (project)
+
 The tool schema documents each field's type and description. Load
 `references/index-format.md` only if you need:
 - The full field list for an entity type

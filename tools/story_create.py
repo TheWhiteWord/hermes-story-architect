@@ -15,6 +15,7 @@ def _build_schema() -> dict:
                     "type": meta["type"],
                     "description": meta["description"],
                     "default": meta["default"],
+                    "optional": meta.get("optional", True),
                     "_entity_types": [entity_type],
                 }
             else:
@@ -29,6 +30,8 @@ def _build_schema() -> dict:
         }
         if info.get("default") != "":
             field_schema["default"] = info["default"]
+        if not info.get("optional", True):
+            field_schema["required"] = True
         frontmatter_props[field] = field_schema
 
     return {
