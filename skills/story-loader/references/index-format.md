@@ -56,7 +56,7 @@ plots:
     setups:
       - heading: INT. LOCATION - DAY
         number: 2
-        description: What happens at this beat
+        description: What happens at this scene
     payoffs:
       - heading: INT. LOCATION - NIGHT
         number: 8
@@ -131,23 +131,9 @@ scenes:
 | `one_sentence` | string | Index label |
 | `status` | string | active/resolved/abandoned |
 | `characters` | string[] | Character slugs (frontmatter-only) |
-| `setups` | object[] | Beats where plot is established: `heading` + `number` (id) + `description` |
-| `payoffs` | object[] | Beats where plot resolves: `heading` + `number` (id) + `description` |
+| `setups` | object[] | Scenes where plot is established: `heading` + `number` (id) + `description` |
+| `payoffs` | object[] | Scenes where plot resolves: `heading` + `number` (id) + `description` |
 | `sections` | string[] | Available `##` headings |
-
-#### Plot Beat Format
-
-> **Note frontmatter** and **index** both use `{heading, number, description}`.
-> `heading` is the fountain scene heading, `number` is the sequential scene id,
-> `description` is what happens at this beat.
-
-```yaml
-# In plot note frontmatter and index.yaml:
-setups:
-  - heading: INT. CENTRAL ROOM - DAY
-    number: 2
-    description: What happens at this beat
-```
 
 ### Scene
 > **Derived from screenplay** — scenes are extracted from `screenplay.fountain`, not from notes. No scene notes exist.
