@@ -54,10 +54,12 @@ plots:
     status: active
     characters: [character-slug]
     setups:
-      - scene: INT. LOCATION - DAY
+      - heading: INT. LOCATION - DAY
+        number: 2
         description: What happens at this beat
     payoffs:
-      - scene: INT. LOCATION - NIGHT
+      - heading: INT. LOCATION - NIGHT
+        number: 8
         description: Resolution
     sections: [Summary, Obstacles, Stakes]
 
@@ -129,25 +131,20 @@ scenes:
 | `one_sentence` | string | Index label |
 | `status` | string | active/resolved/abandoned |
 | `characters` | string[] | Character slugs (frontmatter-only) |
-| `setups` | object[] | Beats where plot is established: `scene` (heading) + `number` (id) + `description` |
-| `payoffs` | object[] | Beats where plot resolves: `scene` (heading) + `number` (id) + `description` |
+| `setups` | object[] | Beats where plot is established: `heading` + `number` (id) + `description` |
+| `payoffs` | object[] | Beats where plot resolves: `heading` + `number` (id) + `description` |
 | `sections` | string[] | Available `##` headings |
 
 #### Plot Beat Format
 
-> **Note frontmatter** uses `{number, heading, description}`. The index normalizes
-> `heading` → `scene` but keeps both `number` and `description`.
+> **Note frontmatter** and **index** both use `{heading, number, description}`.
+> `heading` is the fountain scene heading, `number` is the sequential scene id,
+> `description` is what happens at this beat.
 
 ```yaml
-# In plot note frontmatter:
+# In plot note frontmatter and index.yaml:
 setups:
-  - number: 2
-    heading: INT. CENTRAL ROOM - DAY
-    description: What happens at this beat
-
-# In index.yaml (normalized):
-setups:
-  - scene: INT. CENTRAL ROOM - DAY
+  - heading: INT. CENTRAL ROOM - DAY
     number: 2
     description: What happens at this beat
 ```

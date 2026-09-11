@@ -100,7 +100,7 @@ def _enrich_scenes_with_plots(index: dict) -> None:
     scenes_by_heading = {s["heading"]: s for s in index.get("scenes", [])}
     for plot in index.get("plots", []):
         for beat in plot.get("setups", []) + plot.get("payoffs", []):
-            scene = scenes_by_heading.get(beat["scene"])
+            scene = scenes_by_heading.get(beat["heading"])
             if scene:
                 if "plots" not in scene:
                     scene["plots"] = []
@@ -109,17 +109,16 @@ def _enrich_scenes_with_plots(index: dict) -> None:
 
 
 def _normalize_beat(beat):
-    """Extract {scene, number, description} from note format {number, heading, description}."""
+    """Pass through {heading, number, description} from note frontmatter."""
     if isinstance(beat, dict):
-        heading = beat.get("heading") or beat.get("scene") or ""
         number = beat.get("number")
         if number is not None:
             try:
                 number = int(number)
             except (ValueError, TypeError):
                 number = None
-        return {"scene": str(heading), "number": number, "description": beat.get("description", "")}
-    return {"scene": str(beat), "number": None, "description": ""}
+        return {"heading": beat.get("heading", ""), "number": number, "description": beat.get("description", "")}
+    return {"heading": str(beat), "number": None, "description": ""}
 
 
 def _parse_entities(folder: Path, entity_type: str) -> list[dict]:
