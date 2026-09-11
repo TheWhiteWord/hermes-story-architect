@@ -43,18 +43,21 @@ def generate_index(project_path: Path) -> dict:
                 "location": loc_slug or "",
             })
         index["scenes"] = scenes
-    
+
     # Update project with scene count
     index["project"]["scene_count"] = len(index.get("scenes", []))
-    
+
     # Build cross-references (character scenes from screenplay)
     _enrich_from_screenplay(index)
-    
+
     # Add labels to relationships
     _enrich_relationships(index)
-    
+
     # Add descriptions to setups/payoffs
     _enrich_plots(index)
+
+    # Add plots to scenes (reverse lookup from plot setups/payoffs)
+    _enrich_scenes_with_plots(index)
     
     # Validate
     _validate_index(index)
@@ -90,6 +93,19 @@ def _enrich_plots(index: dict) -> None:
         plot["payoffs"] = [_normalize_beat(p) for p in plot.get("payoffs", [])]
         if "characters" not in plot:
             plot["characters"] = []
+
+
+def _enrich_scenes_with_plots(index: dict) -> None:
+    """Add plots[] to each scene by reverse lookup from plot setups/payoffs."""
+    scenes_by_heading = {s["heading"]: s for s in index.get("scenes", [])}
+    for plot in index.get("plots", []):
+        for beat in plot.get("setups", []) + plot.get("payoffs", []):
+            scene = scenes_by_heading.get(beat["scene"])
+            if scene:
+                if "plots" not in scene:
+                    scene["plots"] = []
+                if plot["id"] not in scene["plots"]:
+                    scene["plots"].append(plot["id"])
 
 
 def _normalize_beat(beat):

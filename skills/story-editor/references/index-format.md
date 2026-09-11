@@ -143,6 +143,7 @@ scenes:
 | `number` | number | Sequential (from screenplay order) |
 | `characters` | string[] | Character slugs (matched from screenplay) |
 | `location` | string | Location slug (matched from screenplay) |
+| `plots` | string[] | Plot slugs (from plot setups/payoffs referencing this scene) |
 
 ---
 

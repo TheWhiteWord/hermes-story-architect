@@ -343,7 +343,7 @@ html, body {
 }
 .tag-scene { background: rgba(123,156,240,0.12); color: var(--accent); }
 .tag-location { background: rgba(107,191,176,0.12); color: #6bbfb0; }
-.tag-plot { background: rgba(176,123,224,0.12); color: #b07be0; }
+.tag-plot { background: rgba(255, 195, 150, 0.18); color: #d4956b; }
 .tag-char { background: rgba(107,191,176,0.1); color: var(--muted-foreground); border: 1px solid var(--border); }
 
 .status-badge {
@@ -2187,24 +2187,11 @@ function showScenePanel(sceneId) {
     return l ? `<button class="entity-link" onclick="showLocationPanel('${l.id}')">${l.name}</button>` : '';
   }).filter(Boolean).join('');
 
-  // Plots: scene.plots may be empty (backend doesn't always populate from scene side)
-  // Also check reverse: which plots reference this scene's heading
-  let plotRefs = (scene.plots || []);
-  if (!plotRefs.length) {
-    const h = scene.heading || '';
-    plotRefs = (story.plots || [])
-      .filter(pl =>
-        (pl.setups || []).some(su => su.scene === h) ||
-        (pl.payoffs || []).some(pa => pa.scene === h) ||
-        (pl.characters || []).some(cid =>
-          (scene.characters || []).includes(cid)
-        )
-      )
-      .map(pl => pl.id);
-  }
+  // Plots: backend populates scene.plots from plot setups/payoffs
+  const plotRefs = (scene.plots || []);
   const plots = plotRefs.map(pid => {
     const pl = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
-    return pl ? `<button class="entity-link" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
+    return pl ? `<button class="entity-link tag-plot" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
   }).filter(Boolean).join('');
 
   // Scene content: extract and format with screenplay CSS classes
