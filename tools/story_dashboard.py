@@ -245,6 +245,40 @@ def _hsl_from_name(name):
     return f'hsl({h}, 60%, 65%)'
 
 
+def _build_title_page(project_frontmatter: dict) -> dict:
+    """Build a title page dict from project.md frontmatter.
+
+    Returns the {tl, tc, tr, cc, bl, br, hidden} structure expected by
+    buildScriptView() in the dashboard. Fields are output-only — never indexed.
+    """
+    cc = []
+    bl = []
+    br = []
+
+    title = project_frontmatter.get("screenplay_title", "")
+    if title:
+        cc.append({"text": title, "type": "title"})
+    credit = project_frontmatter.get("credit", "")
+    if credit:
+        cc.append({"text": credit, "type": "credit"})
+    author = project_frontmatter.get("author", "")
+    if author:
+        cc.append({"text": author, "type": "author"})
+
+    draft_date = project_frontmatter.get("draft_date", "")
+    if draft_date:
+        bl.append({"text": draft_date, "type": "draft_date"})
+    draft = project_frontmatter.get("draft", "")
+    if draft:
+        bl.append({"text": draft, "type": "draft"})
+
+    contact = project_frontmatter.get("contact", "")
+    if contact:
+        br.append({"text": contact, "type": "contact"})
+
+    return {"tl": [], "tc": [], "tr": [], "cc": cc, "bl": bl, "br": br, "hidden": []}
+
+
 def _parse_scene_location(heading):
     """Parse scene heading text into location info. Minimal version of fountain_lexer.parse_location."""
     import regex as re
@@ -303,27 +337,28 @@ def handler(args: dict, **kwargs) -> str:
     html = dashboard_src.read_text(encoding="utf-8")
     css = screenplay_css_src.read_text(encoding="utf-8")
 
+    # Read project.md directly for title page fields (output-only, not in index)
+    try:
+        import frontmatter as fm
+        project_fm = fm.load(project_path / "project.md")
+        project_frontmatter = dict(project_fm.metadata)
+    except Exception:
+        project_frontmatter = yaml_data.get("project", {})
+
     # Replace the external CSS link with inline CSS (so it works from any location)
     html = html.replace(
         '<link rel="stylesheet" href="screenplay.css">',
         f"<style>\n{css}\n</style>"
     )
 
-    injection = f"window.__STORY_DATA__ = {json.dumps(yaml_data)};"
-    html = html.replace(
-        "// ─── Boot ─────────────────────────────────────────────────────────────────────",
-        injection + "\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
-    )
+    # Accumulate all injections, then replace marker once
+    injections = f"window.__STORY_DATA__ = {json.dumps(yaml_data)};"
 
     # Inject section content from notes — panels render on open
     try:
         sections_data = _extract_sections(yaml_data, project_path)
         if sections_data:
-            sections_json = json.dumps(sections_data)
-            html = html.replace(
-                "// ─── Boot ─────────────────────────────────────────────────────────────────────",
-                f"window.__SECTIONS__ = {sections_json};\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
-            )
+            injections += f"\nwindow.__SECTIONS__ = {json.dumps(sections_data)};"
     except Exception:
         pass  # Dashboard still works without sections
 
@@ -336,24 +371,23 @@ def handler(args: dict, **kwargs) -> str:
         if scene_text:
             stats = _compute_screenplay_stats(scene_text)
             if stats:
-                stats_json = json.dumps(stats)
-                html = html.replace(
-                    "// ─── Boot ─────────────────────────────────────────────────────────────────────",
-                    f"window.__SCREENPLAY_STATS__ = {stats_json};\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
-                )
+                # Title page from project frontmatter (output-only, not from Fountain)
+                stats["titlePage"] = _build_title_page(project_frontmatter)
+                injections += f"\nwindow.__SCREENPLAY_STATS__ = {json.dumps(stats)};"
     except Exception:
         pass  # Dashboard still works without stats
 
     # Inject structural stats
     try:
         structural_stats = compute_structural_stats(yaml_data)
-        stats_json = json.dumps(structural_stats)
-        html = html.replace(
-            "// ─── Boot ─────────────────────────────────────────────────────────────────────",
-            f"window.__STRUCTURAL_STATS__ = {stats_json};\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
-        )
+        injections += f"\nwindow.__STRUCTURAL_STATS__ = {json.dumps(structural_stats)};"
     except Exception:
         pass  # Dashboard still works without structural stats
+
+    html = html.replace(
+        "// ─── Boot ─────────────────────────────────────────────────────────────────────",
+        injections + "\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
+    )
 
     # Name temp file after the story title
     project_name = (yaml_data.get("project", {}).get("name") or project).strip()

@@ -141,7 +141,7 @@ scenes:
 | `sections` | string[] | Available `##` headings | code |
 
 ### Scene
-> **Derived from screenplay** — scenes are extracted from `screenplay.fountain`, not from notes. No scene notes exist.
+> **From scene files** — scenes are individual `.md` files in `scenes/`, assembled in sequence order by the dashboard.
 
 | Field | Type | Description | Source |
 |-------|------|-------------|--------|
