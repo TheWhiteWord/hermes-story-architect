@@ -23,8 +23,8 @@ def generate_index(project_path: Path) -> dict:
         "locations": locations,
         "worlds": worlds,
         "plots": plots,
-        "sequences": sequences,
         "acts": acts,
+        "sequences": sequences,
     }
 
     # Scenes from files only — screenplay merge removed (Phase 2).
@@ -253,6 +253,26 @@ def generate_structure_index(index: dict) -> dict:
     # Use _full_scenes (preserved before stripping) to access dramatic metadata.
     source_scenes = index.get("_full_scenes", index.get("scenes", []))
     return {
+        "acts": [
+            {
+                "id": act["id"],
+                "value": act.get("value", ""),
+                "value_open": act.get("value_open", ""),
+                "value_close": act.get("value_close", ""),
+                "climax_scene_id": act.get("climax_scene_id", ""),
+            }
+            for act in index.get("acts", [])
+        ],
+        "sequences": [
+            {
+                "id": seq["id"],
+                "value": seq.get("value", ""),
+                "value_open": seq.get("value_open", ""),
+                "value_close": seq.get("value_close", ""),
+                "climax_scene_id": seq.get("climax_scene_id", ""),
+            }
+            for seq in index.get("sequences", [])
+        ],
         "scenes": [
             {
                 "id": scene["id"],
@@ -268,26 +288,6 @@ def generate_structure_index(index: dict) -> dict:
                 "arc_beat_refs": [],
             }
             for scene in source_scenes
-        ],
-        "sequences": [
-            {
-                "id": seq["id"],
-                "value": seq.get("value", ""),
-                "value_open": seq.get("value_open", ""),
-                "value_close": seq.get("value_close", ""),
-                "climax_scene_id": seq.get("climax_scene_id", ""),
-            }
-            for seq in index.get("sequences", [])
-        ],
-        "acts": [
-            {
-                "id": act["id"],
-                "value": act.get("value", ""),
-                "value_open": act.get("value_open", ""),
-                "value_close": act.get("value_close", ""),
-                "climax_scene_id": act.get("climax_scene_id", ""),
-            }
-            for act in index.get("acts", [])
         ],
     }
 

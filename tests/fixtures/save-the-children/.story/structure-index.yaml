@@ -1,0 +1,50 @@
+acts:
+- id: act-1
+  value: Trust
+  value_open: positive
+  value_close: negative
+  climax_scene_id: central-room-night
+sequences:
+- id: seq-discovery
+  value: Trust
+  value_open: positive
+  value_close: negative
+  climax_scene_id: central-room-night
+scenes:
+- id: central-room-day
+  value: Trust
+  value_open: positive
+  value_close: negative
+  conflict_levels:
+  - inner
+  - personal
+  dramatic_role: setup
+  is_inciting_incident: false
+  is_sequence_climax: false
+  is_act_climax: false
+  is_story_climax: false
+  arc_beat_refs: []
+- id: central-room-night
+  value: Trust
+  value_open: negative
+  value_close: positive
+  conflict_levels:
+  - personal
+  dramatic_role: climax
+  is_inciting_incident: false
+  is_sequence_climax: true
+  is_act_climax: false
+  is_story_climax: false
+  arc_beat_refs: []
+- id: the-core-day
+  value: Trust
+  value_open: positive
+  value_close: positive
+  conflict_levels:
+  - extra-personal
+  dramatic_role: resolution
+  is_inciting_incident: false
+  is_sequence_climax: false
+  is_act_climax: false
+  is_story_climax: false
+  arc_beat_refs: []
