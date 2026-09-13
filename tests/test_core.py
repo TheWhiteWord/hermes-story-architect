@@ -635,6 +635,55 @@ class TestSceneIndex:
 class TestStructureIndex:
     """Tests for structure index generation (Phase 2, Task 9)."""
 
+    def test_structure_index_includes_story(self, tmp_path):
+        """Project structural fields appear in structure-index story key."""
+        from core.index import generate_structure_index, generate_index
+
+        project_path = tmp_path / "proj"
+        project_path.mkdir()
+        (project_path / "project.md").write_text(
+            "---\n"
+            "name: Test\n"
+            "logline: A test logline\n"
+            "value: Trust\n"
+            "value_at_open: positive\n"
+            "value_at_close: ironic\n"
+            "spine: A protagonist wants truth\n"
+            "controlling_idea: Truth wins\n"
+            "inciting_incident_scene_id: opening\n"
+            "story_climax_scene_id: finale\n"
+            "structure_type: Classical\n"
+            "---\n"
+        )
+
+        index = generate_index(project_path)
+        structure = generate_structure_index(index)
+
+        assert "story" in structure
+        assert structure["story"]["id"] == "story"
+        assert structure["story"]["value"] == "Trust"
+        assert structure["story"]["value_open"] == "positive"
+        assert structure["story"]["value_close"] == "ironic"
+        assert structure["story"]["spine"] == "A protagonist wants truth"
+        assert structure["story"]["controlling_idea"] == "Truth wins"
+        assert structure["story"]["inciting_incident_scene_id"] == "opening"
+        assert structure["story"]["story_climax_scene_id"] == "finale"
+        assert structure["story"]["structure_type"] == "Classical"
+
+        # Main index project should NOT have structural fields
+        assert "spine" not in index["project"]
+        assert "controlling_idea" not in index["project"]
+        assert "value" not in index["project"]
+        assert "value_at_open" not in index["project"]
+        assert "value_at_close" not in index["project"]
+        assert "inciting_incident_scene_id" not in index["project"]
+        assert "story_climax_scene_id" not in index["project"]
+        assert "structure_type" not in index["project"]
+
+        # But should still have navigation fields
+        assert index["project"]["name"] == "Test"
+        assert index["project"]["logline"] == "A test logline"
+
     def test_structure_index_includes_file_scenes(self, tmp_path):
         """File scenes with dramatic metadata appear in structure index."""
         from core.index import generate_structure_index, generate_index

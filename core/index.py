@@ -33,6 +33,12 @@ def generate_index(project_path: Path) -> dict:
     index["_full_scenes"] = file_scenes
     index["scenes"] = [_strip_scene_for_navigation(s) for s in file_scenes]
 
+    # Project: same split. Structural/dramatic fields go to structure-index.yaml
+    # under the "story" key. Store full project before stripping.
+    from .constants import PROJECT_STRUCTURAL_FIELDS
+    index["_full_project"] = dict(index["project"])
+    index["project"] = {k: v for k, v in index["project"].items() if k not in PROJECT_STRUCTURAL_FIELDS}
+
     # Populate characters.scenes[] and locations.scenes[] from scene list
     _enrich_entity_scenes(index)
 
@@ -247,12 +253,24 @@ def write_index(index: dict, output_path: Path) -> None:
 def generate_structure_index(index: dict) -> dict:
     """Generate the structure index sidecar from the main index.
 
-    Only file scenes have dramatic metadata. Reads from _full_scenes (stored
-    before navigation stripping) so dramatic metadata is available here.
+    Reads from _full_scenes (stored before navigation stripping) and
+    _full_project (stored before structural field stripping) so dramatic
+    metadata is available here.
     """
-    # Use _full_scenes (preserved before stripping) to access dramatic metadata.
     source_scenes = index.get("_full_scenes", index.get("scenes", []))
+    full_project = index.get("_full_project", index.get("project", {}))
     return {
+        "story": {
+            "id": "story",
+            "value": full_project.get("value", ""),
+            "value_open": full_project.get("value_at_open", ""),
+            "value_close": full_project.get("value_at_close", ""),
+            "spine": full_project.get("spine", ""),
+            "controlling_idea": full_project.get("controlling_idea", ""),
+            "inciting_incident_scene_id": full_project.get("inciting_incident_scene_id", ""),
+            "story_climax_scene_id": full_project.get("story_climax_scene_id", ""),
+            "structure_type": full_project.get("structure_type", ""),
+        },
         "acts": [
             {
                 "id": act["id"],
@@ -351,8 +369,9 @@ def refresh_index(project_path: Path) -> None:
     structure_path = project_path / ".story" / "structure-index.yaml"
     write_structure_index(structure_index, structure_path)
     
-    # Remove internal _full_scenes key before writing main index
+    # Remove internal _full_scenes/_full_project keys before writing main index
     index.pop("_full_scenes", None)
+    index.pop("_full_project", None)
     write_index(index, index_path)
 
 

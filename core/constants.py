@@ -12,6 +12,21 @@ VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 FUZZY_THRESHOLD = 40
 
+# Project fields that are dramatic/structural — these go to structure-index.yaml
+# under the "story" key. All other project fields stay in main index.yaml.
+# Note: value_at_open/value_close in project.md map to value_open/value_close
+# in structure-index for consistency with act/sequence/scene entries.
+PROJECT_STRUCTURAL_FIELDS = frozenset([
+    "spine",
+    "controlling_idea",
+    "value",
+    "value_at_open",
+    "value_at_close",
+    "inciting_incident_scene_id",
+    "story_climax_scene_id",
+    "structure_type",
+])
+
 REQUIRED_FIELDS = {
     "character": ["name", "story_role", "one_sentence"],
     "location": ["name", "one_sentence"],

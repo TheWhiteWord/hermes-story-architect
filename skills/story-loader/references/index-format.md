@@ -26,6 +26,8 @@ project:
   location_count: 2
   world_count: 1
   plot_count: 2
+  sequence_count: 3
+  act_count: 2
 
 characters:
   - id: character-slug
@@ -34,7 +36,8 @@ characters:
     one_sentence: Short description
     sections: [Personality, Background, Voice, Arc, Relationships, Goals]
     scenes:
-      - number: 1
+      - id: scene-slug
+        title: Scene Title
         heading: INT. LOCATION - DAY
 
 locations:
@@ -43,7 +46,8 @@ locations:
     one_sentence: Short description
     sections: [Description, History, Scenes]
     scenes:
-      - number: 1
+      - id: scene-slug
+        title: Scene Title
         heading: INT. LOCATION - DAY
 
 worlds:
@@ -59,21 +63,43 @@ plots:
     status: active
     characters: [character-slug]
     setups:
-      - heading: INT. LOCATION - DAY
-        number: 2
+      - scene_id: scene-slug
         description: What happens at this scene
     payoffs:
-      - heading: INT. LOCATION - NIGHT
-        number: 8
+      - scene_id: scene-slug
         description: Resolution
     sections: [Summary, Obstacles, Stakes]
 
 scenes:
-  - id: 1
+  - id: scene-slug
+    title: Scene Title
+    order: 1
+    status: planned
+    sequence_id: sequence-slug
+    act_id: act-slug
     heading: INT. LOCATION - DAY
-    number: 1
     characters: [character-slug]
+    plots: [plot-slug]
     location: location-slug
+
+sequences:
+  - id: sequence-slug
+    title: Sequence Title
+    order: 1
+    status: planned
+    act_id: act-slug
+    scenes_list: [scene-slug]
+    scene_count: 3
+
+acts:
+  - id: act-slug
+    title: Act Title
+    order: 1
+    status: planned
+    sequences_list: [sequence-slug]
+    scenes_list: [scene-slug]
+    sequence_count: 1
+    scene_count: 3
 ```
 
 ---
@@ -95,6 +121,10 @@ scenes:
 | `location_count` | number | Total locations | code |
 | `world_count` | number | Total worlds | code |
 | `plot_count` | number | Total plots | code |
+| `sequence_count` | number | Total sequences | code |
+| `act_count` | number | Total acts | code |
+
+> **Note:** Story-level structural fields (`spine`, `controlling_idea`, `value`, `value_at_open`, `value_at_close`, `inciting_incident_scene_id`, `story_climax_scene_id`, `structure_type`) live in `.story/structure-index.yaml` under the `story` key, not in the main index.
 
 ### Character
 | Field | Type | Description | Source |
@@ -145,12 +175,41 @@ scenes:
 
 | Field | Type | Description | Source |
 |-------|------|-------------|--------|
-| `id` | number | Sequential (regenerated on each index update) | code |
-| `heading` | string | Fountain heading | code |
-| `number` | number | Sequential (from screenplay order) | code |
-| `characters` | string[] | Character slugs (matched from screenplay) | code |
-| `location` | string | Location slug (matched from screenplay) | code |
-| `plots` | string[] | Plot slugs (from plot setups/payoffs reverse lookup) | code |
+| `id` | string | Dramatic-function slug (e.g. `mara-discovers-files`) | frontmatter |
+| `title` | string | Display name | frontmatter |
+| `order` | number | Position within parent sequence | frontmatter |
+| `status` | string | One of: planned, drafted, written, locked | frontmatter |
+| `sequence_id` | string | Parent sequence slug | frontmatter |
+| `act_id` | string | Parent act slug (denormalized) | frontmatter |
+| `heading` | string | Fountain scene heading | frontmatter |
+| `characters` | string[] | Character slugs | frontmatter |
+| `plots` | string[] | Plot slugs (from reverse lookup) | code |
+| `location` | string | Location slug | frontmatter |
+
+### Sequence
+
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Stable slug | frontmatter |
+| `title` | string | Display name | frontmatter |
+| `order` | number | Position within parent act | frontmatter |
+| `status` | string | One of: planned, in-progress, complete | frontmatter |
+| `act_id` | string | Parent act slug | frontmatter |
+| `scenes_list` | string[] | Scene slugs in this sequence (sorted by order) | code |
+| `scene_count` | number | Total scenes in this sequence | code |
+
+### Act
+
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Stable slug | frontmatter |
+| `title` | string | Display name | frontmatter |
+| `order` | number | Position within story | frontmatter |
+| `status` | string | One of: planned, in-progress, complete | frontmatter |
+| `sequences_list` | string[] | Sequence slugs in this act (sorted by order) | code |
+| `scenes_list` | string[] | Scene slugs in this act (sorted by order) | code |
+| `sequence_count` | number | Total sequences in this act | code |
+| `scene_count` | number | Total scenes in this act | code |
 
 ---
 
@@ -181,3 +240,9 @@ The index does **not** store relationships — they live in the note frontmatter
 ## Story Memory
 
 The index does **not** store story memory. It lives in `.story/memory.md` as plain Markdown.
+
+---
+
+## Structure Index
+
+For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags), see `.story/structure-index.yaml` and its reference: `references/structure-index-format.md`.

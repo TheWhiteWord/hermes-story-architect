@@ -1,3 +1,13 @@
+story:
+  id: story
+  value: Trust
+  value_open: positive
+  value_close: negative
+  spine: "A young person discovers the truth about their world and chooses to escape"
+  controlling_idea: "Freedom requires sacrifice"
+  inciting_incident_scene_id: central-room-day
+  story_climax_scene_id: central-room-night
+  structure_type: Classical
 acts:
 - id: act-1
   value: Trust

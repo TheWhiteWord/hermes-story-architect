@@ -40,9 +40,10 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `story_retrieve` | Get specific sections from a note | `entity_type`, `slug`, `sections` (list of section names, or `['all']`) |
-| `story_edit` | Propose and apply edits (all entity types) | `action`, `target`, `data`, `order_context`, `summary` |
-| `story_create` | Create new entity notes (character, location, world, plot, scene, sequence, act) | `entity_type`, `slug`, `frontmatter` |
+| `story_load` | Load project index, memory, and (optionally) structure-index | `project`, `structure_only` (bool — load only dramatic metadata, skip index.yaml) |
+| `story_retrieve` | Get specific sections from a note | `entity_type`, `slug`, `sections` |
+| `story_edit` | Propose and apply edits | `action`, `target`, `data`, `order_context`, `summary` |
+| `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
 | `story_index` | Regenerate the project index | `project` |
 | `story_search` | Search across all project notes | `query` |
 | `story_dashboard` | Open the dashboard in preview | `project` |
@@ -68,12 +69,15 @@ For `reorder`, provide `order_context`:
 ## Procedure
 
 1. **Understand** — what entity, what change
-2. **Retrieve** — get relevant sections via `story_retrieve`
-3. **Formulate** — build the edit (action type + changes + continuity checks)
-4. **Present** — show the proposed edit in chat, wait for approval
-5. **Apply** — call `story_edit` on approval
-6. **Index** — call `story_index` to regenerate the index
-7. **Confirm** — report what changed
+2. **Load context** — if not already loaded:
+   - Call `story_load` with `project` for navigation/index
+   - If the edit involves story structure, arc, or dramatic function: also call `story_load` with `structure_only: true`
+3. **Retrieve** — get relevant sections via `story_retrieve`
+4. **Formulate** — build the edit (action type + changes + continuity checks)
+5. **Present** — show the proposed edit in chat, wait for approval
+6. **Apply** — call `story_edit` on approval
+7. **Index** — call `story_index` to regenerate the index
+8. **Confirm** — report what changed
 
 ## Entity Creation
 
@@ -101,6 +105,9 @@ The tool schema documents each field's type and description. Load
 - The full field list for an entity type
 - Sub-field structure (plot setups/payoffs use `{scene_id, description}`)
 - To distinguish **frontmatter** (LLM-editable) vs **code** (derived) fields
+
+For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags),
+see `references/structure-index-format.md`.
 
 ### Entity Creation (Required Fields)
 

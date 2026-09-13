@@ -44,6 +44,11 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         if frontmatter["status"] not in VALID_STATUSES:
             warnings.append(f"Invalid status: {frontmatter['status']}")
 
+    if entity_type == "project":
+        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
+
     if entity_type == "scene":
         _validate_enum(frontmatter, "status", SCENE_STATUSES, warnings)
         _validate_enum(frontmatter, "time_of_day", SCENE_TIMES_OF_DAY, warnings, empty_ok=True)
