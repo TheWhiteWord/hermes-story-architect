@@ -249,3 +249,71 @@ The index does **not** store story memory. It lives in `.story/memory.md` as pla
 ## Structure Index
 
 For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags), see `.story/structure-index.yaml` and its reference: `references/structure-index-format.md`.
+| `act_id` | string | Parent act slug (denormalized) | frontmatter |
+| `heading` | string | Fountain scene heading | frontmatter |
+| `characters` | string[] | Character slugs | frontmatter |
+| `plots` | object[] | Plot references: `id` + `beat` (setup or payoff) | code |
+| `location` | string | Location slug | frontmatter |
+
+### Sequence
+
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Stable slug | frontmatter |
+| `title` | string | Display name | frontmatter |
+| `order` | number | Position within parent act | frontmatter |
+| `status` | string | One of: planned, in-progress, complete | frontmatter |
+| `act_id` | string | Parent act slug | frontmatter |
+| `scenes_list` | string[] | Scene slugs in this sequence (sorted by order) | code |
+| `scene_count` | number | Total scenes in this sequence | code |
+| `plots` | object[] | Plots in this sequence: `id` + `has_setup` + `has_payoff` | code |
+
+### Act
+
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `id` | string | Stable slug | frontmatter |
+| `title` | string | Display name | frontmatter |
+| `order` | number | Position within story | frontmatter |
+| `status` | string | One of: planned, in-progress, complete | frontmatter |
+| `sequences_list` | string[] | Sequence slugs in this act (sorted by order) | code |
+| `scenes_list` | string[] | Scene slugs in this act (sorted by order) | code |
+| `sequence_count` | number | Total sequences in this act | code |
+| `scene_count` | number | Total scenes in this act | code |
+| `plots` | object[] | Plots in this act: `id` + `has_setup` + `has_payoff` | code |
+
+---
+
+## Scene Numbering
+
+- `id` is **sequential** (1, 2, 3...), regenerated on each index update
+- `number` mirrors `id` (both are sequential; kept for compatibility)
+- Cross-references use **scene headings** (not numbers) for stability
+
+---
+
+## Relationship Representation
+
+Relationships are **unidirectional** — each character lists their own in frontmatter:
+
+```yaml
+# characters/some-character.md
+related:
+  - id: other-character
+    label: Partner
+    feeling: Wary respect
+```
+
+The index does **not** store relationships — they live in the note frontmatter only.
+
+---
+
+## Story Memory
+
+The index does **not** store story memory. It lives in `.story/memory.md` as plain Markdown.
+
+---
+
+## Structure Index
+
+For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags), see `.story/structure-index.yaml` and its reference: `references/structure-index-format.md`.
