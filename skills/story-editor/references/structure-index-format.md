@@ -106,6 +106,10 @@ scenes:
 | `is_story_climax` | boolean | Marks the story's climax scene | frontmatter |
 | `arc_beat_refs` | array | Reserved for future arc beat linking (always `[]`) | code |
 
+### Non-Event Scenes
+
+McKee says some scenes don't turn — they're exposition, transition, or setup with no value shift. These are valid (sometimes necessary) but structurally weak. Use `dramatic_role: non-event` and leave `value_open`/`value_close` empty. The future structure system can flag them ("this sequence has three non-events in a row") without the data model breaking.
+
 ---
 
 ## Value Arc System

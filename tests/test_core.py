@@ -99,6 +99,19 @@ class TestEntityExtraction:
         warnings = validate_entity("scene", {"title": "Test", "sequence_id": "seq-1", "act_id": "act-1", "dramatic_role": "invalid"})
         assert any("Invalid dramatic_role: invalid" in w for w in warnings)
 
+    def test_validate_scene_accepts_non_event(self):
+        """'non-event' is a valid dramatic_role (McKee: scenes that don't turn)."""
+        warnings = validate_entity("scene", {"title": "Test", "sequence_id": "seq-1", "act_id": "act-1", "dramatic_role": "non-event"})
+        assert not any("Invalid dramatic_role" in w for w in warnings)
+
+    def test_non_event_with_empty_values_is_valid(self):
+        """non-event scenes should leave value_open/value_close empty (no fake value turn)."""
+        warnings = validate_entity("scene", {
+            "title": "Test", "sequence_id": "seq-1", "act_id": "act-1",
+            "dramatic_role": "non-event", "value_open": "", "value_close": ""
+        })
+        assert not any("Invalid" in w for w in warnings)
+
     def test_validate_sequence_invalid_status(self):
         """validate_entity('sequence', {status: 'invalid'}) returns warning."""
         warnings = validate_entity("sequence", {"title": "Test", "act_id": "act-1", "status": "invalid"})
