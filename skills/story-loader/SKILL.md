@@ -38,7 +38,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 |------|---------|----------------|
 | `story_load` | Load project index and memory | `project` (slug or name) |
 | `story_index` | Regenerate the project index | `project` |
-| `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
+| `story_create` | Create new entity notes (characters, locations, worlds, plots, scenes, sequences, acts) | `entity_type`, `slug`, `frontmatter` |
 | `story_dashboard` | Open the dashboard in preview | `project` |
 
 ## Creating a New Project
@@ -65,7 +65,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 
 4. **Confirm** — report loaded project:
    ```
-   Loaded <name> — <scenes> scenes, <characters> characters, <locations> locations, <plots> plots.
+   Loaded <name> — <scenes> scenes, <sequences> sequences, <acts> acts, <characters> characters, <locations> locations, <plots> plots.
    Logline: <logline>
    ```
 
@@ -76,13 +76,21 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - Memory: `.story/memory.md` (continuity map)
 - Match: fuzzy on slug + name, threshold 40
 
+### Entity Quick Reference
+
+| Entity | Key Frontmatter Fields |
+| --- | --- |
+| Scene | `title`, `sequence_id`, `act_id`, `order`, `status`, `characters`, `plots` |
+| Sequence | `title`, `act_id`, `order`, `status`, `climax_scene_id` |
+| Act | `title`, `order`, `status`, `climax_scene_id` |
+
 ## Pitfalls
 
 - **Multiple matches**: list matches, don't guess
 - **Missing index**: run `story_index` first, then retry
 - **Malformed index**: warn but continue with valid sections
 - **No memory file**: not required; skip if absent
-- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only if you need the full field list or sub-field structure (e.g. plot setups/payoffs need `{heading, number, description}`)
+- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only if you need the full field list or sub-field structure (e.g. plot setups/payoffs use `{scene_id, description}`)
 
 ## Verification
 

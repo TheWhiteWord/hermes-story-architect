@@ -28,7 +28,11 @@ def _extract_sections(yaml_data, project_path):
 
     sections_dict = {}
     # Index uses plural keys, but we normalise to singular for the frontend
-    PLURAL_TO_SINGULAR = {'characters': 'character', 'locations': 'location', 'worlds': 'world', 'plots': 'plot'}
+    PLURAL_TO_SINGULAR = {
+        'characters': 'character', 'locations': 'location',
+        'worlds': 'world', 'plots': 'plot',
+        'scenes': 'scene', 'sequences': 'sequence', 'acts': 'act',
+    }
     for plural_key, singular_key in PLURAL_TO_SINGULAR.items():
         folder = ENTITY_FOLDERS[singular_key]
         entities = yaml_data.get(plural_key, [])
@@ -323,26 +327,33 @@ def handler(args: dict, **kwargs) -> str:
     except Exception:
         pass  # Dashboard still works without sections
 
-    # Inject screenplay text the same way — fetch('file://') is blocked in Electron
-    screenplay_path = project_path / "screenplay.fountain"
-    if screenplay_path.exists():
-        screenplay_text = screenplay_path.read_text(encoding="utf-8")
-        html = html.replace(
-            "// ─── Boot ─────────────────────────────────────────────────────────────────────",
-            f'window.__SCREENPLAY_TEXT__ = {json.dumps(screenplay_text)};\n// ─── Boot ─────────────────────────────────────────────────────────────────────',
-        )
-
-        # Inject screenplay stats (computed server-side)
-        try:
-            stats = _compute_screenplay_stats(screenplay_text)
+    # Inject screenplay stats from scene content (reuse _compute_screenplay_stats)
+    # _compute_screenplay_stats() calls tokens_to_html() internally, so stats.scriptHtml
+    # IS the pre-rendered script HTML. No separate assemble_script_from_scenes() needed.
+    from core.index import assemble_scene_content, compute_structural_stats
+    try:
+        scene_text = assemble_scene_content(yaml_data, project_path)
+        if scene_text:
+            stats = _compute_screenplay_stats(scene_text)
             if stats:
                 stats_json = json.dumps(stats)
                 html = html.replace(
                     "// ─── Boot ─────────────────────────────────────────────────────────────────────",
                     f"window.__SCREENPLAY_STATS__ = {stats_json};\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
                 )
-        except Exception:
-            pass  # Dashboard still works without stats
+    except Exception:
+        pass  # Dashboard still works without stats
+
+    # Inject structural stats
+    try:
+        structural_stats = compute_structural_stats(yaml_data)
+        stats_json = json.dumps(structural_stats)
+        html = html.replace(
+            "// ─── Boot ─────────────────────────────────────────────────────────────────────",
+            f"window.__STRUCTURAL_STATS__ = {stats_json};\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
+        )
+    except Exception:
+        pass  # Dashboard still works without structural stats
 
     # Name temp file after the story title
     project_name = (yaml_data.get("project", {}).get("name") or project).strip()

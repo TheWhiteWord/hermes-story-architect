@@ -50,6 +50,8 @@ def handler(args: dict, **kwargs) -> str:
     confirmation = (
         f"Loaded {index['project']['name']} — "
         f"{len(index.get('scenes', []))} scenes, "
+        f"{len(index.get('sequences', []))} sequences, "
+        f"{len(index.get('acts', []))} acts, "
         f"{len(index.get('characters', []))} characters, "
         f"{len(index.get('locations', []))} locations, "
         f"{len(index.get('plots', []))} plots."

@@ -4,15 +4,12 @@ one_sentence: Kael and Mira organize the children to breach the Central Room.
 status: active
 characters: [kael, mira]
 setups:
-  - number: '2'
-    heading: INT. CENTRAL ROOM - DAY
+  - scene_id: central-room-day
     description: Kael discovers the door isn't locked — it was never locked.
-  - number: '6'
-    heading: INT. CENTRAL ROOM - NIGHT
+  - scene_id: central-room-night
     description: The Administrator makes its final offer. Kael refuses.
 payoffs:
-  - number: '8'
-    heading: INT. THE CORE - DAY
+  - scene_id: the-core-day
     description: The children emerge into the real world for the first time.
 ---
 

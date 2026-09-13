@@ -37,7 +37,7 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `story_retrieve` | Get specific sections from a note | `entity_type`, `slug`, `sections` (list of section names, or `['all']`) |
-| `story_edit` | Propose and apply edits | `action`, `target`, `changes`, `summary` |
+| `story_edit` | Propose and apply edits | `action`, `target`, `data`, `order_context`, `summary` |
 | `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
 | `story_index` | Regenerate the project index | `project` |
 | `story_search` | Search across all project notes | `query` |
@@ -47,18 +47,22 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 
 | Action | What it does |
 |--------|--------------|
-| `edit_note` | Edit an entity note's frontmatter or body sections |
+| `edit_note` | Edit an entity note using `data` bag (frontmatter fields + body sections) |
 | `edit_screenplay` | Edit the screenplay.fountain file |
-| `create_entity` | Create a new entity note |
-| `delete_entity` | Move entity to `_recycle-bin/` |
-| `update_story_memory` | Update `.story/memory.md` |
+| `create_entity` | Create a new entity note — works for all entity types |
+| `delete_entity` | Move entity to `_recycle-bin/` (blocks if structural types have children) |
+| `update_story_memory` | Update `.story/memory.md` using `data` bag |
+| `reorder` | Reorder scenes/sequences — batch renumber `order` fields by providing complete new ordering |
 
-### story_edit Changes Shape
+### story_edit Data Shape
 
-For `edit_note`, each change object has:
-- `type`: `"body_section"` or `"frontmatter"`
-- For `"body_section"`: `section` (name), `new` (content)
-- For `"frontmatter"`: `field` (name), `value` (new value)
+For `edit_note` and `update_story_memory`, use the simplified `data` bag:
+
+- **Key name** determines routing: if the key matches a schema field → frontmatter update. If it matches a standard section name → body section update via `replace_section()`.
+- No `type` discriminator needed (old `changes` array with `type: "body_section"|"frontmatter"` is deprecated).
+
+For `reorder`, provide `order_context`:
+- `ordered_ids`: complete list of scene/sequence slugs in the desired order. Handler renumbers `order` fields as 1, 2, 3... All items must exist and belong to the same parent.
 
 ## Procedure
 
@@ -75,6 +79,10 @@ For `edit_note`, each change object has:
 When creating entities, `story_create` auto-fills all expected fields with empty
 defaults. A character with only `name` still gets `relationships`, `goals_short`, etc.
 
+For structural types, additional rules apply:
+- **Parent validation**: scenes require `sequence_id` (sequence must exist) and `act_id` (act must exist). Sequences require `act_id`.
+- **Auto-order**: if `order` is omitted or 0, the next available position in the parent is assigned automatically.
+
 **Required fields** (should be filled for a useful note):
 - `name` — display name for the entity
 - `story_role` (character) — role in the story (Protagonist/Antagonist/Supporting/Minor/Cameo)
@@ -90,8 +98,16 @@ defaults. A character with only `name` still gets `relationships`, `goals_short`
 The tool schema documents each field's type and description. Load
 `references/index-format.md` only if you need:
 - The full field list for an entity type
-- Sub-field structure (plot setups/payoffs use `{heading, number, description}`)
+- Sub-field structure (plot setups/payoffs use `{scene_id, description}`)
 - To distinguish **frontmatter** (LLM-editable) vs **code** (derived) fields
+
+### Entity Creation (Required Fields)
+
+| Entity | Required Fields |
+|--------|-----------------|
+| Scene | `title`, `sequence_id`, `act_id` |
+| Sequence | `title`, `act_id` |
+| Act | `title` |
 
 ### Entity Quick Reference
 
@@ -100,7 +116,10 @@ The tool schema documents each field's type and description. Load
 | Character | `name`, `story_role`, `one_sentence`, `relationships` ({id, label, feeling}), `goals_short`, `goals_long`, `knowledge` |
 | Location | `name`, `one_sentence` |
 | World | `name`, `one_sentence`, `rules` |
-| Plot | `name`, `status`, `setups` ({heading, number, description}), `payoffs` ({heading, number, description}), `characters`, `one_sentence` |
+| Plot | `name`, `status`, `setups` ({scene_id, description}), `payoffs` ({scene_id, description}), `characters`, `one_sentence` |
+| Scene | `id`, `title`, `order`, `status`, `sequence_id`, `act_id`, `characters`, `plots` |
+| Sequence | `id`, `title`, `order`, `status`, `act_id`, `climax_scene_id` |
+| Act | `id`, `title`, `order`, `status`, `climax_scene_id` |
 
 ## Continuity Checks
 
@@ -115,6 +134,8 @@ For categories and examples, see `references/continuity-checks.md`.
 - Applying without approval
 - Forgetting to update index after edit
 - Deleting instead of moving to recycle bin
+- Deleting a sequence that has scenes → blocked by cascade check
+- Deleting an act that has sequences → blocked by cascade check
 
 ## Verification
 

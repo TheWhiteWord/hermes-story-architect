@@ -52,7 +52,7 @@ def _build_schema() -> dict:
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["character", "location", "world", "plot"],
+                "enum": ["character", "location", "world", "plot", "scene", "sequence", "act"],
                 "description": "Type of entity to create",
             },
             "slug": {
@@ -108,6 +108,19 @@ def handler(args: dict, **kwargs) -> str:
     import frontmatter
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+
+    # Parent validation + auto-order for structural types
+    if entity_type in ("scene", "sequence"):
+        try:
+            _validate_parents(project_path, entity_type, merged)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
+        if merged.get("order", 0) == 0:
+            parent = "sequence" if entity_type == "scene" else "act"
+            parent_id = merged.get("sequence_id") or merged.get("act_id")
+            if parent_id:
+                merged["order"] = _get_next_order(project_path, parent, parent_id)
+
     post = frontmatter.Post("", **merged)
     
     # Add standard sections based on entity type
@@ -140,6 +153,46 @@ def handler(args: dict, **kwargs) -> str:
     })
 
 
+def _validate_parents(project_path: Path, entity_type: str, frontmatter: dict) -> None:
+    """Raise ValueError if referenced parents don't exist."""
+    if entity_type == "scene":
+        if frontmatter.get("sequence_id") and not _entity_exists(project_path, "sequence", frontmatter["sequence_id"]):
+            raise ValueError(f"Sequence not found: {frontmatter['sequence_id']}")
+        if frontmatter.get("act_id") and not _entity_exists(project_path, "act", frontmatter["act_id"]):
+            raise ValueError(f"Act not found: {frontmatter['act_id']}")
+    elif entity_type == "sequence":
+        if frontmatter.get("act_id") and not _entity_exists(project_path, "act", frontmatter["act_id"]):
+            raise ValueError(f"Act not found: {frontmatter['act_id']}")
+
+
+def _get_next_order(project_path: Path, parent_type: str, parent_id: str) -> int:
+    """Compute the next order value for a new child within its parent."""
+    folder = "scenes" if parent_type == "sequence" else "sequences"
+    field = "sequence_id" if parent_type == "sequence" else "act_id"
+    child_dir = project_path / folder
+    if not child_dir.exists():
+        return 1
+    import frontmatter
+    max_order = 0
+    for note in child_dir.glob("*.md"):
+        if note.name.startswith("_"):
+            continue
+        post = frontmatter.load(note)
+        if post.get(field) == parent_id:
+            order = post.get("order", 0)
+            if isinstance(order, (int, float)) and order > max_order:
+                max_order = order
+    return int(max_order) + 1
+
+
+def _entity_exists(project_path: Path, entity_type: str, slug: str) -> bool:
+    """Check if an entity file exists."""
+    if not slug:
+        return False
+    folder = ENTITY_FOLDERS[entity_type]
+    return (project_path / folder / f"{slug}.md").exists()
+
+
 def _get_standard_sections(entity_type: str) -> list[str]:
     """Get standard sections for an entity type."""
     sections = {
@@ -147,5 +200,8 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "location": ["Description", "History", "Scenes"],
         "world": ["Description", "History", "Conflict"],
         "plot": ["Summary", "Obstacles", "Stakes"],
+        "scene": ["Description", "Dramatic Function", "Notes", "Content"],
+        "sequence": ["Summary", "Scene Order", "Notes"],
+        "act": ["Summary", "Thematic Function", "Notes"],
     }
     return sections.get(entity_type, [])

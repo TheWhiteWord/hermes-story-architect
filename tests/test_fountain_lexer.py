@@ -572,7 +572,6 @@ I was meant to find this.
         from core.index import generate_index
         index = generate_index(project)
         
-        assert index["project"]["scene_count"] == 2
-        assert len(index["scenes"]) == 2
-        # Character names are matched to slugs by the index generator
-        assert "kael" in index["scenes"][0]["characters"]
+        # Phase 2: scenes come from files only, not screenplay merge
+        assert index["project"]["scene_count"] == 0
+        assert len(index["scenes"]) == 0
