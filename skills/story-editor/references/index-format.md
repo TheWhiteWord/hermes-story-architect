@@ -164,10 +164,11 @@ acts:
 | `id` | string | Slug (from filename) | filename |
 | `name` | string | Display name | frontmatter |
 | `one_sentence` | string | One-sentence summary for index label | frontmatter |
+| `plot_type` | string | One of: Contradictory, Resonant, Complicating, Setup | frontmatter |
 | `status` | string | One of: active, resolved, abandoned | frontmatter |
 | `characters` | string[] | Character slugs (frontmatter-only) | frontmatter |
-| `setups` | object[] | Scenes where plot is established: `heading` + `number` (id) + `description` | frontmatter |
-| `payoffs` | object[] | Scenes where plot resolves: `heading` + `number` (id) + `description` | frontmatter |
+| `setups` | object[] | Scenes where plot is established: `scene_id` + `description` | frontmatter |
+| `payoffs` | object[] | Scenes where plot resolves: `scene_id` + `description` | frontmatter |
 | `sections` | string[] | Available `##` headings | code |
 
 ### Scene
@@ -183,7 +184,7 @@ acts:
 | `act_id` | string | Parent act slug (denormalized) | frontmatter |
 | `heading` | string | Fountain scene heading | frontmatter |
 | `characters` | string[] | Character slugs | frontmatter |
-| `plots` | string[] | Plot slugs (from reverse lookup) | code |
+| `plots` | object[] | Plot references: `id` + `beat` (setup or payoff) | code |
 | `location` | string | Location slug | frontmatter |
 
 ### Sequence
@@ -197,6 +198,7 @@ acts:
 | `act_id` | string | Parent act slug | frontmatter |
 | `scenes_list` | string[] | Scene slugs in this sequence (sorted by order) | code |
 | `scene_count` | number | Total scenes in this sequence | code |
+| `plots` | object[] | Plots in this sequence: `id` + `has_setup` + `has_payoff` | code |
 
 ### Act
 
@@ -210,6 +212,7 @@ acts:
 | `scenes_list` | string[] | Scene slugs in this act (sorted by order) | code |
 | `sequence_count` | number | Total sequences in this act | code |
 | `scene_count` | number | Total scenes in this act | code |
+| `plots` | object[] | Plots in this act: `id` + `has_setup` + `has_payoff` | code |
 
 ---
 

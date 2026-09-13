@@ -10,6 +10,7 @@ SCENE_TIMES_OF_DAY = ["DAY", "NIGHT", "DUSK", "DAWN", "CONTINUOUS", "LATER"]
 SCENE_DRAMATIC_ROLES = ["setup", "complication", "crisis", "climax", "resolution", "transition", "non-event"]
 VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
+PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
 FUZZY_THRESHOLD = 40
 
 # Project fields that are dramatic/structural — these go to structure-index.yaml
@@ -86,6 +87,7 @@ ENTITY_SCHEMAS = {
     "plot": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
         "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary for index label"},
+        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
         "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug (e.g. mara-discovers-files)", "description": "What happens at this scene"}},

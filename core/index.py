@@ -54,6 +54,10 @@ def generate_index(project_path: Path) -> dict:
     # Build derived structure lists
     _enrich_structure(index)
 
+    # Derive plots at sequence and act level (from their scenes)
+    _enrich_sequences_with_plots(index)
+    _enrich_acts_with_plots(index)
+
     # Validate
     _validate_index(index)
 
@@ -104,8 +108,46 @@ def _enrich_scenes_with_plots(index: dict) -> None:
             if scene:
                 if "plots" not in scene:
                     scene["plots"] = []
-                if plot["id"] not in scene["plots"]:
-                    scene["plots"].append(plot["id"])
+                beat_type = "setup" if beat in plot.get("setups", []) else "payoff"
+                scene["plots"].append({"id": plot["id"], "beat": beat_type})
+
+
+def _enrich_sequences_with_plots(index: dict) -> None:
+    """Add plots[] to each sequence derived from its scenes."""
+    for seq in index.get("sequences", []):
+        seq_plots = {}
+        for scene in index.get("scenes", []):
+            if scene.get("sequence_id") != seq["id"]:
+                continue
+            for p in scene.get("plots", []):
+                pid = p.get("id") if isinstance(p, dict) else p
+                if pid not in seq_plots:
+                    seq_plots[pid] = {"id": pid, "has_setup": False, "has_payoff": False}
+                beat = p.get("beat", "") if isinstance(p, dict) else ""
+                if beat == "setup":
+                    seq_plots[pid]["has_setup"] = True
+                elif beat == "payoff":
+                    seq_plots[pid]["has_payoff"] = True
+        seq["plots"] = sorted(seq_plots.values(), key=lambda x: x["id"])
+
+
+def _enrich_acts_with_plots(index: dict) -> None:
+    """Add plots[] to each act derived from its scenes."""
+    for act in index.get("acts", []):
+        act_plots = {}
+        for scene in index.get("scenes", []):
+            if scene.get("act_id") != act["id"]:
+                continue
+            for p in scene.get("plots", []):
+                pid = p.get("id") if isinstance(p, dict) else p
+                if pid not in act_plots:
+                    act_plots[pid] = {"id": pid, "has_setup": False, "has_payoff": False}
+                beat = p.get("beat", "") if isinstance(p, dict) else ""
+                if beat == "setup":
+                    act_plots[pid]["has_setup"] = True
+                elif beat == "payoff":
+                    act_plots[pid]["has_payoff"] = True
+        act["plots"] = sorted(act_plots.values(), key=lambda x: x["id"])
 
 
 def _normalize_plot_scene(scene_ref):

@@ -619,9 +619,9 @@ class TestSceneIndex:
 
         index = generate_index(project_path)
 
-        # Scene should have plot reference
+        # Scene should have plot reference with beat type
         scene = next(s for s in index["scenes"] if s["id"] == "key-scene")
-        assert "main" in scene.get("plots", [])
+        assert any(p["id"] == "main" and p["beat"] == "setup" for p in scene.get("plots", []))
 
         # Plot setup should be normalized to {scene_id, description}
         plot = next(p for p in index["plots"] if p["id"] == "main")

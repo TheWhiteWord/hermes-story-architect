@@ -5,7 +5,7 @@ from .constants import (
     REQUIRED_FIELDS, VALID_ROLES, VALID_STATUSES,
     SCENE_STATUSES, SEQUENCE_STATUSES, ACT_STATUSES,
     SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
-    VALUE_CHARGES, STRUCTURE_TYPES,
+    VALUE_CHARGES, STRUCTURE_TYPES, PLOT_TYPES,
 )
 from .section_parser import list_sections
 
@@ -43,6 +43,7 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
     if entity_type == "plot" and "status" in frontmatter:
         if frontmatter["status"] not in VALID_STATUSES:
             warnings.append(f"Invalid status: {frontmatter['status']}")
+        _validate_enum(frontmatter, "plot_type", PLOT_TYPES, warnings, empty_ok=True)
 
     if entity_type == "project":
         _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
