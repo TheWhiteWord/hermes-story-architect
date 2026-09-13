@@ -9,13 +9,14 @@ SCHEMA = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["edit_note", "edit_screenplay", "delete_entity", "update_story_memory", "create_entity", "reorder"],
-            "description": "Action type"
+            "enum": ["edit_note", "delete_entity", "update_story_memory", "reorder"],
+            "description": "Action type: edit_note (edit entity frontmatter/body sections), delete_entity (move to recycle-bin, blocked if has children), update_story_memory, reorder (batch renumber order fields for scenes/sequences)"
         },
         "target": {
             "type": "object",
+            "description": "Target entity (omit for update_story_memory)",
             "properties": {
-                "entity_type": {"type": "string"},
+                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act"]},
                 "slug": {"type": "string"}
             }
         },
@@ -52,7 +53,6 @@ def handler(args: dict, **kwargs) -> str:
     
     action = args["action"]
     target = args["target"]
-    changes = args.get("changes", [])
     data = args.get("data", {})
     summary = args["summary"]
     
@@ -64,12 +64,8 @@ def handler(args: dict, **kwargs) -> str:
     
     if action == "edit_note":
         result = _edit_note(project_path, target, data, summary)
-    elif action == "edit_screenplay":
-        return _edit_screenplay(project_path, changes, summary)
     elif action == "delete_entity":
         result = _delete_entity(project_path, target, summary)
-    elif action == "create_entity":
-        result = _create_entity(project_path, target, data, summary)
     elif action == "update_story_memory":
         result = _update_story_memory(project_path, data, summary)
     elif action == "reorder":
@@ -131,39 +127,6 @@ def _edit_note(project_path: Path, target: dict, data: dict, summary: str) -> st
         "success": True,
         "message": f"Applied: {summary}",
         "file": str(file_path)
-    })
-
-
-def _edit_screenplay(project_path: Path, changes: list, summary: str) -> str:
-    """Edit screenplay.fountain."""
-    from core.screenplay import extract_scenes
-    from core.fountain_lexer import tokenize
-    
-    screenplay_path = project_path / "screenplay.fountain"
-    if not screenplay_path.exists():
-        return json.dumps({"error": "screenplay.fountain not found"})
-    
-    content = screenplay_path.read_text()
-    tokens = tokenize(content)
-    
-    # Apply changes (simplified — full implementation would modify tokens)
-    for change in changes:
-        # TODO: implement screenplay editing logic
-        pass
-    
-    # Reconstruct fountain text from tokens
-    lines = []
-    for token in tokens:
-        if token['type'] not in ('separator', 'dialogue_begin', 'dialogue_end', 'dual_dialogue_begin', 'dual_dialogue_end'):
-            lines.append(token['text'])
-    
-    new_content = '\n'.join(lines)
-    screenplay_path.write_text(new_content)
-    
-    return json.dumps({
-        "success": True,
-        "message": f"Applied: {summary}",
-        "file": str(screenplay_path)
     })
 
 
@@ -277,44 +240,7 @@ def _check_no_children(project_path: Path, child_folder: str, parent_field: str,
         )
 
 
-def _create_entity(project_path: Path, target: dict, data: dict, summary: str) -> str:
-    """Create a new entity note."""
-    import frontmatter
 
-    entity_type = target.get("entity_type", "")
-    slug = target.get("slug", "")
-    frontmatter_data = target.get("frontmatter", {})
-    folder = ENTITY_FOLDERS.get(entity_type, "")
-    file_path = project_path / folder / f"{slug}.md"
-
-    if file_path.exists():
-        return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
-
-    # Generate frontmatter — merge over schema defaults so all fields are present
-    schema = ENTITY_SCHEMAS.get(entity_type, {})
-    merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
-    post = frontmatter.Post("", **merged)
-
-    # Add standard sections based on entity type
-    sections = _get_standard_sections(entity_type)
-    if sections:
-        post.content = "\n\n".join(f"## {s}\n" for s in sections)
-
-    # Ensure folder exists
-    file_path.parent.mkdir(exist_ok=True)
-
-    # Write file
-    with open(file_path, 'w') as f:
-        frontmatter.dump(post, f)
-
-    # Refresh index so story_load reflects changes immediately
-    _refresh_index(project_path)
-
-    return json.dumps({
-        "success": True,
-        "message": f"Applied: {summary}",
-        "file": str(file_path)
-    })
 
 
 def _update_story_memory(project_path: Path, data: dict, summary: str) -> str:

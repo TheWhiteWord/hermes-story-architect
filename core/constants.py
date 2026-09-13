@@ -92,7 +92,7 @@ ENTITY_SCHEMAS = {
         "structure_type": {"type": "string", "default": "", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
     },
     "scene": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug (user-assigned, dramatic function)"},
+        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug reflecting dramatic function (e.g., 'mara-discovers-files'), NOT the physical heading"},
         "type": {"type": "string", "default": "scene", "optional": False, "description": "Always 'scene'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name (freely editable)"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},

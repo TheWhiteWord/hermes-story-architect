@@ -1,6 +1,6 @@
 ---
 name: story-editor
-description: "Edit story entities, screenplay, and memory with review loop."
+description: "Edit story entities and memory with review loop."
 version: 0.2.0
 author: TWW, Hermes Agent
 license: MIT
@@ -13,8 +13,12 @@ metadata:
 
 # Story Editor Skill
 
-Edits story entities, screenplay, and memory through a review loop. Every edit
+Edits story entities and memory through a review loop. Every edit
 is proposed, reviewed for continuity, and applied only on explicit approval.
+
+**Content model:** Scenes are individual files with `## Content` sections holding
+Fountain text. The dashboard assembles the screenplay view from scenes in
+sequence. To change scene content, use `edit_note` with `data: {Content: "..."}`.
 
 ## When to Use
 
@@ -37,8 +41,8 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `story_retrieve` | Get specific sections from a note | `entity_type`, `slug`, `sections` (list of section names, or `['all']`) |
-| `story_edit` | Propose and apply edits | `action`, `target`, `data`, `order_context`, `summary` |
-| `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
+| `story_edit` | Propose and apply edits (all entity types) | `action`, `target`, `data`, `order_context`, `summary` |
+| `story_create` | Create new entity notes (character, location, world, plot, scene, sequence, act) | `entity_type`, `slug`, `frontmatter` |
 | `story_index` | Regenerate the project index | `project` |
 | `story_search` | Search across all project notes | `query` |
 | `story_dashboard` | Open the dashboard in preview | `project` |
@@ -48,8 +52,6 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 | Action | What it does |
 |--------|--------------|
 | `edit_note` | Edit an entity note using `data` bag (frontmatter fields + body sections) |
-| `edit_screenplay` | Edit the screenplay.fountain file |
-| `create_entity` | Create a new entity note — works for all entity types |
 | `delete_entity` | Move entity to `_recycle-bin/` (blocks if structural types have children) |
 | `update_story_memory` | Update `.story/memory.md` using `data` bag |
 | `reorder` | Reorder scenes/sequences — batch renumber `order` fields by providing complete new ordering |
@@ -59,7 +61,6 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 For `edit_note` and `update_story_memory`, use the simplified `data` bag:
 
 - **Key name** determines routing: if the key matches a schema field → frontmatter update. If it matches a standard section name → body section update via `replace_section()`.
-- No `type` discriminator needed (old `changes` array with `type: "body_section"|"frontmatter"` is deprecated).
 
 For `reorder`, provide `order_context`:
 - `ordered_ids`: complete list of scene/sequence slugs in the desired order. Handler renumbers `order` fields as 1, 2, 3... All items must exist and belong to the same parent.
@@ -117,7 +118,7 @@ The tool schema documents each field's type and description. Load
 | Location | `name`, `one_sentence` |
 | World | `name`, `one_sentence`, `rules` |
 | Plot | `name`, `status`, `setups` ({scene_id, description}), `payoffs` ({scene_id, description}), `characters`, `one_sentence` |
-| Scene | `id`, `title`, `order`, `status`, `sequence_id`, `act_id`, `characters`, `plots` |
+| Scene | `id` (dramatic-function slug, e.g. `mara-discovers-files`), `title` (display name), `order`, `status`, `sequence_id`, `act_id`, `characters`, `plots` |
 | Sequence | `id`, `title`, `order`, `status`, `act_id`, `climax_scene_id` |
 | Act | `id`, `title`, `order`, `status`, `climax_scene_id` |
 

@@ -80,9 +80,9 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 
 | Entity | Key Frontmatter Fields |
 | --- | --- |
-| Scene | `title`, `sequence_id`, `act_id`, `order`, `status`, `characters`, `plots` |
-| Sequence | `title`, `act_id`, `order`, `status`, `climax_scene_id` |
-| Act | `title`, `order`, `status`, `climax_scene_id` |
+| Scene | `id` (dramatic-function slug, e.g. `mara-discovers-files`), `title` (display name), `sequence_id`, `act_id`, `order`, `status`, `characters`, `plots` |
+| Sequence | `id`, `title`, `act_id`, `order`, `status`, `climax_scene_id` |
+| Act | `id`, `title`, `order`, `status`, `climax_scene_id` |
 
 ## Pitfalls
 
