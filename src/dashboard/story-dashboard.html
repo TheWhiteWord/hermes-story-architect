@@ -344,7 +344,7 @@ html, body {
 }
 .tag-scene { background: rgba(123,156,240,0.12); color: var(--accent); }
 .tag-location { background: rgba(107,191,176,0.12); color: #6bbfb0; }
-.tag-plot { background: rgba(255, 195, 150, 0.18); color: #d4956b; }
+.tag-struct { background: rgba(255, 150, 50, 0.18); color: #e0a86b; }
 .tag-char { background: rgba(107,191,176,0.1); color: var(--muted-foreground); border: 1px solid var(--border); }
 
 .status-badge {
@@ -1493,6 +1493,9 @@ html, body {
         <div class="stats-section-label">Dramatic role distribution</div>
         <div class="duration-bar-group" id="structStats-role-bars"></div>
 
+        <div class="stats-section-label">Plot coverage</div>
+        <div class="duration-bar-group" id="structStats-plot-coverage"></div>
+
         <div class="stats-section-label">Acts</div>
         <div id="structStats-act-list"></div>
 
@@ -1966,17 +1969,21 @@ function renderSceneItem(s) {
     const l = findLocation(lref);
     return l ? `<span class="tag tag-location">${escapeHtml(l.name)}</span>` : '';
   }).join('');
-  const plotTags = (s.plots || []).map(pid => {
-    const p = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
-    return p ? `<span class="tag tag-plot">${escapeHtml(p.name)}</span>` : '';
-  }).join('');
+  // Structural tags: dramatic_role + climax flags (orange)
+  const structTags = [];
+  if (s.dramatic_role) structTags.push(s.dramatic_role);
+  if (s.is_inciting_incident) structTags.push('inciting');
+  if (s.is_sequence_climax) structTags.push('seq-climax');
+  if (s.is_act_climax) structTags.push('act-climax');
+  if (s.is_story_climax) structTags.push('story-climax');
+  const structHtml = structTags.map(t => `<span class="tag tag-struct">${t}</span>`).join('');
   return `
     <div class="scene-item" data-id="${s.id}">
       <div class="scene-number">${String(s.order || 0).padStart(2, '0')}</div>
       <div class="scene-body">
         <div class="scene-heading">${s.title || s.id}</div>
         ${s.heading ? `<div class="panel-muted" style="font-size:var(--font-size-xs);margin-top:2px;">${escapeHtml(s.heading)}</div>` : ''}
-        <div class="scene-meta">${charTags}${locTags}${plotTags}</div>
+        <div class="scene-meta">${charTags}${locTags}${structHtml}</div>
       </div>
     </div>
   `;
@@ -2027,32 +2034,68 @@ function buildLocationsView() {
 }
 
 // ─── Plots View ────────────────────────────────────────────────────────────────
+const PLOT_TYPE_COLORS = {
+  Contradictory: '#e07070',
+  Resonant: '#7b9cf0',
+  Complicating: '#e0a86b',
+  Setup: '#6bbfb0',
+};
+
+function plotScopeBadge(pl) {
+  if (pl.plot_scope === 'main') {
+    const arc = pl.value_arc || '';
+    return `<span class="tag" style="background:rgba(176,123,224,0.18);color:#b07be0">MAIN${arc ? ' · ' + arc.toUpperCase() : ''}</span>`;
+  }
+  const pt = pl.plot_type || '';
+  if (pt) {
+    const col = PLOT_TYPE_COLORS[pt] || '#888';
+    return `<span class="tag" style="background:${col}22;color:${col}">${pt.toUpperCase()}</span>`;
+  }
+  return '';
+}
+
 function buildPlotsView() {
   const plots = story.plots || [];
+  const main = plots.filter(p => p.plot_scope === 'main');
+  const subs = plots.filter(p => p.plot_scope !== 'main');
   document.getElementById('plots-subtitle').textContent = plots.length + ' threads';
   const list = document.getElementById('plot-list');
   if (!plots.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No plots</div></div>';
     return;
   }
-  list.innerHTML = plots.map(pl => {
+
+  function renderPlotCard(pl) {
     const charTags = (pl.characters || []).map(cid => {
       const c = (story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
       return c ? `<span class="tag tag-char">${c.name}</span>` : '';
     }).join('');
+    const scopeBadge = plotScopeBadge(pl);
     return `
       <div class="entity-card" data-id="${pl.id}" onclick="showPlotPanel('${pl.id}')">
-        <div class="entity-card-pip" style="background:#b07be0"></div>
+        <div class="entity-card-pip" style="background:${pl.plot_scope === 'main' ? '#b07be0' : (PLOT_TYPE_COLORS[pl.plot_type] || '#888')}"></div>
         <div class="entity-card-body">
-          <div class="entity-card-name" style="display:flex;align-items:center;gap:8px;">
+          <div class="entity-card-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             ${pl.name}
+            ${scopeBadge}
             <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
           </div>
           <div class="entity-card-sub">${pl.one_sentence || ''}</div>
           ${charTags ? `<div class="entity-card-meta">${charTags}</div>` : ''}
         </div>
       </div>`;
-  }).join('');
+  }
+
+  let html = '';
+  if (main.length) {
+    html += `<div class="story-section-title" style="margin-bottom:6px">Main Plot</div>`;
+    html += main.map(renderPlotCard).join('');
+  }
+  if (subs.length) {
+    if (main.length) html += `<div class="story-section-title" style="margin:12px 0 6px">Subplots</div>`;
+    html += subs.map(renderPlotCard).join('');
+  }
+  list.innerHTML = html;
 }
 
 function buildSequencesView() {/* removed */}
@@ -2152,19 +2195,25 @@ function buildStoryView() {
 
   // Plots
   const plots = story.plots || [];
-  const plotsHtml = plots.length ? `
+  const mainPlots = plots.filter(p => p.plot_scope === 'main');
+  const subPlots = plots.filter(p => p.plot_scope !== 'main');
+  const allPlotItems = [...mainPlots, ...subPlots];
+  const plotsHtml = allPlotItems.length ? `
     <div>
       <div class="story-section-title">Active plot threads</div>
       <div class="plot-list">
-        ${plots.map(pl => `
-          <div class="plot-item" onclick="showPlotPanel('${pl.id}')">
+        ${allPlotItems.map(pl => {
+          const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+          const col = pl.plot_scope === 'main' ? '#b07be0' : (PLOT_TYPE_COLORS[pl.plot_type] || '#888');
+          return `<div class="plot-item" onclick="showPlotPanel('${pl.id}')">
             <div class="plot-header">
               <span class="plot-name">${pl.name}</span>
+              ${scope ? `<span class="tag" style="background:${col}22;color:${col};font-size:var(--font-size-xs)">${scope}</span>` : ''}
               <span class="status-badge ${pl.status || ''}">${pl.status || 'active'}</span>
             </div>
             <div class="plot-sentence">${pl.one_sentence || ''}</div>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>` : '';
 
@@ -2304,9 +2353,16 @@ function showScenePanel(sceneId) {
 
   // Plots: backend populates scene.plots from plot setups/payoffs
   const plotRefs = (scene.plots || []);
-  const plots = plotRefs.map(pid => {
+  const plots = plotRefs.map(pref => {
+    const pid = (typeof pref === 'object' && pref !== null) ? pref.id : pref;
+    const beat = (typeof pref === 'object' && pref !== null) ? (pref.beat || '') : '';
     const pl = (story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
-    return pl ? `<button class="entity-link tag-plot" onclick="showPlotPanel('${pl.id}')">${pl.name}</button>` : '';
+    if (!pl) return '';
+    const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+    const col = pl.plot_scope === 'main' ? '#b07be0' : (PLOT_TYPE_COLORS[pl.plot_type] || '#888');
+    const beatLabel = beat ? ` · ${beat.toUpperCase()}` : '';
+    const scopeLabel = scope ? ` · ${scope}` : '';
+    return `<button class="entity-link" onclick="showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${beatLabel}</span></button>`;
   }).filter(Boolean).join('');
 
   // Content from __SECTIONS__.scenes[slug]["Content"]
@@ -2333,7 +2389,7 @@ function showScenePanel(sceneId) {
   const dramaHtml = (dramaTags.length || valueArc.length || conflicts.length) ? `
     <div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
-        ${dramaTags.map(t => `<span class="tag tag-plot">${t.v}</span>`).join('')}
+        ${dramaTags.map(t => `<span class="tag tag-struct">${t.v}</span>`).join('')}
         ${conflicts.map(c => `<span class="tag tag-char" style="font-size:var(--font-size-xs)">${c}</span>`).join('')}
       </div>
       ${valueArc.length ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:8px">Value arc: ${valueArc.join(' → ')}</div>` : ''}
@@ -2450,7 +2506,12 @@ function showPlotPanel(plotId) {
   const plot = (story.plots || []).find(p => p.id === plotId || String(p.id) === String(plotId));
   if (!plot) return;
 
-  document.getElementById('panel-type').textContent = 'Plot thread';
+  const scope = plot.plot_scope === 'main' ? 'MAIN' : (plot.plot_type || '');
+  const col = plot.plot_scope === 'main' ? '#b07be0' : (PLOT_TYPE_COLORS[plot.plot_type] || '#888');
+  const scopeHtml = scope ? `<span class="tag" style="background:${col}22;color:${col}">${scope}</span>` : '';
+  const arcHtml = (plot.plot_scope === 'main' && plot.value_arc) ? `<div style="margin-top:4px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc</span><div style="font-size:var(--font-size-sm);color:var(--foreground)">${plot.value_arc}</div></div>` : '';
+
+  document.getElementById('panel-type').textContent = plot.plot_scope === 'main' ? 'Main Plot' : 'Subplot';
   document.getElementById('panel-name').textContent = plot.name;
 
   const chars = (plot.characters || []).map(cid => {
@@ -2480,8 +2541,12 @@ function showPlotPanel(plotId) {
   }
 
   const setupObjs = plot.setups || [];
+  const crisisObjs = plot.crisis || [];
+  const climaxObjs = plot.climax || [];
   const payoffObjs = plot.payoffs || [];
   const setupsHtml = renderBeats(setupObjs);
+  const crisisHtml = renderBeats(crisisObjs);
+  const climaxHtml = renderBeats(climaxObjs);
   const payoffsHtml = renderBeats(payoffObjs);
 
   document.getElementById('panel-body').innerHTML = `
@@ -2489,7 +2554,11 @@ function showPlotPanel(plotId) {
       <div class="panel-section-title">Thread</div>
       <div class="panel-text">${plot.one_sentence || '—'}</div>
     </div>
-    <div><span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${scopeHtml}
+      <span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span>
+    </div>
+    ${arcHtml}
     ${chars ? `<div>
       <div class="panel-section-title">Characters involved</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
@@ -2497,6 +2566,14 @@ function showPlotPanel(plotId) {
     ${setupsHtml ? `<div>
       <div class="panel-section-title">Setups</div>
       ${setupsHtml}
+    </div>` : ''}
+    ${crisisHtml ? `<div>
+      <div class="panel-section-title">Crisis</div>
+      ${crisisHtml}
+    </div>` : ''}
+    ${climaxHtml ? `<div>
+      <div class="panel-section-title">Climax</div>
+      ${climaxHtml}
     </div>` : ''}
     ${payoffsHtml ? `<div>
       <div class="panel-section-title">Payoffs</div>
@@ -2525,8 +2602,25 @@ function showSequencePanel(seqId) {
     </div>`;
   }).join('');
 
+  // Plot threads in this sequence with scope/type
+  const plotRows = (seq.plots || []).map(p => {
+    const pl = (story.plots || []).find(x => x.id === p.id);
+    if (!pl) return '';
+    const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+    const col = pl.plot_scope === 'main' ? '#b07be0' : (PLOT_TYPE_COLORS[pl.plot_type] || '#888');
+    return `<div class="beat-row" onclick="showPlotPanel('${pl.id}')">
+      <span class="beat-scene" style="color:${col}">${pl.name}</span>
+      ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
+      ${p.has_setup ? '<span class="beat-desc">setup</span>' : ''}
+      ${p.has_crisis ? '<span class="beat-desc">crisis</span>' : ''}
+      ${p.has_climax ? '<span class="beat-desc">climax</span>' : ''}
+      ${p.has_payoff ? '<span class="beat-desc">payoff</span>' : ''}
+    </div>`;
+  }).join('');
+
   document.getElementById('panel-body').innerHTML = `
     <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
     ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div>${sceneRows}</div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
   `;
 
@@ -2552,6 +2646,22 @@ function showActPanel(actId) {
     </div>` : '';
   }).join('');
 
+  // Plot threads in this act with scope/type
+  const plotRows = (act.plots || []).map(p => {
+    const pl = (story.plots || []).find(x => x.id === p.id);
+    if (!pl) return '';
+    const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+    const col = pl.plot_scope === 'main' ? '#b07be0' : (PLOT_TYPE_COLORS[pl.plot_type] || '#888');
+    return `<div class="beat-row" onclick="showPlotPanel('${pl.id}')">
+      <span class="beat-scene" style="color:${col}">${pl.name}</span>
+      ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
+      ${p.has_setup ? '<span class="beat-desc">setup</span>' : ''}
+      ${p.has_crisis ? '<span class="beat-desc">crisis</span>' : ''}
+      ${p.has_climax ? '<span class="beat-desc">climax</span>' : ''}
+      ${p.has_payoff ? '<span class="beat-desc">payoff</span>' : ''}
+    </div>`;
+  }).join('');
+
   document.getElementById('panel-body').innerHTML = `
     <div><span class="status-badge ${act.status || ''}">${act.status || 'planned'}</span></div>
     ${(() => {
@@ -2563,6 +2673,7 @@ function showActPanel(actId) {
         ${actObj ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground)">Act objective: <span style="color:var(--foreground);font-weight:500">${actObj}</span></div>` : ''}
       </div>`;
     })()}
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
     ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div>${seqRows}</div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
   `;
 
@@ -2979,6 +3090,28 @@ function populateStructuralStats() {
         <span class="duration-bar-value">${count}</span>
       </div>`;
     }).join('') || '<div class="panel-muted" style="font-size:var(--font-size-xs);">No roles assigned.</div>';
+  }
+
+  // Plot coverage bars
+  const plotContainer = document.getElementById('structStats-plot-coverage');
+  if (plotContainer) {
+    const plotColors = { main: '#b07be0', Contradictory: '#e07070', Resonant: '#7b9cf0', Complicating: '#e0a86b', Setup: '#6bbfb0' };
+    const coverage = ss.plotCoverage || [];
+    if (coverage.length) {
+      const maxCount = Math.max(...coverage.map(p => p.sceneCount));
+      plotContainer.innerHTML = coverage.map(p => {
+        const col = plotColors[p.plot_scope] || (plotColors[p.plot_type] || '#888');
+        const pct = maxCount > 0 ? Math.round((p.sceneCount / maxCount) * 100) : 0;
+        const label = p.plot_scope === 'main' ? `${p.name} (MAIN)` : p.name;
+        return `<div class="duration-bar-row">
+          <span class="duration-bar-label" style="color:${col}">${escapeHtml(label)}</span>
+          <div class="duration-bar-track"><div class="duration-bar-fill" style="background:${col};width:${pct}%"></div></div>
+          <span class="duration-bar-value">${p.sceneCount} (${p.coveragePct}%)</span>
+        </div>`;
+      }).join('');
+    } else {
+      plotContainer.innerHTML = '<div class="panel-muted" style="font-size:var(--font-size-xs);">No plot coverage data.</div>';
+    }
   }
 
   // Act list

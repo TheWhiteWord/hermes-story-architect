@@ -314,6 +314,44 @@ class TestNoteCreation:
         assert "## Obstacles" in body
         assert "## Stakes" in body
 
+    def test_create_plot_with_scope_and_arc(self, tmp_path):
+        """Creating a plot with plot_scope and value_arc."""
+        from tools.story_create import handler as create_handler
+
+        project_path = _make_minimal_project(tmp_path)
+
+        args = {
+            "entity_type": "plot",
+            "slug": "main-plot",
+            "project": str(project_path),
+            "frontmatter": {"name": "Main Plot", "plot_scope": "main", "value_arc": "Maturation"}
+        }
+        result = json.loads(create_handler(args))
+        assert result["success"] is True
+
+        import frontmatter
+        post = frontmatter.load(project_path / "plots" / "main-plot.md")
+        assert post.metadata["plot_scope"] == "main"
+        assert post.metadata["value_arc"] == "Maturation"
+
+    def test_validate_plot_invalid_scope(self):
+        """validate_entity('plot', {plot_scope: 'invalid'}) returns warning."""
+        from core.entity import validate_entity
+        warnings = validate_entity("plot", {"name": "Test", "status": "active", "plot_scope": "invalid"})
+        assert any("Invalid plot_scope: invalid" in w for w in warnings)
+
+    def test_validate_plot_invalid_value_arc(self):
+        """validate_entity('plot', {value_arc: 'invalid'}) returns warning."""
+        from core.entity import validate_entity
+        warnings = validate_entity("plot", {"name": "Test", "status": "active", "value_arc": "invalid"})
+        assert any("Invalid value_arc: invalid" in w for w in warnings)
+
+    def test_validate_plot_valid_scope_and_arc(self):
+        """validate_entity accepts valid plot_scope and value_arc."""
+        from core.entity import validate_entity
+        warnings = validate_entity("plot", {"name": "Test", "status": "active", "plot_scope": "main", "value_arc": "Maturation"})
+        assert not any("Invalid" in w for w in warnings)
+
     def test_create_scene_has_all_fields_and_sections(self, tmp_path):
         """Creating a scene with minimal fields should still produce all fields and body sections."""
         from tools.story_create import handler as create_handler
@@ -659,6 +697,50 @@ class TestSceneIndex:
         index = generate_index(project_path)
         captured = capsys.readouterr()
         assert "unknown scene" in captured.out
+
+    def test_sequence_plots_include_scope_and_type(self, tmp_path):
+        """_enrich_sequences_with_plots propagates plot_scope and plot_type."""
+        from core.index import generate_index
+
+        project_path = tmp_path / "proj"
+        project_path.mkdir()
+        (project_path / "plots").mkdir()
+        (project_path / "scenes").mkdir()
+        (project_path / "sequences").mkdir()
+        (project_path / "acts").mkdir()
+        (project_path / "project.md").write_text("---\nname: Test\n---\n")
+
+        (project_path / "acts" / "act-1.md").write_text(
+            "---\nid: act-1\ntitle: Act One\n---\n"
+        )
+        (project_path / "sequences" / "seq-1.md").write_text(
+            "---\nid: seq-1\ntitle: Seq One\nact_id: act-1\n---\n"
+        )
+        (project_path / "scenes" / "s1.md").write_text(
+            "---\nid: s1\ntitle: S1\nsequence_id: seq-1\nact_id: act-1\norder: 1\n---\n"
+        )
+        (project_path / "plots" / "main.md").write_text(
+            "---\nid: main\nname: Main Plot\nplot_scope: main\nvalue_arc: Maturation\nsetups:\n  - scene_id: s1\n    description: Setup\n---\n"
+        )
+        (project_path / "plots" / "sub.md").write_text(
+            "---\nid: sub\nname: Sub Plot\nplot_scope: sub\nplot_type: Contradictory\nsetups:\n  - scene_id: s1\n    description: Setup\n---\n"
+        )
+
+        index = generate_index(project_path)
+
+        seq = next(s for s in index["sequences"] if s["id"] == "seq-1")
+        assert len(seq["plots"]) == 2
+        # Main plot comes first
+        assert seq["plots"][0]["id"] == "main"
+        assert seq["plots"][0]["plot_scope"] == "main"
+        assert seq["plots"][1]["id"] == "sub"
+        assert seq["plots"][1]["plot_scope"] == "sub"
+        assert seq["plots"][1]["plot_type"] == "Contradictory"
+
+        # Act also enriched
+        act = next(a for a in index["acts"] if a["id"] == "act-1")
+        assert len(act["plots"]) == 2
+        assert act["plots"][0]["plot_scope"] == "main"
 
     def test_index_scenes_are_files_only(self, project_path):
         """index['scenes'] contains only file scenes, not screenplay scenes."""
@@ -1163,6 +1245,40 @@ class TestComputeStructuralStats:
         assert result["actCount"] == 1
         assert result["sceneStatus"] == {"planned": 2, "written": 1}
         assert result["sceneRoles"] == {"setup": 2, "crisis": 1}
+
+    def test_plot_coverage_counts_scenes_per_plot(self):
+        """compute_structural_stats includes plotCoverage with scene counts."""
+        from core.index import compute_structural_stats
+
+        index = {
+            "scenes": [
+                {"id": "s1", "status": "planned", "dramatic_role": "setup", "plots": [{"id": "main", "beat": "setup"}]},
+                {"id": "s2", "status": "written", "dramatic_role": "crisis", "plots": [{"id": "main", "beat": "setup"}, {"id": "sub", "beat": "setup"}]},
+                {"id": "s3", "status": "planned", "dramatic_role": "setup", "plots": [{"id": "sub", "beat": "payoff"}]},
+            ],
+            "sequences": [{"id": "seq-1"}],
+            "acts": [{"id": "act-1", "title": "Act 1"}],
+            "plots": [
+                {"id": "main", "name": "Main Plot", "plot_scope": "main", "value_arc": "Maturation"},
+                {"id": "sub", "name": "Sub Plot", "plot_scope": "sub", "plot_type": "Contradictory"},
+            ],
+        }
+        result = compute_structural_stats(index)
+
+        assert "plotCoverage" in result
+        assert len(result["plotCoverage"]) == 2
+
+        # main appears in 2 scenes, sub in 2 scenes
+        main = next(p for p in result["plotCoverage"] if p["id"] == "main")
+        assert main["sceneCount"] == 2
+        assert main["plot_scope"] == "main"
+        assert main["value_arc"] == "Maturation"
+        assert main["coveragePct"] == 67  # 2/3 rounded
+
+        sub = next(p for p in result["plotCoverage"] if p["id"] == "sub")
+        assert sub["sceneCount"] == 2
+        assert sub["plot_scope"] == "sub"
+        assert sub["plot_type"] == "Contradictory"
 
     def test_missing_role_defaults_to_unset(self):
         """Scene with empty/missing dramatic_role → 'unset' bucket."""

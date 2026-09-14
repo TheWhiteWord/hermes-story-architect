@@ -90,20 +90,48 @@ def _enrich_plots(index: dict) -> None:
 
 
 def _enrich_scenes_with_plots(index: dict) -> None:
-    """Add plots[] to each scene by reverse lookup from plot setups/payoffs."""
+    """Add plots[] to each scene by reverse lookup from plot setups/payoffs/crisis/climax."""
     scenes_by_id = {s.get("id"): s for s in index.get("scenes", [])}
     for plot in index.get("plots", []):
-        for beat in plot.get("setups", []) + plot.get("payoffs", []):
+        all_beats = (
+            [(b, "setup") for b in plot.get("setups", [])] +
+            [(b, "crisis") for b in plot.get("crisis", [])] +
+            [(b, "climax") for b in plot.get("climax", [])] +
+            [(b, "payoff") for b in plot.get("payoffs", [])]
+        )
+        for beat, beat_type in all_beats:
             scene = scenes_by_id.get(beat.get("scene_id"))
             if scene:
                 if "plots" not in scene:
                     scene["plots"] = []
-                beat_type = "setup" if beat in plot.get("setups", []) else "payoff"
-                scene["plots"].append({"id": plot["id"], "beat": beat_type})
+                # Check if this plot is already referenced with this specific beat
+                existing = None
+                for i, p in enumerate(scene["plots"]):
+                    pid = p.get("id") if isinstance(p, dict) else p
+                    if pid == plot["id"]:
+                        existing = (i, p)
+                        break
+                
+                if existing:
+                    idx, ep = existing
+                    if isinstance(ep, str):
+                        # Upgrade string reference to dict with beat
+                        scene["plots"][idx] = {"id": ep, "beat": beat_type}
+                    elif isinstance(ep, dict):
+                        if not ep.get("beat"):
+                            # Add beat to existing dict reference
+                            ep["beat"] = beat_type
+                        elif ep["beat"] != beat_type:
+                            # Different beat, add as new entry
+                            scene["plots"].append({"id": plot["id"], "beat": beat_type})
+                        # Same beat already exists, skip
+                else:
+                    scene["plots"].append({"id": plot["id"], "beat": beat_type})
 
 
 def _enrich_sequences_with_plots(index: dict) -> None:
-    """Add plots[] to each sequence derived from its scenes."""
+    """Add plots[] to each sequence derived from its scenes, with scope+type+beats for UI."""
+    plot_lookup = {p["id"]: p for p in index.get("plots", [])}
     for seq in index.get("sequences", []):
         seq_plots = {}
         for scene in index.get("scenes", []):
@@ -112,17 +140,32 @@ def _enrich_sequences_with_plots(index: dict) -> None:
             for p in scene.get("plots", []):
                 pid = p.get("id") if isinstance(p, dict) else p
                 if pid not in seq_plots:
-                    seq_plots[pid] = {"id": pid, "has_setup": False, "has_payoff": False}
+                    meta = plot_lookup.get(pid, {})
+                    seq_plots[pid] = {
+                        "id": pid,
+                        "has_setup": False,
+                        "has_crisis": False,
+                        "has_climax": False,
+                        "has_payoff": False,
+                        "plot_scope": meta.get("plot_scope", "sub"),
+                        "plot_type": meta.get("plot_type", ""),
+                        "value_arc": meta.get("value_arc", ""),
+                    }
                 beat = p.get("beat", "") if isinstance(p, dict) else ""
                 if beat == "setup":
                     seq_plots[pid]["has_setup"] = True
+                elif beat == "crisis":
+                    seq_plots[pid]["has_crisis"] = True
+                elif beat == "climax":
+                    seq_plots[pid]["has_climax"] = True
                 elif beat == "payoff":
                     seq_plots[pid]["has_payoff"] = True
-        seq["plots"] = sorted(seq_plots.values(), key=lambda x: x["id"])
+        seq["plots"] = sorted(seq_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
 
 def _enrich_acts_with_plots(index: dict) -> None:
-    """Add plots[] to each act derived from its scenes."""
+    """Add plots[] to each act derived from its scenes, with scope+type+beats for UI."""
+    plot_lookup = {p["id"]: p for p in index.get("plots", [])}
     for act in index.get("acts", []):
         act_plots = {}
         for scene in index.get("scenes", []):
@@ -131,13 +174,27 @@ def _enrich_acts_with_plots(index: dict) -> None:
             for p in scene.get("plots", []):
                 pid = p.get("id") if isinstance(p, dict) else p
                 if pid not in act_plots:
-                    act_plots[pid] = {"id": pid, "has_setup": False, "has_payoff": False}
+                    meta = plot_lookup.get(pid, {})
+                    act_plots[pid] = {
+                        "id": pid,
+                        "has_setup": False,
+                        "has_crisis": False,
+                        "has_climax": False,
+                        "has_payoff": False,
+                        "plot_scope": meta.get("plot_scope", "sub"),
+                        "plot_type": meta.get("plot_type", ""),
+                        "value_arc": meta.get("value_arc", ""),
+                    }
                 beat = p.get("beat", "") if isinstance(p, dict) else ""
                 if beat == "setup":
                     act_plots[pid]["has_setup"] = True
+                elif beat == "crisis":
+                    act_plots[pid]["has_crisis"] = True
+                elif beat == "climax":
+                    act_plots[pid]["has_climax"] = True
                 elif beat == "payoff":
                     act_plots[pid]["has_payoff"] = True
-        act["plots"] = sorted(act_plots.values(), key=lambda x: x["id"])
+        act["plots"] = sorted(act_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
 
 def _normalize_plot_scene(scene_ref):
@@ -343,12 +400,37 @@ def compute_structural_stats(index: dict) -> dict:
         status_counts[scene.get("status", "planned")] += 1
         role_counts[scene.get("dramatic_role", "") or "unset"] += 1
 
+    # Plot coverage: count unique scenes per plot (not beat entries)
+    plot_scene_sets = {}
+    for scene in index.get("scenes", []):
+        for p in scene.get("plots", []):
+            pid = p.get("id") if isinstance(p, dict) else p
+            if pid not in plot_scene_sets:
+                plot_scene_sets[pid] = set()
+            plot_scene_sets[pid].add(scene.get("id"))
+
+    plots_lookup = {p["id"]: p for p in index.get("plots", [])}
+    total_scenes = len(index.get("scenes", []))
+    plot_coverage = []
+    for pid, scene_set in sorted(plot_scene_sets.items(), key=lambda x: len(x[1]), reverse=True):
+        pl = plots_lookup.get(pid, {})
+        plot_coverage.append({
+            "id": pid,
+            "name": pl.get("name", pid),
+            "plot_scope": pl.get("plot_scope", "sub"),
+            "plot_type": pl.get("plot_type", ""),
+            "value_arc": pl.get("value_arc", ""),
+            "sceneCount": len(scene_set),
+            "coveragePct": round((len(scene_set) / total_scenes) * 100) if total_scenes else 0,
+        })
+
     return {
-        "sceneCount": len(index.get("scenes", [])),
+        "sceneCount": total_scenes,
         "sequenceCount": len(index.get("sequences", [])),
         "actCount": len(index.get("acts", [])),
         "sceneStatus": dict(status_counts),
         "sceneRoles": dict(role_counts),
+        "plotCoverage": plot_coverage,
         "acts": [
             {
                 "id": act["id"],

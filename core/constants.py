@@ -11,6 +11,8 @@ SCENE_DRAMATIC_ROLES = ["setup", "complication", "crisis", "climax", "resolution
 VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
+PLOT_SCOPES = ["main", "sub"]
+VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
 FUZZY_THRESHOLD = 40
 
 REQUIRED_FIELDS = {
@@ -73,6 +75,8 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
         "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary for index label"},
         "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
+        "plot_scope": {"type": "string", "default": "sub", "optional": True, "description": "main or sub"},
+        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
         "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug (e.g. mara-discovers-files)", "description": "What happens at this scene"}},
