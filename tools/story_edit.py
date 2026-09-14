@@ -118,11 +118,6 @@ def _edit_note(project_path: Path, target: dict, data: dict, summary: str) -> st
     with open(file_path, 'w') as f:
         frontmatter.dump(post, f)
 
-    # Lightweight structure-index update for scenes (O(1) vs O(N) rebuild)
-    if entity_type == "scene":
-        from core.index import update_structure_index_scene
-        update_structure_index_scene(project_path, slug)
-
     return json.dumps({
         "success": True,
         "message": f"Applied: {summary}",

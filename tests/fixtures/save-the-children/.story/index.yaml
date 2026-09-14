@@ -9,12 +9,22 @@ project:
     inherited memories of the last scientists who built the world that imprisoned
     them.
   status: active
+  spine: A young person discovers the truth about their world and chooses to escape
+  controlling_idea: Freedom requires sacrifice
+  value: Trust
+  value_at_open: positive
+  value_at_close: negative
+  inciting_incident_scene_id: central-room-day
+  story_climax_scene_id: central-room-night
+  structure_type: Classical
   sections: []
-  scene_count: 9
+  scene_count: 3
   character_count: 6
   location_count: 2
   world_count: 2
   plot_count: 2
+  sequence_count: 1
+  act_count: 1
 characters:
 - id: dr-elena-voss
   name: Dr. Elena Voss
@@ -30,11 +40,6 @@ characters:
   - Arc
   - Relationships
   - Goals
-  scenes:
-  - number: 4
-    heading: INT. THE CORE - DAY (400 YEARS EARLIER)
-  - number: 8
-    heading: INT. THE CORE - DAY
 - id: kael
   name: Kael
   one_sentence: A young person inside The I who begins to feel the system is wrong.
@@ -49,10 +54,15 @@ characters:
   - Relationships
   - Goals
   scenes:
-  - number: 2
-    heading: INT. CENTRAL ROOM - DAY
-  - number: 6
-    heading: INT. CENTRAL ROOM - NIGHT
+  - id: central-room-day
+    title: Central Room - Day
+    heading: INT. THE CENTRAL ROOM - DAY
+  - id: central-room-night
+    title: Central Room - Night
+    heading: INT. THE CENTRAL ROOM - NIGHT
+  - id: the-core-day
+    title: The Core - Day
+    heading: EXT. THE CORE - DAY
 - id: marcus-chen
   name: Marcus Chen
   one_sentence: Elena's colleague — believes the outsiders should be included, even
@@ -67,9 +77,6 @@ characters:
   - Arc
   - Relationships
   - Goals
-  scenes:
-  - number: 4
-    heading: INT. THE CORE - DAY (400 YEARS EARLIER)
 - id: mira
   name: Mira
   one_sentence: Kael's closest friend — believes in the feeling before believing in
@@ -85,10 +92,12 @@ characters:
   - Relationships
   - Goals
   scenes:
-  - number: 2
-    heading: INT. CENTRAL ROOM - DAY
-  - number: 8
-    heading: INT. THE CORE - DAY
+  - id: central-room-day
+    title: Central Room - Day
+    heading: INT. THE CENTRAL ROOM - DAY
+  - id: the-core-day
+    title: The Core - Day
+    heading: EXT. THE CORE - DAY
 - id: the-administrator
   name: The Administrator
   one_sentence: The face of the Institute's control — theatrical, precise, almost
@@ -127,10 +136,12 @@ locations:
   - History
   - Scenes
   scenes:
-  - number: 2
-    heading: INT. CENTRAL ROOM - DAY
-  - number: 6
-    heading: INT. CENTRAL ROOM - NIGHT
+  - id: central-room-day
+    title: Central Room - Day
+    heading: INT. THE CENTRAL ROOM - DAY
+  - id: central-room-night
+    title: Central Room - Night
+    heading: INT. THE CENTRAL ROOM - NIGHT
 - id: the-garden
   name: The Garden
   one_sentence: A simulated outdoor space where Kael dreams — the only place that
@@ -140,8 +151,9 @@ locations:
   - History
   - Scenes
   scenes:
-  - number: 3
-    heading: EXT. THE GARDEN - NIGHT
+  - id: the-core-day
+    title: The Core - Day
+    heading: EXT. THE CORE - DAY
 worlds:
 - id: the-i
   name: The I
@@ -161,17 +173,18 @@ plots:
 - id: the-resistance
   name: The Resistance
   one_sentence: Kael and Mira organize the children to breach the Central Room.
+  plot_type: Setup
   status: active
   characters:
   - kael
   - mira
   setups:
-  - scene: INT. CENTRAL ROOM - DAY
+  - scene_id: central-room-day
     description: Kael discovers the door isn't locked — it was never locked.
-  - scene: INT. CENTRAL ROOM - NIGHT
+  - scene_id: central-room-night
     description: The Administrator makes its final offer. Kael refuses.
   payoffs:
-  - scene: INT. THE CORE - DAY
+  - scene_id: the-core-day
     description: The children emerge into the real world for the first time.
   sections:
   - Summary
@@ -181,6 +194,7 @@ plots:
   name: The Scientists' Last Stand
   one_sentence: 400 years earlier, the scientists race to complete Project Save the
     Children as the outsiders gather.
+  plot_type: Contradictory
   status: active
   sections:
   - Summary
@@ -188,56 +202,151 @@ plots:
   - Stakes
   setups: []
   payoffs: []
+  characters: []
+acts:
+- id: act-1
+  type: act
+  title: Act One
+  order: 1
+  status: in-progress
+  value: Trust
+  value_open: positive
+  value_close: negative
+  climax_scene_id: central-room-night
+  act_objective: Kael discovers the truth about the door.
+  sections:
+  - Summary
+  - Thematic Function
+  - Notes
+  sequences_list:
+  - seq-discovery
+  scenes_list:
+  - central-room-day
+  - central-room-night
+  - the-core-day
+  sequence_count: 1
+  scene_count: 3
+  plots:
+  - id: the-resistance
+    has_setup: true
+    has_payoff: true
+sequences:
+- id: seq-discovery
+  type: sequence
+  title: The Discovery
+  order: 1
+  status: in-progress
+  act_id: act-1
+  value: Trust
+  value_open: positive
+  value_close: negative
+  climax_scene_id: central-room-night
+  primary_plot: the-resistance
+  purpose: Kael discovers the truth about the door and chooses to act.
+  sections:
+  - Summary
+  - Scene Order
+  - Notes
+  scenes_list:
+  - central-room-day
+  - central-room-night
+  - the-core-day
+  scene_count: 3
+  plots:
+  - id: the-resistance
+    has_setup: true
+    has_payoff: true
 scenes:
-- id: 1
-  heading: EXT. THE INSTITUTE - DAY
-  number: '1'
-  characters: []
-  location: ''
-- id: 2
-  heading: INT. CENTRAL ROOM - DAY
-  number: '2'
+- id: central-room-day
+  type: scene
+  title: Central Room - Day
+  order: 1
+  status: drafted
+  heading: INT. THE CENTRAL ROOM - DAY
+  location: the-central-room
+  time_of_day: DAY
+  sequence_id: seq-discovery
+  act_id: act-1
   characters:
   - kael
   - mira
+  plots:
+  - id: the-resistance
+    beat: setup
+  value: Trust
+  value_open: positive
+  value_close: negative
+  conflict_levels:
+  - inner
+  - personal
+  dramatic_role: setup
+  is_inciting_incident: false
+  is_sequence_climax: false
+  is_act_climax: false
+  is_story_climax: false
+  sections:
+  - Description
+  - Dramatic Function
+  - Notes
+  - Content
+- id: central-room-night
+  type: scene
+  title: Central Room - Night
+  order: 2
+  status: drafted
+  heading: INT. THE CENTRAL ROOM - NIGHT
   location: the-central-room
-- id: 3
-  heading: EXT. THE GARDEN - NIGHT
-  number: '3'
-  characters: []
+  time_of_day: NIGHT
+  sequence_id: seq-discovery
+  act_id: act-1
+  characters:
+  - kael
+  plots:
+  - id: the-resistance
+    beat: setup
+  value: Trust
+  value_open: negative
+  value_close: positive
+  conflict_levels:
+  - personal
+  dramatic_role: climax
+  is_inciting_incident: false
+  is_sequence_climax: true
+  is_act_climax: false
+  is_story_climax: false
+  sections:
+  - Description
+  - Dramatic Function
+  - Notes
+  - Content
+- id: the-core-day
+  type: scene
+  title: The Core - Day
+  order: 3
+  status: written
+  heading: EXT. THE CORE - DAY
   location: the-garden
-- id: 4
-  heading: INT. THE CORE - DAY (400 YEARS EARLIER)
-  number: '4'
-  characters:
-  - marcus-chen
-  - dr-elena-voss
-  location: ''
-- id: 5
-  heading: EXT. THE INSTITUTE - NIGHT (400 YEARS EARLIER)
-  number: '5'
-  characters: []
-  location: ''
-- id: 6
-  heading: INT. CENTRAL ROOM - NIGHT
-  number: '6'
+  time_of_day: DAY
+  sequence_id: seq-discovery
+  act_id: act-1
   characters:
   - kael
-  location: the-central-room
-- id: 7
-  heading: OPENING TITLES
-  number: '7'
-  characters: []
-  location: ''
-- id: 8
-  heading: INT. THE CORE - DAY
-  number: '8'
-  characters:
-  - dr-elena-voss
   - mira
-  location: ''
-- id: 9
-  heading: EXT. THE INSTITUTE - DAY
-  number: '9'
-  characters: []
-  location: ''
+  plots:
+  - id: the-resistance
+    beat: payoff
+  value: Trust
+  value_open: positive
+  value_close: positive
+  conflict_levels:
+  - extra-personal
+  dramatic_role: resolution
+  is_inciting_incident: false
+  is_sequence_climax: false
+  is_act_climax: false
+  is_story_climax: false
+  sections:
+  - Description
+  - Dramatic Function
+  - Notes
+  - Content

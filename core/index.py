@@ -27,17 +27,7 @@ def generate_index(project_path: Path) -> dict:
         "sequences": sequences,
     }
 
-    # Scenes from files only — screenplay merge removed (Phase 2).
-    # Main index keeps navigation fields; dramatic metadata goes to structure-index.yaml.
-    # Store full scenes for structure index generation before stripping.
-    index["_full_scenes"] = file_scenes
-    index["scenes"] = [_strip_scene_for_navigation(s) for s in file_scenes]
-
-    # Project: same split. Structural/dramatic fields go to structure-index.yaml
-    # under the "story" key. Store full project before stripping.
-    from .constants import PROJECT_STRUCTURAL_FIELDS
-    index["_full_project"] = dict(index["project"])
-    index["project"] = {k: v for k, v in index["project"].items() if k not in PROJECT_STRUCTURAL_FIELDS}
+    index["scenes"] = file_scenes
 
     # Populate characters.scenes[] and locations.scenes[] from scene list
     _enrich_entity_scenes(index)
@@ -173,18 +163,6 @@ def _parse_entities(folder: Path, entity_type: str) -> list[dict]:
     return entities
 
 
-# Fields kept in the main index — navigation only. Dramatic metadata is in structure-index.yaml.
-NAVIGATION_SCENE_FIELDS = frozenset([
-    "id", "type", "title", "order", "status",
-    "sequence_id", "act_id", "heading", "characters",
-    "plots", "location", "sections",
-])
-
-
-def _strip_scene_for_navigation(scene: dict) -> dict:
-    """Return a scene entry with only navigation fields for the main index."""
-    return {k: v for k, v in scene.items() if k in NAVIGATION_SCENE_FIELDS}
-
 
 def _enrich_entity_scenes(index: dict) -> None:
     """Build character.scenes[] and locations.scenes[] by reverse-mapping scene list."""
@@ -292,128 +270,11 @@ def write_index(index: dict, output_path: Path) -> None:
         yaml.dump(index, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
-def generate_structure_index(index: dict) -> dict:
-    """Generate the structure index sidecar from the main index.
-
-    Reads from _full_scenes (stored before navigation stripping) and
-    _full_project (stored before structural field stripping) so dramatic
-    metadata is available here.
-    """
-    source_scenes = index.get("_full_scenes", index.get("scenes", []))
-    full_project = index.get("_full_project", index.get("project", {}))
-    return {
-        "story": {
-            "id": "story",
-            "value": full_project.get("value", ""),
-            "value_open": full_project.get("value_at_open", ""),
-            "value_close": full_project.get("value_at_close", ""),
-            "spine": full_project.get("spine", ""),
-            "controlling_idea": full_project.get("controlling_idea", ""),
-            "inciting_incident_scene_id": full_project.get("inciting_incident_scene_id", ""),
-            "story_climax_scene_id": full_project.get("story_climax_scene_id", ""),
-            "structure_type": full_project.get("structure_type", ""),
-        },
-        "acts": [
-            {
-                "id": act["id"],
-                "value": act.get("value", ""),
-                "value_open": act.get("value_open", ""),
-                "value_close": act.get("value_close", ""),
-                "climax_scene_id": act.get("climax_scene_id", ""),
-            }
-            for act in index.get("acts", [])
-        ],
-        "sequences": [
-            {
-                "id": seq["id"],
-                "value": seq.get("value", ""),
-                "value_open": seq.get("value_open", ""),
-                "value_close": seq.get("value_close", ""),
-                "climax_scene_id": seq.get("climax_scene_id", ""),
-            }
-            for seq in index.get("sequences", [])
-        ],
-        "scenes": [
-            {
-                "id": scene["id"],
-                "value": scene.get("value", ""),
-                "value_open": scene.get("value_open", ""),
-                "value_close": scene.get("value_close", ""),
-                "conflict_levels": scene.get("conflict_levels", []),
-                "dramatic_role": scene.get("dramatic_role", ""),
-                "is_inciting_incident": bool(scene.get("is_inciting_incident", False)),
-                "is_sequence_climax": bool(scene.get("is_sequence_climax", False)),
-                "is_act_climax": bool(scene.get("is_act_climax", False)),
-                "is_story_climax": bool(scene.get("is_story_climax", False)),
-                "arc_beat_refs": [],
-            }
-            for scene in source_scenes
-        ],
-    }
-
-
-def write_structure_index(structure_index: dict, output_path: Path) -> None:
-    """Write structure index to YAML."""
-    with open(output_path, 'w') as f:
-        yaml.dump(structure_index, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-
-
-def update_structure_index_scene(project_path: Path, scene_id: str) -> None:
-    """Lightweight single-scene update to structure-index.yaml.
-
-    Reads scene file frontmatter, finds entry by id, updates dramatic
-    metadata fields, writes back. O(1) vs O(N) rebuild. No-op if
-    structure-index.yaml or scene file doesn't exist.
-    """
-    import frontmatter
-
-    structure_path = project_path / ".story" / "structure-index.yaml"
-    if not structure_path.exists():
-        return
-
-    scene_path = project_path / "scenes" / f"{scene_id}.md"
-    if not scene_path.exists():
-        return
-
-    with open(structure_path) as f:
-        structure_index = yaml.safe_load(f)
-
-    post = frontmatter.load(scene_path)
-    meta = dict(post.metadata)
-
-    for entry in structure_index.get("scenes", []):
-        if entry.get("id") == scene_id:
-            entry["value"] = meta.get("value", "")
-            entry["value_open"] = meta.get("value_open", "")
-            entry["value_close"] = meta.get("value_close", "")
-            entry["conflict_levels"] = meta.get("conflict_levels", [])
-            entry["dramatic_role"] = meta.get("dramatic_role", "")
-            entry["is_inciting_incident"] = bool(meta.get("is_inciting_incident", False))
-            entry["is_sequence_climax"] = bool(meta.get("is_sequence_climax", False))
-            entry["is_act_climax"] = bool(meta.get("is_act_climax", False))
-            entry["is_story_climax"] = bool(meta.get("is_story_climax", False))
-            break
-
-    write_structure_index(structure_index, structure_path)
-
-
 def refresh_index(project_path: Path) -> None:
-    """Regenerate and write the index and structure index for a project.
-    Ensures .story/ directory exists before writing.
-    Raises exceptions on failure so callers can handle/report."""
+    """Regenerate and write the index for a project."""
     index_path = project_path / ".story" / "index.yaml"
     index_path.parent.mkdir(exist_ok=True)
-
     index = generate_index(project_path)
-    
-    # Generate structure index from full scenes (with dramatic metadata)
-    structure_index = generate_structure_index(index)
-    structure_path = project_path / ".story" / "structure-index.yaml"
-    write_structure_index(structure_index, structure_path)
-    
-    # Remove internal _full_scenes/_full_project keys before writing main index
-    index.pop("_full_scenes", None)
-    index.pop("_full_project", None)
     write_index(index, index_path)
 
 

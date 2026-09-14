@@ -1,7 +1,7 @@
 """story_index tool — regenerate project index."""
 import json
 from pathlib import Path
-from core.index import generate_index, generate_structure_index, write_index, write_structure_index
+from core.index import generate_index, write_index
 
 SCHEMA = {
     "type": "object",
@@ -52,14 +52,6 @@ def handler(args: dict, **kwargs) -> str:
     # Generate index
     index = generate_index(project_path)
 
-    # Generate and write structure index (needs full scenes with dramatic metadata)
-    structure_index = generate_structure_index(index)
-    structure_path = project_path / ".story" / "structure-index.yaml"
-    write_structure_index(structure_index, structure_path)
-
-    # Remove internal _full_scenes key before writing main index
-    index.pop("_full_scenes", None)
-
     # Write index
     index_path = project_path / ".story" / "index.yaml"
     index_path.parent.mkdir(exist_ok=True)
@@ -68,6 +60,5 @@ def handler(args: dict, **kwargs) -> str:
     return json.dumps({
         "success": True,
         "message": f"Index regenerated for {index['project']['name']}",
-        "index": index,
-        "structure_index": structure_index
+        "index": index
     })

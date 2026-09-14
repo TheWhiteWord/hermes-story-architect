@@ -36,7 +36,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `story_load` | Load project index and memory | `project` (slug or name), `structure_only` (bool — load only structure-index.yaml, skip index.yaml) |
+| `story_load` | Load project index and memory | `project` (slug or name) |
 | `story_index` | Regenerate the project index | `project` |
 | `story_create` | Create new entity notes (characters, locations, worlds, plots, scenes, sequences, acts) | `entity_type`, `slug`, `frontmatter` |
 | `story_dashboard` | Open the dashboard in preview | `project` |
@@ -64,15 +64,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
    - `project` — project frontmatter (name, logline, genre, status, counts)
    - `memory` — continuity notes from `.story/memory.md`
 
-3. **Load structure (when needed)** — if the task involves story arc, dramatic metadata, or value progression, call `story_load` again with `structure_only: true`. This returns `structure_index` containing:
-   - `story` — spine, controlling idea, value arc, inciting incident, climax, structure type
-   - `acts` — value arc per act
-   - `sequences` — value arc per sequence
-   - `scenes` — dramatic role, value arc, conflict levels, climax flags per scene
-
-   > **When to load structure:** arc analysis, continuity checks on dramatic function, value beat validation, sequence/act restructuring. **Skip for:** simple entity retrieval, character edits, content writing.
-
-4. **Confirm** — report loaded project:
+3. **Confirm** — report loaded project:
    ```
    Loaded <name> — <scenes> scenes, <sequences> sequences, <acts> acts, <characters> characters, <locations> locations, <plots> plots.
    Logline: <logline>
@@ -99,7 +91,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 - **Missing index**: run `story_index` first, then retry
 - **Malformed index**: warn but continue with valid sections
 - **No memory file**: not required; skip if absent
-- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only if you need the full field list or sub-field structure (e.g. plot setups/payoffs use `{scene_id, description}`). Load `references/structure-index-format.md` for dramatic metadata fields (value arcs, dramatic roles, climax flags).
+- **Entity creation**: `story_create` auto-fills all expected fields with empty defaults. Load `references/index-format.md` only if you need the full field list, sub-field structure (e.g. plot setups/payoffs use `{scene_id, description}`), or dramatic metadata fields (value arcs, dramatic roles, climax flags).
 
 ## Verification
 

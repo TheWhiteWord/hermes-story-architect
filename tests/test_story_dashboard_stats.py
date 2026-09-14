@@ -138,7 +138,25 @@ class TestStatsInjection:
         src = Path("src/dashboard/story-dashboard.html").read_text()
         assert "// ─── Boot" in src
 
-    def test_screenplay_css_linked(self):
-        """screenplay.css is linked in the dashboard."""
-        src = Path("src/dashboard/story-dashboard.html").read_text()
-        assert 'screenplay.css' in src
+
+class TestStructuralStats:
+    """Regression tests for dashboard structural stats from unified index."""
+
+    def test_structural_stats_scene_roles(self):
+        """compute_structural_stats returns correct role counts (not all 'unset')."""
+        from core.index import compute_structural_stats
+        import yaml
+
+        with open(FIXTURE_PATH / ".story" / "index.yaml") as f:
+            index = yaml.safe_load(f)
+
+        stats = compute_structural_stats(index)
+        roles = stats["sceneRoles"]
+
+        # Unified index: all scenes have dramatic roles
+        assert roles.get("unset", 0) == 0, f"Expected no 'unset' roles, got: {roles}"
+
+        # Fixture has one scene per role
+        assert roles.get("setup", 0) == 1
+        assert roles.get("climax", 0) == 1
+        assert roles.get("resolution", 0) == 1

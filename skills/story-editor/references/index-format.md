@@ -123,8 +123,14 @@ acts:
 | `plot_count` | number | Total plots | code |
 | `sequence_count` | number | Total sequences | code |
 | `act_count` | number | Total acts | code |
-
-> **Note:** Story-level structural fields (`spine`, `controlling_idea`, `value`, `value_at_open`, `value_at_close`, `inciting_incident_scene_id`, `story_climax_scene_id`, `structure_type`) live in `.story/structure-index.yaml` under the `story` key, not in the main index.
+| `spine` | string | Protagonist's core desire driving the whole story | frontmatter |
+| `controlling_idea` | string | The story's argument — how and why life changes | frontmatter |
+| `value` | string | Value at stake for the whole story (e.g. `Trust`) | frontmatter |
+| `value_open` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `value_close` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `inciting_incident_scene_id` | string | Scene slug of the inciting incident | frontmatter |
+| `story_climax_scene_id` | string | Scene slug of the story's climax | frontmatter |
+| `structure_type` | string | One of: `Classical`, `Miniplot`, `Antiplot` | frontmatter |
 
 ### Character
 | Field | Type | Description | Source |
@@ -186,6 +192,16 @@ acts:
 | `characters` | string[] | Character slugs | frontmatter |
 | `plots` | object[] | Plot references: `id` + `beat` (setup or payoff) | code |
 | `location` | string | Location slug | frontmatter |
+| `value` | string | Value at stake in this scene | frontmatter |
+| `value_open` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `value_close` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `conflict_levels` | string[] | Any of: `inner`, `personal`, `extra-personal` | frontmatter |
+| `dramatic_role` | string | One of: `setup`, `complication`, `crisis`, `climax`, `resolution`, `transition`, `non-event` | frontmatter |
+| `is_inciting_incident` | boolean | Marks the story's inciting incident | frontmatter |
+| `is_sequence_climax` | boolean | Marks the sequence's climax scene | frontmatter |
+| `is_act_climax` | boolean | Marks the act's climax scene | frontmatter |
+| `is_story_climax` | boolean | Marks the story's climax scene | frontmatter |
+| `arc_beat_refs` | array | Reserved for future arc beat linking (always `[]`) | code |
 
 ### Sequence
 
@@ -199,6 +215,10 @@ acts:
 | `scenes_list` | string[] | Scene slugs in this sequence (sorted by order) | code |
 | `scene_count` | number | Total scenes in this sequence | code |
 | `plots` | object[] | Plots in this sequence: `id` + `has_setup` + `has_payoff` | code |
+| `value` | string | Value at stake in this sequence | frontmatter |
+| `value_open` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `value_close` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `climax_scene_id` | string | Scene slug where this sequence's reversal lands | frontmatter |
 
 ### Act
 
@@ -213,6 +233,27 @@ acts:
 | `sequence_count` | number | Total sequences in this act | code |
 | `scene_count` | number | Total scenes in this act | code |
 | `plots` | object[] | Plots in this act: `id` + `has_setup` + `has_payoff` | code |
+| `value` | string | Value at stake in this act | frontmatter |
+| `value_open` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `value_close` | string | One of: `positive`, `negative`, `mixed`, `ironic` | frontmatter |
+| `climax_scene_id` | string | Scene slug where this act's major reversal lands | frontmatter |
+
+---
+
+## Value Arc System
+
+The value arc tracks whether a value (`Trust`, `Freedom`, etc.) is positively or negatively charged at each structural level. The arc moves from `value_open` to `value_close`:
+
+- **positive → negative**: value degrades (tragedy)
+- **negative → positive**: value triumphs (comedy)
+- **positive → ironic**: value wins but at great cost
+- **negative → mixed**: partial recovery, ambiguous
+
+The arc system compares story-level, act-level, sequence-level, and scene-level arcs to evaluate whether character arcs build toward the right destination.
+
+## Non-Event Scenes
+
+McKee says some scenes don't turn — they're exposition, transition, or setup with no value shift. These are valid (sometimes necessary) but structurally weak. Use `dramatic_role: non-event` and leave `value_open`/`value_close` empty. The future structure system can flag them ("this sequence has three non-events in a row") without the data model breaking.
 
 ---
 
@@ -243,77 +284,3 @@ The index does **not** store relationships — they live in the note frontmatter
 ## Story Memory
 
 The index does **not** store story memory. It lives in `.story/memory.md` as plain Markdown.
-
----
-
-## Structure Index
-
-For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags), see `.story/structure-index.yaml` and its reference: `references/structure-index-format.md`.
-| `act_id` | string | Parent act slug (denormalized) | frontmatter |
-| `heading` | string | Fountain scene heading | frontmatter |
-| `characters` | string[] | Character slugs | frontmatter |
-| `plots` | object[] | Plot references: `id` + `beat` (setup or payoff) | code |
-| `location` | string | Location slug | frontmatter |
-
-### Sequence
-
-| Field | Type | Description | Source |
-|-------|------|-------------|--------|
-| `id` | string | Stable slug | frontmatter |
-| `title` | string | Display name | frontmatter |
-| `order` | number | Position within parent act | frontmatter |
-| `status` | string | One of: planned, in-progress, complete | frontmatter |
-| `act_id` | string | Parent act slug | frontmatter |
-| `scenes_list` | string[] | Scene slugs in this sequence (sorted by order) | code |
-| `scene_count` | number | Total scenes in this sequence | code |
-| `plots` | object[] | Plots in this sequence: `id` + `has_setup` + `has_payoff` | code |
-
-### Act
-
-| Field | Type | Description | Source |
-|-------|------|-------------|--------|
-| `id` | string | Stable slug | frontmatter |
-| `title` | string | Display name | frontmatter |
-| `order` | number | Position within story | frontmatter |
-| `status` | string | One of: planned, in-progress, complete | frontmatter |
-| `sequences_list` | string[] | Sequence slugs in this act (sorted by order) | code |
-| `scenes_list` | string[] | Scene slugs in this act (sorted by order) | code |
-| `sequence_count` | number | Total sequences in this act | code |
-| `scene_count` | number | Total scenes in this act | code |
-| `plots` | object[] | Plots in this act: `id` + `has_setup` + `has_payoff` | code |
-
----
-
-## Scene Numbering
-
-- `id` is **sequential** (1, 2, 3...), regenerated on each index update
-- `number` mirrors `id` (both are sequential; kept for compatibility)
-- Cross-references use **scene headings** (not numbers) for stability
-
----
-
-## Relationship Representation
-
-Relationships are **unidirectional** — each character lists their own in frontmatter:
-
-```yaml
-# characters/some-character.md
-related:
-  - id: other-character
-    label: Partner
-    feeling: Wary respect
-```
-
-The index does **not** store relationships — they live in the note frontmatter only.
-
----
-
-## Story Memory
-
-The index does **not** store story memory. It lives in `.story/memory.md` as plain Markdown.
-
----
-
-## Structure Index
-
-For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags), see `.story/structure-index.yaml` and its reference: `references/structure-index-format.md`.

@@ -469,6 +469,22 @@ class TestIndexGeneration:
         assert index["project"]["sequence_count"] == 1
         assert index["project"]["act_count"] == 1
 
+    def test_generate_index_includes_dramatic_metadata(self, project_path):
+        """Unified index: scenes contain dramatic metadata."""
+        from core.index import generate_index
+        index = generate_index(project_path)
+
+        scene = next(s for s in index["scenes"] if s["id"] == "central-room-day")
+        assert scene["value"] == "Trust"
+        assert scene["value_open"] == "positive"
+        assert scene["value_close"] == "negative"
+        assert scene["conflict_levels"] == ["inner", "personal"]
+        assert scene["dramatic_role"] == "setup"
+        assert scene["is_inciting_incident"] is False
+        assert scene["is_sequence_climax"] is False
+        assert scene["is_act_climax"] is False
+        assert scene["is_story_climax"] is False
+
 
 class TestSceneIndex:
     """Tests for scene/sequence/act index generation (Task 3)."""
@@ -644,181 +660,6 @@ class TestSceneIndex:
         captured = capsys.readouterr()
         assert "unknown scene" in captured.out
 
-
-class TestStructureIndex:
-    """Tests for structure index generation (Phase 2, Task 9)."""
-
-    def test_structure_index_includes_story(self, tmp_path):
-        """Project structural fields appear in structure-index story key."""
-        from core.index import generate_structure_index, generate_index
-
-        project_path = tmp_path / "proj"
-        project_path.mkdir()
-        (project_path / "project.md").write_text(
-            "---\n"
-            "name: Test\n"
-            "logline: A test logline\n"
-            "value: Trust\n"
-            "value_at_open: positive\n"
-            "value_at_close: ironic\n"
-            "spine: A protagonist wants truth\n"
-            "controlling_idea: Truth wins\n"
-            "inciting_incident_scene_id: opening\n"
-            "story_climax_scene_id: finale\n"
-            "structure_type: Classical\n"
-            "---\n"
-        )
-
-        index = generate_index(project_path)
-        structure = generate_structure_index(index)
-
-        assert "story" in structure
-        assert structure["story"]["id"] == "story"
-        assert structure["story"]["value"] == "Trust"
-        assert structure["story"]["value_open"] == "positive"
-        assert structure["story"]["value_close"] == "ironic"
-        assert structure["story"]["spine"] == "A protagonist wants truth"
-        assert structure["story"]["controlling_idea"] == "Truth wins"
-        assert structure["story"]["inciting_incident_scene_id"] == "opening"
-        assert structure["story"]["story_climax_scene_id"] == "finale"
-        assert structure["story"]["structure_type"] == "Classical"
-
-        # Main index project should NOT have structural fields
-        assert "spine" not in index["project"]
-        assert "controlling_idea" not in index["project"]
-        assert "value" not in index["project"]
-        assert "value_at_open" not in index["project"]
-        assert "value_at_close" not in index["project"]
-        assert "inciting_incident_scene_id" not in index["project"]
-        assert "story_climax_scene_id" not in index["project"]
-        assert "structure_type" not in index["project"]
-
-        # But should still have navigation fields
-        assert index["project"]["name"] == "Test"
-        assert index["project"]["logline"] == "A test logline"
-
-    def test_structure_index_includes_file_scenes(self, tmp_path):
-        """File scenes with dramatic metadata appear in structure index."""
-        from core.index import generate_structure_index, generate_index
-
-        project_path = tmp_path / "proj"
-        project_path.mkdir()
-        (project_path / "scenes").mkdir()
-        (project_path / "project.md").write_text("---\nname: Test\n---\n")
-
-        (project_path / "scenes" / "scene-1.md").write_text(
-            "---\nid: scene-1\ntitle: Scene One\nsequence_id: seq-1\nact_id: act-1\n"
-            "value: Trust\nvalue_open: positive\nvalue_close: negative\n"
-            "conflict_levels: [inner, personal]\ndramatic_role: setup\n"
-            "is_inciting_incident: true\nis_sequence_climax: false\n"
-            "is_act_climax: false\nis_story_climax: false\n---\n"
-        )
-
-        index = generate_index(project_path)
-        structure = generate_structure_index(index)
-
-        assert len(structure["scenes"]) == 1
-        assert structure["scenes"][0]["id"] == "scene-1"
-        assert structure["scenes"][0]["value"] == "Trust"
-        assert structure["scenes"][0]["value_open"] == "positive"
-        assert structure["scenes"][0]["value_close"] == "negative"
-        assert structure["scenes"][0]["conflict_levels"] == ["inner", "personal"]
-        assert structure["scenes"][0]["dramatic_role"] == "setup"
-        assert structure["scenes"][0]["is_inciting_incident"] is True
-        assert structure["scenes"][0]["is_sequence_climax"] is False
-        assert structure["scenes"][0]["is_act_climax"] is False
-        assert structure["scenes"][0]["is_story_climax"] is False
-
-    def test_structure_index_includes_sequences_and_acts(self, tmp_path):
-        """Sequences and acts appear in structure index."""
-        from core.index import generate_structure_index, generate_index
-
-        project_path = tmp_path / "proj"
-        project_path.mkdir()
-        (project_path / "sequences").mkdir()
-        (project_path / "acts").mkdir()
-        (project_path / "project.md").write_text("---\nname: Test\n---\n")
-
-        (project_path / "sequences" / "seq-1.md").write_text(
-            "---\nid: seq-1\ntitle: Seq One\nact_id: act-1\n"
-            "value: Trust\nvalue_open: positive\nvalue_close: negative\n"
-            "climax_scene_id: scene-1\n---\n"
-        )
-        (project_path / "acts" / "act-1.md").write_text(
-            "---\nid: act-1\ntitle: Act One\n"
-            "value: Trust\nvalue_open: positive\nvalue_close: negative\n"
-            "climax_scene_id: scene-1\n---\n"
-        )
-
-        index = generate_index(project_path)
-        structure = generate_structure_index(index)
-
-        assert len(structure["sequences"]) == 1
-        assert structure["sequences"][0]["id"] == "seq-1"
-        assert structure["sequences"][0]["value"] == "Trust"
-        assert structure["sequences"][0]["climax_scene_id"] == "scene-1"
-
-        assert len(structure["acts"]) == 1
-        assert structure["acts"][0]["id"] == "act-1"
-        assert structure["acts"][0]["value"] == "Trust"
-        assert structure["acts"][0]["climax_scene_id"] == "scene-1"
-
-    def test_structure_index_scene_fields(self, tmp_path):
-        """All dramatic metadata fields present with correct types."""
-        from core.index import generate_structure_index, generate_index
-
-        project_path = tmp_path / "proj"
-        project_path.mkdir()
-        (project_path / "scenes").mkdir()
-        (project_path / "project.md").write_text("---\nname: Test\n---\n")
-
-        (project_path / "scenes" / "scene-1.md").write_text(
-            "---\nid: scene-1\ntitle: Scene\nsequence_id: seq-1\nact_id: act-1\n"
-            "value: Freedom\nvalue_open: mixed\nvalue_close: ironic\n"
-            "conflict_levels: [inner]\ndramatic_role: crisis\n"
-            "is_inciting_incident: true\nis_sequence_climax: true\n"
-            "is_act_climax: true\nis_story_climax: false\n---\n"
-        )
-
-        index = generate_index(project_path)
-        structure = generate_structure_index(index)
-
-        scene = structure["scenes"][0]
-        expected_keys = {
-            "id", "value", "value_open", "value_close",
-            "conflict_levels", "dramatic_role",
-            "is_inciting_incident", "is_sequence_climax",
-            "is_act_climax", "is_story_climax", "arc_beat_refs",
-        }
-        assert set(scene.keys()) == expected_keys
-
-        # Boolean fields are actual bools
-        assert isinstance(scene["is_inciting_incident"], bool)
-        assert isinstance(scene["is_sequence_climax"], bool)
-        assert isinstance(scene["is_act_climax"], bool)
-        assert isinstance(scene["is_story_climax"], bool)
-        # conflict_levels is a list
-        assert isinstance(scene["conflict_levels"], list)
-
-    def test_structure_index_arc_beat_refs_empty(self, tmp_path):
-        """arc_beat_refs is [] for all scenes."""
-        from core.index import generate_structure_index, generate_index
-
-        project_path = tmp_path / "proj"
-        project_path.mkdir()
-        (project_path / "scenes").mkdir()
-        (project_path / "project.md").write_text("---\nname: Test\n---\n")
-
-        (project_path / "scenes" / "scene-1.md").write_text(
-            "---\nid: scene-1\ntitle: Scene\nsequence_id: seq-1\nact_id: act-1\n---\n"
-        )
-
-        index = generate_index(project_path)
-        structure = generate_structure_index(index)
-
-        for scene in structure["scenes"]:
-            assert scene["arc_beat_refs"] == []
-
     def test_index_scenes_are_files_only(self, project_path):
         """index['scenes'] contains only file scenes, not screenplay scenes."""
         from core.index import generate_index
@@ -831,23 +672,6 @@ class TestStructureIndex:
         scene_ids = {s["id"] for s in index["scenes"]}
         assert scene_ids == {"central-room-day", "central-room-night", "the-core-day"}
 
-    def test_index_scenes_stripped_for_navigation(self, project_path):
-        """Main index scene entries lack dramatic metadata."""
-        from core.index import generate_index
-
-        index = generate_index(project_path)
-
-        for scene in index["scenes"]:
-            # Should NOT have dramatic metadata
-            assert "value" not in scene or scene.get("value", "") == ""
-            assert "value_open" not in scene or scene.get("value_open", "") == ""
-            assert "value_close" not in scene or scene.get("value_close", "") == ""
-            assert "conflict_levels" not in scene or scene.get("conflict_levels", []) == []
-            assert "dramatic_role" not in scene or scene.get("dramatic_role", "") == ""
-            assert "is_inciting_incident" not in scene or scene.get("is_inciting_incident", False) is False
-            assert "is_sequence_climax" not in scene or scene.get("is_sequence_climax", False) is False
-            assert "is_act_climax" not in scene or scene.get("is_act_climax", False) is False
-            assert "is_story_climax" not in scene or scene.get("is_story_climax", False) is False
 
     def test_sequence_scene_count(self, project_path):
         """sequence.scene_count equals number of scenes in sequence."""
@@ -883,15 +707,12 @@ class TestStructureIndex:
 
 # ---- Phase 3: Tool Surface Tests (Task 7) ----
 
-def _make_project_with_structure(tmp, with_structure_index=False):
-    """Create a project with acts/sequences/scenes folders for structural tests."""
+def _make_project_with_structure(tmp):
+    """Create a project with acts/sequences/scenes folders for tool surface tests."""
     project_path = _make_minimal_project(tmp)
     (project_path / "scenes").mkdir(parents=True, exist_ok=True)
     (project_path / "sequences").mkdir(parents=True, exist_ok=True)
     (project_path / "acts").mkdir(parents=True, exist_ok=True)
-    if with_structure_index:
-        from core.index import refresh_index
-        refresh_index(project_path)
     return project_path
 
 
@@ -1083,73 +904,6 @@ class TestPhase3ToolSurface:
 
         # No scene file should have been created
         assert not (project_path / "scenes" / "orphan.md").exists()
-
-    def test_update_structure_index_scene(self, tmp_path):
-        """After edit, structure-index.yaml updated without full rebuild."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-        from core.index import update_structure_index_scene, refresh_index
-
-        project_path = _make_project_with_structure(tmp_path)
-
-        # Create entities with explicit id fields (story_create doesn't auto-fill id)
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"id": "act-1", "title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"id": "seq-1", "title": "Seq 1", "act_id": "act-1"}
-        })
-        create_handler({
-            "entity_type": "scene", "slug": "dramatic-scene", "project": str(project_path),
-            "frontmatter": {
-                "id": "dramatic-scene", "title": "Dramatic Scene",
-                "sequence_id": "seq-1", "act_id": "act-1",
-                "value": "Trust", "dramatic_role": "setup"
-            }
-        })
-
-        # Refresh index to pick up all created entities (structure-index includes dramatic-scene)
-        refresh_index(project_path)
-
-        # Verify initial state
-        import frontmatter, yaml
-        structure_path = project_path / ".story" / "structure-index.yaml"
-        with open(structure_path) as f:
-            si = yaml.safe_load(f)
-        scene_entry = next(s for s in si["scenes"] if s["id"] == "dramatic-scene")
-        assert scene_entry["dramatic_role"] == "setup"
-
-        # Edit scene frontmatter
-        edit_handler({
-            "action": "edit_note",
-            "target": {"entity_type": "scene", "slug": "dramatic-scene", "project": str(project_path)},
-            "data": {"dramatic_role": "crisis", "value_close": "negative"},
-            "summary": "Change dramatic role"
-        })
-
-        # Verify structure-index.yaml was updated (lightweight, no full rebuild)
-        with open(structure_path) as f:
-            si = yaml.safe_load(f)
-        scene_entry = next(s for s in si["scenes"] if s["id"] == "dramatic-scene")
-        assert scene_entry["dramatic_role"] == "crisis"
-        assert scene_entry["value_close"] == "negative"
-
-        # Also verify update_structure_index_scene directly (the underlying mechanism)
-        # Edit frontmatter directly, then call update
-        scene_path = project_path / "scenes" / "dramatic-scene.md"
-        post = frontmatter.load(scene_path)
-        post.metadata["value_open"] = "mixed"
-        with open(scene_path, "w") as f:
-            frontmatter.dump(post, f)
-        update_structure_index_scene(project_path, "dramatic-scene")
-
-        with open(structure_path) as f:
-            si = yaml.safe_load(f)
-        scene_entry = next(s for s in si["scenes"] if s["id"] == "dramatic-scene")
-        assert scene_entry["value_open"] == "mixed"
-
 
 # ---- Phase 4: assemble_scene_content() Tests (Task 17) ----
 

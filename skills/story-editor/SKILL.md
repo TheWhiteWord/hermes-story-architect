@@ -40,7 +40,7 @@ Don't use for: loading projects (use story-loader), simple questions (use answer
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `story_load` | Load project index, memory, and (optionally) structure-index | `project`, `structure_only` (bool — load only dramatic metadata, skip index.yaml) |
+| `story_load` | Load project index, memory, and dramatic metadata | `project` |
 | `story_retrieve` | Get specific sections from a note | `entity_type`, `slug`, `sections` |
 | `story_edit` | Propose and apply edits | `action`, `target`, `data`, `order_context`, `summary` |
 | `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
@@ -70,8 +70,7 @@ For `reorder`, provide `order_context`:
 
 1. **Understand** — what entity, what change
 2. **Load context** — if not already loaded:
-   - Call `story_load` with `project` for navigation/index
-   - If the edit involves story structure, arc, or dramatic function: also call `story_load` with `structure_only: true`
+   - Call `story_load` with `project` — this returns the full index (navigation + dramatic metadata) and memory
 3. **Retrieve** — get relevant sections via `story_retrieve`
 4. **Formulate** — build the edit (action type + changes + continuity checks)
 5. **Present** — show the proposed edit in chat, wait for approval
@@ -107,7 +106,7 @@ The tool schema documents each field's type and description. Load
 - To distinguish **frontmatter** (LLM-editable) vs **code** (derived) fields
 
 For dramatic metadata (value arcs, dramatic roles, conflict levels, climax flags),
-see `references/structure-index-format.md`.
+see `references/index-format.md`.
 
 ### Entity Creation (Required Fields)
 

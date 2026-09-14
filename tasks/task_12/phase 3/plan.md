@@ -4,6 +4,8 @@
 **Status:** Plan — decided, ready for implementation
 **Input:** `refactor_overview.md` + `Claude_structure_refactor.md` + `phase 1/plan.md` + `phase 2/plan.md`
 
+> **Deprecated (2026-09-14):** This phase extended the two-file approach from Phase 2. Since Phase 2 was reverted in Task 13, this plan is obsolete. Preserved for historical context.
+
 ---
 
 ## 1. What This Phase Does

@@ -4,6 +4,8 @@
 **Status:** Plan — decided, ready for implementation
 **Input:** `refactor_overview.md` + `Claude_structure_refactor.md` + `phase 1/plan.md` + user clarification
 
+> **Deprecated (2026-09-14):** The two-file approach (main index + structure-index sidecar) was reverted in Task 13 in favor of a unified index. This plan is preserved for historical context.
+
 ---
 
 ## 1. What This Phase Does
