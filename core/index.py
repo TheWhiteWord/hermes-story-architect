@@ -248,6 +248,13 @@ def _validate_index(index: dict) -> None:
         if act.get("climax_scene_id") and act["climax_scene_id"] not in scene_ids:
             print(f"Warning: act {act['id']} references unknown climax scene {act['climax_scene_id']}")
 
+    # Validate project-level scene references
+    project = index.get("project", {})
+    for field in ("inciting_incident_scene_id", "story_climax_scene_id"):
+        scene_id = project.get(field, "")
+        if scene_id and scene_id not in scene_ids:
+            print(f"Warning: project.{field} references unknown scene {scene_id}")
+
     scenes_list = index.get("scenes", [])
     seqs_list = index.get("sequences", [])
     seq_lookup = {s["id"]: s for s in seqs_list}

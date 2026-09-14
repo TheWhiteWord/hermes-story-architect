@@ -1587,7 +1587,7 @@ function handleFileLoad(input) {
 function loadSampleData() {
   // Sample data in the REAL backend schema (as per brief) — exercises the normaliser
   const sample = {
-    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", spine: "", controlling_idea: "", value: "", value_at_open: "", value_at_close: "", inciting_incident_scene_id: "", story_climax_scene_id: "", structure_type: "", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
     characters: [
       {
         id: "detective-oak", name: "Detective Oak", story_role: "Supporting",
@@ -2111,6 +2111,45 @@ function buildStoryView() {
       </div>
     </div>`;
 
+  // Structure section (spine, controlling idea, value arc, structure type, key scenes)
+  const structure = [];
+
+  if (p.spine) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Spine</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.spine}</div></div>`);
+
+  if (p.controlling_idea) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Controlling Idea</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.controlling_idea}</div></div>`);
+
+  const valueArc = [];
+  if (p.value) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.value}</span>`);
+  if (p.value_at_open) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.value_at_open}</span>`);
+  if (p.value_at_close) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.value_at_close}</span>`);
+  if (valueArc.length) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px;display:flex;gap:6px;align-items:center">${valueArc.join(' → ')}</div></div>`);
+
+  if (p.structure_type) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Structure</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.structure_type}</div></div>`);
+
+  // Key scenes: inciting incident, story climax — clickable
+  const keyScenes = [];
+  if (p.inciting_incident_scene_id) {
+    const sid = p.inciting_incident_scene_id;
+    const scene = (story.scenes || []).find(s => String(s.id) === String(sid));
+    const label = scene ? scene.title : sid;
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="margin-top:2px"><button class="entity-link" onclick="showScenePanel('${sid}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${label}</button></div></div>`);
+  }
+  if (p.story_climax_scene_id) {
+    const sid = p.story_climax_scene_id;
+    const scene = (story.scenes || []).find(s => String(s.id) === String(sid));
+    const label = scene ? scene.title : sid;
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="margin-top:2px"><button class="entity-link" onclick="showScenePanel('${sid}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${label}</button></div></div>`);
+  }
+
+  const structureHtml = (structure.length || keyScenes.length) ? `
+    <div>
+      <div class="story-section-title">Structure</div>
+      <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
+        ${structure.join('')}
+        ${keyScenes.join('')}
+      </div>
+    </div>` : '';
+
   // Plots
   const plots = story.plots || [];
   const plotsHtml = plots.length ? `
@@ -2145,7 +2184,7 @@ function buildStoryView() {
       <button class="btn btn-hermes" data-hermes-send="Give me an overview of ${p.name}.">Ask Hermes about this story</button>
     </div>` : '';
 
-  body.innerHTML = statsHtml + plotsHtml + risksHtml + hermesHtml;
+  body.innerHTML = statsHtml + structureHtml + plotsHtml + risksHtml + hermesHtml;
 }
 
 // ─── Detail Panel ──────────────────────────────────────────────────────────────
@@ -2280,7 +2319,28 @@ function showScenePanel(sceneId) {
     contentHtml = '<div class="panel-muted">No content yet.</div>';
   }
 
+  // Dramatic metadata — only show positive values
+  const dramaTags = [];
+  if (scene.dramatic_role) dramaTags.push({ l: 'role', v: scene.dramatic_role });
+  if (scene.is_inciting_incident) dramaTags.push({ l: 'inciting', v: 'Inciting Incident' });
+  if (scene.is_sequence_climax) dramaTags.push({ l: 'seq-climax', v: 'Sequence Climax' });
+  if (scene.is_act_climax) dramaTags.push({ l: 'act-climax', v: 'Act Climax' });
+  if (scene.is_story_climax) dramaTags.push({ l: 'story-climax', v: 'Story Climax' });
+
+  const valueArc = [scene.value, scene.value_open, scene.value_close].filter(Boolean);
+  const conflicts = (scene.conflict_levels || []).filter(Boolean);
+
+  const dramaHtml = (dramaTags.length || valueArc.length || conflicts.length) ? `
+    <div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+        ${dramaTags.map(t => `<span class="tag tag-plot">${t.v}</span>`).join('')}
+        ${conflicts.map(c => `<span class="tag tag-char" style="font-size:var(--font-size-xs)">${c}</span>`).join('')}
+      </div>
+      ${valueArc.length ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:8px">Value arc: ${valueArc.join(' → ')}</div>` : ''}
+    </div>` : '';
+
   document.getElementById('panel-body').innerHTML = `
+    ${dramaHtml}
     ${chars ? `<div>
       <div class="panel-section-title">Characters</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
@@ -2494,6 +2554,15 @@ function showActPanel(actId) {
 
   document.getElementById('panel-body').innerHTML = `
     <div><span class="status-badge ${act.status || ''}">${act.status || 'planned'}</span></div>
+    ${(() => {
+      const projectSpine = (story.project || {}).spine;
+      const actObj = act.act_objective;
+      if (!projectSpine && !actObj) return '';
+      return `<div style="margin-top:8px">
+        ${projectSpine ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:4px">Story spine: <span style="font-style:italic">${projectSpine}</span></div>` : ''}
+        ${actObj ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground)">Act objective: <span style="color:var(--foreground);font-weight:500">${actObj}</span></div>` : ''}
+      </div>`;
+    })()}
     ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div>${seqRows}</div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
   `;
 
