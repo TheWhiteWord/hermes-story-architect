@@ -13,11 +13,13 @@ def generate_index(project_path: Path) -> dict:
     file_scenes = _parse_entities(project_path / "scenes", "scene")
     sequences = _parse_entities(project_path / "sequences", "sequence")
     acts = _parse_entities(project_path / "acts", "act")
+    arcs = _parse_arcs(project_path / "arcs")
 
     index = {
         "project": _parse_project(
             project_path, characters, locations, worlds, plots,
-            scenes_count=len(file_scenes), sequences_count=len(sequences), acts_count=len(acts)
+            scenes_count=len(file_scenes), sequences_count=len(sequences),
+            acts_count=len(acts), arcs_count=len(arcs)
         ),
         "characters": characters,
         "locations": locations,
@@ -28,6 +30,7 @@ def generate_index(project_path: Path) -> dict:
     }
 
     index["scenes"] = file_scenes
+    index["arcs"] = arcs
 
     # Populate characters.scenes[] and locations.scenes[] from scene list
     _enrich_entity_scenes(index)
@@ -48,6 +51,12 @@ def generate_index(project_path: Path) -> dict:
     _enrich_sequences_with_plots(index)
     _enrich_acts_with_plots(index)
 
+    # Enrich characters with arc beats
+    _enrich_characters_with_arcs(index)
+
+    # Enrich scenes with arc beats (reverse lookup)
+    _enrich_scenes_with_arcs(index)
+
     # Validate
     _validate_index(index)
 
@@ -56,7 +65,7 @@ def generate_index(project_path: Path) -> dict:
 
 def _parse_project(
     project_path: Path, characters, locations, worlds, plots,
-    scenes_count=0, sequences_count=0, acts_count=0
+    scenes_count=0, sequences_count=0, acts_count=0, arcs_count=0
 ) -> dict:
     """Parse project.md and add count fields."""
     fm = project_path / "project.md"
@@ -68,7 +77,75 @@ def _parse_project(
     project["plot_count"] = len(plots)
     project["sequence_count"] = sequences_count
     project["act_count"] = acts_count
+    project["arc_count"] = arcs_count
     return project
+
+
+def _parse_arcs(arcs_folder: Path) -> list[dict]:
+    """Parse arc beats from nested arcs/{character}/{beat_id}.md structure."""
+    if not arcs_folder.exists():
+        return []
+    beats = []
+    for char_folder in sorted(arcs_folder.iterdir()):
+        if not char_folder.is_dir() or char_folder.name.startswith("_") or char_folder.name.startswith("."):
+            continue
+        for note in sorted(char_folder.glob("*.md")):
+            if note.name.startswith("_"):
+                continue
+            beat = extract_entity(note, "arc")
+            # Inherit character from folder name if not in frontmatter
+            if "character" not in beat or not beat["character"]:
+                beat["character"] = char_folder.name
+            warnings = validate_entity("arc", beat)
+            if warnings:
+                print(f"Warnings for {note}: {warnings}")
+            beats.append(beat)
+    return beats
+
+
+def _enrich_characters_with_arcs(index: dict) -> None:
+    """Build character.arc_beats_list and set arc_beat_count."""
+    char_beats = {c["id"]: [] for c in index["characters"]}
+    for beat in index.get("arcs", []):
+        char_id = beat.get("character")
+        if char_id in char_beats:
+            char_beats[char_id].append({
+                "id": beat.get("id", ""),
+                "label": beat.get("label", ""),
+                "scene": beat.get("scene", ""),
+                "y": beat.get("y", 0.0),
+                "order": beat.get("order", 0),
+                "is_crisis": beat.get("is_crisis", False),
+                "is_climax": beat.get("is_climax", False),
+            })
+    for char in index["characters"]:
+        beats = char_beats.get(char["id"], [])
+        if beats:
+            char["arc_beats_list"] = sorted(beats, key=lambda b: b.get("order", 0))
+            char["arc_beat_count"] = len(beats)
+        else:
+            char["arc_beats_list"] = []
+            char["arc_beat_count"] = 0
+
+
+def _enrich_scenes_with_arcs(index: dict) -> None:
+    """Build scene.arc_beats[] by reverse lookup from beats."""
+    scene_beats = {s.get("id"): [] for s in index.get("scenes", [])}
+    for beat in index.get("arcs", []):
+        scene_id = beat.get("scene")
+        if scene_id in scene_beats:
+            scene_beats[scene_id].append({
+                "character": beat.get("character", ""),
+                "beat_id": beat.get("id", ""),
+                "label": beat.get("label", ""),
+                "y": beat.get("y", 0.0),
+                "is_crisis": beat.get("is_crisis", False),
+                "is_climax": beat.get("is_climax", False),
+            })
+    for scene in index.get("scenes", []):
+        beats = scene_beats.get(scene.get("id"), [])
+        if beats:
+            scene["arc_beats"] = beats
 
 
 def _enrich_relationships(index: dict) -> None:
@@ -326,6 +403,23 @@ def _validate_index(index: dict) -> None:
             seq = seq_lookup.get(scene["sequence_id"])
             if seq and seq.get("act_id") and seq["act_id"] != scene["act_id"]:
                 print(f"Warning: scene {sid} act_id={scene['act_id']} != sequence.act_id={seq['act_id']}")
+
+    # Arc beat validation
+    char_ids_set = {c["id"] for c in index["characters"]}
+    scene_ids_set = {s.get("id") for s in index.get("scenes", [])}
+    for beat in index.get("arcs", []):
+        beat_char = beat.get("character", "")
+        if beat_char and beat_char not in char_ids_set:
+            print(f"Warning: arc beat {beat.get('id')} references unknown character {beat_char}")
+        beat_scene = beat.get("scene", "")
+        if beat_scene and beat_scene not in scene_ids_set:
+            print(f"Warning: arc beat {beat.get('id')} references unknown scene {beat_scene}")
+        y_val = beat.get("y", 0)
+        if isinstance(y_val, (int, float)) and not (-1.0 <= float(y_val) <= 1.0):
+            print(f"Warning: arc beat {beat.get('id')} y out of range: {y_val}")
+        order_val = beat.get("order", 0)
+        if not isinstance(order_val, (int, float)):
+            print(f"Warning: arc beat {beat.get('id')} order is not numeric: {order_val}")
 
 
 def write_index(index: dict, output_path: Path) -> None:

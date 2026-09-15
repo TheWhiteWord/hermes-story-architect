@@ -167,22 +167,56 @@ None — this is additive.
 - `arc_count` (follows `scene_count` pattern on project)
 - `arc_beat_count` (follows `scene_count` pattern on character)
 
-## Final checklist (unmarked)
+## Final checklist
 
-- [ ] `_parse_arcs()` handles nested `arcs/{character}/{beat_id}.md` structure
-- [ ] `_parse_arcs()` skips hidden files/folders (leading `_` or `.`)
-- [ ] `_parse_arcs()` inherits character from folder name if missing in frontmatter
-- [ ] `generate_index()` includes `arcs` key in returned index
-- [ ] `_enrich_characters_with_arcs()` populates `arc_beats_list` sorted by order
-- [ ] `_enrich_characters_with_arcs()` sets `arc_beat_count`
-- [ ] `_enrich_characters_with_arcs()` handles characters with no beats (empty list, count 0)
-- [ ] `_enrich_scenes_with_arcs()` populates `scene["arc_beats"]`
-- [ ] `_validate_index()` warns on unknown character slug in beat
-- [ ] `_validate_index()` warns on unknown scene slug in beat
-- [ ] `_validate_index()` warns on y out of range
-- [ ] `_validate_index()` warns on non-numeric order
-- [ ] `arc_count` added to project metadata
-- [ ] Tests added to `test_arcs.py` for index derivation
-- [ ] Tests added to `test_arcs.py` for validation warnings
-- [ ] `pytest tests/test_arcs.py` passes
-- [ ] Existing `test_core.py` tests still pass
+- [x] `_parse_arcs()` handles nested `arcs/{character}/{beat_id}.md` structure
+- [x] `_parse_arcs()` skips hidden files/folders (leading `_` or `.`)
+- [x] `_parse_arcs()` inherits character from folder name if missing in frontmatter
+- [x] `generate_index()` includes `arcs` key in returned index
+- [x] `_enrich_characters_with_arcs()` populates `arc_beats_list` sorted by order
+- [x] `_enrich_characters_with_arcs()` sets `arc_beat_count`
+- [x] `_enrich_characters_with_arcs()` handles characters with no beats (empty list, count 0)
+- [x] `_enrich_scenes_with_arcs()` populates `scene["arc_beats"]`
+- [x] `_validate_index()` warns on unknown character slug in beat
+- [x] `_validate_index()` warns on unknown scene slug in beat
+- [x] `_validate_index()` warns on y out of range
+- [x] `_validate_index()` warns on non-numeric order
+- [x] `arc_count` added to project metadata
+- [x] Tests added to `test_arcs.py` for index derivation
+- [x] Tests added to `test_arcs.py` for validation warnings
+- [x] `pytest tests/test_arcs.py` passes
+- [x] Existing `test_core.py` tests still pass
+
+## Completed
+
+**Date**: 2026-09-15
+**Status**: All steps implemented and verified.
+
+### Implementation Summary
+
+1. **`_parse_arcs()`** — Parses `arcs/{character}/{beat_id}.md` nested structure, skips `_`/`.`-prefixed files, inherits character from folder when absent in frontmatter, validates each beat.
+2. **`generate_index()` wiring** — `arcs = _parse_arcs(project_path / "arcs")`, `index["arcs"] = arcs`, enrichment calls added after existing enrichment chain.
+3. **`_enrich_characters_with_arcs()`** — Groups beats by `character`, sorts by `order`, builds lightweight `arc_beats_list` (7 graph-oriented fields), sets `arc_beat_count`. Characters without beats get empty list + 0.
+4. **`_enrich_scenes_with_arcs()`** — Reverse lookup from beats to scenes, populates `scene["arc_beats"]` with `{character, beat_id, label, y, is_crisis, is_climax}`.
+5. **Arc validation in `_validate_index()`** — Unknown character, unknown scene, y range check, order numeric check.
+6. **`arc_count`** on project metadata, passed from `generate_index()`.
+
+### Fixtures Added
+
+- `tests/fixtures/save-the-children/arcs/dr-elena-voss/1.md` (First Doubt, y=0.5)
+- `tests/fixtures/save-the-children/arcs/dr-elena-voss/2.md` (The Weight of Choice, y=-0.2)
+- `tests/fixtures/save-the-children/arcs/dr-elena-voss/3.md` (Acceptance, y=-0.5, is_climax)
+- Updated `dr-elena-voss.md` with arc frontmatter fields
+
+### Tests Added (16 new)
+
+- `TestParseArcs` (4): parse beats, inherit character, empty folder, skip hidden
+- `TestEnrichCharactersWithArcs` (4): beats list, no arcs, sorted by order, lightweight fields
+- `TestEnrichScenesWithArcs` (3): scene beats, empty scenes, not-set when empty
+- `TestFullIndexArcIntegration` (5): index includes arcs, character beats list, empty character, scene beats, arc_count
+- `TestArcValidationWarnings` (4): unknown character, unknown scene, y out of range, valid arc
+
+### Result
+
+- `pytest tests/test_arcs.py` — 36/36 passed
+- `pytest tests/` — 216/216 passed (full suite, no regressions)

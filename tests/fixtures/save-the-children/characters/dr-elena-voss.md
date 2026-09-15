@@ -2,6 +2,11 @@
 name: Dr. Elena Voss
 one_sentence: Lead scientist on Project Save the Children — chose to preserve the minds even knowing the bodies would never come.
 story_role: Supporting
+arc_type: negative
+arc_value: Responsibility
+arc_value_at_open: positive
+arc_value_at_close: ironic
+arc_complete: true
 ---
 
 ## Personality
