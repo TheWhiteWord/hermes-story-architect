@@ -1114,27 +1114,98 @@ html, body {
 .graph-tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
 .graph-tab-content.active { display: flex; }
 #graph-tab-network { position: relative; }
-#graph-tab-charlist { padding: var(--gap); overflow-y: auto; }
 
-/* ─── Arc Graph ───────────────────────────────────────────────── */
+/* ─── Section Labels ─────────────────────────────────────────── */
+.panel-section-label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+}
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+/* ─── Cast / Char cards (inside Arc graph tab) ──────────────── */
+.chars-section { padding: 16px; }
+.chars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.char-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 120ms;
+  position: relative;
+}
+.char-card:hover { background: var(--card-hover); border-color: var(--border-hover); }
+.char-card.selected { border-color: rgba(123,156,240,0.4); background: rgba(123,156,240,0.06); }
+.char-name { font-size: var(--font-size-base); font-weight: 600; margin-bottom: 2px; }
+.char-role {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  display: flex; align-items: center; gap: 5px;
+}
+.char-role-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.char-arc-type {
+  font-size: var(--font-size-xs);
+  margin-top: 8px;
+  display: flex; align-items: center; gap: 4px;
+}
+.arc-type-badge {
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.arc-type-negative { background: rgba(224,112,112,0.15); color: #e07070; }
+.arc-type-positive { background: rgba(107,191,176,0.15); color: #6bbfb0; }
+.arc-type-flat { background: rgba(138,138,138,0.15); color: #8a8a8a; }
+.arc-type-ironic { background: rgba(224,168,107,0.15); color: #e0a86b; }
+.arc-type-absent { background: rgba(80,80,80,0.15); color: #555; }
+.char-beat-count { font-size: var(--font-size-xs); color: var(--muted-foreground); margin-top: 3px; }
+
+/* ─── Arc Graph Panel ────────────────────────────────────────── */
+.arc-graph-section { padding: 0 16px 16px; }
+.arc-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.arc-graph-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--foreground);
+}
+.arc-controls { display: flex; gap: 6px; align-items: center; }
 .arc-graph-wrap {
-  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   padding: 16px;
   position: relative;
-  overflow: hidden;
 }
-.arc-graph-svg {
+.arc-graph {
   width: 100%;
-  height: 100%;
   display: block;
+  cursor: crosshair;
 }
 .arc-legend {
-  padding: 8px 16px 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  margin-top: 12px;
 }
 .arc-legend .legend-item {
   display: flex;
@@ -1142,7 +1213,11 @@ html, body {
   gap: 6px;
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 120ms;
 }
+.arc-legend .legend-item:hover, .arc-legend .legend-item.active { color: var(--foreground); }
+.arc-legend .legend-item.muted { opacity: 0.35; }
 .arc-legend .legend-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
@@ -1150,20 +1225,63 @@ html, body {
   width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0;
 }
 .arc-legend .legend-arc-type { font-size: 9px; color: var(--muted-foreground); }
-/* Arc SVG elements */
+
+/* Sanity warnings */
+.arc-warnings { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.arc-warning {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,217,61,0.08);
+  border: 1px solid rgba(255,217,61,0.2);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: var(--font-size-xs);
+  color: #ffd93d;
+}
+.arc-warning-icon { font-size: 10px; flex-shrink: 0; }
+
+/* Empty state */
+.arc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  gap: 12px;
+}
+.arc-empty-icon { font-size: 28px; opacity: 0.25; }
+.arc-empty-title { font-size: var(--font-size-base); font-weight: 600; color: var(--foreground); }
+.arc-empty-text { font-size: var(--font-size-sm); color: var(--muted-foreground); max-width: 260px; line-height: 1.5; }
+
+/* SVG Arc graph elements */
 .arc-grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
 .arc-zero-line { stroke: rgba(255,255,255,0.12); stroke-width: 1; }
+.arc-act-line { stroke: rgba(255,255,255,0.1); stroke-width: 1; stroke-dasharray: 4 4; }
 .arc-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: opacity 200ms; }
-.arc-beat-dot { cursor: pointer; }
-.arc-beat-dot:hover { r: 7 !important; }
+.arc-line.muted { opacity: 0.15; }
+.arc-beat-dot { cursor: pointer; transition: r 150ms, opacity 200ms; }
+.arc-beat-dot:hover { r: 7; }
+.arc-beat-dot.muted { opacity: 0.15; }
 .arc-beat-dot.crisis { filter: drop-shadow(0 0 4px rgba(255,217,61,0.6)); }
 .arc-beat-dot.climax { filter: drop-shadow(0 0 6px currentColor); }
+.beat-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.55);
+  pointer-events: none;
+  font-family: inherit;
+}
 .arc-axis-label {
   font-size: 9px;
   fill: rgba(255,255,255,0.28);
   font-family: inherit;
 }
-/* Arc tooltip */
+.arc-act-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.2);
+  font-family: inherit;
+}
+
+/* Beat tooltip */
 #arc-beat-tooltip {
   position: fixed;
   background: #222;
@@ -1182,20 +1300,9 @@ html, body {
 #arc-beat-tooltip.visible { opacity: 1; }
 #arc-beat-tooltip .tt-label { font-weight: 600; margin-bottom: 2px; }
 #arc-beat-tooltip .tt-char { color: var(--muted-foreground); font-size: var(--font-size-xs); }
+#arc-beat-tooltip .tt-shift { font-size: var(--font-size-xs); margin-top: 2px; font-style: italic; color: var(--muted-foreground); }
 #arc-beat-tooltip .tt-value { margin-top: 3px; font-variant-numeric: tabular-nums; font-size: var(--font-size-xs); }
-/* Arc empty state */
-.arc-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 8px;
-  text-align: center;
-  color: var(--muted-foreground);
-}
-.arc-empty-icon { font-size: 28px; opacity: 0.25; }
-.arc-empty-text { font-size: var(--font-size-sm); max-width: 260px; line-height: 1.5; }
+
 /* Arc beat indicator dots on scene cards */
 .arc-beat-dot-scene {
   display: inline-block;
@@ -1213,6 +1320,7 @@ html, body {
 <div id="arc-beat-tooltip">
   <div class="tt-label" id="tt-label"></div>
   <div class="tt-char" id="tt-char"></div>
+  <div class="tt-shift" id="tt-shift"></div>
   <div class="tt-value" id="tt-value"></div>
 </div>
 <div id="app">
@@ -1350,9 +1458,8 @@ html, body {
         </div>
       </div>
       <div class="graph-tabs">
-        <div class="graph-tab active" id="tab-network" onclick="switchGraphTab('network')">Network</div>
+        <div class="graph-tab" id="tab-network" onclick="switchGraphTab('network')">Network</div>
         <div class="graph-tab" id="tab-arcgraph" onclick="switchGraphTab('arcgraph')">Arc graph</div>
-        <div class="graph-tab" id="tab-charlist" onclick="switchGraphTab('charlist')">List</div>
       </div>
       <div class="view-body">
         <div id="graph-tab-network" class="graph-tab-content active">
@@ -1360,11 +1467,23 @@ html, body {
           <div class="graph-legend" id="graph-legend"></div>
         </div>
         <div id="graph-tab-arcgraph" class="graph-tab-content" style="display:none;">
-          <div class="arc-graph-wrap" id="arc-graph-wrap"></div>
-          <div class="arc-legend" id="arc-legend"></div>
-        </div>
-        <div id="graph-tab-charlist" class="graph-tab-content" style="display:none;">
-          <div class="entity-grid" id="character-list-grid"></div>
+          <div class="chars-section">
+            <div class="panel-section-label">Cast</div>
+            <div class="chars-grid" id="chars-grid"></div>
+            <hr class="section-divider">
+          </div>
+          <div class="arc-graph-section">
+            <div class="arc-graph-header">
+              <div class="arc-graph-title">Value arc trajectories</div>
+              <div class="arc-controls">
+                <button class="btn btn-sm" id="btn-spline" onclick="toggleArcSpline()">Smooth</button>
+                <button class="btn btn-sm" id="btn-labels" onclick="toggleArcLabels()">Labels</button>
+              </div>
+            </div>
+            <div class="arc-graph-wrap" id="arc-graph-wrap"></div>
+            <div class="arc-legend" id="arc-legend"></div>
+            <div class="arc-warnings" id="arc-warnings"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -3456,47 +3575,80 @@ function switchGraphTab(tab) {
     content.classList.add('active');
     content.style.display = '';
   }
-  // Hide/show legend for network tab
   const netLegend = document.getElementById('graph-legend');
   if (netLegend) netLegend.style.display = (tab === 'network') ? '' : 'none';
-  if (tab === 'arcgraph') buildArcGraph();
-  if (tab === 'charlist') buildCharList();
+  if (tab === 'arcgraph') { buildCharsGrid(); buildArcGraph(); updateLegend(); }
 }
 
-function buildCharList() {
-  const grid = document.getElementById('character-list-grid');
+/* ─── State ─────────────────────────────────────────────────── */
+let arcUseSpline = false;
+let arcShowLabels = true;
+let arcMutedChars = new Set();
+
+/* ─── Character cards ───────────────────────────────────────── */
+function getArcTypeClass(type) {
+  const map = {
+    negative: 'arc-type-negative',
+    positive: 'arc-type-positive',
+    flat:     'arc-type-flat',
+    ironic:   'arc-type-ironic',
+    absent:   'arc-type-absent',
+  };
+  return map[type] || 'arc-type-flat';
+}
+
+function buildCharsGrid() {
+  const grid = document.getElementById('chars-grid');
   if (!grid) return;
-  const chars = story.characters || [];
-  if (!chars.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-title">No characters</div></div>';
-    return;
-  }
-  grid.innerHTML = chars.map(c => {
-    const color = roleColor(c.role || c.story_role || '');
-    const arcInfo = c.arc_beat_count > 0
-      ? `<span class="tag" style="background:${color}22;color:${color}">${c.arc_beat_count} beats</span>`
-      : '<span class="tag">No arc</span>';
-    const arcType = c.arc_type && c.arc_type !== 'absent'
-      ? `<span class="tag">${c.arc_type}</span>` : '';
-    return `
-      <div class="entity-card" data-id="${c.id}" onclick="showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))">
-        <div class="entity-card-pip" style="background:${color}"></div>
-        <div class="entity-card-body">
-          <div class="entity-card-name">${c.name}</div>
-          <div class="entity-card-sub">${c.role || c.story_role || ''} ${arcType}</div>
-          <div class="entity-card-meta">${arcInfo}</div>
-        </div>
-      </div>`;
-  }).join('');
+  grid.innerHTML = '';
+  (story.characters || []).forEach(char => {
+    const color = roleColor(char.role || char.story_role || '');
+    const div = document.createElement('div');
+    div.className = 'char-card';
+    div.innerHTML = `
+      <div class="char-name" style="color:${color}">${escapeHtml(char.name)}</div>
+      <div class="char-role">
+        <span class="char-role-dot" style="background:${color}"></span>
+        ${escapeHtml(char.role || char.story_role || '')}
+      </div>
+      <div class="char-arc-type">
+        <span class="arc-type-badge ${getArcTypeClass(char.arc_type)}">${char.arc_type || 'absent'}</span>
+        ${char.arc_value ? `<span style="font-size:10px;color:var(--muted-foreground)">${escapeHtml(char.arc_value)}</span>` : ''}
+      </div>
+      ${char.arc_beat_count > 0
+        ? `<div class="char-beat-count">${char.arc_beat_count} beat${char.arc_beat_count !== 1 ? 's' : ''}</div>`
+        : `<div class="char-beat-count" style="color:#555">No arc designed</div>`}
+    `;
+    div.addEventListener('click', () => {
+      const wasSelected = div.classList.contains('selected');
+      document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+      if (!wasSelected) {
+        div.classList.add('selected');
+        arcMutedChars = new Set((story.characters || []).filter(c => c.id !== char.id).map(c => c.id));
+      } else {
+        arcMutedChars = new Set();
+      }
+      buildArcGraph();
+      updateLegend();
+    });
+    grid.appendChild(div);
+  });
 }
 
-// ─── Arc Graph Rendering ───────────────────────────────────────────────────────
+/* ─── Arc Graph ─────────────────────────────────────────────── */
+const ARC_GW = 760;
+const ARC_GH = 320;
+const ARC_PAD = { top: 28, right: 40, bottom: 36, left: 42 };
 
-const ARC_GRAPH_PADDING = { top: 20, right: 20, bottom: 30, left: 40 };
+function arcXScale(t) {
+  return ARC_PAD.left + t * (ARC_GW - ARC_PAD.left - ARC_PAD.right);
+}
+function arcYScale(v) {
+  return ARC_PAD.top + (1 - (v + 1) / 2) * (ARC_GH - ARC_PAD.top - ARC_PAD.bottom);
+}
 
 function buildArcGraph() {
   const wrap = document.getElementById('arc-graph-wrap');
-  const legend = document.getElementById('arc-legend');
   if (!wrap) return;
 
   const chars = (story.characters || []).filter(c =>
@@ -3507,116 +3659,196 @@ function buildArcGraph() {
     wrap.innerHTML = `
       <div class="arc-empty">
         <div class="arc-empty-icon">&#9670;</div>
-        <div class="arc-empty-text">No arc trajectories yet. Design a character arc to see value trajectories plotted here.</div>
+        <div class="arc-empty-title">No arc trajectories yet</div>
+        <div class="arc-empty-text">Design a character arc to see value trajectories plotted here.</div>
         <button class="btn btn-hermes" data-hermes-send="Design a character arc for the protagonist showing their value shift across the story.">Design arc with Hermes</button>
       </div>`;
-    if (legend) legend.innerHTML = '';
     return;
   }
 
-  // Build scene order lookup for X-axis
   const sceneOrder = {};
   (story.scenes || []).forEach((s, i) => { sceneOrder[s.id] = i; });
-  const totalScenes = (story.scenes || []).length || 1;
+  const sceneCount = (story.scenes || []).length;
 
-  // Read dimensions from container
-  const rect = wrap.getBoundingClientRect();
-  const W = rect.width || 760;
-  const H = rect.height || 300;
-  const pad = ARC_GRAPH_PADDING;
-  const plotW = W - pad.left - pad.right;
-  const plotH = H - pad.top - pad.bottom;
-
-  // Y scale: -1.0 to +1.0 → plotH
-  const yScale = (y) => pad.top + plotH / 2 - (y * plotH / 2);
-
-  // X scale: scene index → plotW
-  const xScale = (sceneId) => {
-    const idx = sceneOrder[sceneId];
-    if (idx === undefined) return pad.left;
-    return pad.left + (idx / Math.max(1, totalScenes - 1)) * plotW;
-  };
-
-  // Build SVG
-  let svg = `<svg viewBox="0 0 ${W} ${H}" class="arc-graph-svg" preserveAspectRatio="xMidYMid meet">`;
-
-  // Grid lines
-  for (let y = -1.0; y <= 1.0; y += 0.5) {
-    const py = yScale(y);
-    const cls = y === 0 ? 'arc-zero-line' : 'arc-grid-line';
-    svg += `<line x1="${pad.left}" y1="${py}" x2="${W - pad.right}" y2="${py}" class="${cls}"/>`;
-    svg += `<text x="${pad.left - 5}" y="${py + 3}" class="arc-axis-label" text-anchor="end">${y > 0 ? '+' : ''}${y.toFixed(1)}</text>`;
+  function beatX(char, beat) {
+    const scIdx = sceneOrder[beat.scene];
+    if (scIdx === undefined) return (beat.order - 1) / (char.arc_beat_count || 1);
+    return scIdx / Math.max(1, sceneCount - 1);
   }
 
-  // Plot each character's arc line and beats
+  // Sanity warnings
+  const warnings = [];
+  chars.forEach(char => {
+    const ys = char.arc_beats_list.map(b => b.y);
+    const maxDelta = Math.max(...ys.map((y, i) => i > 0 ? Math.abs(y - ys[i-1]) : 0));
+    const range = Math.max(...ys) - Math.min(...ys);
+    if (range < 0.2) warnings.push(`"${char.name}" arc is flat — nothing dramatic happens`);
+    if (maxDelta > 0.8) warnings.push(`"${char.name}" has a single beat jump > 0.8 — consider splitting`);
+  });
+
+  let svg = `<svg viewBox="0 0 ${ARC_GW} ${ARC_GH}" class="arc-graph" id="arc-svg">`;
+
+  // Grid lines
+  for (let v = -1; v <= 1; v += 0.5) {
+    const y = arcYScale(v);
+    const cls = v === 0 ? 'arc-zero-line' : 'arc-grid-line';
+    svg += `<line x1="${ARC_PAD.left}" y1="${y}" x2="${ARC_GW - ARC_PAD.right}" y2="${y}" class="${cls}"/>`;
+    svg += `<text x="${ARC_PAD.left - 5}" y="${y}" class="arc-axis-label" text-anchor="end" dominant-baseline="central">${v > 0 ? '+' : ''}${v.toFixed(1)}</text>`;
+  }
+
+  // Y-axis label
+  svg += `<text x="9" y="${ARC_GH/2}" class="arc-axis-label" text-anchor="middle" transform="rotate(-90,9,${ARC_GH/2})">value charge</text>`;
+
+  // Act boundaries (dotted lines) — Act I label at start, boundary lines at first scene of each subsequent act
+  const acts = story.acts || [];
+  const scenes = story.scenes || [];
+  acts.forEach((act, i) => {
+    if (i === 0) {
+      svg += `<line x1="${ARC_PAD.left}" y1="${ARC_PAD.top - 8}" x2="${ARC_PAD.left}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-act-line"/>`;
+      svg += `<text x="${ARC_PAD.left + 4}" y="${ARC_PAD.top - 4}" class="arc-act-label">${escapeHtml(act.title || act.id || '')}</text>`;
+    } else {
+      const firstSceneIdx = scenes.findIndex(s => s.act_id === act.id);
+      if (firstSceneIdx > 0) {
+        const x = ARC_PAD.left + (firstSceneIdx / Math.max(1, scenes.length - 1)) * (ARC_GW - ARC_PAD.left - ARC_PAD.right);
+        svg += `<line x1="${x}" y1="${ARC_PAD.top - 8}" x2="${x}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-act-line"/>`;
+        svg += `<text x="${x + 4}" y="${ARC_PAD.top - 4}" class="arc-act-label">${escapeHtml(act.title || act.id || '')}</text>`;
+      }
+    }
+  });
+
+  // Arc lines + beat dots
   chars.forEach(char => {
     const color = roleColor(char.role || char.story_role || '');
+    const muted = arcMutedChars.has(char.id) ? ' muted' : '';
     const beats = [...(char.arc_beats_list || [])].sort((a, b) => a.order - b.order);
+    const pts = beats.map(b => [arcXScale(beatX(char, b)), arcYScale(b.y)]);
 
-    // Polyline points
-    const pts = beats.map(b => `${xScale(b.scene)},${yScale(b.y)}`).join(' ');
-    svg += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" opacity="0.8" class="arc-line"/>`;
+    if (arcUseSpline && pts.length > 2) {
+      svg += `<path class="arc-line${muted}" d="${catmullRomPath(pts)}" stroke="${color}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
+    } else {
+      svg += `<polyline class="arc-line${muted}" points="${pts.map(p => p.join(',')).join(' ')}" stroke="${color}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
+    }
 
-    // Beat dots
-    beats.forEach(b => {
-      const px = xScale(b.scene);
-      const py = yScale(b.y);
-      let r = 4;
-      let cls = 'arc-beat-dot';
-      let fill = color;
-      if (b.is_crisis) { r = 7; fill = '#ffd93d'; cls += ' crisis'; }
-      else if (b.is_climax) { r = 7; fill = 'transparent'; cls += ' climax'; }
-      svg += `<circle cx="${px}" cy="${py}" r="${r}" fill="${fill}" class="${cls}"
-        data-label="${escapeHtml(b.label)}" data-char="${escapeHtml(char.name)}" data-y="${b.y.toFixed(2)}"
-        onmouseenter="showArcTooltip(event, this)" onmouseleave="hideArcTooltip()"/>`;
+    beats.forEach(beat => {
+      const bx = arcXScale(beatX(char, beat));
+      const by = arcYScale(beat.y);
+      let r = 5, extraClass = '', fill = color, stroke = 'none', strokeW = 0;
+      if (beat.is_crisis) { r = 7; fill = '#ffd93d'; extraClass = ' crisis'; }
+      else if (beat.is_climax) { r = 7; fill = 'transparent'; stroke = color; strokeW = 2; extraClass = ' climax'; }
+      const yDisp = beat.y >= 0 ? `+${beat.y.toFixed(2)}` : beat.y.toFixed(2);
+      svg += `<circle class="arc-beat-dot${extraClass}${muted}" cx="${bx}" cy="${by}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" data-label="${escapeHtml(beat.label)}" data-char="${escapeHtml(char.name)}" data-shift="${escapeHtml(beat.shift || '')}" data-y="${yDisp}" onmouseenter="showArcTooltip(event, this)" onmouseleave="hideArcTooltip()"/>`;
+      if (arcShowLabels && !arcMutedChars.has(char.id)) {
+        svg += `<text class="beat-label" x="${bx}" y="${by - (beat.is_crisis || beat.is_climax ? 12 : 10)}" text-anchor="middle">${escapeHtml(beat.label)}</text>`;
+      }
     });
+  });
+
+  // X-axis (scene names at bottom)
+  (story.scenes || []).forEach((scene, i) => {
+    const x = ARC_PAD.left + (i / Math.max(1, sceneCount - 1)) * (ARC_GW - ARC_PAD.left - ARC_PAD.right);
+    const y = ARC_GH - ARC_PAD.bottom + 14;
+    const hasBeats = scene.arc_beats && scene.arc_beats.length > 0;
+    if (hasBeats) {
+      svg += `<text x="${x}" y="${y}" class="arc-axis-label" text-anchor="middle">${escapeHtml((scene.title || scene.id || '').split('—')[0].trim())}</text>`;
+      svg += `<line x1="${x}" y1="${ARC_GH - ARC_PAD.bottom}" x2="${x}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-grid-line"/>`;
+    }
   });
 
   svg += '</svg>';
   wrap.innerHTML = svg;
 
-  // Build legend
-  if (legend) {
-    legend.innerHTML = chars.map(char => {
-      const color = roleColor(char.role || char.story_role || '');
-      return `<div class="legend-item">
-        <div class="legend-line" style="background:${color}"></div>
-        <span>${escapeHtml(char.name)}</span>
-        <span class="legend-arc-type">${char.arc_type}</span>
-      </div>`;
-    }).join('') + `
-      <div class="legend-item" style="gap:12px;margin-left:auto">
-        <div style="display:flex;align-items:center;gap:4px"><div class="legend-dot" style="background:#ffd93d"></div><span>crisis</span></div>
-        <div style="display:flex;align-items:center;gap:4px"><div class="legend-dot" style="background:transparent;border:1px solid #e8e8e8"></div><span>climax</span></div>
-      </div>`;
+  // Warnings
+  const warningsEl = document.getElementById('arc-warnings');
+  if (warningsEl) {
+    warningsEl.innerHTML = warnings.map(w => `
+      <div class="arc-warning">
+        <span class="arc-warning-icon">&#9888;</span>
+        <span>${escapeHtml(w)}</span>
+      </div>
+    `).join('');
   }
 }
 
+function catmullRomPath(pts, alpha = 0.5) {
+  if (pts.length < 2) return '';
+  const d = [`M ${pts[0][0]} ${pts[0][1]}`];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(i - 1, 0)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(i + 2, pts.length - 1)];
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
+  }
+  return d.join(' ');
+}
+
+/* ─── Legend ────────────────────────────────────────────────── */
+function updateLegend() {
+  const legend = document.getElementById('arc-legend');
+  if (!legend) return;
+  const chars = (story.characters || []).filter(c =>
+    c.arc_type && c.arc_type !== 'absent' && c.arc_beats_list && c.arc_beats_list.length > 0
+  );
+  legend.innerHTML = chars.map(char => {
+    const color = roleColor(char.role || char.story_role || '');
+    const muted = arcMutedChars.has(char.id) ? ' muted' : '';
+    return `<div class="legend-item${muted}" onclick="toggleArcCharMute('${char.id}')">
+      <div class="legend-line" style="background:${color}"></div>
+      <span>${escapeHtml(char.name)}</span>
+      <span class="legend-arc-type">${char.arc_type}</span>
+    </div>`;
+  }).join('') + `
+    <div class="legend-item" style="gap:12px;margin-left:auto">
+      <div style="display:flex;align-items:center;gap:4px"><div class="legend-dot" style="background:#ffd93d"></div><span>crisis</span></div>
+      <div style="display:flex;align-items:center;gap:4px"><div class="legend-dot" style="background:transparent;border:1px solid #e8e8e8"></div><span>climax</span></div>
+    </div>`;
+}
+
+function toggleArcCharMute(charId) {
+  if (arcMutedChars.has(charId)) arcMutedChars.delete(charId);
+  else arcMutedChars.add(charId);
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+  buildArcGraph();
+  updateLegend();
+}
+
+function toggleArcSpline() {
+  arcUseSpline = !arcUseSpline;
+  document.getElementById('btn-spline')?.classList.toggle('btn-primary', arcUseSpline);
+  buildArcGraph();
+}
+
+function toggleArcLabels() {
+  arcShowLabels = !arcShowLabels;
+  document.getElementById('btn-labels')?.classList.toggle('btn-primary', arcShowLabels);
+  buildArcGraph();
+}
+
+/* ─── Tooltip ───────────────────────────────────────────────── */
 function showArcTooltip(e, el) {
   const tt = document.getElementById('arc-beat-tooltip');
   if (!tt) return;
   document.getElementById('tt-label').textContent = el.dataset.label;
   document.getElementById('tt-char').textContent = el.dataset.char;
-  const y = parseFloat(el.dataset.y);
-  document.getElementById('tt-value').innerHTML = `Value charge: <strong>${y >= 0 ? '+' : ''}${y.toFixed(2)}</strong>`;
+  document.getElementById('tt-shift').textContent = el.dataset.shift || '';
+  document.getElementById('tt-value').innerHTML = `Value charge: <strong>${el.dataset.y}</strong>`;
   tt.classList.add('visible');
   positionArcTooltip(e);
 }
-
 function hideArcTooltip() {
   const tt = document.getElementById('arc-beat-tooltip');
   if (tt) tt.classList.remove('visible');
 }
-
 function positionArcTooltip(e) {
   const tt = document.getElementById('arc-beat-tooltip');
   if (!tt) return;
-  const x = Math.min(e.clientX + 14, window.innerWidth - 220);
-  const y = Math.max(e.clientY - 40, 8);
-  tt.style.left = x + 'px';
-  tt.style.top = y + 'px';
+  tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 220) + 'px';
+  tt.style.top = Math.max(e.clientY - 40, 8) + 'px';
 }
-
 document.addEventListener('mousemove', e => {
   const tt = document.getElementById('arc-beat-tooltip');
   if (tt?.classList.contains('visible')) positionArcTooltip(e);

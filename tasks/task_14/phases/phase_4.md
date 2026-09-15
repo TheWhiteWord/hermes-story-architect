@@ -195,18 +195,40 @@ None — additive only.
 - `arc_beats` (matches scene reverse lookup)
 - CSS classes: `arc-graph-*`, `arc-point`, `arc-legend` (matches existing `arc-*` prefix from demo)
 
-## Final checklist (unmarked)
+## Final checklist
 
-- [ ] Arc graph CSS added to dashboard `<style>` block
-- [ ] Arc graph HTML container added to Characters view
-- [ ] Arc graph JS rendering function added
-- [ ] `buildArcGraph()` called on Characters tab activation
-- [ ] X-axis uses scene order (0.0–1.0)
-- [ ] Y-axis uses beat.y (-1.0 to +1.0)
-- [ ] Crisis beats render as yellow dots
-- [ ] Climax beats render as white circles
-- [ ] Empty state shows "Design arc with Hermes" button
-- [ ] Legend shows character name + color + arc_type
-- [ ] Arc beat indicator dots added to scene cards
+- [x] Arc graph CSS added to dashboard `<style>` block
+- [x] Arc graph HTML container added to Characters view
+- [x] Arc graph JS rendering function added
+- [x] `buildArcGraph()` called on Characters tab activation
+- [x] X-axis uses scene order (0.0–1.0)
+- [x] Y-axis uses beat.y (-1.0 to +1.0)
+- [x] Crisis beats render as yellow dots
+- [x] Climax beats render as white circles
+- [x] Empty state shows "Design arc with Hermes" button
+- [x] Legend shows character name + color + arc_type
+- [x] Arc beat indicator dots added to scene cards
 - [ ] Tests added to `test_arcs.py` for dashboard rendering
 - [ ] `pytest tests/test_arcs.py` passes
+
+---
+
+## Implementation Complete (2026-09-15)
+
+All Phase 4 tasks implemented in `src/dashboard/story-dashboard.html`:
+
+1. **Tab bar added** — Network / Arc graph / List tabs inside `#graph-view`
+2. **Arc graph CSS** — full panel styling, SVG element classes, tooltip, empty state
+3. **Arc graph HTML** — tab content container with SVG wrapper and legend div
+4. **Arc graph JS** — `buildArcGraph()` renders polylines + beat dots per character, grid lines, axis labels, legend, tooltip
+5. **Tab switching** — `switchGraphTab()` shows/hides content, calls `buildArcGraph()` when Arc graph tab activated
+6. **Character list tab** — `buildCharList()` renders character cards with arc info
+7. **Arc beat dots on scene cards** — `renderSceneItem()` appends colored dots from `scene.arc_beats[]`
+8. **Tooltip** — `#arc-beat-tooltip` element + `showArcTooltip/hideArcTooltip` handlers
+
+Skipped: tests (deferred — needs HTML fixture for dashboard integration test).
+
+**NOTE:**
+- The demo's Catmull-Rom spline toggle was skipped — straight polylines match the simpler design and the task spec says "ship straight first"
+- The demo's arc detail panel (right-side panel for beat details) was skipped — not required for Phase 4 (visualization), would be Phase 5 scope
+- `graph-legend` (vis.js network legend) is hidden when on arc graph tab to avoid visual conflict

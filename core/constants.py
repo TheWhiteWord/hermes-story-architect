@@ -159,7 +159,7 @@ ENTITY_SCHEMAS = {
     "act": {
         "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug"},
         "type": {"type": "string", "default": "act", "optional": False, "description": "Always 'act'"},
-        "title": {"type": "string", "default": "", "optional": False, "description": "Display name"},
+        "title": {"type": "string", "default": "", "optional": False, "description": "Display name. Use 'Act One', 'Act Two', 'Act Three', etc."},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within story (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "value": {"type": "string", "default": "", "optional": True, "description": "Value at stake in this act"},

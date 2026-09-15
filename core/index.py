@@ -113,6 +113,7 @@ def _enrich_characters_with_arcs(index: dict) -> None:
                 "id": beat.get("id", ""),
                 "label": beat.get("label", ""),
                 "scene": beat.get("scene", ""),
+                "shift": beat.get("shift", ""),
                 "y": beat.get("y", 0.0),
                 "order": beat.get("order", 0),
                 "is_crisis": beat.get("is_crisis", False),
