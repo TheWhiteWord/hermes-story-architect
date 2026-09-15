@@ -93,7 +93,7 @@ sequences:
 
 acts:
   - id: act-slug
-    title: Act One
+    title: Act I
     order: 1
     status: planned
     sequences_list: [sequence-slug]
