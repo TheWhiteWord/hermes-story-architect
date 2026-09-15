@@ -232,3 +232,18 @@ Skipped: tests (deferred — needs HTML fixture for dashboard integration test).
 - The demo's Catmull-Rom spline toggle was skipped — straight polylines match the simpler design and the task spec says "ship straight first"
 - The demo's arc detail panel (right-side panel for beat details) was skipped — not required for Phase 4 (visualization), would be Phase 5 scope
 - `graph-legend` (vis.js network legend) is hidden when on arc graph tab to avoid visual conflict
+
+---
+
+## Post-Implementation Notes
+
+The following adjustments were made during implementation to fix issues and align with the demo blueprint:
+
+- **Removed List tab** — only Network + Arc graph remain (List was redundant with Cast section)
+- **Cast section added** — character cards with name, role, arc type badge, beat count (matches demo)
+- **Act boundaries** — dotted vertical lines at first scene of each subsequent act, Act I label at start
+- **X-axis scene labels** — tick marks + scene names at bottom for scenes with arc beats
+- **Shift in tooltip** — beat `shift` field now shown in hover tooltip (label → character → shift → value)
+- **Index fix** — `_enrich_characters_with_arcs()` now promotes `shift` field to `arc_beats_list[]`
+- **Graph layout fix** — added `display:flex; flex-direction:column` to `#graph-view .view-body` to restore vis.js canvas height after Phase 4 restructure
+- **Right padding** — increased from 18px to 40px to reduce cutoff of rightmost beat

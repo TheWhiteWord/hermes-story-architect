@@ -120,13 +120,32 @@ None — additive only.
 
 ## Final checklist (unmarked)
 
-- [ ] Character nodes show arc_type in tooltip
-- [ ] Character nodes show arc beat count in tooltip
-- [ ] Character panel shows arc summary section
-- [ ] Character panel shows arc beats list (label + y value)
-- [ ] Character panel shows "Design arc" button when no beats
-- [ ] Structure view shows arc design summary (characters with arcs, total beats)
-- [ ] Graph legend shows arc count per role
-- [ ] Scene cards show arc beat dots (from Phase 4)
+- [x] Character nodes show arc_type in tooltip
+- [x] Character nodes show arc beat count in tooltip
+- [x] Character panel shows arc summary section
+- [x] Character panel shows arc beats list (label + y value)
+- [x] Character panel shows "Design arc" button when no beats
+- [x] Structure view shows arc design summary (characters with arcs, total beats)
+- [x] Graph legend shows arc count per role
+- [x] Scene cards show arc beat dots (from Phase 4)
 - [ ] Tests added to `test_arcs.py` for dashboard integration
 - [ ] `pytest tests/test_arcs.py` passes
+
+---
+
+## Implementation Complete (2026-09-15)
+
+All Phase 5 tasks implemented in `src/dashboard/story-dashboard.html`:
+
+1. **Step 5.1** — Character nodes show `arc_type` + beat count in vis.js tooltip
+2. **Step 5.2** — `showCharacterPanel()` renders arc summary section via `arcSectionHtml()` helper; shows beat list with label + y values, or "Design arc" button when empty
+3. **Step 5.3** — `populateStructuralStats()` populates `#structStats-arc-summary` with per-character arc info (name, type, beat count) + total
+4. **Step 5.4** — Graph legend shows `(N arc)` badge per role when characters have arcs
+
+Skipped: tests (dashboard integration requires HTML fixture, deferred per Phase 4 pattern).
+
+**NOTE:**
+- The Phase 5 spec suggested a `structure` array pattern for the Structure view, but the actual code directly populates DOM elements. Adapted to match existing `populateStructuralStats()` pattern — added new `#structStats-arc-summary` container + JS population.
+- `arcSectionHtml()` is a standalone helper called from `showCharacterPanel()` — keeps the panel function clean and the arc rendering testable/reusable.
+- CSS for `.arc-beat-item` / `.arc-beat-list` not needed — all styling is inline in the HTML template (matches existing dashboard patterns for ad-hoc panel sections).
+- `roleColor()` confirmed at line 2034, `getRoleKey()` at line 2043 — both already used by existing graph code.

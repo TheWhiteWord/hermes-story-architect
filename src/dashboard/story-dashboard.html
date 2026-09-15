@@ -1756,6 +1756,9 @@ html, body {
         <div class="stats-section-label">Acts</div>
         <div id="structStats-act-list"></div>
 
+        <div class="stats-section-label">Character arcs</div>
+        <div id="structStats-arc-summary"></div>
+
         <button class="btn btn-hermes" data-hermes-send="Analyze the dramatic structure of this story. Comment on the distribution of scene roles, the balance of acts, and any structural patterns or gaps.">Ask Hermes about structure</button>
 
       </div>
@@ -2058,25 +2061,24 @@ function buildGraphView() {
   const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim() || '#8a8a8a';
 
   const nodes = new vis.DataSet(chars.map(c => {
-    const role = c.role || c.story_role || '';
-    const col = roleColor(role);
-    return {
-      id: c.id,
-      label: c.name,
-      color: {
-        background: col + '22',
-        border: col,
-        highlight: { background: col + '44', border: col },
-        hover: { background: col + '33', border: col }
-      },
-      font: { color: fgColor, size: 12, face: 'inherit' },
-      borderWidth: 1.5,
-      borderWidthSelected: 2,
-      size: 22,
-      shape: 'dot',
-      title: role
-    };
-  }));
+      const role = c.role || c.story_role || '';
+      const col = roleColor(role);
+      return {
+        id: c.id,
+        label: c.name,
+        color: {
+          background: col + '22',
+          border: col,
+          highlight: { background: col + '44', border: col },
+          hover: { background: col + '33', border: col }
+        },
+        font: { color: fgColor, size: 12, face: 'inherit' },
+        borderWidth: 1.5,
+        borderWidthSelected: 2,
+        size: 22,
+        shape: 'dot'
+      };
+    }));
 
   const edges = [];
   const seen = new Set();
@@ -2116,6 +2118,32 @@ function buildGraphView() {
 
   network = new vis.Network(container, { nodes, edges: edgeDataSet }, options);
 
+  // Replace native tooltip with custom styled tooltip
+  network.on('hoverNode', params => {
+    const nodeId = params.node;
+    const char = chars.find(c => c.id === nodeId);
+    if (!char) return;
+    const role = char.role || char.story_role || '';
+    const arcType = char.arc_type || 'absent';
+    const arcValue = char.arc_value || '';
+    const arcBeatCount = char.arc_beats_list ? char.arc_beats_list.length : 0;
+    const tt = document.getElementById('arc-beat-tooltip');
+    if (!tt) return;
+    document.getElementById('tt-label').textContent = char.name;
+    document.getElementById('tt-char').textContent = role;
+    let shiftText = '';
+    if (arcBeatCount > 0) {
+      shiftText = arcType + (arcValue ? ' · ' + arcValue : '') + ' · ' + arcBeatCount + ' beats';
+    } else {
+      shiftText = arcType;
+    }
+    document.getElementById('tt-shift').textContent = shiftText;
+    document.getElementById('tt-value').innerHTML = '';
+    tt.classList.add('visible');
+    positionArcTooltip({ clientX: params.event.clientX, clientY: params.event.clientY });
+  });
+  network.on('blurNode', () => hideArcTooltip());
+
   network.on('click', params => {
     if (params.nodes.length > 0) {
       const charId = params.nodes[0];
@@ -2127,12 +2155,17 @@ function buildGraphView() {
   const legend = document.getElementById('graph-legend');
   const seen_roles = new Set();
   chars.forEach(c => seen_roles.add(getRoleKey(c.role)));
-  legend.innerHTML = [...seen_roles].map(role => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${ROLE_COLORS[role] || '#8a8a8a'}"></div>
-      <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>
-    </div>
-  `).join('');
+  legend.innerHTML = [...seen_roles].map(role => {
+    const charsInRole = chars.filter(c => getRoleKey(c.role) === role);
+    const arcChars = charsInRole.filter(c => c.arc_type && c.arc_type !== 'absent');
+    const arcBadge = arcChars.length > 0 ? ` <span style="color:var(--muted-foreground);font-size:9px">(${arcChars.length} arc)</span>` : '';
+    return `
+      <div class="legend-item">
+        <div class="legend-dot" style="background:${ROLE_COLORS[role] || '#8a8a8a'}"></div>
+        <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>${arcBadge}
+      </div>
+    `;
+  }).join('');
 }
 
 function resetGraphLayout() {
@@ -2515,6 +2548,30 @@ function renderSectionsHtml(entityType, slug) {
   `).join('');
 }
 
+function arcSectionHtml(char) {
+  const arcBeats = char.arc_beats_list || [];
+  const arcType = char.arc_type || 'absent';
+  const arcValue = char.arc_value || '';
+  if (arcBeats.length > 0) {
+    return `
+      <div class="panel-muted" style="font-size:var(--font-size-sm);margin-bottom:8px">
+        ${arcBeats.length} beats designed (${arcType}${arcValue ? ' · ' + arcValue : ''})
+      </div>
+      <div class="arc-beat-list">
+        ${arcBeats.map(b => `
+          <div class="arc-beat-item" style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span class="arc-beat-dot" style="background:${roleColor(char.role || char.story_role || '')}"></span>
+            <span style="font-size:var(--font-size-sm)">${escapeHtml(b.label || b.id)}</span>
+            <span class="panel-muted" style="margin-left:auto;font-size:var(--font-size-xs)">${escapeHtml(b.shift || '')}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+  return `
+    <div class="panel-muted" style="font-size:var(--font-size-sm)">No beats designed</div>
+    <button class="btn btn-hermes" data-hermes-send="Design a character arc for ${char.name} showing their value shift across the story.">Design arc with Hermes</button>`;
+}
+
 function showCharacterPanel(char) {
   document.getElementById('panel-type').textContent = char.role || char.story_role || 'Character';
   document.getElementById('panel-name').textContent = char.name;
@@ -2576,6 +2633,10 @@ function showCharacterPanel(char) {
       <div class="panel-section-title">Relationships</div>
       ${rels}
     </div>` : ''}
+    <div>
+      <div class="panel-section-title">Arc</div>
+      ${arcSectionHtml(char)}
+    </div>
     ${renderSectionsHtml('character', char.id)}
   `;
 
@@ -3387,6 +3448,27 @@ function populateStructuralStats() {
         <span class="beat-desc">${a.sceneCount || 0} scenes · ${a.sequenceCount || 0} sequences</span>
       </div>`
     ).join('') || '<div class="panel-muted" style="font-size:var(--font-size-xs);">No acts.</div>';
+  }
+
+  // Arc design summary
+  const arcContainer = document.getElementById('structStats-arc-summary');
+  if (arcContainer) {
+    const chars = story.characters || [];
+    const charsWithArcs = chars.filter(c => c.arc_type && c.arc_type !== 'absent' && c.arc_beats_list && c.arc_beats_list.length > 0);
+    const totalArcBeats = chars.reduce((sum, c) => sum + (c.arc_beats_list ? c.arc_beats_list.length : 0), 0);
+    if (charsWithArcs.length > 0) {
+      arcContainer.innerHTML = `<div style="margin-bottom:6px;font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${charsWithArcs.length} characters · ${totalArcBeats} beats designed</div>` +
+        charsWithArcs.map(c => {
+          const col = roleColor(c.role || c.story_role || '');
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span class="legend-dot" style="background:${col}"></span>
+            <span style="font-size:var(--font-size-sm)">${escapeHtml(c.name)}</span>
+            <span class="panel-muted" style="margin-left:auto;font-size:var(--font-size-xs)">${c.arc_type} · ${c.arc_beats_list.length} beats</span>
+          </div>`;
+        }).join('');
+    } else {
+      arcContainer.innerHTML = '<div class="panel-muted" style="font-size:var(--font-size-xs);">No character arcs designed.</div>';
+    }
   }
 }
 
