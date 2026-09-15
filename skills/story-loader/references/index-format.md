@@ -28,6 +28,7 @@ project:
   plot_count: 2
   sequence_count: 3
   act_count: 2
+  arc_count: 2
 
 characters:
   - id: character-slug
@@ -240,7 +241,71 @@ acts:
 
 ---
 
-## Value Arc System
+## Arcs
+
+```yaml
+arcs:
+  - id: "1"
+    character: character-slug
+    scene: scene-slug
+    label: "First Doubt"
+    action: "What the character does"
+    gap: "Expectation vs reality"
+    choice: "The choice made"
+    shift: "positive → mixed"
+    y: 0.5
+    order: 1
+    is_crisis: false
+    is_climax: false
+    sections: [Action, Gap, Choice, Shift, Development Log]
+```
+
+**Notes:**
+- Arc beats are stored in `arcs/{character}/{beat_id}.md` (nested by character)
+- Beat files use numeric IDs (`1.md`, `2.md`) for ordering
+- The `character` field is inferred from the folder if not in frontmatter
+- The `y` field is the value charge at that beat (-1.0 to +1.0)
+
+### Enriched Fields on Characters
+
+```yaml
+characters:
+  - id: character-slug
+    arc_type: positive | negative | flat | ironic | absent
+    arc_value: Value at stake
+    arc_value_at_open: positive | negative | mixed | ironic
+    arc_value_at_close: positive | negative | mixed | ironic
+    arc_complete: true | false
+    arc_beat_count: 3
+    arc_beats_list:
+      - id: "1"
+        label: "First Doubt"
+        scene: scene-slug
+        shift: "positive → mixed"
+        y: 0.5
+        order: 1
+        is_crisis: false
+        is_climax: false
+```
+
+**Source:** `arc_beats_list` and `arc_beat_count` are derived by the index generator. `arc_type`, `arc_value`, `arc_value_at_open`, `arc_value_at_close`, `arc_complete` are frontmatter (LLM domain).
+
+### Enriched Fields on Scenes
+
+```yaml
+scenes:
+  - id: scene-slug
+    arc_beats:
+      - character: character-slug
+        beat_id: "1"
+        label: "First Doubt"
+        y: 0.5
+        is_crisis: false
+        is_climax: false
+```
+
+**Source:** `arc_beats` is derived by reverse lookup from arc beat files.
+
 
 The value arc tracks whether a value (`Trust`, `Freedom`, etc.) is positively or negatively charged at each structural level. The arc moves from `value_open` to `value_close`:
 

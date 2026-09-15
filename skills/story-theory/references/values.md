@@ -265,7 +265,144 @@ Not:
 
 ---
 
-## 11. Numeric Value Encoding (for graphs and analysis)
+## 11. Theory → File Schema Bridge
+
+> This section maps McKee's theory to the actual frontmatter fields the LLM fills in when creating arc beats.
+
+### Frontmatter Fields
+
+Each beat file (`arcs/{character}/{beat_id}.md`) uses these fields:
+
+| Field | Theory Source | What to Write |
+|-------|---------------|---------------|
+| `id` | Beat identifier | Numeric (`"1"`, `"2"`) — order within character |
+| `character` | Character whose arc this belongs to | Character slug (must exist) |
+| `scene` | The scene where this beat occurs | Scene slug (must exist) |
+| `label` | Beat name | Short human description (`"First Doubt"`) |
+| `action` | What the character tries | One sentence, present tense |
+| `gap` | Expectation vs reality | One sentence, the surprise |
+| `choice` | True character revealed | One sentence, what they do next |
+| `shift` | Value charge change | Format: `"positive → mixed"` or `"negative → ironic"` |
+| `y` | Numeric value of the shift | -1.0 to +1.0, derived from Shift |
+| `order` | Position in arc sequence | 1, 2, 3... (explicit, not derived) |
+| `is_crisis` | Major reversal marker | `true` only for sequence/act climax beats |
+| `is_climax` | Arc completion marker | `true` only for the final beat of the arc |
+
+### Character Arc Fields
+
+On the character file, these fields describe the overall arc:
+
+| Field | Theory Source | What to Write |
+|-------|---------------|---------------|
+| `arc_type` | Arc trajectory type | `positive`, `negative`, `flat`, `ironic`, or `absent` |
+| `arc_value` | The value that changes for this character | Same value word as the story's value, or a thematic variant |
+| `arc_value_at_open` | Starting charge | `positive`, `negative`, `mixed`, `ironic` |
+| `arc_value_at_close` | Ending charge | `positive`, `negative`, `mixed`, `ironic` |
+| `arc_complete` | Whether arc is finished | `true` when all beats are designed |
+
+### Arc Type Decision Logic
+
+How to choose `arc_type`:
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| `positive` | Y ends higher than it starts | Trust → Betrayal → Earned Trust (earned positive) |
+| `negative` | Y ends lower than it starts | Trust → Doubt → Betrayal confirmed |
+| `flat` | Y stays roughly the same | World changes around them, they hold [P] |
+| `ironic` | Y appears to go one way but the true charge goes the other | Gains freedom but loses meaning (surface +1.0, true -0.5) |
+| `absent` | Character has no arc | Minor characters, cameos — they exist but don't change |
+
+**Rule:** Not every character needs an arc. Use `absent` for characters who don't change. The index will still track scenes they appear in.
+
+### Beat-to-Scene Relationship
+
+A beat happens WITHIN a scene. The `scene` field links to the scene where this beat occurs. A scene can have multiple beats (different characters, different arcs crossing). A character's beats span multiple scenes across the story.
+
+```
+Scene: central-room-day
+├── Beat 1 (Elena) — "The Choice"
+└── Beat 2 (Marcus) — "The Witness"
+
+Scene: central-room-night
+├── Beat 2 (Elena) — "The Haunting"
+└── Beat 3 (Kael) — "The Discovery"
+```
+
+### Complete Beat File Example
+
+```markdown
+---
+id: "1"
+character: dr-elena-voss
+scene: central-room-day
+label: "The Choice"
+action: "Elena makes the call — save the minds, abandon the bodies."
+gap: "She expects relief. She gets silence."
+choice: "She does not explain herself. She signs the order."
+shift: "positive → negative"
+y: 0.8
+order: 1
+is_crisis: false
+is_climax: false
+---
+
+## Action
+
+Elena stands before the console. She has minutes. She chooses the safe path: save the four hundred inside, let the four hundred outside die.
+
+## Gap
+
+She expected salvation to feel like strength. It feels like murder. The math was simple; the aftermath is not.
+
+## Choice
+
+She does not call Marcus. She signs alone. She watches the vitals flatline. She does not look away.
+
+## Shift
+
+From "I saved them" to "I chose who dies." Certainty becomes a wall.
+
+## Development Log
+
+Beat designed during arc planning. Elena's arc is negative. First beat sets up the value journey.
+```
+
+### Deriving Y from the Shift Line
+
+The `shift` line is linguistic. The `y` field is numeric. The LLM derives `y` from the shift using this logic:
+
+| Shift Pattern | Starting Y | Ending Y | How to derive |
+|---------------|------------|----------|---------------|
+| `positive → mixed` | +1.0 | +0.3 to 0.0 | Start high, move slightly negative |
+| `mixed → negative` | +0.3 | -0.5 to -0.8 | Cross zero into negative |
+| `positive → negative` | +1.0 | -1.0 | Full reversal — only for crisis/climax |
+| `negative → ironic` | -0.5 | *true* -0.5, surface +0.5 | Ironic: store true charge, mark shift as ironic |
+| `flat arc` | +0.8 | +0.7 | Small movement, character holds [P] |
+
+**Practical rule:** The `y` value is the ENDING charge after this beat's shift. If the shift is "positive → mixed" and the character started at +1.0, the `y` is where they land (e.g., +0.3).
+
+### Arc Design Checklist
+
+Before writing beat files, the LLM should:
+
+1. **Choose which characters get arcs** — protagonist always, antagonist usually, supporting if they change, minor/cameo = `absent`
+2. **Determine arc_type** — look at the character's journey across all scenes
+3. **Identify arc_value** — what value is at stake for THIS character (may differ from story value)
+4. **Map beats to scenes** — which scenes show this character changing?
+5. **Check P/C/CD/NN escalation** — beats should escalate through the schema, not jump
+6. **Verify crisis/climax placement** — crisis should be a major reversal, climax should resolve the arc
+
+After writing beats, verify:
+- [ ] Beat count matches `arc_beat_count` on character
+- [ ] `arc_value_at_open` matches first beat's starting charge
+- [ ] `arc_value_at_close` matches last beat's ending charge
+- [ ] Crisis beats have `is_crisis: true`
+- [ ] Climax beat has `is_climax: true`
+- [ ] Y values follow a gradual trend (not too jagged, not too flat)
+
+---
+
+## 12. Numeric Value Encoding (for graphs and analysis)
 
 ### The Axes
 

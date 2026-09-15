@@ -84,6 +84,45 @@ Does this match the character's established voice?
 
 ---
 
+## Arc Beat Patterns
+
+### Creating a new arc beat
+
+Use `story_create` with `entity_type: "arc"`:
+- `character` field is required (must match existing character slug)
+- `scene` field is required (must match existing scene slug)
+- `order` is explicit (1, 2, 3...) — determines beat sequence
+- `y` is the value charge (-1.0 to +1.0)
+- Path is auto-generated: `arcs/{character}/{beat_id}.md`
+
+### Editing beat frontmatter
+
+Use `story_edit` with `entity_type: "arc"`:
+- Can update any field: `label`, `action`, `gap`, `choice`, `shift`, `y`, `order`
+- Can mark `is_crisis: true` or `is_climax: true`
+
+### Retrieving beat content
+
+Use `story_retrieve` with `entity_type: "arc"`:
+- Retrieve full beat: `sections: ["all"]`
+- Retrieve specific section: `sections: ["Development Log"]`
+
+### Adding to development log
+
+Use `story_edit` with `entity_type: "arc"`:
+- Key `"Development Log"` appends to the section body
+- Log entries should include timestamps and reasoning
+
+### Arc design principles
+
+1. Each beat corresponds to a scene (beat.scene → scene.id)
+2. Beats are ordered per character by `order` field
+3. Y value tracks the character's value charge at that point
+4. Crisis beats mark major reversals; climax beats mark arc completion
+5. The arc_type on character summarizes the overall trajectory
+
+---
+
 ## Severity Levels
 
 | Level | Meaning | Action |

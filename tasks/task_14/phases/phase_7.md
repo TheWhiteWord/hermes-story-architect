@@ -298,23 +298,37 @@ None — additive only.
 - All entity types match (`arc`)
 - All section names match (`Action`, `Gap`, `Choice`, `Shift`, `Development Log`)
 
-## Final checklist (unmarked)
+## Final checklist
 
-- [ ] `index-format.md` documents arc entity schema
-- [ ] `index-format.md` documents character arc fields (arc_beats_list, arc_type, etc.)
-- [ ] `index-format.md` documents scene arc_beats reverse lookup
-- [ ] `index-format.md` documents arc_count on project
-- [ ] `continuity-checks.md` has arc beat creation pattern
-- [ ] `continuity-checks.md` has arc beat edit pattern
-- [ ] `continuity-checks.md` has arc beat retrieval pattern
-- [ ] `continuity-checks.md` has development log pattern
-- [ ] `continuity-checks.md` has arc design principles
-- [ ] `values.md` enriched with "Theory → File Schema Bridge" section
-- [ ] `values.md` has frontmatter field mapping table
-- [ ] `values.md` has character arc field mapping table
-- [ ] `values.md` has arc type decision logic
-- [ ] `values.md` has beat-to-scene relationship diagram
-- [ ] `values.md` has complete beat file example
-- [ ] `values.md` has Y-from-shift derivation table
-- [ ] `values.md` has arc design checklist
-- [ ] `story-theory/SKILL.md` links to values.md
+- [x] `index-format.md` documents arc entity schema
+- [x] `index-format.md` documents character arc fields (`arc_beats_list`, `arc_type`, etc.)
+- [x] `index-format.md` documents scene `arc_beats` reverse lookup
+- [x] `index-format.md` documents `arc_count` on project
+- [x] `continuity-checks.md` has arc beat creation pattern
+- [x] `continuity-checks.md` has arc beat edit pattern
+- [x] `continuity-checks.md` has arc beat retrieval pattern
+- [x] `continuity-checks.md` has development log pattern
+- [x] `continuity-checks.md` has arc design principles
+- [x] `values.md` enriched with "Theory → File Schema Bridge" section
+- [x] `values.md` has frontmatter field mapping table
+- [x] `values.md` has character arc field mapping table
+- [x] `values.md` has arc type decision logic
+- [x] `values.md` has beat-to-scene relationship diagram
+- [x] `values.md` has complete beat file example
+- [x] `values.md` has Y-from-shift derivation table
+- [x] `values.md` has arc design checklist
+- [x] `story-theory/SKILL.md` links to `values.md`
+
+---
+
+## Phase 7 — Final Brief
+
+**Completed:** All steps (7.1–7.4) implemented and verified.
+
+**Files modified:**
+- `skills/story-loader/references/index-format.md` — Added `arc_count` to project block, new Arcs section with beat schema, enriched character fields (including `shift` in `arc_beats_list`), scene `arc_beats` reverse lookup
+- `skills/story-editor/references/continuity-checks.md` — Added Arc Beat Patterns section (create/edit/retrieve/log/principles)
+- `skills/story-theory/references/values.md` — Added Section 11 "Theory → File Schema Bridge" with frontmatter table, character arc fields, arc type decision logic, beat-to-scene diagram, complete file example, Y-from-shift derivation, arc design checklist. Renumbered old Section 11 → 12.
+- `skills/story-theory/SKILL.md` — Added `references/values.md` link
+
+**Key fix:** `arc_beats_list` docs now correctly list `shift` as one of the 8 lightweight fields (matching `core/index.py` and `test_arcs.py`). Dashboard tooltips depend on it (`story-dashboard.html:2565, 3821, 3919`).

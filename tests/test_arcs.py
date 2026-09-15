@@ -183,7 +183,7 @@ class TestEnrichCharactersWithArcs:
         }
         _enrich_characters_with_arcs(index)
         beat = index["characters"][0]["arc_beats_list"][0]
-        assert set(beat.keys()) == {"id", "label", "scene", "y", "order", "is_crisis", "is_climax"}
+        assert set(beat.keys()) == {"id", "label", "scene", "shift", "y", "order", "is_crisis", "is_climax"}
 
 
 class TestEnrichScenesWithArcs:

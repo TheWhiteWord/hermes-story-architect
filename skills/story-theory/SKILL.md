@@ -17,3 +17,4 @@ Index page. Content lives in references.
 ## References
 
 - `references/plot.md` — Plot theory: definitions, characteristics, schema mapping
+- `references/values.md` — Value theory: arc types, value charges, value hierarchy, beat file schema
