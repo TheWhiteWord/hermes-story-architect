@@ -6,7 +6,7 @@ from .constants import (
     SCENE_STATUSES, SEQUENCE_STATUSES, ACT_STATUSES,
     SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
     VALUE_CHARGES, STRUCTURE_TYPES, PLOT_TYPES,
-    PLOT_SCOPES, VALUE_ARCS,
+    PLOT_SCOPES, VALUE_ARCS, ARC_TYPES,
 )
 from .section_parser import list_sections
 
@@ -37,9 +37,12 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         if field not in frontmatter:
             warnings.append(f"Missing required field: {field}")
 
-    if entity_type == "character" and "story_role" in frontmatter:
-        if frontmatter["story_role"] not in VALID_ROLES:
+    if entity_type == "character":
+        if "story_role" in frontmatter and frontmatter["story_role"] not in VALID_ROLES:
             warnings.append(f"Invalid story_role: {frontmatter['story_role']}")
+        _validate_enum(frontmatter, "arc_type", ARC_TYPES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "arc_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "arc_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
 
     if entity_type == "plot" and "status" in frontmatter:
         if frontmatter["status"] not in VALID_STATUSES:
@@ -73,6 +76,14 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "value_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
+
+    if entity_type == "arc":
+        _validate_numeric(frontmatter, "y", warnings)
+        _validate_numeric(frontmatter, "order", warnings)
+        if "y" in frontmatter:
+            y_val = frontmatter["y"]
+            if isinstance(y_val, (int, float)) and not (-1.0 <= float(y_val) <= 1.0):
+                warnings.append(f"y out of range: {y_val} (must be -1.0 to +1.0)")
 
     return warnings
 

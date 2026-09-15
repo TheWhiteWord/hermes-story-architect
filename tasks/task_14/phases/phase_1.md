@@ -275,19 +275,21 @@ None — this is additive only. No existing arc code to remove.
 - `arc_value_at_open` / `arc_value_at_close` (matches `value_at_open` / `value_at_close` pattern on project)
 - No existing arc field names to check against — this is a new entity
 
-## Final checklist (unmarked)
 
-- [ ] `ARC_TYPES` added to constants.py
-- [ ] `arc` added to `REQUIRED_FIELDS`
-- [ ] `arc` added to `ENTITY_FOLDERS`
-- [ ] `arc` added to `ENTITY_LABELS`
-- [ ] `arc` added to `ENTITY_SCHEMAS` with all fields
-- [ ] `arc_type` / `arc_value` / `arc_value_at_open` / `arc_value_at_close` / `arc_complete` added to character schema
-- [ ] `NESTED_ENTITIES` dict added to constants.py
-- [ ] `core/paths.py` created with `build_entity_path()` and `find_entity_path()`
-- [ ] `ARC_TYPES` imported in entity.py
-- [ ] Arc validation branch added to `validate_entity()`
-- [ ] Character arc field validation added
-- [ ] `test_arcs.py` created with `TestArcValidation` and `TestPathResolution` classes
-- [ ] `pytest tests/test_arcs.py` passes
-- [ ] No existing tests broken (`pytest tests/test_core.py`)
+
+- [x] `ARC_TYPES` added to constants.py
+- [x] `arc` added to `REQUIRED_FIELDS`
+- [x] `arc` added to `ENTITY_FOLDERS`
+- [x] `arc` added to `ENTITY_LABELS`
+- [x] `arc` added to `ENTITY_SCHEMAS` with all fields
+- [x] `arc_type` / `arc_value` / `arc_value_at_open` / `arc_value_at_close` / `arc_complete` added to character schema
+- [x] `NESTED_ENTITIES` dict added to constants.py
+- [x] `core/paths.py` created with `build_entity_path()` and `find_entity_path()`
+- [x] `ARC_TYPES` imported in entity.py
+- [x] Arc validation branch added to `validate_entity()`
+- [x] Character arc field validation added
+- [x] `test_arcs.py` created with `TestArcValidation` and `TestPathResolution` classes
+- [x] `pytest tests/test_arcs.py` passes (16/16)
+- [x] No existing tests broken (`pytest tests/test_core.py` — 73/73)
+
+**Note:** Arc content fields (label, action, gap, choice, shift, y) are optional — allows beat shells to be created during scene planning, content filled later. Structural anchors only (id, character, scene, order) remain required.

@@ -13,6 +13,7 @@ STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
 PLOT_SCOPES = ["main", "sub"]
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
+ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
 
 REQUIRED_FIELDS = {
@@ -24,6 +25,7 @@ REQUIRED_FIELDS = {
     "scene": ["title", "sequence_id", "act_id"],
     "sequence": ["title", "act_id"],
     "act": ["title"],
+    "arc": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
 }
 
 ENTITY_FOLDERS = {
@@ -35,6 +37,13 @@ ENTITY_FOLDERS = {
     "scene": "scenes",
     "sequence": "sequences",
     "act": "acts",
+    "arc": "arcs",
+}
+
+# Nested entities use {parent_field} in their path: folder/{parent}/{slug}.md
+# Non-nested entities use flat paths: folder/{slug}.md
+NESTED_ENTITIES = {
+    "arc": "character",  # arcs/{character}/{beat_id}.md
 }
 
 ENTITY_LABELS = {
@@ -46,6 +55,7 @@ ENTITY_LABELS = {
     "scene": "Scene",
     "sequence": "Sequence",
     "act": "Act",
+    "arc": "Arc Beat",
 }
 
 # Full field schemas — used by story_create and story_edit to ensure all fields
@@ -61,6 +71,12 @@ ENTITY_SCHEMAS = {
         "goals_short": {"type": "string", "default": "", "optional": True, "description": "Short-term goal (flat form; nested goals.short also accepted)"},
         "goals_long": {"type": "string", "default": "", "optional": True, "description": "Long-term goal (flat form; nested goals.long also accepted)"},
         "knowledge": {"type": "list", "default": [], "optional": True, "description": "Facts the character knows. Each entry is a string."},
+        "arc_type": {"type": "string", "default": "absent", "optional": True, "description": "One of: positive, negative, flat, ironic, absent"},
+        "arc_value": {"type": "string", "default": "", "optional": True, "description": "Value at stake across this character's arc"},
+        "arc_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Value charge at arc open (positive/negative/mixed/ironic)"},
+        "arc_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Value charge at arc close (positive/negative/mixed/ironic)"},
+        "arc_complete": {"type": "boolean", "default": False, "optional": True, "description": "Whether this character's arc is complete"},
+        "arc_beat_count": {"type": "number", "default": 0, "optional": True, "description": "Number of arc beats (derived, overwritten by index)"},
     },
     "location": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
@@ -151,5 +167,19 @@ ENTITY_SCHEMAS = {
         "value_close": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, mixed, ironic"},
         "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this act's major reversal lands"},
         "act_objective": {"type": "string", "default": "", "optional": True, "description": "Protagonist's immediate goal for this act"},
+    },
+    "arc": {
+        "id": {"type": "string", "default": "", "optional": False, "description": "Beat slug (unique within character)"},
+        "character": {"type": "string", "default": "", "optional": False, "description": "Character slug this beat belongs to"},
+        "scene": {"type": "string", "default": "", "optional": False, "description": "Scene slug where this beat occurs"},
+        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within character's arc"},
+        "label": {"type": "string", "default": "", "optional": True, "description": "Human-readable label (e.g. 'First Doubt')"},
+        "action": {"type": "string", "default": "", "optional": True, "description": "What the character does"},
+        "gap": {"type": "string", "default": "", "optional": True, "description": "Expectation vs reality gap"},
+        "choice": {"type": "string", "default": "", "optional": True, "description": "The choice the character makes"},
+        "shift": {"type": "string", "default": "", "optional": True, "description": "Value shift (e.g. 'positive → mixed')"},
+        "y": {"type": "number", "default": 0.0, "optional": True, "description": "Value charge (-1.0 to +1.0)"},
+        "is_crisis": {"type": "boolean", "default": False, "optional": True, "description": "Marks a crisis beat"},
+        "is_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks a climax beat"},
     },
 }
