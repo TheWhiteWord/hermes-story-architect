@@ -1,0 +1,1 @@
+A story-writing environment as a standalone Hermes plugin. Story projects live as Markdown + YAML frontmatter in a dedicated vault. Hermes provides the intelligence layer with **section-level targeted retrieval**. The preview pane provides interactive navigation

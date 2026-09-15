@@ -1,7 +1,7 @@
 # Task 13 (cont.): Story-Level Structural Fields — Dashboard & Validation
 
 **Created:** 2026-09-14
-**Status:** Plan — ready for task decomposition → ✅ COMPLETED
+**Status:** Plan — ready for task decomposition
 **Input:** Task 13 refactor (unified index) + McKee hierarchy discussion
 
 ---
@@ -226,12 +226,11 @@ Then prepend `dramaHtml` to the existing `panel-body` innerHTML.
 ## 5. Task Order
 
 1. **A** (dashboard story view) — prerequisite for B
-2. **B** (act panel spine + objective) — depends on A's pattern
+2. **B** (act panel spine) — depends on A's pattern
 3. **C** (validator) — independent, can run anytime
 4. **D** (fallback) — independent, trivial
-5. **E** (scene panel drama) — independent, uses existing `showScenePanel()` pattern
 
-A → B → E (→ C → D anywhere, parallel)
+A → B → C → D (or A → B, C → D in parallel)
 
 ---
 
@@ -240,7 +239,94 @@ A → B → E (→ C → D anywhere, parallel)
 - Open dashboard on `browser-verification-test` project
 - Story view shows: spine, controlling idea, value arc, structure type (when fields are populated)
 - Act panel shows: "Story spine: ..." above act objective
-- Scene panel shows: "Inciting Incident", "Sequence Climax" as small tags (when true)
+- Run `story_index` — no false warnings on valid data
+- Temporarily break a `inciting_incident_scene_id` in project.md → `story_index` prints warning
+- Reload dashboard → no JS console errors
+```
+
+**Check:** Run `story_index` on a project with `inciting_incident_scene_id: bad-slug` → prints warning. Valid references → no warning. Empty string → no warning.
+
+---
+
+### Task D: Hardcoded Fallback — Update Default Project
+
+**File:** `src/dashboard/story-dashboard.html`
+**Function:** `loadSampleData()` (line ~1587)
+**Line:** 1590
+
+**Current state:**
+```javascript
+project: { name: "The Water Audit", logline: "A forensic accountant...", genre: "Sci-fi thriller", setting: "Near-future city-state", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+```
+
+**Change:** Add new fields with empty string defaults:
+```javascript
+project: { name: "The Water Audit", logline: "A forensic accountant...", genre: "Sci-fi thriller", setting: "Near-future city-state", spine: "", controlling_idea: "", value: "", value_at_open: "", value_at_close: "", inciting_incident_scene_id: "", story_climax_scene_id: "", structure_type: "", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+```
+
+**Verified:** `normalise()` doesn't process `project` — new fields pass through as-is. Dashboard A's code uses `if (p.field)` guards — empty strings are falsy, so sections render absent. No JS errors.
+
+**Check:** Dashboard opens with `loadSampleData()` (no `__STORY_DATA__`) → no console errors. Story view doesn't crash on missing/empty new fields.
+
+---
+
+### Task E: Scene Panel — Dramatic Metadata Block
+
+**File:** `src/dashboard/story-dashboard.html`
+**Function:** `showScenePanel()` (line ~2243)
+
+**Scope:** The detail panel that opens when clicking a specific scene (not the main Scenes list). Shows only truthy/positive values — booleans only if `true`, strings only if non-empty, arrays only if non-empty.
+
+**Current state:** Shows Characters, Location, Plot threads, Screenplay heading, Content. Ignores `dramatic_role`, climax flags, value arc, conflict levels.
+
+**Implementation:**
+
+Insert at the top of the panel-body innerHTML (before Characters):
+
+```javascript
+// Dramatic metadata — only show positive values
+const dramaTags = [];
+if (scene.dramatic_role) dramaTags.push({ l: 'role', v: scene.dramatic_role });
+if (scene.is_inciting_incident) dramaTags.push({ l: 'inciting', v: 'Inciting Incident' });
+if (scene.is_sequence_climax) dramaTags.push({ l: 'seq-climax', v: 'Sequence Climax' });
+if (scene.is_act_climax) dramaTags.push({ l: 'act-climax', v: 'Act Climax' });
+if (scene.is_story_climax) dramaTags.push({ l: 'story-climax', v: 'Story Climax' });
+
+const valueArc = [scene.value, scene.value_open, scene.value_close].filter(Boolean);
+const conflicts = (scene.conflict_levels || []).filter(Boolean);
+
+const dramaHtml = (dramaTags.length || valueArc.length || conflicts.length) ? `
+  <div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      ${dramaTags.map(t => `<span class="tag tag-plot">${t.v}</span>`).join('')}
+      ${conflicts.map(c => `<span class="tag tag-char" style="font-size:var(--font-size-xs)">${c}</span>`).join('')}
+    </div>
+    ${valueArc.length ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:8px">Value arc: ${valueArc.join(' → ')}</div>` : ''}
+  </div>` : '';
+```
+
+Then prepend `dramaHtml` to the existing `panel-body` innerHTML.
+
+**Check:** Scene panel shows "Inciting Incident", "Sequence Climax", etc. as small tags when flags are true. Shows value arc as a compact line when populated. No visible output when all fields are empty/false. No console errors.
+
+---
+
+## 5. Task Order
+
+1. **A** (dashboard story view) — prerequisite for B
+2. **B** (act panel spine) — depends on A's pattern
+3. **C** (validator) — independent, can run anytime
+4. **D** (fallback) — independent, trivial
+
+A → B → C → D (or A → B, C → D in parallel)
+
+---
+
+## 6. Verification
+
+- Open dashboard on `browser-verification-test` project
+- Story view shows: spine, controlling idea, value arc, structure type (when fields are populated)
+- Act panel shows: "Story spine: ..." above act objective
 - Run `story_index` — no false warnings on valid data
 - Temporarily break a `inciting_incident_scene_id` in project.md → `story_index` prints warning
 - Reload dashboard → no JS console errors

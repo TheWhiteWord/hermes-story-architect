@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arc Visualization — Story Dashboard</title>
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+body {
+  background: #121212;
+  color: #e8e8e8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── CSS Tokens ────────────────────────────────────────────── */
+:root {
+  --foreground: #e8e8e8;
+  --muted-foreground: #8a8a8a;
+  --accent: #7b9cf0;
+  --border: rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.15);
+  --card: rgba(255,255,255,0.04);
+  --card-hover: rgba(255,255,255,0.07);
+  --panel-bg: #181818;
+  --panel-width: 340px;
+
+  --role-protagonist: #7b9cf0;
+  --role-antagonist: #e07070;
+  --role-mentor: #b07be0;
+  --role-rival: #e0a86b;
+  --role-supporting: #6bbfb0;
+
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 13px;
+  --font-size-lg: 15px;
+
+  --warning-flat: #ffd93d;
+  --crisis-yellow: #ffd93d;
+
+  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Layout ────────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  flex: 1;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────── */
+.sidebar {
+  width: 200px;
+  background: #0f0f0f;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.sidebar-logo {
+  padding: 20px 16px 14px;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.02em;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo span { color: var(--accent); }
+.sidebar-nav { padding: 8px 0; flex: 1; }
+.nav-section-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 10px 16px 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  font-size: var(--font-size-base);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border-radius: 0;
+  transition: color var(--transition), background var(--transition);
+  text-decoration: none;
+  user-select: none;
+}
+.nav-item:hover { color: var(--foreground); background: var(--card); }
+.nav-item.active {
+  color: var(--foreground);
+  background: rgba(123,156,240,0.1);
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+}
+.nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── Main Content ──────────────────────────────────────────── */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.view-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.view-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--foreground);
+}
+.view-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+.header-actions { display: flex; gap: 8px; }
+
+/* ─── Buttons ───────────────────────────────────────────────── */
+.btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-hover);
+  background: var(--card);
+  color: var(--muted-foreground);
+  transition: all var(--transition);
+}
+.btn:hover { background: var(--card-hover); color: var(--foreground); border-color: var(--border-hover); }
+.btn-primary { background: rgba(123,156,240,0.15); color: var(--accent); border-color: rgba(123,156,240,0.3); }
+.btn-primary:hover { background: rgba(123,156,240,0.25); }
+.btn-hermes {
+  background: linear-gradient(135deg, rgba(176,123,224,0.2), rgba(123,156,240,0.2));
+  color: #c9a3f0;
+  border-color: rgba(176,123,224,0.35);
+}
+.btn-hermes:hover { background: linear-gradient(135deg, rgba(176,123,224,0.3), rgba(123,156,240,0.3)); }
+.btn-sm { padding: 4px 9px; font-size: var(--font-size-xs); }
+.btn-icon {
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  border-radius: 4px;
+}
+
+/* ─── Tabs ──────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab {
+  padding: 10px 14px;
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all var(--transition);
+  user-select: none;
+}
+.tab:hover { color: var(--foreground); }
+.tab.active { color: var(--foreground); border-bottom-color: var(--accent); }
+
+/* ─── Characters Grid ────────────────────────────────────────── */
+.view-content { flex: 1; overflow-y: auto; }
+.chars-section { padding: 20px 24px; }
+.chars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.char-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+}
+.char-card:hover { background: var(--card-hover); border-color: var(--border-hover); }
+.char-card.selected { border-color: rgba(123,156,240,0.4); background: rgba(123,156,240,0.06); }
+.char-name { font-size: var(--font-size-base); font-weight: 600; margin-bottom: 2px; }
+.char-role {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  display: flex; align-items: center; gap: 5px;
+}
+.char-role-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.char-arc-type {
+  font-size: var(--font-size-xs);
+  margin-top: 8px;
+  display: flex; align-items: center; gap: 4px;
+}
+.arc-type-badge {
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.arc-type-negative { background: rgba(224,112,112,0.15); color: #e07070; }
+.arc-type-positive { background: rgba(107,191,176,0.15); color: #6bbfb0; }
+.arc-type-flat { background: rgba(138,138,138,0.15); color: #8a8a8a; }
+.arc-type-ironic { background: rgba(224,168,107,0.15); color: #e0a86b; }
+.arc-type-absent { background: rgba(80,80,80,0.15); color: #555; }
+.char-beat-count { font-size: var(--font-size-xs); color: var(--muted-foreground); margin-top: 3px; }
+
+/* ─── Section Labels ─────────────────────────────────────────── */
+.panel-section-label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+}
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+/* ─── Arc Graph Panel ────────────────────────────────────────── */
+.arc-graph-section {
+  padding: 0 24px 24px;
+}
+.arc-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.arc-graph-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--foreground);
+}
+.arc-controls { display: flex; gap: 6px; align-items: center; }
+.arc-graph-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+}
+.arc-graph {
+  width: 100%;
+  display: block;
+  cursor: crosshair;
+}
+.arc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color var(--transition);
+}
+.legend-item:hover, .legend-item.active { color: var(--foreground); }
+.legend-item.muted { opacity: 0.35; }
+.legend-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.legend-line {
+  width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0;
+}
+.legend-arc-type { font-size: 9px; color: var(--muted-foreground); }
+
+/* Sanity warnings */
+.arc-warnings { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.arc-warning {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,217,61,0.08);
+  border: 1px solid rgba(255,217,61,0.2);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: var(--font-size-xs);
+  color: #ffd93d;
+}
+.arc-warning-icon { font-size: 10px; flex-shrink: 0; }
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  gap: 12px;
+}
+.empty-state-icon { font-size: 28px; opacity: 0.25; }
+.empty-state-title { font-size: var(--font-size-base); font-weight: 600; color: var(--foreground); }
+.empty-state-text { font-size: var(--font-size-sm); color: var(--muted-foreground); max-width: 260px; line-height: 1.5; }
+
+/* SVG Arc graph elements */
+.grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
+.zero-line { stroke: rgba(255,255,255,0.12); stroke-width: 1; }
+.act-line { stroke: rgba(255,255,255,0.1); stroke-width: 1; stroke-dasharray: 4 4; }
+.arc-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: opacity 200ms; }
+.arc-line.muted { opacity: 0.15; }
+.arc-beat-dot { cursor: pointer; transition: r 150ms, opacity 200ms; }
+.arc-beat-dot:hover { r: 7; }
+.arc-beat-dot.muted { opacity: 0.15; }
+.arc-beat-dot.crisis { filter: drop-shadow(0 0 4px rgba(255,217,61,0.6)); }
+.arc-beat-dot.climax { filter: drop-shadow(0 0 6px currentColor); }
+.beat-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.55);
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+}
+.axis-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.28);
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+}
+.act-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+}
+
+/* Beat tooltip */
+#beat-tooltip {
+  position: fixed;
+  background: #222;
+  border: 1px solid var(--border-hover);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+  max-width: 200px;
+  z-index: 1000;
+  line-height: 1.5;
+}
+#beat-tooltip.visible { opacity: 1; }
+#beat-tooltip .tt-label { font-weight: 600; margin-bottom: 2px; }
+#beat-tooltip .tt-char { color: var(--muted-foreground); }
+#beat-tooltip .tt-value { margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* ─── Arc Detail Panel ───────────────────────────────────────── */
+.arc-panel {
+  position: fixed;
+  top: 0; right: 0;
+  width: var(--panel-width);
+  height: 100vh;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 200;
+  overflow: hidden;
+}
+.arc-panel.open { transform: translateX(0); }
+.panel-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.panel-header-info {}
+.panel-header-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 3px;
+}
+.panel-header-sub { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.panel-close {
+  width: 22px; height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all var(--transition);
+  margin-left: 8px;
+}
+.panel-close:hover { color: var(--foreground); background: var(--card); }
+.panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+.panel-char-indicator {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.panel-char-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.panel-char-name { font-size: var(--font-size-sm); font-weight: 600; color: var(--foreground); }
+.panel-char-role { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.beat-section {
+  margin-bottom: 14px;
+}
+.beat-section-header {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 6px;
+}
+.beat-section-icon {
+  width: 18px; height: 18px;
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.icon-action { background: rgba(123,156,240,0.15); color: var(--accent); }
+.icon-gap { background: rgba(224,112,112,0.15); color: #e07070; }
+.icon-choice { background: rgba(224,168,107,0.15); color: #e0a86b; }
+.icon-shift { background: rgba(107,191,176,0.15); color: #6bbfb0; }
+.beat-section-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted-foreground);
+}
+.beat-frontmatter {
+  font-size: var(--font-size-sm);
+  color: rgba(255,255,255,0.7);
+  font-style: italic;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+.panel-text {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+.beat-shift-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--font-size-sm);
+}
+.shift-from { color: #e0a86b; font-weight: 500; }
+.shift-arrow { color: var(--muted-foreground); }
+.shift-to { color: #6bbfb0; font-weight: 500; }
+.beat-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.beat-nav-label { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.beat-y-display {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.beat-y-val {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.devlog {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.devlog-label { font-size: var(--font-size-xs); color: var(--muted-foreground); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; }
+.devlog-entry { font-size: var(--font-size-xs); color: var(--muted-foreground); line-height: 1.6; }
+
+/* ─── Scenes View ───────────────────────────────────────────── */
+.scenes-section { padding: 20px 24px; }
+.scenes-grid { display: flex; flex-direction: column; gap: 6px; }
+.scene-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.scene-card:hover { background: var(--card-hover); border-color: var(--border-hover); }
+.scene-card-top { display: flex; align-items: center; justify-content: space-between; }
+.scene-name { font-size: var(--font-size-base); font-weight: 500; }
+.scene-meta {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.scene-loc { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.tag {
+  font-size: var(--font-size-xs);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+/* Scene beat indicators */
+.arc-scene-indicator {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  cursor: default;
+  title: attr(data-tooltip);
+}
+
+/* ─── Stats bar at bottom of panel ──────────────────────────── */
+.stats-bar {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.stat-item { display: flex; flex-direction: column; gap: 1px; }
+.stat-label { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.stat-value { font-size: var(--font-size-base); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ─── Animations ────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.arc-graph-wrap { animation: fadeIn 300ms ease both; }
+
+/* ─── Scrollbars ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* ─── Arc Panel ─────────────────────────────────────────────── */
+</style>
+</head>
+<body>
+
+<div id="beat-tooltip">
+  <div class="tt-label" id="tt-label"></div>
+  <div class="tt-char" id="tt-char"></div>
+  <div class="tt-value" id="tt-value"></div>
+</div>
+
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">hermes <span>●</span></div>
+    <div class="sidebar-nav">
+      <div class="nav-section-label">Story</div>
+      <div class="nav-item" onclick="switchView('scenes')">
+        <span style="font-size:14px">◈</span> Scenes
+      </div>
+      <div class="nav-item active" id="nav-characters" onclick="switchView('characters')">
+        <span style="font-size:14px">◉</span> Characters
+      </div>
+      <div class="nav-item" onclick="switchView('sequences')">
+        <span style="font-size:14px">◫</span> Sequences
+      </div>
+      <div class="nav-section-label" style="margin-top:8px">Tools</div>
+      <div class="nav-item">
+        <span style="font-size:14px">⌘</span> Hermes
+      </div>
+      <div class="nav-item">
+        <span style="font-size:14px">✦</span> Arcs
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main" id="main-content">
+    <!-- Characters View (default) -->
+    <div id="view-characters">
+      <div class="view-header">
+        <div>
+          <div class="view-title">Characters</div>
+          <div class="view-subtitle">5 characters · 4 arcs designed</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-sm" onclick="toggleEmptyState()">Toggle empty state</button>
+          <button class="btn btn-sm btn-hermes">✦ New character</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" id="tab-web" onclick="switchTab('web')">Network</div>
+        <div class="tab" id="tab-arcs" onclick="switchTab('arcs')">Arc graph</div>
+        <div class="tab" id="tab-list" onclick="switchTab('list')">List</div>
+      </div>
+
+      <div class="view-content" id="view-content-characters">
+        <div class="chars-section" id="chars-section-content">
+          <div class="panel-section-label">Cast</div>
+          <div class="chars-grid" id="chars-grid"></div>
+          <hr class="section-divider">
+        </div>
+
+        <!-- Arc Graph Section -->
+        <div class="arc-graph-section">
+          <div class="arc-graph-header">
+            <div class="arc-graph-title">Value arc trajectories</div>
+            <div class="arc-controls">
+              <button class="btn btn-sm" id="btn-spline" onclick="toggleSpline()">Smooth</button>
+              <button class="btn btn-sm" id="btn-labels" onclick="toggleLabels()">Labels</button>
+              <button class="btn btn-sm btn-primary" onclick="openPanel(null, null)">All acts</button>
+            </div>
+          </div>
+
+          <div class="arc-graph-wrap" id="arc-graph-wrap">
+            <!-- SVG injected here -->
+          </div>
+
+          <div class="arc-legend" id="arc-legend"></div>
+          <div class="arc-warnings" id="arc-warnings"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenes View -->
+    <div id="view-scenes" style="display:none">
+      <div class="view-header">
+        <div>
+          <div class="view-title">Scenes</div>
+          <div class="view-subtitle">7 scenes across 3 acts</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-sm btn-hermes">✦ New scene</button>
+        </div>
+      </div>
+      <div class="scenes-section">
+        <div class="panel-section-label">Act I — The Setup</div>
+        <div class="scenes-grid" id="scenes-grid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Arc Beat Detail Panel -->
+<aside id="arc-panel" class="arc-panel">
+  <div class="panel-header">
+    <div class="panel-header-info">
+      <div class="panel-header-title" id="panel-beat-title">Beat</div>
+      <div class="panel-header-sub" id="panel-beat-sub">Character · Scene</div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="panel-body" id="panel-body-content">
+    <!-- Populated dynamically -->
+  </div>
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-label">Value charge</div>
+      <div class="stat-value" id="stat-y">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Beat order</div>
+      <div class="stat-value" id="stat-order">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Arc type</div>
+      <div class="stat-value" id="stat-arc-type">—</div>
+    </div>
+  </div>
+</aside>
+
+<script>
+/* ─── Story Data ────────────────────────────────────────────── */
+const STORY_DATA = {
+  story: {
+    title: "The Last Archivist",
+    acts: [
+      { id: "act1", label: "Act I", x_start: 0,    x_end: 0.33 },
+      { id: "act2", label: "Act II", x_start: 0.33, x_end: 0.70 },
+      { id: "act3", label: "Act III", x_start: 0.70, x_end: 1.0  },
+    ]
+  },
+  characters: [
+    {
+      id: "mara",
+      name: "Mara Voss",
+      story_role: "Protagonist",
+      arc_type: "negative",
+      arc_value: "Trust",
+      arc_value_at_open: "positive",
+      arc_value_at_close: "ironic",
+      arc_complete: true,
+      arc_beat_count: 5,
+      arc_beats_list: [
+        { id: "1", label: "Naïve Trust",      scene: "central-room-day",   y: 0.82, order: 1, is_crisis: false, is_climax: false },
+        { id: "2", label: "First Doubt",       scene: "the-garden",         y: 0.30, order: 2, is_crisis: false, is_climax: false },
+        { id: "3", label: "Betrayal",          scene: "central-room-night", y: -0.40, order: 3, is_crisis: true,  is_climax: false },
+        { id: "4", label: "Hollow Resolve",    scene: "archive-floor",      y: -0.60, order: 4, is_crisis: false, is_climax: false },
+        { id: "5", label: "Bitter Acceptance", scene: "the-roof",           y: -0.75, order: 5, is_crisis: false, is_climax: true  },
+      ]
+    },
+    {
+      id: "oak",
+      name: "Oak Devereux",
+      story_role: "Antagonist",
+      arc_type: "ironic",
+      arc_value: "Control",
+      arc_value_at_open: "positive",
+      arc_value_at_close: "positive",
+      arc_complete: true,
+      arc_beat_count: 4,
+      arc_beats_list: [
+        { id: "1", label: "The Facade",        scene: "central-room-day",   y: 0.65, order: 1, is_crisis: false, is_climax: false },
+        { id: "2", label: "Overconfidence",    scene: "the-garden",         y: 0.85, order: 2, is_crisis: false, is_climax: false },
+        { id: "3", label: "Overreach",         scene: "central-room-night", y: 0.50, order: 3, is_crisis: false, is_climax: false },
+        { id: "4", label: "Illusory Victory",  scene: "the-roof",           y: 0.70, order: 4, is_crisis: false, is_climax: true  },
+      ]
+    },
+    {
+      id: "sable",
+      name: "Sable Orin",
+      story_role: "Mentor",
+      arc_type: "positive",
+      arc_value: "Faith",
+      arc_value_at_open: "negative",
+      arc_value_at_close: "positive",
+      arc_complete: true,
+      arc_beat_count: 4,
+      arc_beats_list: [
+        { id: "1", label: "Burnt Out",         scene: "lower-stacks",       y: -0.55, order: 1, is_crisis: false, is_climax: false },
+        { id: "2", label: "A Reason to Care",  scene: "the-garden",         y: -0.10, order: 2, is_crisis: false, is_climax: false },
+        { id: "3", label: "Risk",              scene: "archive-floor",      y: 0.35, order: 3, is_crisis: true,  is_climax: false },
+        { id: "4", label: "Renewed Purpose",   scene: "the-roof",           y: 0.72, order: 4, is_crisis: false, is_climax: true  },
+      ]
+    },
+    {
+      id: "press",
+      name: "Pressly Tak",
+      story_role: "Rival",
+      arc_type: "flat",
+      arc_value: "Ambition",
+      arc_value_at_open: "positive",
+      arc_value_at_close: "positive",
+      arc_complete: true,
+      arc_beat_count: 3,
+      arc_beats_list: [
+        { id: "1", label: "Competitor",       scene: "central-room-day",   y: 0.55, order: 1, is_crisis: false, is_climax: false },
+        { id: "2", label: "Uneasy Alliance",  scene: "archive-floor",      y: 0.48, order: 2, is_crisis: false, is_climax: false },
+        { id: "3", label: "Back to the Race", scene: "the-roof",           y: 0.60, order: 3, is_crisis: false, is_climax: false },
+      ]
+    },
+    {
+      id: "lena",
+      name: "Lena Marsh",
+      story_role: "Supporting",
+      arc_type: "absent",
+      arc_value: null,
+      arc_complete: false,
+      arc_beat_count: 0,
+      arc_beats_list: []
+    }
+  ],
+  scenes: [
+    {
+      id: "central-room-day",
+      title: "The Central Room — Day",
+      location: "Archive HQ", sequence: "Opening Moves", act: "act1",
+      arc_beats: [
+        { char: "mara", beat_id: "1" },
+        { char: "oak",  beat_id: "1" },
+        { char: "press",beat_id: "1" },
+      ]
+    },
+    {
+      id: "the-garden",
+      title: "The Garden",
+      location: "Rooftop terrace", sequence: "Opening Moves", act: "act1",
+      arc_beats: [
+        { char: "mara",  beat_id: "2" },
+        { char: "oak",   beat_id: "2" },
+        { char: "sable", beat_id: "2" },
+      ]
+    },
+    {
+      id: "lower-stacks",
+      title: "Lower Stacks",
+      location: "Basement level 4", sequence: "Opening Moves", act: "act1",
+      arc_beats: [
+        { char: "sable", beat_id: "1" },
+      ]
+    },
+    {
+      id: "central-room-night",
+      title: "The Central Room — Night",
+      location: "Archive HQ", sequence: "The Fracture", act: "act2",
+      arc_beats: [
+        { char: "mara", beat_id: "3" },
+        { char: "oak",  beat_id: "3" },
+      ]
+    },
+    {
+      id: "archive-floor",
+      title: "The Archive Floor",
+      location: "Level 7 stacks", sequence: "The Fracture", act: "act2",
+      arc_beats: [
+        { char: "mara",  beat_id: "4" },
+        { char: "sable", beat_id: "3" },
+        { char: "press", beat_id: "2" },
+      ]
+    },
+    {
+      id: "the-roof",
+      title: "The Roof",
+      location: "Exterior — rooftop", sequence: "Reckoning", act: "act3",
+      arc_beats: [
+        { char: "mara",  beat_id: "5" },
+        { char: "oak",   beat_id: "4" },
+        { char: "sable", beat_id: "4" },
+        { char: "press", beat_id: "3" },
+      ]
+    },
+  ]
+};
+
+/* Beat detail data (normally fetched on demand) */
+const BEAT_DETAILS = {
+  "mara-2": {
+    action: "Mara asks Oak directly about the missing files, pressing for a straight answer.",
+    gap: "Oak lies smoothly — she realises, with sudden clarity, that he has been lying for months.",
+    choice: "She nods, says nothing, files the report herself. She won't reveal that she knows.",
+    shift: "positive → mixed",
+    dev_log: ["v1: Initial beat", "v2: Refined gap description — added 'months'"]
+  },
+  "mara-3": {
+    action: "Mara confronts Oak with the evidence she collected in secret.",
+    gap: "He doesn't deny it. He smiles. The institution she trusted has been complicit.",
+    choice: "She destroys the evidence rather than let him weaponize it.",
+    shift: "mixed → contrary",
+    dev_log: ["v1: Initial beat", "v2: Crisis added — institutional betrayal weighs heavier than personal one"]
+  },
+  "sable-3": {
+    action: "Sable puts their name on the transfer request — vouching for Mara despite the risk.",
+    gap: "The request triggers an audit. Sable's own archive access is frozen.",
+    choice: "They stay. The work matters more than the credentials.",
+    shift: "neutral → positive",
+    dev_log: ["v1: Initial beat", "v2: Crisis marker added — audit raises stakes"]
+  },
+};
+
+/* ─── State ─────────────────────────────────────────────────── */
+let activeTab = 'web';
+let useSpline = false;
+let showLabels = true;
+let mutedChars = new Set();
+let currentView = 'characters';
+let isEmptyState = false;
+
+/* ─── Role colors ───────────────────────────────────────────── */
+const ROLE_COLOR = {
+  Protagonist: '#7b9cf0',
+  Antagonist:  '#e07070',
+  Mentor:      '#b07be0',
+  Rival:       '#e0a86b',
+  Supporting:  '#6bbfb0',
+};
+
+/* ─── Helpers ───────────────────────────────────────────────── */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function getRoleColor(char) {
+  return ROLE_COLOR[char.story_role] || '#8a8a8a';
+}
+
+function getArcTypeClass(type) {
+  const map = {
+    negative: 'arc-type-negative',
+    positive: 'arc-type-positive',
+    flat:     'arc-type-flat',
+    ironic:   'arc-type-ironic',
+    absent:   'arc-type-absent',
+  };
+  return map[type] || 'arc-type-flat';
+}
+
+/* ─── Character cards ───────────────────────────────────────── */
+function buildCharsGrid() {
+  const grid = document.getElementById('chars-grid');
+  grid.innerHTML = '';
+  STORY_DATA.characters.forEach(char => {
+    const color = getRoleColor(char);
+    const div = document.createElement('div');
+    div.className = 'char-card';
+    div.innerHTML = `
+      <div class="char-name" style="color:${color}">${escapeHtml(char.name)}</div>
+      <div class="char-role">
+        <span class="char-role-dot" style="background:${color}"></span>
+        ${escapeHtml(char.story_role)}
+      </div>
+      <div class="char-arc-type">
+        <span class="arc-type-badge ${getArcTypeClass(char.arc_type)}">${char.arc_type || 'absent'}</span>
+        ${char.arc_value ? `<span style="font-size:10px;color:var(--muted-foreground)">${escapeHtml(char.arc_value)}</span>` : ''}
+      </div>
+      ${char.arc_beat_count > 0
+        ? `<div class="char-beat-count">${char.arc_beat_count} beat${char.arc_beat_count !== 1 ? 's' : ''}</div>`
+        : `<div class="char-beat-count" style="color:#555">No arc designed</div>`}
+    `;
+    div.addEventListener('click', () => {
+      // Mute others, focus this one
+      const wasSelected = div.classList.contains('selected');
+      document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+      if (!wasSelected) {
+        div.classList.add('selected');
+        mutedChars = new Set(STORY_DATA.characters.filter(c => c.id !== char.id).map(c => c.id));
+      } else {
+        mutedChars = new Set();
+      }
+      buildArcGraph();
+      updateLegend();
+    });
+    grid.appendChild(div);
+  });
+}
+
+/* ─── Arc Graph ─────────────────────────────────────────────── */
+const GRAPH_W = 760;
+const GRAPH_H = 320;
+const PAD = { top: 28, right: 18, bottom: 36, left: 42 };
+
+function xScale(t) {
+  return PAD.left + t * (GRAPH_W - PAD.left - PAD.right);
+}
+
+function yScale(v) {
+  // v in [-1, 1] → pixels
+  return PAD.top + (1 - (v + 1) / 2) * (GRAPH_H - PAD.top - PAD.bottom);
+}
+
+function buildArcGraph() {
+  const wrap = document.getElementById('arc-graph-wrap');
+
+  const chars = STORY_DATA.characters.filter(c =>
+    c.arc_type !== 'absent' && c.arc_beats_list.length > 0
+  );
+
+  if (isEmptyState || chars.length === 0) {
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">◉</div>
+        <div class="empty-state-title">No arc trajectories yet</div>
+        <div class="empty-state-text">Design a character arc to see value trajectories plotted here.</div>
+        <button class="btn btn-hermes" onclick="designArcWithHermes()">✦ Design arc with Hermes</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Normalize beat positions: x = scene order / total scenes
+  const sceneOrder = {};
+  STORY_DATA.scenes.forEach((s, i) => { sceneOrder[s.id] = i; });
+  const sceneCount = STORY_DATA.scenes.length;
+
+  function beatX(char, beat) {
+    const scIdx = sceneOrder[beat.scene];
+    if (scIdx === undefined) return (beat.order - 1) / (char.arc_beat_count);
+    return scIdx / (sceneCount - 1);
+  }
+
+  // Compute sanity warnings
+  const warnings = [];
+  chars.forEach(char => {
+    const ys = char.arc_beats_list.map(b => b.y);
+    const maxDelta = Math.max(...ys.map((y, i) => i > 0 ? Math.abs(y - ys[i-1]) : 0));
+    const range = Math.max(...ys) - Math.min(...ys);
+    if (range < 0.2) warnings.push(`"${char.name}" arc is flat — nothing dramatic happens`);
+    if (maxDelta > 0.8) warnings.push(`"${char.name}" has a single beat jump > 0.8 — consider splitting`);
+  });
+  // Redundancy check
+  if (chars.length >= 2) {
+    for (let i = 0; i < chars.length - 1; i++) {
+      for (let j = i + 1; j < chars.length; j++) {
+        const a = chars[i]; const b = chars[j];
+        if (a.arc_type === b.arc_type && Math.abs((a.arc_beats_list[0]?.y||0) - (b.arc_beats_list[0]?.y||0)) < 0.1)
+          warnings.push(`"${a.name}" and "${b.name}" start similarly — check for redundancy`);
+      }
+    }
+  }
+
+  // Build SVG
+  let svg = `<svg viewBox="0 0 ${GRAPH_W} ${GRAPH_H}" class="arc-graph" id="arc-svg">`;
+
+  // ── Grid lines ──
+  for (let v = -1; v <= 1; v += 0.5) {
+    const y = yScale(v);
+    const cls = v === 0 ? 'zero-line' : 'grid-line';
+    svg += `<line x1="${PAD.left}" y1="${y}" x2="${GRAPH_W - PAD.right}" y2="${y}" class="${cls}"/>`;
+  }
+
+  // ── Y-axis labels ──
+  [1.0, 0.5, 0, -0.5, -1.0].forEach(v => {
+    const y = yScale(v);
+    const label = v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1);
+    svg += `<text x="${PAD.left - 5}" y="${y}" class="axis-label" text-anchor="end" dominant-baseline="central">${label}</text>`;
+  });
+
+  // Y-axis label
+  svg += `<text x="9" y="${GRAPH_H/2}" class="axis-label" text-anchor="middle" transform="rotate(-90,9,${GRAPH_H/2})">value charge</text>`;
+
+  // ── Act boundaries ──
+  STORY_DATA.story.acts.forEach((act, i) => {
+    if (i > 0) {
+      const x = xScale(act.x_start);
+      svg += `<line x1="${x}" y1="${PAD.top - 8}" x2="${x}" y2="${GRAPH_H - PAD.bottom + 4}" class="act-line"/>`;
+      svg += `<text x="${x + 4}" y="${PAD.top - 4}" class="act-label">${escapeHtml(act.label)}</text>`;
+    } else {
+      svg += `<text x="${PAD.left + 4}" y="${PAD.top - 4}" class="act-label">${escapeHtml(act.label)}</text>`;
+    }
+  });
+
+  // ── Arc lines ──
+  chars.forEach(char => {
+    const color = getRoleColor(char);
+    const muted = mutedChars.has(char.id) ? ' muted' : '';
+    const beats = [...char.arc_beats_list].sort((a, b) => a.order - b.order);
+    const pts = beats.map(b => [xScale(beatX(char, b)), yScale(b.y)]);
+
+    if (useSpline && pts.length > 2) {
+      // Catmull-Rom to bezier
+      const d = catmullRomPath(pts);
+      svg += `<path class="arc-line${muted}" d="${d}" stroke="${color}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
+    } else {
+      const pts_str = pts.map(p => p.join(',')).join(' ');
+      svg += `<polyline class="arc-line${muted}" points="${pts_str}" stroke="${color}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
+    }
+  });
+
+  // ── Beat dots + labels ──
+  chars.forEach(char => {
+    const color = getRoleColor(char);
+    const muted = mutedChars.has(char.id) ? ' muted' : '';
+    const beats = [...char.arc_beats_list].sort((a, b) => a.order - b.order);
+
+    beats.forEach(beat => {
+      const bx = xScale(beatX(char, beat));
+      const by = yScale(beat.y);
+
+      let r = 5;
+      let extraClass = '';
+      let fill = color;
+      let stroke = 'none';
+      let strokeW = 0;
+
+      if (beat.is_crisis) {
+        r = 7; fill = '#ffd93d'; extraClass = ' crisis';
+      } else if (beat.is_climax) {
+        r = 7; fill = 'transparent'; stroke = color; strokeW = 2; extraClass = ' climax';
+      }
+
+      // Encode data for tooltip
+      const yDisp = beat.y >= 0 ? `+${beat.y.toFixed(2)}` : beat.y.toFixed(2);
+      svg += `<circle 
+        class="arc-beat-dot${extraClass}${muted}"
+        cx="${bx}" cy="${by}" r="${r}"
+        fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"
+        data-char="${char.id}" data-beat="${beat.id}"
+        data-label="${escapeHtml(beat.label)}" data-name="${escapeHtml(char.name)}"
+        data-y="${yDisp}" data-color="${color}"
+        onmouseenter="showTooltip(event, this)"
+        onmouseleave="hideTooltip()"
+        onclick="openPanel('${char.id}', '${beat.id}')"
+      />`;
+
+      if (showLabels && !mutedChars.has(char.id)) {
+        const labelX = bx;
+        const labelY = by - (beat.is_crisis || beat.is_climax ? 12 : 10);
+        svg += `<text class="beat-label" x="${labelX}" y="${labelY}" text-anchor="middle">${escapeHtml(beat.label)}</text>`;
+      }
+    });
+  });
+
+  // ── X-axis (scene names) ──
+  STORY_DATA.scenes.forEach((scene, i) => {
+    const x = xScale(i / (sceneCount - 1));
+    const y = GRAPH_H - PAD.bottom + 14;
+    // Only label scenes with beat activity
+    const hasBeats = scene.arc_beats && scene.arc_beats.length > 0;
+    if (hasBeats) {
+      svg += `<text x="${x}" y="${y}" class="axis-label" text-anchor="middle">${escapeHtml(scene.title.split('—')[0].trim())}</text>`;
+      svg += `<line x1="${x}" y1="${GRAPH_H - PAD.bottom}" x2="${x}" y2="${GRAPH_H - PAD.bottom + 4}" class="grid-line"/>`;
+    }
+  });
+
+  svg += `</svg>`;
+  wrap.innerHTML = svg;
+
+  // Render warnings
+  const warningsEl = document.getElementById('arc-warnings');
+  warningsEl.innerHTML = warnings.map(w => `
+    <div class="arc-warning">
+      <span class="arc-warning-icon">⚠</span>
+      <span>${escapeHtml(w)}</span>
+    </div>
+  `).join('');
+}
+
+/* Catmull-Rom spline → SVG path */
+function catmullRomPath(pts, alpha = 0.5) {
+  if (pts.length < 2) return '';
+  const d = [`M ${pts[0][0]} ${pts[0][1]}`];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(i - 1, 0)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(i + 2, pts.length - 1)];
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
+  }
+  return d.join(' ');
+}
+
+/* ─── Legend ────────────────────────────────────────────────── */
+function updateLegend() {
+  const legend = document.getElementById('arc-legend');
+  const chars = STORY_DATA.characters.filter(c => c.arc_type !== 'absent' && c.arc_beats_list.length > 0);
+
+  legend.innerHTML = chars.map(char => {
+    const color = getRoleColor(char);
+    const muted = mutedChars.has(char.id) ? ' muted' : '';
+    return `
+      <div class="legend-item${muted}" onclick="toggleCharMute('${char.id}')">
+        <div class="legend-line" style="background:${color}"></div>
+        <span>${escapeHtml(char.name)}</span>
+        <span class="legend-arc-type">${char.arc_type}</span>
+      </div>
+    `;
+  }).join('');
+
+  // Crisis/climax key
+  legend.innerHTML += `
+    <div class="legend-item" style="gap:12px;margin-left:auto">
+      <div style="display:flex;align-items:center;gap:4px">
+        <div class="legend-dot" style="background:#ffd93d"></div>
+        <span>crisis</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <div class="legend-dot" style="background:transparent;border:1px solid #e8e8e8"></div>
+        <span>climax</span>
+      </div>
+    </div>
+  `;
+}
+
+function toggleCharMute(charId) {
+  if (mutedChars.has(charId)) mutedChars.delete(charId);
+  else mutedChars.add(charId);
+  // deselect char cards
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+  buildArcGraph();
+  updateLegend();
+}
+
+/* ─── Tooltip ───────────────────────────────────────────────── */
+function showTooltip(e, el) {
+  const tt = document.getElementById('beat-tooltip');
+  document.getElementById('tt-label').textContent = el.dataset.label;
+  document.getElementById('tt-char').textContent = el.dataset.name;
+  document.getElementById('tt-value').innerHTML = `Value charge: <strong>${el.dataset.y}</strong>`;
+  tt.classList.add('visible');
+  positionTooltip(e);
+}
+
+function hideTooltip() {
+  document.getElementById('beat-tooltip').classList.remove('visible');
+}
+
+document.addEventListener('mousemove', e => {
+  if (document.getElementById('beat-tooltip').classList.contains('visible')) {
+    positionTooltip(e);
+  }
+});
+
+function positionTooltip(e) {
+  const tt = document.getElementById('beat-tooltip');
+  const x = e.clientX + 14;
+  const y = e.clientY - 40;
+  tt.style.left = Math.min(x, window.innerWidth - 220) + 'px';
+  tt.style.top = Math.max(y, 8) + 'px';
+}
+
+/* ─── Arc Panel ─────────────────────────────────────────────── */
+function openPanel(charId, beatId) {
+  const panel = document.getElementById('arc-panel');
+  const body  = document.getElementById('panel-body-content');
+
+  if (!charId) {
+    // Show all-acts overview
+    document.getElementById('panel-beat-title').textContent = 'Story Arcs';
+    document.getElementById('panel-beat-sub').textContent = 'All characters';
+    body.innerHTML = `<div class="panel-text">Click a beat point on the graph to open beat details here.</div>`;
+    panel.classList.add('open');
+    return;
+  }
+
+  const char = STORY_DATA.characters.find(c => c.id === charId);
+  const beat = char?.arc_beats_list.find(b => b.id === beatId);
+  if (!char || !beat) return;
+
+  const color = getRoleColor(char);
+  const scene = STORY_DATA.scenes.find(s => s.id === beat.scene);
+  const detailKey = `${charId}-${beatId}`;
+  const detail = BEAT_DETAILS[detailKey];
+
+  document.getElementById('panel-beat-title').textContent = beat.label;
+  document.getElementById('panel-beat-sub').textContent = `${char.name} · ${scene?.title || beat.scene}`;
+  document.getElementById('stat-y').textContent = beat.y >= 0 ? `+${beat.y.toFixed(2)}` : beat.y.toFixed(2);
+  document.getElementById('stat-order').textContent = `${beat.order} / ${char.arc_beat_count}`;
+  document.getElementById('stat-arc-type').textContent = char.arc_type;
+
+  const isCrisis = beat.is_crisis ? '<span class="arc-type-badge arc-type-negative" style="margin-left:6px">crisis</span>' : '';
+  const isClimax = beat.is_climax ? '<span class="arc-type-badge arc-type-ironic" style="margin-left:6px">climax</span>' : '';
+
+  const sections = detail ? [
+    { key: 'action', label: 'Action', icon: 'icon-action', sym: '→',
+      fm: `"${detail.action}"`,
+      body: 'Why this action was chosen — the move the character makes in the argument and what they want from it.' },
+    { key: 'gap',    label: 'Gap',    icon: 'icon-gap',    sym: '⊘',
+      fm: `"${detail.gap}"`,
+      body: 'The collision between expectation and reality — why the unexpected reaction forces a change.' },
+    { key: 'choice', label: 'Choice', icon: 'icon-choice', sym: '◎',
+      fm: `"${detail.choice}"`,
+      body: 'The decision made under pressure — what it reveals about the character\'s true nature when stakes are highest.' },
+    { key: 'shift',  label: 'Shift',  icon: 'icon-shift',  sym: '↕',
+      fm: detail.shift, isShift: true,
+      body: 'How the value charge changes as a result of the action, gap, and choice above.' },
+  ] : null;
+
+  let beatNavHtml = '';
+  const prevBeat = char.arc_beats_list.find(b => b.order === beat.order - 1);
+  const nextBeat = char.arc_beats_list.find(b => b.order === beat.order + 1);
+  beatNavHtml = `
+    <div class="beat-nav">
+      <div>
+        ${prevBeat ? `<button class="btn btn-sm" onclick="openPanel('${charId}','${prevBeat.id}')">← ${escapeHtml(prevBeat.label)}</button>` : '<span class="beat-nav-label">First beat</span>'}
+      </div>
+      <div>
+        ${nextBeat ? `<button class="btn btn-sm" onclick="openPanel('${charId}','${nextBeat.id}')">→ ${escapeHtml(nextBeat.label)}</button>` : '<span class="beat-nav-label">Final beat</span>'}
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = `
+    <div class="panel-char-indicator">
+      <div class="panel-char-dot" style="background:${color}"></div>
+      <div>
+        <div class="panel-char-name">${escapeHtml(char.name)} ${isCrisis}${isClimax}</div>
+        <div class="panel-char-role">${char.story_role} · ${char.arc_value || '—'}</div>
+      </div>
+    </div>
+
+    ${sections ? sections.map(s => `
+      <div class="beat-section">
+        <div class="beat-section-header">
+          <div class="beat-section-icon ${s.icon}">${s.sym}</div>
+          <div class="beat-section-label">${s.label}</div>
+        </div>
+        ${s.isShift
+          ? (() => {
+              const parts = s.fm.split('→').map(p => p.trim());
+              return `<div class="beat-shift-row">
+                <span class="shift-from">${escapeHtml(parts[0] || '')}</span>
+                <span class="shift-arrow">→</span>
+                <span class="shift-to">${escapeHtml(parts[1] || '')}</span>
+              </div>`;
+            })()
+          : `<div class="beat-frontmatter">${escapeHtml(s.fm)}</div>`
+        }
+        <div class="panel-text" style="margin-top:4px">${escapeHtml(s.body)}</div>
+      </div>
+    `).join('') : `
+      <div class="empty-state" style="padding:20px 0">
+        <div class="empty-state-title" style="font-size:12px">No beat detail loaded</div>
+        <div class="empty-state-text">Beat notes load on demand from the arcs directory. Click another beat to see one with content.</div>
+        <button class="btn btn-sm btn-hermes" style="margin-top:6px">✦ Write beat with Hermes</button>
+      </div>
+    `}
+
+    ${detail?.dev_log ? `
+      <div class="devlog">
+        <div class="devlog-label">Dev log</div>
+        ${detail.dev_log.map(e => `<div class="devlog-entry">· ${escapeHtml(e)}</div>`).join('')}
+      </div>
+    ` : ''}
+
+    ${beatNavHtml}
+  `;
+
+  panel.classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('arc-panel').classList.remove('open');
+}
+
+/* ─── Scenes view ───────────────────────────────────────────── */
+function buildScenesView() {
+  const grid = document.getElementById('scenes-grid');
+  grid.innerHTML = '';
+
+  STORY_DATA.scenes.forEach(scene => {
+    const card = document.createElement('div');
+    card.className = 'scene-card';
+
+    // Arc beat indicators
+    const indicators = (scene.arc_beats || []).map(ab => {
+      const char = STORY_DATA.characters.find(c => c.id === ab.char);
+      if (!char) return '';
+      const color = getRoleColor(char);
+      return `<span class="arc-scene-indicator" style="background:${color}" title="${char.name}" onclick="openPanel('${char.id}','${ab.beat_id}');event.stopPropagation()"></span>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="scene-card-top">
+        <div class="scene-name">${escapeHtml(scene.title)}</div>
+        <div style="display:flex;gap:4px;align-items:center">${indicators}</div>
+      </div>
+      <div class="scene-meta">
+        <span class="scene-loc">${escapeHtml(scene.location)}</span>
+        <span class="tag">${escapeHtml(scene.act || '')}</span>
+        ${scene.sequence ? `<span class="tag">${escapeHtml(scene.sequence)}</span>` : ''}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+/* ─── Tabs & Views ──────────────────────────────────────────── */
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab)?.classList.add('active');
+  // For demo, all tabs show the same content but we re-build arc if needed
+  if (tab === 'arcs') {
+    document.getElementById('chars-section-content').style.display = 'none';
+  } else {
+    document.getElementById('chars-section-content').style.display = '';
+  }
+}
+
+function switchView(view) {
+  currentView = view;
+  closePanel();
+
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('nav-' + view)?.classList.add('active');
+
+  // Show/hide views
+  document.getElementById('view-characters').style.display = view === 'characters' ? '' : 'none';
+  document.getElementById('view-scenes').style.display      = view === 'scenes'     ? '' : 'none';
+}
+
+/* ─── Controls ──────────────────────────────────────────────── */
+function toggleSpline() {
+  useSpline = !useSpline;
+  const btn = document.getElementById('btn-spline');
+  btn.classList.toggle('btn-primary', useSpline);
+  buildArcGraph();
+}
+
+function toggleLabels() {
+  showLabels = !showLabels;
+  const btn = document.getElementById('btn-labels');
+  btn.classList.toggle('btn-primary', showLabels);
+  buildArcGraph();
+}
+
+function toggleEmptyState() {
+  isEmptyState = !isEmptyState;
+  buildArcGraph();
+}
+
+function designArcWithHermes() {
+  // In the real plugin this sends a message to Hermes
+  isEmptyState = false;
+  buildArcGraph();
+  updateLegend();
+}
+
+/* ─── Init ──────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  buildCharsGrid();
+  buildArcGraph();
+  updateLegend();
+  buildScenesView();
+
+  // Switch nav to scenes
+  document.querySelectorAll('.nav-item')[0].addEventListener('click', () => switchView('scenes'));
+  document.querySelectorAll('.nav-item')[1].addEventListener('click', () => switchView('characters'));
+});
+</script>
+</body>
+</html>

@@ -392,7 +392,7 @@ acts:
 
 ## 7. What's Missing from What You Described
 
-### The Story Level Entity
+### The Story Level Entity (DONE)
 
 McKee's hierarchy is: Beat → Scene → Sequence → Act → **Story**. You have scenes, sequences, and acts. You don't have an explicit Story entity above the act. Currently `project.md` plays this role — it holds the logline, genre, status.
 
@@ -420,13 +420,13 @@ Right now a subplot scene would have `plots: [romance-subplot]` and `sequence_id
 
 The minimal solution: a sequence gets an optional `subplot_role` field on its `plots[]` entries, or alternatively each scene's `plots[]` array is treated as ordered (first entry = primary thread for this scene). Either is fine. The key constraint is that this doesn't require a new entity type — it's a metadata field on existing relationships.
 
-### The `dramatic_role` Enum Needs a `non-event` Value
+### The `dramatic_role` Enum Needs a `non-event` Value (DONE)
 
 McKee explicitly says some scenes don't turn — they're exposition, transition, or setup with no value shift. These are valid (sometimes necessary) but structurally weak. The system needs to be able to represent them without forcing a fake value turn. Add `non-event` to the `dramatic_role` enum, and leave `value_open` and `value_close` as null for those scenes. The future structure system can flag them ("this sequence has three non-events in a row") without the data model breaking.
 
 ---
 
-## 8. Accommodating Structure Types
+## 8. Accommodating Structure Types (DONE)
 
 Classical, Miniplot, and Antiplot have different structural expectations, but the data model doesn't need to branch for them. The model is neutral. What changes is **what the LLM enforces** based on `project.structure_type`.
 
@@ -441,7 +441,7 @@ The model accommodates all three by being nullable. The structure system, not th
 
 ---
 
-## 9. Where the Spine Lives
+## 9. Where the Spine Lives (DONE)
 
 McKee defines the spine as "the energy of the protagonist's desire" — it's a story-level concept, not an act-level one. It belongs in `project.md`.
 

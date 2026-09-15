@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Arc Visualization — Example</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 2rem; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; color: #fff; }
+  .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 1.5rem; }
+  svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 1.5rem; margin: 1rem 0; font-size: 0.8rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+  .legend-line { width: 20px; height: 3px; border-radius: 2px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .beat-label { font-size: 10px; fill: #aaa; }
+  .beat-label:hover { fill: #fff; cursor: pointer; }
+  .axis-label { font-size: 9px; fill: #666; }
+  .act-label { font-size: 11px; fill: #888; font-weight: 600; }
+  .grid-line { stroke: #2a2a3e; stroke-width: 1; }
+  .act-line { stroke: #444; stroke-width: 1.5; stroke-dasharray: 4,4; }
+  .arc-line { fill: none; stroke-width: 2.5; }
+  .beat-dot { stroke: #1a1a2e; stroke-width: 1.5; }
+  .beat-dot.crisis { stroke-width: 3; }
+  .beat-dot.climax { stroke-width: 3; }
+  .tooltip { position: absolute; background: #2a2a3e; border: 1px solid #444; padding: 0.6rem; border-radius: 4px; font-size: 0.75rem; max-width: 280px; pointer-events: none; display: none; z-index: 10; }
+  .tooltip-title { font-weight: 600; margin-bottom: 0.3rem; color: #fff; }
+  .tooltip-row { color: #aaa; margin: 0.15rem 0; }
+  .tooltip-row span { color: #ccc; }
+  .section { margin-top: 2rem; padding: 1rem; background: #16162a; border-radius: 6px; border-left: 3px solid #4a9eff; }
+  .section h2 { font-size: 0.95rem; margin: 0 0 0.5rem; color: #4a9eff; }
+  .section p { font-size: 0.8rem; color: #999; margin: 0.3rem 0; line-height: 1.5; }
+  .section code { background: #0d0d1a; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem; color: #7ec8e3; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Character Arc Visualization — Example</h1>
+  <p class="subtitle">"The Falling Woman" — Trust → Betrayal across 3 acts</p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-line" style="background:#4a9eff"></div> Mara (Protagonist)</div>
+    <div class="legend-item"><div class="legend-line" style="background:#ff6b6b"></div> Oak (Antagonist)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffd93d"></div> Crisis</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fff; border:2px solid #ff6b6b"></div> Climax</div>
+  </div>
+
+  <svg viewBox="0 0 800 400" id="arc-chart">
+    <!-- Y-axis grid lines -->
+    <line x1="60" y1="60" x2="780" y2="60" class="grid-line"/>
+    <line x1="60" y1="140" x2="780" y2="140" class="grid-line"/>
+    <line x1="60" y1="220" x2="780" y2="220" class="grid-line"/>
+    <line x1="60" y1="300" x2="780" y2="300" class="grid-line"/>
+    <line x1="60" y1="380" x2="780" y2="380" class="grid-line"/>
+
+    <!-- Y-axis labels -->
+    <text x="50" y="64" text-anchor="end" class="axis-label">+1.0 (positive)</text>
+    <text x="50" y="144" text-anchor="end" class="axis-label">+0.5</text>
+    <text x="50" y="224" text-anchor="end" class="axis-label">0.0 (mixed)</text>
+    <text x="50" y="304" text-anchor="end" class="axis-label">-0.5</text>
+    <text x="50" y="384" text-anchor="end" class="axis-label">-1.0 (negative)</text>
+
+    <!-- Act boundaries -->
+    <line x1="273" y1="40" x2="273" y2="395" class="act-line"/>
+    <line x1="546" y1="40" x2="546" y2="395" class="act-line"/>
+
+    <!-- Act labels -->
+    <text x="137" y="30" text-anchor="middle" class="act-label">ACT 1: Setup</text>
+    <text x="410" y="30" text-anchor="middle" class="act-label">ACT 2: Confrontation</text>
+    <text x="663" y="30" text-anchor="middle" class="act-label">ACT 3: Resolution</text>
+
+    <!-- Scene number axis -->
+    <text x="60" y="395" class="axis-label">1</text>
+    <text x="273" y="395" class="axis-label">28</text>
+    <text x="410" y="395" class="axis-label">56</text>
+    <text x="546" y="395" class="axis-label">84</text>
+    <text x="780" y="395" class="axis-label">94</text>
+
+    <!-- Mara's arc (Protagonist: positive → negative, with ironic end) -->
+    <!-- Points: scene/94 normalized to x, value mapped to y -->
+    <!-- y = 220 - (value * 160)  [+1=60, 0=220, -1=380] -->
+    <!-- x = 60 + (scene/94 * 720) -->
+
+    <!-- Mara beat points -->
+    <!-- Beat 1: scene 4, y=+0.8 (naive trust) -->
+    <!-- Beat 2: scene 22, y=+0.3 (first doubt) -->
+    <!-- Beat 3: scene 45, y=-0.4 (betrayal confirmed) -->
+    <!-- Beat 4: scene 82, y=-0.9 (crisis) -->
+    <!-- Beat 5: scene 94, y=-0.6 IRONIC (climax: wins but alone) -->
+
+    <polyline class="arc-line" style="stroke:#4a9eff"
+      points="
+        87,92
+        193,172
+        360,284
+        663,364
+        780,316
+      "/>
+
+    <!-- Mara beat dots -->
+    <circle class="beat-dot" cx="87" cy="92" r="5" style="fill:#4a9eff"/>
+    <circle class="beat-dot" cx="193" cy="172" r="5" style="fill:#4a9eff"/>
+    <circle class="beat-dot" cx="360" cy="284" r="5" style="fill:#4a9eff"/>
+    <circle class="beat-dot crisis" cx="663" cy="364" r="6" style="fill:#ffd93d"/>
+    <circle class="beat-dot climax" cx="780" cy="316" r="7" style="fill:none;stroke:#ff6b6b;stroke-width:2"/>
+
+    <!-- Mara beat labels -->
+    <text x="87" y="82" text-anchor="middle" class="beat-label">Naïve Trust</text>
+    <text x="193" y="162" text-anchor="middle" class="beat-label">First Doubt</text>
+    <text x="360" y="274" text-anchor="middle" class="beat-label">Betrayal</text>
+    <text x="663" y="354" text-anchor="middle" class="beat-label">Crisis</text>
+    <text x="780" y="306" text-anchor="middle" class="beat-label" style="fill:#ff6b6b">Climax ◆</text>
+
+    <!-- Oak's arc (Antagonist: appears positive, reveals negativity) -->
+    <!-- Oak is Mara's partner — his arc is inverse reveal -->
+    <!-- Beat 1: scene 4, y=+0.7 (appears trustworthy) -->
+    <!-- Beat 2: scene 28, y=+0.5 (slight cracks show) -->
+    <!-- Beat 3: scene 56, y=-0.3 (Mara starts suspecting) -->
+    <!-- Beat 4: scene 78, y=-0.8 (cover-up mode) -->
+    <!-- Beat 5: scene 94, y=-1.0 (exposed, no redemption) -->
+
+    <polyline class="arc-line" style="stroke:#ff6b6b"
+      points="
+        87,108
+        220,140
+        410,268
+        639,356
+        780,380
+      "/>
+
+    <!-- Oak beat dots -->
+    <circle class="beat-dot" cx="87" cy="108" r="5" style="fill:#ff6b6b"/>
+    <circle class="beat-dot" cx="220" cy="140" r="5" style="fill:#ff6b6b"/>
+    <circle class="beat-dot" cx="410" cy="268" r="5" style="fill:#ff6b6b"/>
+    <circle class="beat-dot" cx="639" cy="356" r="5" style="fill:#ff6b6b"/>
+    <circle class="beat-dot climax" cx="780" cy="380" r="7" style="fill:none;stroke:#ff6b6b;stroke-width:2"/>
+
+    <!-- Oak beat labels -->
+    <text x="87" y="98" text-anchor="middle" class="beat-label">Trustworthy</text>
+    <text x="220" y="130" text-anchor="middle" class="beat-label">Cracks Show</text>
+    <text x="410" y="258" text-anchor="middle" class="beat-label">Suspected</text>
+    <text x="639" y="346" text-anchor="middle" class="beat-label">Cover-up</text>
+    <text x="780" y="395" text-anchor="middle" class="beat-label" style="fill:#ff6b6b">Exposed ◆</text>
+
+    <!-- Convergence/divergence indicators -->
+    <!-- At scene 4: lines are close (both positive) -->
+    <text x="87" y="75" text-anchor="middle" font-size="8" style="fill:#666">aligned</text>
+    <!-- At scene 94: lines diverge (Mara ironic-negative, Oak fully negative) -->
+    <text x="780" y="335" text-anchor="middle" font-size="8" style="fill:#666">diverged</text>
+
+    <!-- Ironic marker for Mara's climax -->
+    <text x="772" y="318" font-size="8" style="fill:#ff6b6b">╳</text>
+  </svg>
+
+  <div id="tooltip" class="tooltip"></div>
+
+  <div class="section">
+    <h2>What the Graph Reveals</h2>
+    <p><strong>Slope (Δy/Δx):</strong> Mara's arc has a steep drop between scenes 45→82 (Betrayal → Crisis), showing rapid deterioration. Oak's arc declines more gradually — his corruption is revealed slowly, then collapses at the end.</p>
+    <p><strong>Inflection point:</strong> Mara's curve bottoms at the crisis (scene 82), then <em>rises slightly</em> to the ironic climax. This is the hallmark of an arc that doesn't end at the absolute lowest point — she regains something (justice) but loses everything else.</p>
+    <p><strong>Divergence:</strong> At scene 4, both characters occupy similar value space (trust). By scene 94, they're maximally apart — their arcs are mirror images, showing the relationship's destruction.</p>
+    <p><strong>Over-drama check:</strong> Mara's |Δy| per beat: 0.5, 0.7, 0.5, 0.3. No single beat exceeds 0.8. This is a measured decline, not hysterical. Oak's are even smoother: 0.2, 0.8, 0.5, 0.2.</p>
+  </div>
+
+  <div class="section">
+    <h2>Beat Data (stored alongside the graph)</h2>
+    <p>Each beat stores the linguistic turn + derived Y value:</p>
+    <p><code>- Action: Mara asks Oak about the discrepancy. Gap: He lies smoothly — she realizes months of lies. Choice: She nods, files the report herself. Shift: Trust → Doubt (positive → contrary). Y: +0.3</code></p>
+    <p>The Y value is derived by the LLM at authoring time. The dashboard plots Y directly. No separate derivation pipeline.</p>
+  </div>
+
+  <div class="section">
+    <h2>Dashboard Sanity Checks (applied at render time)</h2>
+    <p><strong>If all |Δy| &lt; 0.2:</strong> Arc is flat — nothing happens. Flag to user.</p>
+    <p><strong>If any |Δy| &gt; 0.8:</strong> Single beat is melodramatic. Suggest splitting into two beats.</p>
+    <p><strong>If two arcs never diverge:</strong> Characters may be redundant — suggest differentiation.</p>
+    <p><strong>If irony flag set but Y &lt; 0:</strong> Ironic positive requires Y near +1 with irony=true. Mismatch = authoring error.</p>
+  </div>
+</div>
+
+<script>
+// Tooltip on beat hover
+document.querySelectorAll('.beat-dot').forEach(dot => {
+  dot.addEventListener('mouseenter', (e) => {
+    const tooltip = document.getElementById('tooltip');
+    const label = e.target.nextElementSibling?.textContent || '';
+    tooltip.innerHTML = `<div class="tooltip-title">Beat: ${label}</div><div class="tooltip-row">Scene position: ${Math.round((e.target.cx.baseVal.value - 60) / 720 * 94)}</div><div class="tooltip-row">Value charge: ${((-1) * ((e.target.cy.baseVal.value - 220) / 160)).toFixed(1)}</div>`;
+    tooltip.style.display = 'block';
+    const rect = e.target.getBoundingClientRect();
+    tooltip.style.left = (rect.left + 15) + 'px';
+    tooltip.style.top = (rect.top - 10) + 'px';
+  });
+  dot.addEventListener('mouseleave', () => {
+    document.getElementById('tooltip').style.display = 'none';
+  });
+});
+</script>
+</body>
+</html>
