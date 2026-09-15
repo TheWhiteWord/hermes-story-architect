@@ -126,17 +126,33 @@ None — additive only.
 - Path pattern: `arcs/{character}/{beat_id}.md` (handled by `core/paths.py`)
 - No existing arc tool code to clean up
 
-## Final checklist (unmarked)
+## Final checklist
 
-- [ ] `story_create.py`: arc sections added to `_get_standard_sections()`
-- [ ] `story_create.py`: uses `build_entity_path()` for path construction
-- [ ] `story_create.py`: arc validates character exists
-- [ ] `story_create.py`: arc validates scene exists
-- [ ] `story_edit.py`: arc added to target enum
-- [ ] `story_edit.py`: uses `find_entity_path()` for path resolution
-- [ ] `story_retrieve.py`: arc added to entity_type enum
-- [ ] `story_retrieve.py`: uses `find_entity_path()` for path resolution
-- [ ] `story_load.py`: arc count in confirmation string
-- [ ] Tests added to `test_arcs.py` for create/edit/retrieve
-- [ ] `pytest tests/test_arcs.py` passes
-- [ ] Existing `test_core.py` tests still pass
+- [x] `story_create.py`: arc sections added to `_get_standard_sections()`
+- [x] `story_create.py`: uses `build_entity_path()` for path construction
+- [x] `story_create.py`: arc validates character exists
+- [x] `story_create.py`: arc validates scene exists
+- [x] `story_edit.py`: arc added to target enum
+- [x] `story_edit.py`: uses `find_entity_path()` for path resolution
+- [x] `story_retrieve.py`: arc added to entity_type enum
+- [x] `story_retrieve.py`: uses `find_entity_path()` for path resolution
+- [x] `story_load.py`: arc count in confirmation string
+- [x] Tests added to `test_arcs.py` for create/edit/retrieve
+- [x] `pytest tests/test_arcs.py` passes (46 tests)
+- [x] Existing `test_core.py` tests still pass (73 tests)
+
+## Final Brief
+
+Phase 3 complete. All four tools (create, edit, retrieve, load) now support the `arc` entity type. Path construction and resolution is fully centralized through `core/paths.py` — no inline `if entity_type == "arc"` logic remains in any tool. Arc beats are created at nested paths `arcs/{character}/{beat_id}.md`, validated against existing characters and scenes, and include the five standard sections (Action, Gap, Choice, Shift, Development Log).
+
+**Total: 226 tests passing (46 arc-specific, 180 existing).**
+
+## Notes
+
+- `story_create.py` entity_type enum was hardcoded — added `"arc"` to enable arc creation through the tool.
+- `story_edit.py` had a local `_get_standard_sections()` missing arc sections — added them so body section edits (e.g. updating `## Action`) work correctly.
+- `story_retrieve.py` had a redundant `file_path.exists()` check after `find_entity_path()` already returns `None` for missing files — removed the dead check.
+- `story_create.py` `_entity_exists()` was using inline path construction — replaced with `find_entity_path()` for consistency.
+- `story_create.py` `mkdir(exist_ok=True)` changed to `mkdir(parents=True, exist_ok=True)` to handle nested arc paths (`arcs/{character}/` where `arcs/` doesn't exist yet).
+- `story_load.py` confirmation string used `index['project']['name']` which fails when project.md lacks a name field — changed to `.get('name', 'Unknown')` for robustness.
+- Test fixtures: arc beat tests omit `scene` field (defaults to `""`, skips scene validation) to avoid requiring scene fixtures in unit tests.

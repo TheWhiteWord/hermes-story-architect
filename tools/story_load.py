@@ -42,7 +42,8 @@ def handler(args: dict, **kwargs) -> str:
 
     # Build confirmation
     confirmation = (
-        f"Loaded {index['project']['name']} — "
+        f"Loaded {index['project'].get('name', 'Unknown')} — "
+        f"{len(index.get('arcs', []))} arc beats, "
         f"{len(index.get('scenes', []))} scenes, "
         f"{len(index.get('sequences', []))} sequences, "
         f"{len(index.get('acts', []))} acts, "

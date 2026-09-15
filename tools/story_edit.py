@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from core.constants import ENTITY_FOLDERS, ENTITY_SCHEMAS
+from core.paths import find_entity_path
 from core.section_parser import replace_section
 
 SCHEMA = {
@@ -16,7 +17,7 @@ SCHEMA = {
             "type": "object",
             "description": "Target entity (omit for update_story_memory)",
             "properties": {
-                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act"]},
+                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc"]},
                 "slug": {"type": "string"}
             }
         },
@@ -99,10 +100,9 @@ def _edit_note(project_path: Path, target: dict, data: dict, summary: str) -> st
     
     entity_type = target.get("entity_type") or ""
     slug = target.get("slug") or ""
-    folder = ENTITY_FOLDERS.get(entity_type, "")
-    file_path = project_path / folder / f"{slug}.md"
-    
-    if not file_path.exists():
+    file_path = find_entity_path(project_path, entity_type, slug)
+
+    if not file_path:
         return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
 
     post = frontmatter.load(file_path)
@@ -185,10 +185,9 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
 
     entity_type = target.get("entity_type") or ""
     slug = target.get("slug") or ""
-    folder = ENTITY_FOLDERS.get(entity_type, "")
-    file_path = project_path / folder / f"{slug}.md"
+    file_path = find_entity_path(project_path, entity_type, slug)
 
-    if not file_path.exists():
+    if not file_path:
         return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
 
     # Cascade blocking for structural types (containment hierarchy)
@@ -271,5 +270,6 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
+        "arc": ["Action", "Gap", "Choice", "Shift", "Development Log"],
     }
     return sections.get(entity_type, [])

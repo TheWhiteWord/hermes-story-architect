@@ -1,7 +1,8 @@
 """story_create tool — create new entities."""
 import json
 from pathlib import Path
-from core.constants import ENTITY_FOLDERS, REQUIRED_FIELDS, ENTITY_SCHEMAS
+from core.constants import ENTITY_SCHEMAS
+from core.paths import build_entity_path, find_entity_path
 
 
 def _build_schema() -> dict:
@@ -52,7 +53,7 @@ def _build_schema() -> dict:
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["character", "location", "world", "plot", "scene", "sequence", "act"],
+                "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc"],
                 "description": "Type of entity to create",
             },
             "slug": {
@@ -98,9 +99,8 @@ def handler(args: dict, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
     
-    # Check if entity already exists
-    folder = ENTITY_FOLDERS[entity_type]
-    file_path = project_path / folder / f"{slug}.md"
+    # Build path (handles flat + nested via core/paths.py)
+    file_path = build_entity_path(project_path, entity_type, slug, frontmatter_data)
     if file_path.exists():
         return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
     
@@ -108,6 +108,13 @@ def handler(args: dict, **kwargs) -> str:
     import frontmatter
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+
+    # Parent validation for arc type
+    if entity_type == "arc":
+        if frontmatter_data.get("character") and not _entity_exists(project_path, "character", frontmatter_data["character"]):
+            return json.dumps({"error": f"Character not found: {frontmatter_data['character']}"})
+        if frontmatter_data.get("scene") and not _entity_exists(project_path, "scene", frontmatter_data["scene"]):
+            return json.dumps({"error": f"Scene not found: {frontmatter_data['scene']}"})
 
     # Parent validation + auto-order for structural types
     if entity_type in ("scene", "sequence"):
@@ -128,8 +135,8 @@ def handler(args: dict, **kwargs) -> str:
     if sections:
         post.content = "\n\n".join(f"## {s}\n" for s in sections)
     
-    # Ensure folder exists
-    file_path.parent.mkdir(exist_ok=True)
+    # Ensure folder exists (parents=True for nested entities like arcs/{character}/)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Write file
     with open(file_path, 'w') as f:
@@ -189,8 +196,7 @@ def _entity_exists(project_path: Path, entity_type: str, slug: str) -> bool:
     """Check if an entity file exists."""
     if not slug:
         return False
-    folder = ENTITY_FOLDERS[entity_type]
-    return (project_path / folder / f"{slug}.md").exists()
+    return find_entity_path(project_path, entity_type, slug) is not None
 
 
 def _get_standard_sections(entity_type: str) -> list[str]:
@@ -203,5 +209,6 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
+        "arc": ["Action", "Gap", "Choice", "Shift", "Development Log"],
     }
     return sections.get(entity_type, [])

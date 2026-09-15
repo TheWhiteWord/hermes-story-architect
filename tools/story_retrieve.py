@@ -2,7 +2,7 @@
 import json
 import frontmatter
 from pathlib import Path
-from core.constants import ENTITY_FOLDERS
+from core.paths import find_entity_path
 from core.section_parser import get_section, list_sections
 
 SCHEMA = {
@@ -14,7 +14,7 @@ SCHEMA = {
         },
         "entity_type": {
             "type": "string",
-            "enum": ["character", "location", "world", "plot", "project", "scene", "sequence", "act"],
+            "enum": ["character", "location", "world", "plot", "project", "scene", "sequence", "act", "arc"],
             "description": "Type of entity"
         },
         "slug": {
@@ -50,15 +50,13 @@ def handler(args: dict, **kwargs) -> str:
         return json.dumps({"error": str(e)})
     
     # Resolve file path
-    folder = ENTITY_FOLDERS[entity_type]
     if entity_type == "project":
         file_path = project_path / "project.md"
     else:
-        file_path = project_path / folder / f"{slug}.md"
-    
-    if not file_path.exists():
-        return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
-    
+        file_path = find_entity_path(project_path, entity_type, slug)
+        if not file_path:
+            return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
+
     # Read file
     post = frontmatter.load(file_path)
     body = post.content
