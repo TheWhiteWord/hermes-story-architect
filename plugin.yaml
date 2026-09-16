@@ -12,5 +12,4 @@ provides_tools:
   - story_create
   - story_dashboard
 provides_skills:
-  - story-loader
-  - story-editor
+  - hermes-story-architect

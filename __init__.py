@@ -77,11 +77,8 @@ def register(ctx) -> None:
         emoji="➕",
     )
 
-    # Register skills
-    for child in _SKILL_DIR.iterdir():
-        skill_md = child / "SKILL.md"
-        if child.is_dir() and skill_md.exists():
-            ctx.register_skill(child.name, skill_md)
+    # Register skills — new combined skill + legacy sub-skills
+    _register_skills(ctx)
 
     from .tools import story_dashboard
 
@@ -93,6 +90,9 @@ def register(ctx) -> None:
         check_fn=_requirements_met,
         emoji="📊",
     )
+
+    # Inject SOUL.md block if plugin is enabled
+    _manage_soul_block()
 
     # Auto-refresh dashboard after any data-modifying action
     def auto_refresh_dashboard(*, tool_name, result, **kwargs):
@@ -114,3 +114,84 @@ def register(ctx) -> None:
             pass
 
     ctx.register_hook("post_tool_call", auto_refresh_dashboard)
+
+
+def _register_skills(ctx) -> None:
+    """Register the combined hermes-story-architect skill."""
+    skill_md = _REPO_ROOT / "skills" / "hermes-story-architect" / "SKILL.md"
+    if skill_md.exists():
+        ctx.register_skill(
+            "hermes-story-architect",
+            skill_md,
+            description="Story Architect — manage story projects (characters, locations, plots, scenes, sequences, acts, arcs).",
+        )
+
+
+SOUL_ANCHOR = "<!-- story-architect: managed by plugin; do not edit -->"
+
+
+def _manage_soul_block() -> None:
+    """Ensure SOUL.md has the managed block if plugin is enabled.
+
+    Idempotent: safe to call on every Hermes startup.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return
+
+    try:
+        from hermes_constants import get_hermes_home
+    except ImportError:
+        return
+
+    hermes_home = get_hermes_home()
+
+    # Check if plugin is enabled
+    config_path = hermes_home / "config.yaml"
+    if not config_path.exists():
+        return
+    try:
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return
+
+    enabled = "hermes-story-architect" in config.get("plugins", {}).get("enabled", [])
+    if not enabled:
+        return
+
+    # Build the managed block
+    block = f"""{SOUL_ANCHOR}
+## Story Architect
+
+When the user asks about story projects (characters, locations, plots, scenes, 
+sequences, acts, arcs, screenplays, value arcs), load the story architect skill:
+`skill_view("hermes-story-architect:hermes-story-architect")`
+
+This gives you the full project context, index format, and entity schemas.
+{SOUL_ANCHOR}"""
+
+    soul_path = hermes_home / "SOUL.md"
+
+    if not soul_path.exists():
+        soul_path.write_text(block, encoding="utf-8")
+        return
+
+    try:
+        text = soul_path.read_text(encoding="utf-8")
+    except Exception:
+        return
+
+    if SOUL_ANCHOR in text:
+        # Already managed — replace the block in place
+        start = text.index(SOUL_ANCHOR)
+        end = text.index(SOUL_ANCHOR, start + 1) + len(SOUL_ANCHOR)
+        text = text[:start] + block + text[end:]
+    else:
+        # Append
+        text = text.rstrip() + "\n\n" + block
+
+    try:
+        soul_path.write_text(text, encoding="utf-8")
+    except Exception:
+        pass
