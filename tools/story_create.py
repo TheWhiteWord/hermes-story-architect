@@ -53,7 +53,7 @@ def _build_schema() -> dict:
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc"],
+                "enum": ["project", "character", "location", "world", "plot", "scene", "sequence", "act", "arc"],
                 "description": "Type of entity to create",
             },
             "slug": {
@@ -82,12 +82,20 @@ def handler(args: dict, **kwargs) -> str:
     from core.config import load_plugin_config
     from .story_resolve import resolve_project
     
-    config = load_plugin_config()
-    vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    _vault = kwargs.get("vault_path")
+    if _vault:
+        vault_path = Path(_vault)
+    else:
+        config = load_plugin_config()
+        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
     
     entity_type = args["entity_type"]
     slug = args["slug"]
     frontmatter_data = args["frontmatter"]
+    
+    # Project creation is special — initializes the full project structure
+    if entity_type == "project":
+        return _create_project(slug, frontmatter_data, vault_path)
     
     # Validate slug
     if not slug.replace("-", "").replace("_", "").isalnum():
@@ -160,6 +168,64 @@ def handler(args: dict, **kwargs) -> str:
     })
 
 
+def _create_project(slug, frontmatter_data, vault_path):
+    """Create a new project with full scaffolding."""
+    import frontmatter
+    
+    project_path = vault_path / "projects" / slug
+    
+    # Check if project already exists
+    if (project_path / "project.md").exists():
+        return json.dumps({"error": f"Project already exists: {slug}"})
+    
+    # Validate required fields
+    schema = ENTITY_SCHEMAS.get("project", {})
+    required = [f for f, meta in schema.items() if not meta.get("optional", True)]
+    missing = [f for f in required if not frontmatter_data.get(f)]
+    if missing:
+        return json.dumps({
+            "error": f"Missing required fields for project: {', '.join(missing)}"
+        })
+    
+    # Merge frontmatter over schema defaults
+    merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+    
+    # Create project.md with standard sections
+    project_path.mkdir(parents=True, exist_ok=True)
+    post = frontmatter.Post("", **merged)
+    sections = _get_standard_sections("project")
+    post.content = "\n".join(f"## {s}\n" for s in sections)
+    with open(project_path / "project.md", 'w') as f:
+        frontmatter.dump(post, f)
+    
+    # Create .story/memory.md with standard sections
+    memory_dir = project_path / ".story"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    memory_content = "\n\n".join([
+        "# Story Memory",
+        "## Continuity notes\n",
+        "## Character knowledge\n",
+        "## World events\n",
+        "## Open questions\n",
+    ])
+    (memory_dir / "memory.md").write_text(memory_content)
+    
+    # Create entity folders
+    for folder in ["characters", "locations", "worlds", "plots", "scenes", "sequences", "acts", "arcs"]:
+        (project_path / folder).mkdir(exist_ok=True)
+    
+    # Generate initial index
+    from core.index import generate_index, write_index
+    index = generate_index(project_path)
+    write_index(index, memory_dir / "index.yaml")
+    
+    return json.dumps({
+        "success": True,
+        "message": f"Created project: {slug}",
+        "file": str(project_path / "project.md")
+    })
+
+
 def _validate_parents(project_path: Path, entity_type: str, frontmatter: dict) -> None:
     """Raise ValueError if referenced parents don't exist."""
     if entity_type == "scene":
@@ -202,6 +268,7 @@ def _entity_exists(project_path: Path, entity_type: str, slug: str) -> bool:
 def _get_standard_sections(entity_type: str) -> list[str]:
     """Get standard sections for an entity type."""
     sections = {
+        "project": ["Synopsis", "Themes", "Structure", "Notes"],
         "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
         "location": ["Description", "History", "Scenes"],
         "world": ["Description", "History", "Conflict"],

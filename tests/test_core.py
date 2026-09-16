@@ -8,6 +8,11 @@ from core.screenplay import extract_scenes, match_character, match_location, ext
 from core.constants import ENTITY_SCHEMAS
 
 
+# ---- Imports for tool tests ----
+from tools.story_create import handler as create_handler
+from tools.story_load import handler as load_handler
+
+
 # ---- Fixtures ----
 
 @pytest.fixture
@@ -473,6 +478,108 @@ class TestNoteCreation:
         assert "## Summary" in body
         assert "## Thematic Function" in body
         assert "## Notes" in body
+
+
+class TestProjectCreation:
+    """Tests for story_create(entity_type='project', ...)."""
+
+    def test_create_project_creates_all_folders(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {"name": "Test Project", "logline": "A test"},
+        }
+        create_handler(args, vault_path=str(tmp_path))
+        proj = tmp_path / "projects" / "test-proj"
+        for folder in ["characters", "locations", "worlds", "plots", "scenes", "sequences", "acts", "arcs"]:
+            assert (proj / folder).is_dir(), f"Missing folder: {folder}"
+
+    def test_create_project_creates_project_md(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {"name": "Test Project"},
+        }
+        create_handler(args, vault_path=str(tmp_path))
+        import frontmatter
+        post = frontmatter.load(tmp_path / "projects" / "test-proj" / "project.md")
+        for field in ENTITY_SCHEMAS["project"]:
+            assert field in post.metadata, f"Missing field: {field}"
+        assert "## Synopsis" in post.content
+        assert "## Notes" in post.content
+
+    def test_create_project_creates_memory_md(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {"name": "Test Project"},
+        }
+        create_handler(args, vault_path=str(tmp_path))
+        memory = tmp_path / "projects" / "test-proj" / ".story" / "memory.md"
+        assert memory.exists()
+        assert "# Story Memory" in memory.read_text()
+        assert "## Continuity notes" in memory.read_text()
+
+    def test_create_project_creates_index(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {"name": "Test Project"},
+        }
+        create_handler(args, vault_path=str(tmp_path))
+        import yaml
+        index_path = tmp_path / "projects" / "test-proj" / ".story" / "index.yaml"
+        assert index_path.exists()
+        index = yaml.safe_load(index_path.read_text())
+        assert "project" in index
+        assert index["project"]["name"] == "Test Project"
+
+    def test_create_project_validates_required_fields(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {},
+        }
+        result = json.loads(create_handler(args, vault_path=str(tmp_path)))
+        assert "error" in result
+        assert "Missing required" in result["error"]
+
+    def test_create_project_idempotent(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {"name": "Test Project"},
+        }
+        create_handler(args, vault_path=str(tmp_path))
+        result = json.loads(create_handler(args, vault_path=str(tmp_path)))
+        assert "error" in result
+
+    def test_story_load_works_after_create(self, tmp_path):
+        args = {
+            "entity_type": "project",
+            "slug": "test-proj",
+            "project": "",
+            "frontmatter": {"name": "Test Project"},
+        }
+        create_handler(args, vault_path=str(tmp_path))
+        load_args = {"project": str(tmp_path / "projects" / "test-proj")}
+        result = json.loads(load_handler(load_args, vault_path=str(tmp_path)))
+        assert result["loaded"] is True
+        assert result["project"]["name"] == "Test Project"
+
+
+class TestStoryIndexErrors:
+    def test_story_index_errors_without_project_md(self, tmp_path):
+        from tools.story_index import handler as index_handler
+        args = {"project": str(tmp_path / "projects" / "missing")}
+        result = json.loads(index_handler(args, vault_path=str(tmp_path)))
+        assert "error" in result
 
 
 # ---- Integration Test ----

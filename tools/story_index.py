@@ -17,11 +17,15 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Regenerate project index."""
-    from core.config import load_plugin_config
     from .story_resolve import resolve_project
     
-    config = load_plugin_config()
-    vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    _vault = kwargs.get("vault_path")
+    if _vault:
+        vault_path = Path(_vault)
+    else:
+        from core.config import load_plugin_config
+        config = load_plugin_config()
+        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
     project = args["project"]
     
     try:
@@ -29,26 +33,15 @@ def handler(args: dict, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    # Initialize project.md if missing (marker file)
+    # Check required files exist (don't auto-create)
     project_md = project_path / "project.md"
     if not project_md.exists():
-        project_md.write_text(
-            f"---\n"
-            f"name: {project_path.name}\n"
-            f"---\n"
-            f"\n"
-            f"# {project_path.name}\n"
-            f"\n"
-        )
-
-    # Initialize memory.md if missing
-    memory_dir = project_path / ".story"
-    if not memory_dir.exists():
-        memory_dir.mkdir(parents=True, exist_ok=True)
-    memory_path = memory_dir / "memory.md"
+        return json.dumps({"error": f"project.md not found at {project_path}. Create with story_create(entity_type='project', slug='{project_path.name}')"})
+    
+    memory_path = project_path / ".story" / "memory.md"
     if not memory_path.exists():
-        memory_path.write_text("# Story Memory\n\n")
-
+        return json.dumps({"error": f".story/memory.md not found. Create with story_create(entity_type='project', slug='{project_path.name}')"})
+    
     # Generate index
     index = generate_index(project_path)
 

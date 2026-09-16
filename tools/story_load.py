@@ -19,11 +19,15 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Load project index and memory into context."""
-    from core.config import load_plugin_config
     from .story_resolve import resolve_project
-
-    config = load_plugin_config()
-    vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    
+    _vault = kwargs.get("vault_path")
+    if _vault:
+        vault_path = Path(_vault)
+    else:
+        from core.config import load_plugin_config
+        config = load_plugin_config()
+        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
     project = args["project"]
 
     # Resolve project
