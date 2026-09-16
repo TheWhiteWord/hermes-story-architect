@@ -80,24 +80,24 @@ For `reorder`, provide `order_context`:
 
 ## Entity Creation
 
-When creating entities, `story_create` auto-fills all expected fields with empty
+When creating entities, `story_create` auto-fills all expected fields with schema
 defaults. A character with only `name` still gets `relationships`, `goals_short`, etc.
 
 For structural types, additional rules apply:
 - **Parent validation**: scenes require `sequence_id` (sequence must exist) and `act_id` (act must exist). Sequences require `act_id`.
 - **Auto-order**: if `order` is omitted or 0, the next available position in the parent is assigned automatically.
 
-**Required fields** (should be filled for a useful note):
-- `name` — display name for the entity
-- `story_role` (character) — role in the story (Protagonist/Antagonist/Supporting/Minor/Cameo)
-- `one_sentence` — one-line summary for index labels
-- `status` (plot/project) — defaults to `active` if omitted
+**Required fields** (must be filled for a valid note):
+- `project`: `name` (only required field; `logline`, `genre`, etc. are optional)
+- `character`: `name`, `story_role`, `one_sentence`
+- `location`: `name`, `one_sentence`
+- `world`: `name`, `one_sentence`
+- `plot`: `name`, `status`
+- `scene`: `title`, `sequence_id`, `act_id`
+- `sequence`: `title`, `act_id`
+- `act`: `title`
 
-**Optional fields** (can be filled as the story develops):
-- `relationships`, `goals_short`, `goals_long`, `knowledge` (character)
-- `rules` (world)
-- `setups`, `payoffs`, `characters`, `status` (plot)
-- `genre`, `setting`, `status` (project)
+**Default values:** Core project fields like `logline`, `genre`, `setting`, `spine`, `value`, `value_at_open`, `value_at_close`, `structure_type` default to `"not set"`. Title page fields default to `""`.
 
 The tool schema documents each field's type and description. Load
 `references/index-format.md` only if you need:
@@ -111,7 +111,8 @@ see `references/index-format.md`.
 ### Entity Creation (Required Fields)
 
 | Entity | Required Fields |
-|--------|-----------------|
+|--------|----------------|
+| Project | `name` |
 | Scene | `title`, `sequence_id`, `act_id` |
 | Sequence | `title`, `act_id` |
 | Act | `title` |
@@ -120,6 +121,7 @@ see `references/index-format.md`.
 
 | Entity | Key Frontmatter Fields |
 | --- | --- |
+| Project | `name`, `logline`, `genre`, `setting`, `status`, `structure_type`, `spine`, `value`, `value_at_open`, `value_at_close` |
 | Character | `name`, `story_role`, `one_sentence`, `relationships` ({id, label, feeling}), `goals_short`, `goals_long`, `knowledge` |
 | Location | `name`, `one_sentence` |
 | World | `name`, `one_sentence`, `rules` |

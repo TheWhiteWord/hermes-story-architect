@@ -20,7 +20,7 @@ project:
   genre: Genre
   setting: Primary setting
   status: active
-  sections: [Logline, Themes, Notes]
+  sections: [Synopsis, Themes, Structure, Notes]
   scene_count: 9
   character_count: 5
   location_count: 2
