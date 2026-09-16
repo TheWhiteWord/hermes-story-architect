@@ -114,13 +114,13 @@ class TestParseArcs:
     def test_parse_arcs_returns_beats(self):
         arcs_folder = FIXTURE_PATH / "arcs"
         beats = _parse_arcs(arcs_folder)
-        assert len(beats) == 6
+        assert len(beats) == 11
 
     def test_parse_arcs_inherits_character_from_folder(self):
         arcs_folder = FIXTURE_PATH / "arcs"
         beats = _parse_arcs(arcs_folder)
         for beat in beats:
-            assert beat["character"] in ("dr-elena-voss", "kael")
+            assert beat["character"] in ("dr-elena-voss", "kael", "the-administrator", "marcus-chen")
 
     def test_parse_arcs_empty_folder(self, tmp_path):
         beats = _parse_arcs(tmp_path / "nonexistent")
@@ -220,7 +220,7 @@ class TestFullIndexArcIntegration:
     def test_index_includes_arcs(self):
         index = generate_index(FIXTURE_PATH)
         assert "arcs" in index
-        assert len(index["arcs"]) == 6
+        assert len(index["arcs"]) == 11
 
     def test_index_character_arc_beats_list(self):
         index = generate_index(FIXTURE_PATH)
@@ -233,23 +233,23 @@ class TestFullIndexArcIntegration:
 
     def test_index_character_without_arcs_empty(self):
         index = generate_index(FIXTURE_PATH)
-        marcus = next(c for c in index["characters"] if c["id"] == "marcus-chen")
-        assert "arc_beats_list" in marcus
-        assert marcus["arc_beats_list"] == []
-        assert marcus["arc_beat_count"] == 0
+        mira = next(c for c in index["characters"] if c["id"] == "mira")
+        assert "arc_beats_list" in mira
+        assert mira["arc_beats_list"] == []
+        assert mira["arc_beat_count"] == 0
 
     def test_index_scene_arc_beats(self):
         index = generate_index(FIXTURE_PATH)
         central_day = next((s for s in index["scenes"] if s["id"] == "central-room-day"), None)
         assert central_day is not None
         assert "arc_beats" in central_day
-        assert len(central_day["arc_beats"]) == 2
+        assert len(central_day["arc_beats"]) == 4
         chars = {b["character"] for b in central_day["arc_beats"]}
-        assert chars == {"dr-elena-voss", "kael"}
+        assert chars == {"dr-elena-voss", "kael", "the-administrator", "marcus-chen"}
 
     def test_project_arc_count(self):
         index = generate_index(FIXTURE_PATH)
-        assert index["project"]["arc_count"] == 6
+        assert index["project"]["arc_count"] == 11
 
 
 class TestArcValidationWarnings:
@@ -635,4 +635,4 @@ class TestArcToolIntegrationFixture:
             "project": str(self.FIXTURE_PATH)
         })
         data = json.loads(result)
-        assert "6 arc beats" in data["confirmation"]
+        assert "11 arc beats" in data["confirmation"]

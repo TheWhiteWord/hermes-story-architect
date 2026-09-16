@@ -1239,6 +1239,31 @@ html, body {
 }
 .arc-warning-icon { font-size: 10px; flex-shrink: 0; }
 
+/* ─── Coherence Visualization ────────────────────────────────── */
+
+/* Structural avenue — wide soft band from value_open to value_close per act */
+.arc-structural-avenue {
+    fill: rgba(255, 255, 255, 0.06);
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 1;
+    rx: 6;
+    filter: blur(4px);
+}
+
+/* Multi-character line styles */
+.arc-line.antagonist { stroke-dasharray: 6 4; }
+.arc-line.supporting { stroke-width: 1; opacity: 0.4; }
+
+/* Per-act delta bar */
+.arc-delta-bar { display: flex; gap: 4px; padding: 8px 16px; border-top: 1px solid var(--border); }
+.arc-delta-bar-bar { flex: 1; height: 24px; border-radius: 3px; position: relative; min-width: 20px; }
+.arc-delta-bar-bar.positive { background: rgba(107,191,176,0.5); }
+.arc-delta-bar-bar.negative { background: rgba(239,108,92,0.5); }
+.arc-delta-bar-label { font-size: 9px; color: var(--muted-foreground); text-align: center; margin-top: 2px; }
+
+/* Coherence flags — appended to existing arc-warnings, slightly different color */
+.arc-warning.coherence .arc-warning-icon { color: #e0a86b; }
+
 /* Empty state */
 .arc-empty {
   display: flex;
@@ -1485,6 +1510,7 @@ html, body {
             <div class="arc-graph-wrap" id="arc-graph-wrap"></div>
             <div class="arc-legend" id="arc-legend"></div>
             <div class="arc-warnings" id="arc-warnings"></div>
+            <div class="arc-delta-bar" id="arc-delta-bar"></div>
           </div>
         </div>
       </div>
@@ -3811,12 +3837,25 @@ function buildArcGraph() {
 
   // Equal-width act bands from act_count (renders even with no act files)
   const actBandwidth = (ARC_GW - ARC_PAD.left - ARC_PAD.right) / actCount;
+  const CHARGE_SIGN = { positive: 1, mixed: 0, negative: -1, ironic: 0 };
+
   for (let i = 0; i < actCount; i++) {
     const x = ARC_PAD.left + i * actBandwidth;
     const act = acts[i];
+    const actId = act ? (act.id || `act-${i+1}`) : `act-${i+1}`;
     const label = act ? (act.title || act.id || `Act ${i+1}`) : `Act ${i+1}`;
     const cls = i % 2 === 0 ? 'even' : 'odd';
-    svg += `<rect x="${x}" y="${ARC_PAD.top - 8}" width="${actBandwidth}" height="${ARC_GH - ARC_PAD.top - ARC_PAD.bottom + 12}" class="arc-act-band ${cls}"/>`;
+    svg += `<rect x="${x}" y="${ARC_PAD.top - 8}" width="${actBandwidth}" height="${ARC_GH - ARC_PAD.top - ARC_PAD.bottom + 12}" class="arc-act-band ${cls}" data-act="${actId}"/>`;
+
+    // Structural avenue: soft wide band from value_open to value_close
+    if (act && act.value_open && act.value_close) {
+        const yOpen = arcYScale(CHARGE_SIGN[act.value_open] || 0);
+        const yClose = arcYScale(CHARGE_SIGN[act.value_close] || 0);
+        const bandTop = Math.min(yOpen, yClose);
+        const bandHeight = Math.max(Math.abs(yClose - yOpen), 4);
+        svg += `<rect x="${x + 4}" y="${bandTop}" width="${actBandwidth - 8}" height="${bandHeight}" rx="8" class="arc-structural-avenue"/>`;
+    }
+
     if (i > 0) {
       svg += `<line x1="${x}" y1="${ARC_PAD.top - 8}" x2="${x}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-act-line"/>`;
     }
@@ -3827,13 +3866,17 @@ function buildArcGraph() {
   chars.forEach(char => {
     const color = roleColor(char.role || char.story_role || '');
     const muted = arcMutedChars.has(char.id) ? ' muted' : '';
+    const lineClass = char.story_role === 'Antagonist' ? ' antagonist' : 
+                      char.story_role === 'Protagonist' ? '' : ' supporting';
+    const lineWidth = char.story_role === 'Protagonist' ? 2 : 
+                      char.story_role === 'Antagonist' ? 2 : 1;
     const beats = [...(char.arc_beats_list || [])].sort((a, b) => a.order - b.order);
     const pts = beats.map(b => [arcXScale(beatX(char, b)), arcYScale(b.y)]);
 
     if (arcUseSpline && pts.length > 2) {
-      svg += `<path class="arc-line${muted}" d="${catmullRomPath(pts)}" stroke="${color}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
+      svg += `<path class="arc-line${lineClass}${muted}" d="${catmullRomPath(pts)}" stroke="${color}" stroke-width="${lineWidth}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
     } else {
-      svg += `<polyline class="arc-line${muted}" points="${pts.map(p => p.join(',')).join(' ')}" stroke="${color}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
+      svg += `<polyline class="arc-line${lineClass}${muted}" points="${pts.map(p => p.join(',')).join(' ')}" stroke="${color}" stroke-width="${lineWidth}" stroke-opacity="${muted ? '0.15' : '0.8'}"/>`;
     }
 
     beats.forEach(beat => {
@@ -3868,19 +3911,58 @@ function buildArcGraph() {
     }
   });
 
+  // Coherence flags from backend
+  const coherenceFlags = (window.__COHERENCE_FLAGS__ || []);
+  coherenceFlags.forEach(f => {
+    warnings.push(`${f.message}`);
+  });
+
   svg += '</svg>';
   wrap.innerHTML = svg;
 
   // Warnings
   const warningsEl = document.getElementById('arc-warnings');
   if (warningsEl) {
-    warningsEl.innerHTML = warnings.map(w => `
-      <div class="arc-warning">
-        <span class="arc-warning-icon">&#9888;</span>
-        <span>${escapeHtml(w)}</span>
-      </div>
-    `).join('');
+    warningsEl.innerHTML = warnings.map(w => {
+      const isCoherence = coherenceFlags.some(f => f.message === w);
+      return `<div class="arc-warning${isCoherence ? ' coherence' : ''}"><span class="arc-warning-icon">&#9888;</span><span>${escapeHtml(w)}</span></div>`;
+    }).join('');
   }
+
+  // Delta bar
+  const protag = (story.characters || []).find(c => c.story_role === 'Protagonist');
+  buildDeltaBar(protag ? protag.id : null);
+}
+
+function buildDeltaBar(protagonistId) {
+    const container = document.getElementById('arc-delta-bar');
+    if (!container) return;
+    if (!protagonistId) { container.innerHTML = ''; return; }
+    
+    const acts = story.acts || [];
+    const actCount = story.project.act_count || 3;
+    const chars = story.characters || [];
+    const char = chars.find(c => c.id === protagonistId);
+    if (!char || !char.arc_beats_list) { container.innerHTML = ''; return; }
+    
+    // Compute net Δy per act
+    const netDy = {};
+    char.arc_beats_list.forEach(b => {
+        const scene = (story.scenes || []).find(s => s.id === b.scene);
+        if (!scene) return;
+        const actIdx = acts.findIndex(a => a.id === scene.act_id);
+        if (actIdx === -1) return;
+        netDy[actIdx] = (netDy[actIdx] || 0) + b.y;
+    });
+    
+    let html = '';
+    for (let i = 0; i < actCount; i++) {
+        const dy = netDy[i] || 0;
+        const cls = dy >= 0 ? 'positive' : 'negative';
+        const height = Math.min(Math.abs(dy) * 30, 24);  // ponytail: linear scale, normalize against max Δy if saturation shows
+        html += `<div class="arc-delta-bar-bar ${cls}" style="height:${height}px" title="Act ${i+1}: net Δy ${dy >= 0 ? '+' : ''}${dy.toFixed(2)}"></div>`;
+    }
+    container.innerHTML = html;
 }
 
 function catmullRomPath(pts, alpha = 0.5) {

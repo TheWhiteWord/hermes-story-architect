@@ -384,6 +384,14 @@ def handler(args: dict, **kwargs) -> str:
     except Exception:
         pass  # Dashboard still works without structural stats
 
+    # Inject coherence flags
+    try:
+        from core.coherence import compute_coherence
+        coherence_flags = compute_coherence(yaml_data)
+        injections += f"\nwindow.__COHERENCE_FLAGS__ = {json.dumps(coherence_flags)};"
+    except Exception:
+        pass  # Dashboard still works without coherence flags
+
     html = html.replace(
         "// ─── Boot ─────────────────────────────────────────────────────────────────────",
         injections + "\n// ─── Boot ─────────────────────────────────────────────────────────────────────",

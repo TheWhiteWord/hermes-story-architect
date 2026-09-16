@@ -1,5 +1,6 @@
-"""Tests for arc coherence checks (Phase 1) and graph decoupling (Phase 2)."""
+"""Tests for arc coherence checks (Phase 1), graph decoupling (Phase 2), and coherence visualization (Phase 3)."""
 import pytest
+from pathlib import Path
 from core.coherence import (
     compute_coherence,
     _act_direction,
@@ -407,9 +408,9 @@ class TestComputeCoherence:
 
         index = generate_index(Path("tests/fixtures/save-the-children"))
         flags = compute_coherence(index)
-        # Kael has beats, crisis is in final act → at least crisis_placement flag
+        # Kael ends at +0.5 (positive) but project value_at_close is negative → controlling_idea flag
         assert len(flags) >= 1
-        assert any(f["check"] == "crisis_placement" for f in flags)
+        assert any(f["check"] == "controlling_idea" for f in flags)
 
     def test_flag_format_consistent(self):
         """All flags have required keys."""
@@ -431,7 +432,55 @@ class TestComputeCoherence:
             assert "data" in f
 
 
-# ─── Phase 2: Graph Decoupling ───────────────────────────────────────────
+
+
+
+# ─── Phase 4: Fixture Integration ────────────────────────────────────────
+
+
+class TestCoherenceFixtureIntegration:
+    FIXTURE_PATH = Path(__file__).parent / "fixtures" / "save-the-children"
+
+    def test_controlling_idea_flag(self):
+        """Protagonist ends at +0.5 but project closes negative — should flag."""
+        from core.coherence import compute_coherence
+        from core.index import generate_index
+        index = generate_index(self.FIXTURE_PATH)
+        flags = compute_coherence(index)
+        controlling = [f for f in flags if f["check"] == "controlling_idea"]
+        assert len(controlling) == 1
+        assert "opposite" in controlling[0]["message"].lower() or "contradiction" in controlling[0]["message"].lower()
+
+    def test_antagonist_divergence_no_flag(self):
+        """P and A diverge at climax — no flag expected."""
+        from core.coherence import compute_coherence
+        from core.index import generate_index
+        index = generate_index(self.FIXTURE_PATH)
+        flags = compute_coherence(index)
+        divergence = [f for f in flags if f["check"] == "antagonist_divergence"]
+        assert len(divergence) == 0
+
+    def test_protagonist_beats_all_in_act1(self):
+        """All protagonist beats are in act-1 — escalation skipped (single act)."""
+        from core.coherence import compute_coherence
+        from core.index import generate_index
+        index = generate_index(self.FIXTURE_PATH)
+        flags = compute_coherence(index)
+        escalation = [f for f in flags if f["check"] == "escalation"]
+        assert len(escalation) == 0
+
+    def test_full_coherence_report_structure(self):
+        """All flags have required fields."""
+        from core.coherence import compute_coherence
+        from core.index import generate_index
+        index = generate_index(self.FIXTURE_PATH)
+        flags = compute_coherence(index)
+        for f in flags:
+            assert "check" in f
+            assert "severity" in f
+            assert "act" in f
+            assert "message" in f
+            assert "data" in f
 
 
 class TestGraphDecoupling:
@@ -472,3 +521,85 @@ class TestGraphDecoupling:
         assert "arc-act-band" in js
         assert "actCount" in js
         assert "actBandwidth" in js
+
+
+# ─── Phase 3: Coherence Visualization ───────────────────────────────────
+
+
+class TestDashboardVisualization:
+    """Test that dashboard HTML/JS includes coherence visualization elements."""
+
+    @pytest.fixture
+    def dashboard_html(self):
+        return Path("src/dashboard/story-dashboard.html").read_text()
+
+    @pytest.fixture
+    def dashboard_py(self):
+        return Path("tools/story_dashboard.py").read_text()
+
+    def test_delta_bar_css_exists(self, dashboard_html):
+        """Delta bar CSS classes are defined."""
+        assert ".arc-delta-bar" in dashboard_html
+        assert ".arc-delta-bar-bar" in dashboard_html
+        assert ".arc-delta-bar-bar.positive" in dashboard_html
+        assert ".arc-delta-bar-bar.negative" in dashboard_html
+
+    def test_structural_avenue_css_exists(self, dashboard_html):
+        """Structural avenue CSS class is defined."""
+        assert ".arc-structural-avenue" in dashboard_html
+
+    def test_line_style_css_exists(self, dashboard_html):
+        """Multi-character line style CSS classes are defined."""
+        assert ".arc-line.antagonist" in dashboard_html
+        assert ".arc-line.supporting" in dashboard_html
+
+    def test_coherence_flag_css_exists(self, dashboard_html):
+        """Coherence flag CSS class is defined."""
+        assert ".arc-warning.coherence" in dashboard_html
+
+    def test_delta_bar_html_container_exists(self, dashboard_html):
+        """Delta bar HTML container is present."""
+        assert 'id="arc-delta-bar"' in dashboard_html
+
+    def test_charge_sign_mapping_exists(self, dashboard_html):
+        """CHARGE_SIGN mapping is defined in buildArcGraph."""
+        assert "CHARGE_SIGN" in dashboard_html
+        assert "positive: 1" in dashboard_html
+
+    def test_structural_avenue_rendered_in_svg(self, dashboard_html):
+        """Structural avenue rect is rendered in SVG output."""
+        assert "arc-structural-avenue" in dashboard_html
+
+    def test_act_band_has_data_attribute(self, dashboard_html):
+        """Act band rects have data-act attribute."""
+        assert 'data-act=' in dashboard_html
+
+    def test_antagonist_line_class_applied(self, dashboard_html):
+        """Antagonist character lines use dashed style class."""
+        assert "'antagonist'" in dashboard_html or '"antagonist"' in dashboard_html
+
+    def test_supporting_line_class_applied(self, dashboard_html):
+        """Supporting character lines use thin style class."""
+        assert "'supporting'" in dashboard_html or '"supporting"' in dashboard_html
+
+    def test_buildDeltaBar_function_exists(self, dashboard_html):
+        """buildDeltaBar function is defined."""
+        assert "function buildDeltaBar(" in dashboard_html
+
+    def test_buildDeltaBar_called_in_buildArcGraph(self, dashboard_html):
+        """buildDeltaBar is called at the end of buildArcGraph."""
+        idx = dashboard_html.find("function buildArcGraph(")
+        assert idx > 0
+        end_idx = dashboard_html.find("\nfunction ", idx + 1)
+        func_body = dashboard_html[idx:end_idx]
+        assert "buildDeltaBar" in func_body
+
+    def test_coherence_flags_rendered_in_warnings(self, dashboard_html):
+        """Coherence flags are rendered in the warnings area with special class."""
+        assert "coherenceFlags" in dashboard_html
+        assert "arc-warning" in dashboard_html
+
+    def test_coherence_flags_injected_by_backend(self, dashboard_py):
+        """story_dashboard.py injects __COHERENCE_FLAGS__."""
+        assert "__COHERENCE_FLAGS__" in dashboard_py
+        assert "from core.coherence import compute_coherence" in dashboard_py

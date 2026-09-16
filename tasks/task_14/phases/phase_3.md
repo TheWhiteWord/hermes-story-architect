@@ -138,14 +138,14 @@ None — additive only.
 - [x] `story_retrieve.py`: uses `find_entity_path()` for path resolution
 - [x] `story_load.py`: arc count in confirmation string
 - [x] Tests added to `test_arcs.py` for create/edit/retrieve
-- [x] `pytest tests/test_arcs.py` passes (46 tests)
-- [x] Existing `test_core.py` tests still pass (73 tests)
+- [x] `pytest tests/test_arcs.py` passes (49 tests)
+- [x] Existing `test_core.py` tests still pass (268 total)
 
 ## Final Brief
 
 Phase 3 complete. All four tools (create, edit, retrieve, load) now support the `arc` entity type. Path construction and resolution is fully centralized through `core/paths.py` — no inline `if entity_type == "arc"` logic remains in any tool. Arc beats are created at nested paths `arcs/{character}/{beat_id}.md`, validated against existing characters and scenes, and include the five standard sections (Action, Gap, Choice, Shift, Development Log).
 
-**Total: 226 tests passing (46 arc-specific, 180 existing).**
+**Total: 268 tests passing (49 arc-specific, 219 existing).**
 
 ## Notes
 

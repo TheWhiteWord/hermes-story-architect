@@ -249,7 +249,7 @@ def _check_controlling_idea(index: dict, protagonist_id: str) -> list[dict]:
             "check": "controlling_idea",
             "severity": "warning",
             "act": "project",
-            "message": f"Protagonist final value ({y_final:+.1f}) contradicts project value_at_close ({value_close}) — intentional?",
+            "message": f"Protagonist final value ({y_final:+.1f}) shows contradiction — project value_at_close is ({value_close}) — intentional?",
             "data": {"y_final": y_final, "value_at_close": value_close},
         }]
 
