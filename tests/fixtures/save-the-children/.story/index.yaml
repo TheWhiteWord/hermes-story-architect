@@ -25,7 +25,7 @@ project:
   plot_count: 2
   sequence_count: 1
   act_count: 1
-  arc_count: 3
+  arc_count: 6
 characters:
 - id: dr-elena-voss
   name: Dr. Elena Voss
@@ -33,9 +33,9 @@ characters:
     minds even knowing the bodies would never come.
   story_role: Supporting
   arc_type: negative
-  arc_value: Responsibility
+  arc_value: Redemption
   arc_value_at_open: positive
-  arc_value_at_close: ironic
+  arc_value_at_close: negative
   arc_complete: true
   sections:
   - Personality
@@ -48,23 +48,26 @@ characters:
   - Goals
   arc_beats_list:
   - id: '1'
-    label: First Doubt
+    label: The Choice
     scene: central-room-day
-    y: 0.5
+    shift: positive → negative
+    y: 0.8
     order: 1
     is_crisis: false
     is_climax: false
   - id: '2'
-    label: The Weight of Choice
+    label: The Haunting
     scene: central-room-night
-    y: -0.2
+    shift: negative → negative
+    y: 0.2
     order: 2
-    is_crisis: false
+    is_crisis: true
     is_climax: false
   - id: '3'
-    label: Acceptance
+    label: The Truth
     scene: the-core-day
-    y: -0.5
+    shift: negative → mixed
+    y: -0.3
     order: 3
     is_crisis: false
     is_climax: true
@@ -92,8 +95,32 @@ characters:
   - id: the-core-day
     title: The Core - Day
     heading: EXT. THE CORE - DAY
-  arc_beats_list: []
-  arc_beat_count: 0
+  arc_beats_list:
+  - id: '1'
+    label: The Door Was Never Locked
+    scene: central-room-day
+    shift: positive → mixed
+    y: 0.6
+    order: 1
+    is_crisis: false
+    is_climax: false
+  - id: '2'
+    label: The Offer
+    scene: central-room-night
+    shift: mixed → negative
+    y: -0.2
+    order: 2
+    is_crisis: true
+    is_climax: false
+  - id: '3'
+    label: What the Garden Costs
+    scene: the-core-day
+    shift: negative → negative
+    y: -0.7
+    order: 3
+    is_crisis: false
+    is_climax: true
+  arc_beat_count: 3
 - id: marcus-chen
   name: Marcus Chen
   one_sentence: Elena's colleague — believes the outsiders should be included, even
@@ -341,8 +368,14 @@ scenes:
   arc_beats:
   - character: dr-elena-voss
     beat_id: '1'
-    label: First Doubt
-    y: 0.5
+    label: The Choice
+    y: 0.8
+    is_crisis: false
+    is_climax: false
+  - character: kael
+    beat_id: '1'
+    label: The Door Was Never Locked
+    y: 0.6
     is_crisis: false
     is_climax: false
 - id: central-room-night
@@ -378,9 +411,15 @@ scenes:
   arc_beats:
   - character: dr-elena-voss
     beat_id: '2'
-    label: The Weight of Choice
+    label: The Haunting
+    y: 0.2
+    is_crisis: true
+    is_climax: false
+  - character: kael
+    beat_id: '2'
+    label: The Offer
     y: -0.2
-    is_crisis: false
+    is_crisis: true
     is_climax: false
 - id: the-core-day
   type: scene
@@ -416,20 +455,27 @@ scenes:
   arc_beats:
   - character: dr-elena-voss
     beat_id: '3'
-    label: Acceptance
-    y: -0.5
+    label: The Truth
+    y: -0.3
+    is_crisis: false
+    is_climax: true
+  - character: kael
+    beat_id: '3'
+    label: What the Garden Costs
+    y: -0.7
     is_crisis: false
     is_climax: true
 arcs:
 - id: '1'
   character: dr-elena-voss
   scene: central-room-day
-  label: First Doubt
-  action: Elena watches the first child mind archive complete
-  gap: She expected relief — feels only the weight of the bodies left behind
-  choice: She approves the next archive without hesitation
-  shift: positive → mixed
-  y: 0.5
+  label: The Choice
+  action: Elena makes the call — save the minds, abandon the bodies. Four hundred
+    people will die so four hundred others can live forever.
+  gap: She expects relief. She gets silence.
+  choice: She does not explain herself to Marcus. She signs the order.
+  shift: positive → negative
+  y: 0.8
   order: 1
   is_crisis: false
   is_climax: false
@@ -442,15 +488,16 @@ arcs:
 - id: '2'
   character: dr-elena-voss
   scene: central-room-night
-  label: The Weight of Choice
-  action: Elena alone in the control room reviews the archive logs
-  gap: She discovers anomalies in the earliest archives — the children's memories
-    show signs of corruption
-  choice: She decides to hide the anomalies, telling herself it's to avoid panic
-  shift: mixed → negative
-  y: -0.2
+  label: The Haunting
+  action: Elena watches the preserved children through the system. She cannot intervene,
+    cannot speak, cannot look away. Kael grows up in a world she built.
+  gap: She expected to feel pride. She feels like a ghost watching a life she made
+    possible but cannot touch.
+  choice: She does not reveal herself to Kael. She watches.
+  shift: negative → negative
+  y: 0.2
   order: 2
-  is_crisis: false
+  is_crisis: true
   is_climax: false
   sections:
   - Action
@@ -461,13 +508,76 @@ arcs:
 - id: '3'
   character: dr-elena-voss
   scene: the-core-day
-  label: Acceptance
-  action: Elena stands before the core system, preparing to reveal everything to Marcus
-    and the children
-  gap: She expects condemnation — instead sees their complicated gratitude
-  choice: She speaks the truth without omission or apology
-  shift: negative → ironic
-  y: -0.5
+  label: The Truth
+  action: Elena makes contact with Kael. She tells him what she did. She does not
+    ask for forgiveness.
+  gap: She expected judgment. She gets understanding — and that is worse.
+  choice: She tells the truth. She lets Kael decide what to do with it.
+  shift: negative → mixed
+  y: -0.3
+  order: 3
+  is_crisis: false
+  is_climax: true
+  sections:
+  - Action
+  - Gap
+  - Choice
+  - Shift
+  - Development Log
+- id: '1'
+  character: kael
+  scene: central-room-day
+  label: The Door Was Never Locked
+  action: Kael tests the door handle. It turns. The lock was never engaged — the imprisonment
+    was always internal.
+  gap: Kael expected resistance, a clear enemy. Instead, the door was always open
+    — the only thing keeping them inside was the belief that it was locked.
+  choice: Kael walks through. Not because they understand, but because they can't
+    unsee it now.
+  shift: positive → mixed
+  y: 0.6
+  order: 1
+  is_crisis: false
+  is_climax: false
+  sections:
+  - Action
+  - Gap
+  - Choice
+  - Shift
+  - Development Log
+- id: '2'
+  character: kael
+  scene: central-room-night
+  label: The Offer
+  action: The Administrator makes its case — stay, and the world remains comprehensible.
+    Leave, and lose every certainty Kael has ever had.
+  gap: 'Kael expected the Administrator to threaten, to coerce. Instead, it asks a
+    question: ''What will you be, out there, without the walls that made you?'''
+  choice: Kael refuses. Not because they have an answer, but because the question
+    itself was the trap.
+  shift: mixed → negative
+  y: -0.2
+  order: 2
+  is_crisis: true
+  is_climax: false
+  sections:
+  - Action
+  - Gap
+  - Choice
+  - Shift
+  - Development Log
+- id: '3'
+  character: kael
+  scene: the-core-day
+  label: What the Garden Costs
+  action: Kael steps into the garden. The world is real, and it is vast, and nothing
+    in it was built for them.
+  gap: Kael expected freedom to feel like relief. Instead, it feels like standing
+    in a field with no walls and no horizon.
+  choice: Kael doesn't look back. Not because the doubt is gone, but because looking
+    back would make it real again.
+  shift: negative → negative
+  y: -0.7
   order: 3
   is_crisis: false
   is_climax: true
