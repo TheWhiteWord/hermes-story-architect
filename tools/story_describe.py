@@ -182,6 +182,8 @@ def _build_tool_schema(name: str) -> dict:
 
 
 SCHEMA = {
+    "name": "story_describe",
+    "description": "Return full schemas for story tools and entity types. Use this to discover available tools and their parameters before calling them.",
     "type": "object",
     "properties": {
         "tools": {

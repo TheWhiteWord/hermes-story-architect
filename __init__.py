@@ -27,6 +27,16 @@ def register(ctx) -> None:
     from .tools import story_search
     from .tools import story_edit
     from .tools import story_create
+    from .tools import story_describe
+
+    ctx.register_tool(
+        name="story_describe",
+        toolset="story_architect",
+        schema=story_describe.SCHEMA,
+        handler=story_describe.handler,
+        check_fn=_requirements_met,
+        emoji="📋",
+    )
 
     ctx.register_tool(
         name="story_load",

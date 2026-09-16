@@ -4,6 +4,7 @@ description: "Story-writing environment for Hermes Desktop"
 author: Davide, Hermes Agent
 kind: backend
 provides_tools:
+  - story_describe
   - story_load
   - story_retrieve
   - story_index
@@ -13,3 +14,5 @@ provides_tools:
   - story_dashboard
 provides_skills:
   - hermes-story-architect
+provides_hooks:
+  - post_tool_call
