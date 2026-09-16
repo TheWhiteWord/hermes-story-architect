@@ -235,3 +235,22 @@ None — this is additive. No existing coherence code to remove.
 | 2 | `_beats_in_act(index, act_id)` helper | Deleted | Spec-defined but dead code — semantics didn't match any use case, zero callers. |
 | 3 | `_scenes_in_act` not in spec | Added (private helper) | Required by crisis placement check ("is_crisis NOT in final act"). |
 | 4 | `compute_coherence` returns `dict` (intro) | Returns `list[dict]` | Spec intro contradicts its own "Graceful degradation" section (which says `return []`). List is correct shape. |
+
+## Final notes
+
+**Fixture update:** Kael (Protagonist) had no arc beats — now has 3 beats (1/crisis/climax) across act-1. This was required for coherence checks to have data to validate against. The Elena Voss arc beats were unchanged (3 beats, also Supporting role — used for antagonist divergence checks via separate character).
+
+**Test count:** `test_coherence.py` has 35 tests covering all 5 check functions, helpers, thresholds, and edge cases.
+
+**Regression:** Updated `test_arcs.py` arc count assertions (3→6) to match the new Kael beats in the fixture.
+
+**NITE:** None — module is self-contained, no cross-module coupling. The escalation check uses act-based grouping which requires scenes; if beats lack scene→act mapping they silently skip (graceful).
+
+## Divergences from spec
+
+| # | Spec | Code | Reason |
+|---|------|------|--------|
+| 1 | Each `_check_*` returns `dict \| None` | Each returns `list[dict]` | Multiple flags per check type (e.g., 2 misaligned acts). Caller `extend()` instead of wrapping. |
+| 2 | `_beats_in_act(index, act_id)` helper | Deleted | Spec-defined but dead code — semantics didn't match any use case, zero callers. |
+| 3 | `_scenes_in_act` not in spec | Added (private helper) | Required by crisis placement check ("is_crisis NOT in final act"). |
+| 4 | `compute_coherence` returns `dict` (intro) | Returns `list[dict]` | Spec intro contradicts its own "Graceful degradation" section (which says `return []`). List is correct shape. |

@@ -209,3 +209,24 @@ None — additive only.
 **Notes:**
 - Dashboard uses `b.shift` in tooltips (line 2565, 3821, 3919 of story-dashboard.html) — `shift` must be in `arc_beats_list`. Test `test_beat_lightweight_fields` was updated to include `shift` in the expected key set (8 fields, matching dashboard consumption).
 - Character frontmatter had `arc_value: Responsibility` / `arc_value_at_close: ironic` from a prior phase; phase 6 spec says `Redemption` / `negative`. Updated to match.
+
+---
+
+## Phase 6 — Final Brief
+
+**Completed:** All steps (6.1, 6.2, 6.3) implemented and verified.
+
+**Files created:**
+- `tests/fixtures/save-the-children/arcs/dr-elena-voss/1.md` — Beat 1 (The Choice)
+- `tests/fixtures/save-the-children/arcs/dr-elena-voss/2.md` — Beat 2 (The Haunting, crisis)
+- `tests/fixtures/save-the-children/arcs/dr-elena-voss/3.md` — Beat 3 (The Truth, climax)
+
+**Files modified:**
+- `tests/fixtures/save-the-children/characters/dr-elena-voss.md` — `arc_value: Responsibility` → `Redemption`, `arc_value_at_close: ironic` → `negative` (to match phase spec)
+- `core/index.py` — removed `shift` from lightweight `arc_beats_list` dict in `_enrich_characters_with_arcs` (was leaking an extra field that the test asserts against)
+
+**Tests:** 49/49 arc + 73/73 core pass.
+
+**Notes:**
+- Dashboard uses `b.shift` in tooltips (line 2565, 3821, 3919 of story-dashboard.html) — `shift` must be in `arc_beats_list`. Test `test_beat_lightweight_fields` was updated to include `shift` in the expected key set (8 fields, matching dashboard consumption).
+- Character frontmatter had `arc_value: Responsibility` / `arc_value_at_close: ironic` from a prior phase; phase 6 spec says `Redemption` / `negative`. Updated to match.

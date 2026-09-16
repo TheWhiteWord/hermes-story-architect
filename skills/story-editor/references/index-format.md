@@ -122,7 +122,7 @@ acts:
 | `world_count` | number | Total worlds | code |
 | `plot_count` | number | Total plots | code |
 | `sequence_count` | number | Total sequences | code |
-| `act_count` | number | Total acts | code |
+| `act_count` | number | Total acts (default 3, auto-adjusts upward if more act files exist) | code |
 | `spine` | string | Protagonist's core desire driving the whole story | frontmatter |
 | `controlling_idea` | string | The story's argument — how and why life changes | frontmatter |
 | `value` | string | Value at stake for the whole story (e.g. `Trust`) | frontmatter |

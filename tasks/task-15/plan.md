@@ -315,3 +315,13 @@ All resolved — see architecture decisions above.
 2. ~~Verify open questions against existing code~~ ✅
 3. Break each phase into individual implementation tasks with full specs
 4. Begin Phase 1 implementation
+| **Total** | **16 tasks** | **~470 lines** |
+
+---
+
+## Next Steps
+
+1. ~~Review this plan with user for any gaps or changes~~
+2. ~~Verify open questions against existing code~~ ✅
+3. Break each phase into individual implementation tasks with full specs
+4. Begin Phase 1 implementation
