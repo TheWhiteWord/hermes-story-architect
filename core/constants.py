@@ -76,7 +76,6 @@ ENTITY_SCHEMAS = {
         "arc_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Value charge at arc open (positive/negative/mixed/ironic)"},
         "arc_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Value charge at arc close (positive/negative/mixed/ironic)"},
         "arc_complete": {"type": "boolean", "default": False, "optional": True, "description": "Whether this character's arc is complete"},
-        "arc_beat_count": {"type": "number", "default": 0, "optional": True, "description": "Number of arc beats (derived, overwritten by index)"},
     },
     "location": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
@@ -132,7 +131,6 @@ ENTITY_SCHEMAS = {
         "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug (denormalized shortcut)"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs present in this scene"},
-        "plots": {"type": "list", "default": [], "optional": True, "description": "Plot slugs this scene advances"},
         "value": {"type": "string", "default": "", "optional": True, "description": "Value at stake in this scene"},
         "value_open": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, mixed, ironic"},
         "value_close": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, mixed, ironic"},

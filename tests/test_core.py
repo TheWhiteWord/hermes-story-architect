@@ -400,7 +400,7 @@ class TestNoteCreation:
         # Auto-order assigned since parent exists
         assert post.metadata["order"] == 1
         assert post.metadata["characters"] == []
-        assert post.metadata["plots"] == []
+        # plots is derived by the index, not stored in frontmatter
 
         # All standard sections should be present
         body = post.content
