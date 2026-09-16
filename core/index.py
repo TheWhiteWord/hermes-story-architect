@@ -76,7 +76,8 @@ def _parse_project(
     project["world_count"] = len(worlds)
     project["plot_count"] = len(plots)
     project["sequence_count"] = sequences_count
-    project["act_count"] = acts_count
+    declared = project.get("act_count", 3)
+    project["act_count"] = max(declared, acts_count)
     project["arc_count"] = arcs_count
     return project
 

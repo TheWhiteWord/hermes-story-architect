@@ -1257,6 +1257,8 @@ html, body {
 .arc-grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
 .arc-zero-line { stroke: rgba(255,255,255,0.12); stroke-width: 1; }
 .arc-act-line { stroke: rgba(255,255,255,0.1); stroke-width: 1; stroke-dasharray: 4 4; }
+.arc-act-band.even { fill: rgba(255,255,255,0.02); }
+.arc-act-band.odd { fill: rgba(255,255,255,0.04); }
 .arc-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: opacity 200ms; }
 .arc-line.muted { opacity: 0.15; }
 .arc-beat-dot { cursor: pointer; transition: r 150ms, opacity 200ms; }
@@ -3748,14 +3750,40 @@ function buildArcGraph() {
     return;
   }
 
-  const sceneOrder = {};
-  (story.scenes || []).forEach((s, i) => { sceneOrder[s.id] = i; });
-  const sceneCount = (story.scenes || []).length;
+  const actCount = story.project.act_count || 3;
+  const acts = story.acts || [];
+  const scenes = story.scenes || [];
+
+  // Map scene → act index and scene order within that act
+  const actById = {};
+  acts.forEach((a, i) => { actById[a.id] = i; });
+  const scenesInActMap = {};
+  scenes.forEach(s => {
+    if (s.act_id != null) {
+      (scenesInActMap[s.act_id] = scenesInActMap[s.act_id] || []).push(s);
+    }
+  });
+  Object.values(scenesInActMap).forEach(list => list.sort((a, b) => a.order - b.order));
+  const sceneActIdx = {};  // scene id → { actIdx, idxInAct, countInAct }
+  scenes.forEach(s => {
+    if (s.act_id != null && scenesInActMap[s.act_id]) {
+      const list = scenesInActMap[s.act_id];
+      sceneActIdx[s.id] = {
+        actIdx: actById[s.act_id] != null ? actById[s.act_id] : -1,
+        idxInAct: list.findIndex(x => x.id === s.id),
+        countInAct: list.length,
+      };
+    }
+  });
 
   function beatX(char, beat) {
-    const scIdx = sceneOrder[beat.scene];
-    if (scIdx === undefined) return (beat.order - 1) / (char.arc_beat_count || 1);
-    return scIdx / Math.max(1, sceneCount - 1);
+    const info = sceneActIdx[beat.scene];
+    if (!info || info.actIdx === -1) {
+      // Fallback: use beat order within character arc
+      return (beat.order - 1) / (char.arc_beat_count || 1);
+    }
+    const innerPos = info.countInAct > 1 ? info.idxInAct / (info.countInAct - 1) : 0.5;
+    return (info.actIdx + innerPos) / actCount;
   }
 
   // Sanity warnings
@@ -3781,22 +3809,19 @@ function buildArcGraph() {
   // Y-axis label
   svg += `<text x="9" y="${ARC_GH/2}" class="arc-axis-label" text-anchor="middle" transform="rotate(-90,9,${ARC_GH/2})">value charge</text>`;
 
-  // Act boundaries (dotted lines) — Act I label at start, boundary lines at first scene of each subsequent act
-  const acts = story.acts || [];
-  const scenes = story.scenes || [];
-  acts.forEach((act, i) => {
-    if (i === 0) {
-      svg += `<line x1="${ARC_PAD.left}" y1="${ARC_PAD.top - 8}" x2="${ARC_PAD.left}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-act-line"/>`;
-      svg += `<text x="${ARC_PAD.left + 4}" y="${ARC_PAD.top - 4}" class="arc-act-label">${escapeHtml(act.title || act.id || '')}</text>`;
-    } else {
-      const firstSceneIdx = scenes.findIndex(s => s.act_id === act.id);
-      if (firstSceneIdx > 0) {
-        const x = ARC_PAD.left + (firstSceneIdx / Math.max(1, scenes.length - 1)) * (ARC_GW - ARC_PAD.left - ARC_PAD.right);
-        svg += `<line x1="${x}" y1="${ARC_PAD.top - 8}" x2="${x}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-act-line"/>`;
-        svg += `<text x="${x + 4}" y="${ARC_PAD.top - 4}" class="arc-act-label">${escapeHtml(act.title || act.id || '')}</text>`;
-      }
+  // Equal-width act bands from act_count (renders even with no act files)
+  const actBandwidth = (ARC_GW - ARC_PAD.left - ARC_PAD.right) / actCount;
+  for (let i = 0; i < actCount; i++) {
+    const x = ARC_PAD.left + i * actBandwidth;
+    const act = acts[i];
+    const label = act ? (act.title || act.id || `Act ${i+1}`) : `Act ${i+1}`;
+    const cls = i % 2 === 0 ? 'even' : 'odd';
+    svg += `<rect x="${x}" y="${ARC_PAD.top - 8}" width="${actBandwidth}" height="${ARC_GH - ARC_PAD.top - ARC_PAD.bottom + 12}" class="arc-act-band ${cls}"/>`;
+    if (i > 0) {
+      svg += `<line x1="${x}" y1="${ARC_PAD.top - 8}" x2="${x}" y2="${ARC_GH - ARC_PAD.bottom + 4}" class="arc-act-line"/>`;
     }
-  });
+    svg += `<text x="${x + 4}" y="${ARC_PAD.top - 4}" class="arc-act-label">${escapeHtml(label)}</text>`;
+  }
 
   // Arc lines + beat dots
   chars.forEach(char => {
@@ -3825,9 +3850,16 @@ function buildArcGraph() {
     });
   });
 
-  // X-axis (scene names at bottom)
-  (story.scenes || []).forEach((scene, i) => {
-    const x = ARC_PAD.left + (i / Math.max(1, sceneCount - 1)) * (ARC_GW - ARC_PAD.left - ARC_PAD.right);
+  // X-axis (scene names at bottom, positioned within their act band)
+  (story.scenes || []).forEach(scene => {
+    const info = sceneActIdx[scene.id];
+    let x;
+    if (info && info.actIdx !== -1) {
+      const innerPos = info.countInAct > 1 ? info.idxInAct / (info.countInAct - 1) : 0.5;
+      x = ARC_PAD.left + (info.actIdx + innerPos) * actBandwidth;
+    } else {
+      return; // skip scenes with no act mapping
+    }
     const y = ARC_GH - ARC_PAD.bottom + 14;
     const hasBeats = scene.arc_beats && scene.arc_beats.length > 0;
     if (hasBeats) {

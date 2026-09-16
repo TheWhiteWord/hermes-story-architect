@@ -503,9 +503,9 @@ class TestIndexGeneration:
         central_room = next(l for l in index["locations"] if l["id"] == "the-central-room")
         assert len(central_room.get("scenes", [])) == 2  # central-room-day, central-room-night
 
-        # Sequence and act counts
+        # Sequence and act counts (act_count defaults to 3, auto-adjusts upward)
         assert index["project"]["sequence_count"] == 1
-        assert index["project"]["act_count"] == 1
+        assert index["project"]["act_count"] == 3
 
     def test_generate_index_includes_dramatic_metadata(self, project_path):
         """Unified index: scenes contain dramatic metadata."""
@@ -565,7 +565,7 @@ class TestSceneIndex:
         assert len(index["sequences"]) == 1
         assert len(index["acts"]) == 1
         assert index["project"]["sequence_count"] == 1
-        assert index["project"]["act_count"] == 1
+        assert index["project"]["act_count"] == 3
 
     def test_project_has_sequence_and_act_counts(self, tmp_path):
         """_parse_project adds sequence_count and act_count."""
@@ -577,7 +577,7 @@ class TestSceneIndex:
 
         index = generate_index(project_path)
         assert index["project"]["sequence_count"] == 0
-        assert index["project"]["act_count"] == 0
+        assert index["project"]["act_count"] == 3
 
     def test_index_cross_reference_validation(self, tmp_path, capsys):
         """Scene with non-existent sequence_id triggers validation warning."""

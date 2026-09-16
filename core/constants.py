@@ -118,6 +118,7 @@ ENTITY_SCHEMAS = {
         "inciting_incident_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug of the inciting incident"},
         "story_climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug of the story climax"},
         "structure_type": {"type": "string", "default": "", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
+        "act_count": {"type": "number", "default": 3, "optional": True, "description": "Number of acts in story structure (default 3, auto-adjusts upward if more act files exist)"},
     },
     "scene": {
         "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug reflecting dramatic function (e.g., 'mara-discovers-files'), NOT the physical heading"},

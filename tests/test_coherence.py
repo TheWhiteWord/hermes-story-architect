@@ -1,4 +1,4 @@
-"""Tests for arc coherence checks (Phase 1)."""
+"""Tests for arc coherence checks (Phase 1) and graph decoupling (Phase 2)."""
 import pytest
 from core.coherence import (
     compute_coherence,
@@ -12,6 +12,7 @@ from core.coherence import (
     DIRECTIONAL_ALIGNMENT_MIN_DELTA,
     ESCALATION_IMBALANCE_RATIO,
 )
+from core.constants import ENTITY_SCHEMAS
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
@@ -428,3 +429,46 @@ class TestComputeCoherence:
             assert "act" in f
             assert "message" in f
             assert "data" in f
+
+
+# ─── Phase 2: Graph Decoupling ───────────────────────────────────────────
+
+
+class TestGraphDecoupling:
+    def test_project_has_act_count(self):
+        """act_count defaults to 3 at project creation."""
+        schema = ENTITY_SCHEMAS["project"]
+        assert "act_count" in schema
+        assert schema["act_count"]["type"] == "number"
+        assert schema["act_count"]["default"] == 3
+
+    def test_act_count_auto_adjusts(self):
+        """act_count auto-adjusts upward if more act files exist."""
+        from core.index import _parse_project
+        from pathlib import Path
+
+        result = _parse_project(
+            Path("."), [], [], [], [],
+            scenes_count=0, sequences_count=0, acts_count=4, arcs_count=0,
+        )
+        assert result["act_count"] == 4
+
+    def test_act_count_manual_override(self):
+        """act_count can be set manually and persists if higher than file count."""
+        from core.index import _parse_project
+        from pathlib import Path
+
+        # Without a real project.md, declared defaults to 3, acts_count=2 → max=3
+        result = _parse_project(
+            Path("."), [], [], [], [],
+            scenes_count=0, sequences_count=0, acts_count=2, arcs_count=0,
+        )
+        assert result["act_count"] == 3
+
+    def test_graph_renders_empty_bands(self):
+        """Graph renders act_count bands even with no act files."""
+        with open("src/dashboard/story-dashboard.html") as f:
+            js = f.read()
+        assert "arc-act-band" in js
+        assert "actCount" in js
+        assert "actBandwidth" in js
