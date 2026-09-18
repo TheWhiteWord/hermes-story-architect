@@ -139,6 +139,8 @@ _RELATION_FIELDS = {
     "scene": {"characters": ("character_scene", True)},
     "plot": {
         "setups": ("plot_setup", True),
+        "crisis": ("plot_crisis", True),
+        "climax": ("plot_climax", True),
         "payoffs": ("plot_payoff", True),
     },
     "character": {"relationships": ("character_relationship", True)},

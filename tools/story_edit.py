@@ -176,6 +176,33 @@ def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) ->
                 (json.dumps(extra), entity_id)
             )
 
+        # Create relation rows for plot beat fields (setups, crisis, climax, payoffs)
+        from core.entity import _RELATION_FIELDS
+        plot_rel_fields = _RELATION_FIELDS.get("plot", {})
+        for field, (kind, _) in plot_rel_fields.items():
+            if field not in data:
+                continue
+            beats = data[field]
+            if not isinstance(beats, list):
+                continue
+            # Delete old relations of this kind for this entity
+            conn.execute(
+                "DELETE FROM relations WHERE from_id=? AND kind=?", (entity_id, kind)
+            )
+            # Insert new relations
+            for i, beat in enumerate(beats):
+                if isinstance(beat, dict):
+                    scene_id = beat.get("scene_id", "")
+                    description = beat.get("description", "")
+                else:
+                    scene_id = str(beat)
+                    description = ""
+                if scene_id:
+                    conn.execute(
+                        "INSERT INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
+                        (entity_id, scene_id, kind, description, i + 1)
+                    )
+
         # Upsert sections
         for heading, body in section_updates.items():
             conn.execute(

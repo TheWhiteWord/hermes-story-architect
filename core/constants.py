@@ -76,8 +76,10 @@ ENTITY_SCHEMAS = {
         "value_arc": {"type": "string", "default": "Value arc not set", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
-        "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug (e.g. mara-discovers-files)", "description": "What happens at this scene"}},
-        "payoffs": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"scene_id": "Scene slug (e.g. mara-discovers-files)", "description": "What happens at this scene"}},
+        "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "crisis": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches crisis point", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "climax": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches climax", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "payoffs": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},

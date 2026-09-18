@@ -188,18 +188,18 @@ def get_dashboard_data(project_path: Path) -> dict:
             "FROM entities ORDER BY type, id"
         ).fetchall()
 
-        # Load all relations for denormalization
+        # Load all relations for denormalization (include note for plot beat descriptions)
         rel_rows = conn.execute(
-            "SELECT from_id, to_id, kind FROM relations"
+            "SELECT from_id, to_id, kind, note FROM relations"
         ).fetchall()
-        # Build lookup: entity_id -> {kind -> [target_ids]}
+        # Build lookup: entity_id -> {kind -> [{to_id, note}]}
         rel_map = {}
-        for from_id, to_id, kind in rel_rows:
+        for from_id, to_id, kind, note in rel_rows:
             if from_id not in rel_map:
                 rel_map[from_id] = {}
             if kind not in rel_map[from_id]:
                 rel_map[from_id][kind] = []
-            rel_map[from_id][kind].append(to_id)
+            rel_map[from_id][kind].append({"to_id": to_id, "note": note or ""})
 
         # Build entity lookup for cross-references
         entity_by_id = {}
@@ -249,13 +249,14 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["scenes"] = rel_map.get(eid, {}).get("character_scene", [])
                 # relationships: denormalized from character_relationship
                 rels = []
-                for target in rel_map.get(eid, {}).get("character_relationship", []):
-                    if target in entity_by_id:
-                        t = entity_by_id[target]
+                for rel in rel_map.get(eid, {}).get("character_relationship", []):
+                    target_id = rel.get("to_id", "") if isinstance(rel, dict) else rel
+                    if target_id in entity_by_id:
+                        t = entity_by_id[target_id]
                         rels.append({
                             "id": t["id"],
                             "label": t["name"],
-                            "feeling": "",  # feeling not in extra for relation targets
+                            "feeling": rel.get("note", "") if isinstance(rel, dict) else "",
                         })
                 d["relationships"] = rels
                 characters.append(d)
@@ -268,21 +269,36 @@ def get_dashboard_data(project_path: Path) -> dict:
                 # characters from character_scene relations (reverse lookup)
                 char_ids = []
                 for cid, kinds in rel_map.items():
-                    if "character_scene" in kinds and eid in kinds["character_scene"]:
-                        char_ids.append(cid)
+                    if "character_scene" in kinds:
+                        for rel in kinds["character_scene"]:
+                            if isinstance(rel, dict):
+                                if rel.get("to_id") == eid:
+                                    char_ids.append(cid)
+                            elif rel == eid:
+                                char_ids.append(cid)
                 d["characters"] = char_ids
                 # locations from location_scene relations (reverse lookup)
                 loc_ids = []
                 for lid, kinds in rel_map.items():
-                    if "location_scene" in kinds and eid in kinds["location_scene"]:
-                        loc_ids.append(lid)
+                    if "location_scene" in kinds:
+                        for rel in kinds["location_scene"]:
+                            if isinstance(rel, dict):
+                                if rel.get("to_id") == eid:
+                                    loc_ids.append(lid)
+                            elif rel == eid:
+                                loc_ids.append(lid)
                 d["locations"] = loc_ids
                 # plots from plot_setup/plot_payoff relations (reverse lookup)
                 plot_ids = []
                 for pid, kinds in rel_map.items():
-                    if ("plot_setup" in kinds and eid in kinds["plot_setup"]) or \
-                       ("plot_payoff" in kinds and eid in kinds["plot_payoff"]):
-                        plot_ids.append(pid)
+                    for kind in ("plot_setup", "plot_payoff"):
+                        if kind in kinds:
+                            for rel in kinds[kind]:
+                                if isinstance(rel, dict):
+                                    if rel.get("to_id") == eid:
+                                        plot_ids.append(pid)
+                                elif rel == eid:
+                                    plot_ids.append(pid)
                 d["plots"] = plot_ids
                 scenes.append(d)
 
@@ -304,8 +320,24 @@ def get_dashboard_data(project_path: Path) -> dict:
                     "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
                     "status": e[5], "parent_id": e[6], "extra": extra,
                 })
-                d["setups"] = rel_map.get(eid, {}).get("plot_setup", [])
-                d["payoffs"] = rel_map.get(eid, {}).get("plot_payoff", [])
+                # Normalize all plot beat fields to [{scene_id, description}] objects
+                def _normalize_beats(beats):
+                    result = []
+                    for b in beats:
+                        if isinstance(b, dict):
+                            if "to_id" in b:
+                                # New format: {to_id, note}
+                                result.append({"scene_id": b["to_id"], "description": b.get("note", "")})
+                            else:
+                                # Already normalized: {scene_id, description}
+                                result.append(b)
+                        else:
+                            result.append({"scene_id": str(b), "description": ""})
+                    return result
+                d["setups"] = _normalize_beats(rel_map.get(eid, {}).get("plot_setup", []))
+                d["crisis"] = _normalize_beats(rel_map.get(eid, {}).get("plot_crisis", []))
+                d["climax"] = _normalize_beats(rel_map.get(eid, {}).get("plot_climax", []))
+                d["payoffs"] = _normalize_beats(rel_map.get(eid, {}).get("plot_payoff", []))
                 # characters from character list (stored in extra.characters)
                 d["characters"] = extra.get("characters", [])
                 plots.append(d)

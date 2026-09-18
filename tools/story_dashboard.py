@@ -279,7 +279,12 @@ def handler(args: dict, **kwargs) -> str:
     try:
         data = get_dashboard_data(project_path)
     except Exception as e:
-        return json.dumps({"error": f"Failed to load dashboard data: {e}"})
+        import traceback
+        tb = traceback.format_exc()
+        # Find the exact line that failed
+        lines = tb.strip().split("\n")
+        last_line = lines[-1] if lines else "no traceback"
+        return json.dumps({"error": f"Failed: {e}", "last_line": last_line, "full_tb": tb})
 
     return _render_dashboard(data, project_path, project)
 
