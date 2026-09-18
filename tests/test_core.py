@@ -217,8 +217,8 @@ class TestNoteCreation:
             extra = json.loads(row[2])
             assert extra["story_role"] == "Protagonist"
             # relationships are stored in relations table, not extra JSON
-            assert extra["goals_short"] == ""
-            assert extra["goals_long"] == ""
+            assert extra["goals_short"] == "Goals not set"
+            assert extra["goals_long"] == "Goals not set"
             assert extra["knowledge"] == []
         finally:
             conn.close()
@@ -279,7 +279,7 @@ class TestNoteCreation:
             ).fetchone()
             assert row is not None
             assert row[0] == "Test Plot"
-            assert row[1] == ""  # one_sentence is a column
+            assert row[1] == "Summary not set"  # one_sentence is a column
             assert row[2] == "active"
             extra = json.loads(row[3])
             assert extra["characters"] == []
@@ -902,5 +902,116 @@ class TestScreenplayStatsFromSceneContent:
         assert stats["scriptHtml"], "scriptHtml should not be empty for valid scene content"
         assert "lengthStats" in stats
         assert stats["lengthStats"]["scenes"] >= 1
+
+
+# ---- Unfilled Fields Tests ----
+
+class TestUnfilledFields:
+    def test_unfilled_fields_character(self):
+        from core.entity import unfilled_fields
+        extra = {"story_role": "Protagonist", "goals_short": "Goals not set", "goals_long": "Goals not set"}
+        result = unfilled_fields("character", extra)
+        assert "goals_short" in result
+        assert "goals_long" in result
+
+    def test_unfilled_fields_skips_filled(self):
+        from core.entity import unfilled_fields
+        extra = {"story_role": "Protagonist", "goals_short": "Escaped from prison", "goals_long": "Goals not set"}
+        result = unfilled_fields("character", extra)
+        assert "goals_short" not in result
+        assert "goals_long" in result
+
+    def test_unfilled_fields_only_optional(self):
+        from core.entity import unfilled_fields
+        # story_role is required (optional: False), should not appear even if at default
+        extra = {"story_role": "", "goals_short": "Goals not set"}
+        result = unfilled_fields("character", extra)
+        assert "story_role" not in result
+        assert "goals_short" in result
+
+    def test_unfilled_fields_scene_location(self):
+        from core.entity import unfilled_fields
+        extra = {"location": "Location not set", "value": "Value not set", "dramatic_role": ""}
+        result = unfilled_fields("scene", extra)
+        assert "location" in result
+        assert "value" in result
+        # dramatic_role is at default "" but also optional — should appear
+        assert "dramatic_role" in result
+
+    def test_unfilled_fields_plot_type(self):
+        from core.entity import unfilled_fields
+        extra = {"plot_type": "", "value_arc": "Value arc not set", "one_sentence": "Summary not set"}
+        result = unfilled_fields("plot", extra)
+        assert "plot_type" in result
+        assert "value_arc" in result
+        assert "one_sentence" in result
+
+    def test_unfilled_fields_arc_action(self):
+        from core.entity import unfilled_fields
+        extra = {"action": "Action not described", "gap": "Gap not defined"}
+        result = unfilled_fields("arc", extra)
+        assert "action" in result
+        assert "gap" in result
+
+    def test_unfilled_fields_sequence(self):
+        from core.entity import unfilled_fields
+        extra = {"value": "Value not set", "purpose": "Purpose not set", "primary_plot": ""}
+        result = unfilled_fields("sequence", extra)
+        assert "value" in result
+        assert "purpose" in result
+        assert "primary_plot" in result
+
+    def test_unfilled_fields_act(self):
+        from core.entity import unfilled_fields
+        extra = {"value": "Value not set", "act_objective": "Objective not set", "climax_scene_id": ""}
+        result = unfilled_fields("act", extra)
+        assert "value" in result
+        assert "act_objective" in result
+        assert "climax_scene_id" in result
+
+    def test_get_project_summary_includes_unfilled(self, tmp_path):
+        from tools.story_create import handler as create_handler
+        from core.db import get_project_summary
+
+        project_path = _make_minimal_project(tmp_path)
+
+        args = {
+            "entity_type": "character",
+            "slug": "test-char",
+            "project": str(project_path),
+            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
+        }
+        result = json.loads(create_handler(args))
+        assert result["success"]
+
+        summary = get_project_summary(project_path)
+        assert "unfilled" in summary
+        # Character should have unfilled fields (e.g., goals_short, goals_long)
+        char_unfilled = summary["unfilled"].get("test-char", [])
+        assert len(char_unfilled) > 0
+        # goals_short defaults to "Goals not set", so it should be unfilled
+        assert "goals_short" in char_unfilled
+
+    def test_created_character_has_unfilled_fields(self, tmp_path):
+        from tools.story_create import handler as create_handler
+        from core.db import get_project_summary
+
+        project_path = _make_minimal_project(tmp_path)
+
+        char_args = {
+            "entity_type": "character",
+            "slug": "test-char",
+            "project": str(project_path),
+            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
+        }
+        json.loads(create_handler(char_args))
+
+        summary = get_project_summary(project_path)
+        char_unfilled = summary["unfilled"].get("test-char", [])
+        # goals_short and goals_long should be unfilled (default "Goals not set")
+        assert "goals_short" in char_unfilled
+        assert "goals_long" in char_unfilled
+        # story_role is required and was provided, should NOT be unfilled
+        assert "story_role" not in char_unfilled
 
 

@@ -100,4 +100,5 @@ def _db_response(summary: dict, project_path: Path) -> str:
         "entities": entities,
         "relations": relations,
         "memory": memory,
+        "unfilled": summary.get("unfilled", {}),
     })

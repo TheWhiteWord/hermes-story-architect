@@ -146,6 +146,17 @@ _RELATION_FIELDS = {
 }
 
 
+def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
+    """Return list of optional field names whose value matches the schema default."""
+    from .constants import ENTITY_SCHEMAS
+    schema = ENTITY_SCHEMAS.get(entity_type, {})
+    unfilled = []
+    for field, meta in schema.items():
+        if meta.get("optional", True) and extra.get(field, meta["default"]) == meta["default"]:
+            unfilled.append(field)
+    return unfilled
+
+
 def standard_sections(entity_type: str) -> list[str]:
     """Standard body sections for an entity type."""
     sections = {

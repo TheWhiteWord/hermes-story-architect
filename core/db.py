@@ -122,7 +122,13 @@ def get_project_summary(project_path: Path) -> dict:
             "rows": [list(r) for r in rel_rows],
         }
 
-        return {"project": project, "entities": entities, "relations": relations}
+        # Unfilled fields per entity
+        from .entity import unfilled_fields
+        unfilled_map = {}
+        for row in entities["rows"]:
+            unfilled_map[row[0]] = unfilled_fields(row[1], row[8])
+
+        return {"project": project, "entities": entities, "relations": relations, "unfilled": unfilled_map}
     finally:
         conn.close()
 

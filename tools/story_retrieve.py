@@ -59,8 +59,9 @@ def handler(args: dict, **kwargs) -> str:
                 if entity_id:
                     db_sections = get_entity_sections(project_path, entity_id)
                     if db_sections:
+                        unfilled = _unfilled_for_entity(conn, entity_id)
                         conn.close()
-                        return _format_sections(entity_type, slug, sections, db_sections, project_path)
+                        return _format_sections(entity_type, slug, sections, db_sections, project_path, unfilled)
         except Exception:
             pass
         finally:
@@ -72,6 +73,18 @@ def handler(args: dict, **kwargs) -> str:
 
     # No DB or no schema — error
     return json.dumps({"error": "Database not found. Run story_import first."})
+
+
+def _unfilled_for_entity(conn, entity_id: str) -> list[str]:
+    """Return unfilled fields for an entity from its extra JSON."""
+    from core.entity import unfilled_fields
+    row = conn.execute(
+        "SELECT type, extra FROM entities WHERE id=?", (entity_id,)
+    ).fetchone()
+    if not row:
+        return []
+    extra = json.loads(row[1]) if row[1] else {}
+    return unfilled_fields(row[0], extra)
 
 
 def _entity_id_for(conn, entity_type: str, slug: str) -> str | None:
@@ -96,7 +109,7 @@ def _entity_id_for(conn, entity_type: str, slug: str) -> str | None:
         return row[0] if row else None
 
 
-def _format_sections(entity_type: str, slug: str, sections: list, db_sections: dict, project_path: Path) -> str:
+def _format_sections(entity_type: str, slug: str, sections: list, db_sections: dict, project_path: Path, unfilled: list | None = None) -> str:
     """Format DB sections to match the old file-based response."""
     from core.section_parser import list_sections
 
@@ -105,12 +118,15 @@ def _format_sections(entity_type: str, slug: str, sections: list, db_sections: d
         all_content = "\n\n".join(
             f"## {heading}\n{body}" for heading, body in db_sections.items()
         )
-        return json.dumps({
+        result = {
             "entity_type": entity_type,
             "slug": slug,
             "sections": list(db_sections.keys()),
             "content": all_content
-        })
+        }
+        if unfilled is not None:
+            result["unfilled_fields"] = unfilled
+        return json.dumps(result)
 
     results = {}
     for section in sections:
@@ -120,8 +136,11 @@ def _format_sections(entity_type: str, slug: str, sections: list, db_sections: d
             available = list(db_sections.keys())
             results[section] = f"Section '{section}' not found. Available: {available}"
 
-    return json.dumps({
+    result = {
         "entity_type": entity_type,
         "slug": slug,
         "sections": results
-    })
+    }
+    if unfilled is not None:
+        result["unfilled_fields"] = unfilled
+    return json.dumps(result)
