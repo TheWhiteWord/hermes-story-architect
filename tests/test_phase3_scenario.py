@@ -57,17 +57,26 @@ class Test3EditScenario:
         assert kael_row[3] == "Updated description for kael."
 
     def test_delete_entity_excluded_from_load(self, db_project):
-        """Delete a character → story_load excludes it."""
+        """Delete a character → story_load excludes it. Arcs cascade-delete."""
         proj, vault = db_project
 
-        # Create a character to delete (so we don't break the fixture)
+        # Create a character with arc beats
         create_handler({
             "entity_type": "character", "slug": "temp-char", "project": str(proj),
             "frontmatter": {"name": "Temp", "story_role": "Minor", "one_sentence": "Temp"},
             "vault_path": vault
         })
+        create_handler({
+            "entity_type": "arc", "slug": "1", "project": str(proj),
+            "frontmatter": {
+                "id": "1", "character": "temp-char",
+                "label": "Beat", "action": "a", "gap": "g",
+                "choice": "c", "shift": "s", "y": 0.0, "order": 1,
+            },
+            "vault_path": vault
+        })
 
-        # Delete
+        # Delete character
         result = edit_handler({
             "action": "delete_entity",
             "target": {"entity_type": "character", "slug": "temp-char", "project": str(proj)},
@@ -76,18 +85,74 @@ class Test3EditScenario:
         })
         assert json.loads(result)["success"] is True
 
-        # Load excludes deleted entity
+        # Load excludes deleted entity AND its arcs
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         entities = result["entities"]["rows"]
         ids = [r[0] for r in entities]
         assert "temp-char" not in ids
+        assert "temp-char-1" not in ids, f"Arc beat not cascade-deleted: {ids}"
 
-        # Search excludes deleted entity body
-        search_result = json.loads(search_handler({
-            "project": str(proj), "query": "Temp", "vault_path": vault
-        }))
-        # No results (entity was hard-deleted, so FTS doesn't have it)
-        # But at minimum, the entity shouldn't appear in the load
+    def test_delete_sequence_with_scenes_blocked(self, db_project):
+        """Deleting a sequence that has scenes is blocked."""
+        proj, vault = db_project
+
+        create_handler({
+            "entity_type": "sequence", "slug": "seq-with-scenes", "project": str(proj),
+            "frontmatter": {"title": "Seq", "act_id": "act-1"},  # act-1 from fixture import
+            "vault_path": vault
+        })
+        # Create a scene in this sequence
+        create_handler({
+            "entity_type": "scene", "slug": "scene-in-seq", "project": str(proj),
+            "frontmatter": {"title": "Scene", "sequence_id": "seq-with-scenes", "act_id": "act-1"},
+            "vault_path": vault
+        })
+
+        result = edit_handler({
+            "action": "delete_entity",
+            "target": {"entity_type": "sequence", "slug": "seq-with-scenes", "project": str(proj)},
+            "summary": "Delete seq",
+            "vault_path": vault
+        })
+        data = json.loads(result)
+        assert "error" in data
+        assert "structural" in data["error"].lower() or "scene" in data["error"].lower()
+
+    def test_delete_character_cascades_arcs(self, db_project):
+        """Deleting a character cascade-deletes all their arc beats."""
+        proj, vault = db_project
+
+        create_handler({
+            "entity_type": "character", "slug": "cascade-char", "project": str(proj),
+            "frontmatter": {"name": "Cascade", "story_role": "Minor", "one_sentence": "Test"},
+            "vault_path": vault
+        })
+        for i in range(1, 4):
+            create_handler({
+                "entity_type": "arc", "slug": str(i), "project": str(proj),
+                "frontmatter": {
+                    "id": str(i), "character": "cascade-char",
+                    "label": f"Beat {i}", "action": "a", "gap": "g",
+                    "choice": "c", "shift": "s", "y": 0.0, "order": i,
+                },
+                "vault_path": vault
+            })
+
+        # Delete character
+        result = edit_handler({
+            "action": "delete_entity",
+            "target": {"entity_type": "character", "slug": "cascade-char", "project": str(proj)},
+            "summary": "Delete cascade-char",
+            "vault_path": vault
+        })
+        assert json.loads(result)["success"] is True
+
+        # All arcs gone
+        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        ids = [r[0] for r in result["entities"]["rows"]]
+        assert "cascade-char" not in ids
+        for i in range(1, 4):
+            assert f"cascade-char-{i}" not in ids, f"Arc {i} not cascade-deleted: {ids}"
 
     def test_reorder_visible_in_load(self, db_project):
         """Reorder scenes → story_load shows new order_key sequence."""

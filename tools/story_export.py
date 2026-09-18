@@ -62,18 +62,13 @@ def _export_all(conn, project_path: Path) -> None:
                 extra["characters"] = [r[0] for r in chars]
 
         if entity_type == "plot":
-            setups = conn.execute(
-                "SELECT to_id, note FROM relations WHERE from_id=? AND kind='plot_setup'",
-                (entity_id,)
-            ).fetchall()
-            if setups:
-                extra["setups"] = [{"scene_id": s[0], "description": s[1]} for s in setups]
-            payoffs = conn.execute(
-                "SELECT to_id, note FROM relations WHERE from_id=? AND kind='plot_payoff'",
-                (entity_id,)
-            ).fetchall()
-            if payoffs:
-                extra["payoffs"] = [{"scene_id": p[0], "description": p[1]} for p in payoffs]
+            for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"), ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
+                rows = conn.execute(
+                    f"SELECT to_id, note FROM relations WHERE from_id=? AND kind='{kind}'",
+                    (entity_id,)
+                ).fetchall()
+                if rows:
+                    extra[field] = [{"scene_id": r[0], "description": r[1]} for r in rows]
 
         fm = _frontmatter_for(entity_type, entity_id, name, one_sentence, order_key, status, parent_id, location_id, extra)
         sections = conn.execute(

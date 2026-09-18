@@ -288,7 +288,7 @@ def _reorder(project_path: Path, target: dict, order_context: dict, summary: str
 
 
 def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
-    """Hard-delete entity and its dependencies. Blocks if structural types have children."""
+    """Hard-delete entity and its dependencies."""
     from core.db import get_db
 
     entity_type = target.get("entity_type") or ""
@@ -300,23 +300,24 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
         if not entity_id:
             return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
 
-        # Cascade blocking for structural types (containment hierarchy)
-        if entity_type == "sequence":
-            children = conn.execute(
-                "SELECT id FROM entities WHERE type='scene' AND parent_id=?",
-                (entity_id,)
-            ).fetchall()
-            if children:
-                ids = [r[0] for r in children[:5]]
-                raise ValueError(f"Cannot delete: {len(children)} scene(s) reference this: {', '.join(ids)}")
-        elif entity_type == "act":
-            children = conn.execute(
-                "SELECT id FROM entities WHERE type='sequence' AND parent_id=?",
-                (entity_id,)
-            ).fetchall()
-            if children:
-                ids = [r[0] for r in children[:5]]
-                raise ValueError(f"Cannot delete: {len(children)} sequence(s) reference this: {', '.join(ids)}")
+        # Cascade block: structural types (containment hierarchy)
+        # Derived from DB: any entity whose parent_id points to this one is a child
+        children = conn.execute(
+            "SELECT id, type FROM entities WHERE parent_id=?", (entity_id,)
+        ).fetchall()
+        if children:
+            # If any child is a structural type (act/sequence/scene), block deletion
+            structural = [c for c in children if c[1] in ("scene", "sequence")]
+            if structural:
+                ids = [c[0] for c in structural[:5]]
+                raise ValueError(
+                    f"Cannot delete: {len(structural)} structural child(ren) reference this: {', '.join(ids)}"
+                )
+            # Non-structural children (arcs) are cascade-deleted with parent
+            for child_id, child_type in children:
+                conn.execute("DELETE FROM sections WHERE entity_id=?", (child_id,))
+                conn.execute("DELETE FROM relations WHERE from_id=? OR to_id=?", (child_id, child_id))
+                conn.execute("DELETE FROM entities WHERE id=?", (child_id,))
 
         # Hard delete: entity + its sections + its relations
         conn.execute("DELETE FROM sections WHERE entity_id=?", (entity_id,))

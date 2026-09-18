@@ -249,10 +249,10 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     """Extract extra JSON fields for an entity type."""
     # Fields that go to columns or relations (not extra)
     skip = {
-        "character": {"name", "one_sentence", "id"},
+        "character": {"name", "one_sentence", "id", "relationships"},
         "location": {"name", "one_sentence", "id"},
         "world": {"name", "one_sentence", "id"},
-        "plot": {"name", "one_sentence", "status", "id", "setups", "payoffs"},
+        "plot": {"name", "one_sentence", "status", "id", "setups", "payoffs", "crisis", "climax"},
         "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
@@ -281,22 +281,16 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                 (loc_id, slug, "location_scene"),
             )
     elif entity_type == "plot":
-        for beat in fm.get("setups", []):
-            sid = beat.get("scene_id", "") if isinstance(beat, dict) else beat
-            desc = beat.get("description", "") if isinstance(beat, dict) else ""
-            if sid:
-                conn.execute(
-                    "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
-                    (slug, sid, "plot_setup", desc),
-                )
-        for beat in fm.get("payoffs", []):
-            sid = beat.get("scene_id", "") if isinstance(beat, dict) else beat
-            desc = beat.get("description", "") if isinstance(beat, dict) else ""
-            if sid:
-                conn.execute(
-                    "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
-                    (slug, sid, "plot_payoff", desc),
-                )
+        # All 4 plot beat types — setups, crisis, climax, payoffs
+        for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"), ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
+            for beat in fm.get(field, []):
+                sid = beat.get("scene_id", "") if isinstance(beat, dict) else beat
+                desc = beat.get("description", "") if isinstance(beat, dict) else ""
+                if sid:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
+                        (slug, sid, kind, desc),
+                    )
     elif entity_type == "character":
         # Structured relationships from frontmatter
         for rel in fm.get("relationships", []):
