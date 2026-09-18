@@ -28,24 +28,6 @@ REQUIRED_FIELDS = {
     "arc": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
 }
 
-ENTITY_FOLDERS = {
-    "character": "characters",
-    "location": "locations",
-    "world": "worlds",
-    "plot": "plots",
-    "project": ".",
-    "scene": "scenes",
-    "sequence": "sequences",
-    "act": "acts",
-    "arc": "arcs",
-}
-
-# Nested entities use {parent_field} in their path: folder/{parent}/{slug}.md
-# Non-nested entities use flat paths: folder/{slug}.md
-NESTED_ENTITIES = {
-    "arc": "character",  # arcs/{character}/{beat_id}.md
-}
-
 ENTITY_LABELS = {
     "character": "Character",
     "location": "Location",

@@ -8,22 +8,29 @@ story_role: Supporting
 ## Personality
 
 
+
 ## Background
+
 
 
 ## Voice
 
 
+
 ## Greatest Fear
+
 
 
 ## Secrets
 
 
+
 ## Arc
 
 
+
 ## Relationships
+
 
 
 ## Goals

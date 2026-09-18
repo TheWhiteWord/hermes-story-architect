@@ -1,25 +1,28 @@
 ---
-id: central-room-day
-type: scene
-title: "Central Room - Day"
-order: 1
-status: drafted
-heading: "INT. THE CENTRAL ROOM - DAY"
-location: the-central-room
-time_of_day: DAY
-sequence_id: seq-discovery
 act_id: act-1
-characters: [kael, mira]
-plots: []
-value: "Trust"
-value_open: "positive"
-value_close: "negative"
-conflict_levels: [inner, personal]
+characters:
+- kael
+- mira
+conflict_levels:
+- inner
+- personal
 dramatic_role: setup
+heading: INT. THE CENTRAL ROOM - DAY
+id: central-room-day
+is_act_climax: false
 is_inciting_incident: false
 is_sequence_climax: false
-is_act_climax: false
 is_story_climax: false
+location: the-central-room
+order: 1
+sequence_id: seq-discovery
+status: drafted
+time_of_day: DAY
+title: Central Room - Day
+type: scene
+value: Trust
+value_close: negative
+value_open: positive
 ---
 
 ## Description

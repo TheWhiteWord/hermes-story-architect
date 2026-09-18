@@ -1,17 +1,19 @@
 ---
+characters:
+- kael
+- mira
 name: The Resistance
 one_sentence: Kael and Mira organize the children to breach the Central Room.
-plot_type: Setup
-status: active
-characters: [kael, mira]
-setups:
-  - scene_id: central-room-day
-    description: Kael discovers the door isn't locked — it was never locked.
-  - scene_id: central-room-night
-    description: The Administrator makes its final offer. Kael refuses.
 payoffs:
-  - scene_id: the-core-day
-    description: The children emerge into the real world for the first time.
+- description: The children emerge into the real world for the first time.
+  scene_id: the-core-day
+plot_type: Setup
+setups:
+- description: Kael discovers the door isn't locked — it was never locked.
+  scene_id: central-room-day
+- description: The Administrator makes its final offer. Kael refuses.
+  scene_id: central-room-night
+status: active
 ---
 
 ## Summary

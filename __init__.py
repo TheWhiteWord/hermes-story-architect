@@ -23,11 +23,13 @@ def register(ctx) -> None:
     """Register all Story Architect tools and skills."""
     from .tools import story_load
     from .tools import story_retrieve
-    from .tools import story_index
     from .tools import story_search
     from .tools import story_edit
     from .tools import story_create
     from .tools import story_describe
+    from .tools import story_import
+    from .tools import story_export
+    from .tools import story_backup
 
     ctx.register_tool(
         name="story_describe",
@@ -53,14 +55,6 @@ def register(ctx) -> None:
         handler=story_retrieve.handler,
         check_fn=_requirements_met,
         emoji="🔍",
-    )
-    ctx.register_tool(
-        name="story_index",
-        toolset="story_architect",
-        schema=story_index.SCHEMA,
-        handler=story_index.handler,
-        check_fn=_requirements_met,
-        emoji="📊",
     )
     ctx.register_tool(
         name="story_search",
@@ -90,6 +84,31 @@ def register(ctx) -> None:
     # Register skills — new combined skill + legacy sub-skills
     _register_skills(ctx)
 
+    ctx.register_tool(
+        name="story_import",
+        toolset="story_architect",
+        schema=story_import.SCHEMA,
+        handler=story_import.handler,
+        check_fn=_requirements_met,
+        emoji="📥",
+    )
+    ctx.register_tool(
+        name="story_export",
+        toolset="story_architect",
+        schema=story_export.SCHEMA,
+        handler=story_export.handler,
+        check_fn=_requirements_met,
+        emoji="📤",
+    )
+    ctx.register_tool(
+        name="story_backup",
+        toolset="story_architect",
+        schema=story_backup.SCHEMA,
+        handler=story_backup.handler,
+        check_fn=_requirements_met,
+        emoji="💾",
+    )
+
     from .tools import story_dashboard
 
     ctx.register_tool(
@@ -106,7 +125,7 @@ def register(ctx) -> None:
 
     # Auto-refresh dashboard after any data-modifying action
     def auto_refresh_dashboard(*, tool_name, result, **kwargs):
-        if tool_name not in ("story_dashboard", "story_edit", "story_create", "story_index"):
+        if tool_name not in ("story_dashboard", "story_edit", "story_create"):
             return
         try:
             data = json.loads(result)

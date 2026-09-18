@@ -140,20 +140,17 @@ class TestStatsInjection:
 
 
 class TestStructuralStats:
-    """Regression tests for dashboard structural stats from unified index."""
+    """Regression tests for dashboard structural stats from DB."""
 
     def test_structural_stats_scene_roles(self):
-        """compute_structural_stats returns correct role counts (not all 'unset')."""
-        from core.index import compute_structural_stats
-        import yaml
+        """get_dashboard_data returns correct role counts (not all 'unset')."""
+        from core.db import get_dashboard_data
 
-        with open(FIXTURE_PATH / ".story" / "index.yaml") as f:
-            index = yaml.safe_load(f)
-
-        stats = compute_structural_stats(index)
+        data = get_dashboard_data(FIXTURE_PATH)
+        stats = data["structural_stats"]
         roles = stats["sceneRoles"]
 
-        # Unified index: all scenes have dramatic roles
+        # DB: all scenes have dramatic roles
         assert roles.get("unset", 0) == 0, f"Expected no 'unset' roles, got: {roles}"
 
         # Fixture has one scene per role

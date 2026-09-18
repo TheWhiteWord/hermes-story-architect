@@ -7,10 +7,16 @@ from core.constants import FUZZY_THRESHOLD
 def resolve_project(user_input: str, vault_path: Path) -> Path:
     """Resolve user input to a project folder path.
     
-    1. Exact slug match
-    2. Fuzzy match on slug + project name
-    3. No match → raise ValueError
+    1. Direct path (if user_input is an existing directory)
+    2. Exact slug match
+    3. Fuzzy match on slug + project name
+    4. No match → raise ValueError
     """
+    # Direct path — if user_input is an existing directory, use it
+    direct = Path(user_input)
+    if direct.is_dir():
+        return direct
+    
     projects_dir = vault_path / "projects"
     
     if not projects_dir.exists():

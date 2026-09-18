@@ -1,16 +1,16 @@
 ---
-id: seq-discovery
-type: sequence
-title: "The Discovery"
-order: 1
-status: in-progress
 act_id: act-1
-value: "Trust"
-value_open: "positive"
-value_close: "negative"
 climax_scene_id: central-room-night
+id: seq-discovery
+order: 1
 primary_plot: the-resistance
 purpose: Kael discovers the truth about the door and chooses to act.
+status: in-progress
+title: The Discovery
+type: sequence
+value: Trust
+value_close: negative
+value_open: positive
 ---
 
 ## Summary

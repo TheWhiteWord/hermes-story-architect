@@ -16,56 +16,6 @@ SCHEMA = {
 }
 
 
-def _extract_sections(yaml_data, project_path):
-    """Extract section content from notes for dashboard injection.
-
-    Returns {entity_type: {slug: {section_name: section_content}}}.
-    Skips missing notes gracefully — dashboard still works without sections.
-    """
-    import frontmatter
-    from core.section_parser import get_section
-    from core.constants import ENTITY_FOLDERS
-
-    sections_dict = {}
-    # Index uses plural keys, but we normalise to singular for the frontend
-    PLURAL_TO_SINGULAR = {
-        'characters': 'character', 'locations': 'location',
-        'worlds': 'world', 'plots': 'plot',
-        'scenes': 'scene', 'sequences': 'sequence', 'acts': 'act',
-    }
-    for plural_key, singular_key in PLURAL_TO_SINGULAR.items():
-        folder = ENTITY_FOLDERS[singular_key]
-        entities = yaml_data.get(plural_key, [])
-        type_dict = {}
-        for entity in entities:
-            slug = entity.get("id")
-            if not slug or not entity.get("sections"):
-                continue
-            note_path = project_path / folder / f"{slug}.md"
-            if not note_path.exists():
-                continue
-            try:
-                post = frontmatter.load(note_path)
-                body = post.content
-                sec_dict = {}
-                for sec_name in entity["sections"]:
-                    content = get_section(body, sec_name)
-                    if content:
-                        # Strip "## Heading\n" prefix — keep body only
-                        if content.startswith("## "):
-                            nl = content.find("\n")
-                            if nl != -1:
-                                content = content[nl + 1:]
-                        sec_dict[sec_name] = content
-                if sec_dict:
-                    type_dict[slug] = sec_dict
-            except Exception:
-                continue  # Skip broken notes
-        if type_dict:
-            sections_dict[singular_key] = type_dict
-    return sections_dict
-
-
 def _compute_screenplay_stats(screenplay_text):
     """Compute screenplay statistics from fountain text using fountain_lexer.
 
@@ -296,11 +246,12 @@ def _parse_scene_location(heading):
 
 
 def handler(args: dict, **kwargs) -> str:
-    """Open project dashboard in the preview pane."""
+    """Open project dashboard in preview pane."""
     import tempfile
-    import yaml
+    import frontmatter as fm
 
     from core.config import load_plugin_config
+    from core.db import get_dashboard_data, has_schema
     from .story_resolve import resolve_project
 
     config = load_plugin_config()
@@ -312,17 +263,31 @@ def handler(args: dict, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    index_path = project_path / ".story" / "index.yaml"
-    if not index_path.exists():
-        return json.dumps({"error": "Index not found. Run story_index first."})
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return json.dumps({"error": "Database not found. Run story_import first."})
 
-    # Regenerate index so dashboard reflects latest note data
+    import sqlite3
+    conn = sqlite3.connect(str(db_path))
     try:
-        from core.index import generate_index, write_index
-        index = generate_index(project_path)
-        write_index(index, index_path)
-    except Exception:
-        pass  # Use existing index if regeneration fails
+        if not has_schema(conn):
+            return json.dumps({"error": "Database schema not found. Run story_import first."})
+    finally:
+        conn.close()
+
+    # Get all dashboard data from DB in one call
+    try:
+        data = get_dashboard_data(project_path)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to load dashboard data: {e}"})
+
+    return _render_dashboard(data, project_path, project)
+
+
+def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
+    """Render dashboard HTML from get_dashboard_data() output."""
+    import tempfile
+    import frontmatter as fm
 
     dashboard_src = Path(__file__).parent.parent / "src" / "dashboard" / "story-dashboard.html"
     if not dashboard_src.exists():
@@ -332,57 +297,43 @@ def handler(args: dict, **kwargs) -> str:
     if not screenplay_css_src.exists():
         return json.dumps({"error": "Screenplay CSS file not found in plugin"})
 
-    # Read index.yaml, convert to JSON, inject inline — avoids fetch('file://') which Electron blocks
-    yaml_data = yaml.safe_load(index_path.read_text(encoding="utf-8"))
     html = dashboard_src.read_text(encoding="utf-8")
     css = screenplay_css_src.read_text(encoding="utf-8")
 
-    # Read project.md directly for title page fields (output-only, not in index)
+    # Read project.md directly for title page fields (output-only, not in DB title_page)
     try:
-        import frontmatter as fm
         project_fm = fm.load(project_path / "project.md")
         project_frontmatter = dict(project_fm.metadata)
     except Exception:
-        project_frontmatter = yaml_data.get("project", {})
+        project_frontmatter = {}
 
-    # Replace the external CSS link with inline CSS (so it works from any location)
+    # Replace the external CSS link with inline CSS
     html = html.replace(
         '<link rel="stylesheet" href="screenplay.css">',
         f"<style>\n{css}\n</style>"
     )
 
-    # Accumulate all injections, then replace marker once
-    injections = f"window.__STORY_DATA__ = {json.dumps(yaml_data)};"
+    # Build all injections from get_dashboard_data output
+    injections = f"window.__STORY_DATA__ = {json.dumps(data['story_data'])};"
 
-    # Inject section content from notes — panels render on open
-    try:
-        sections_data = _extract_sections(yaml_data, project_path)
-        if sections_data:
-            injections += f"\nwindow.__SECTIONS__ = {json.dumps(sections_data)};"
-    except Exception:
-        pass  # Dashboard still works without sections
+    # Inject section content
+    if data.get("sections"):
+        injections += f"\nwindow.__SECTIONS__ = {json.dumps(data['sections'])};"
 
-    # Inject screenplay stats from scene content (reuse _compute_screenplay_stats)
-    # _compute_screenplay_stats() calls tokens_to_html() internally, so stats.scriptHtml
-    # IS the pre-rendered script HTML. No separate assemble_script_from_scenes() needed.
-    from core.index import assemble_scene_content, compute_structural_stats
-    try:
-        scene_text = assemble_scene_content(yaml_data, project_path)
-        if scene_text:
+    # Inject screenplay stats from DB scene content
+    scene_text = data.get("screenplay_text", "")
+    if scene_text:
+        try:
             stats = _compute_screenplay_stats(scene_text)
             if stats:
-                # Title page from project frontmatter (output-only, not from Fountain)
                 stats["titlePage"] = _build_title_page(project_frontmatter)
                 injections += f"\nwindow.__SCREENPLAY_STATS__ = {json.dumps(stats)};"
-    except Exception:
-        pass  # Dashboard still works without stats
+        except Exception:
+            pass  # Dashboard still works without stats
 
     # Inject structural stats
-    try:
-        structural_stats = compute_structural_stats(yaml_data)
-        injections += f"\nwindow.__STRUCTURAL_STATS__ = {json.dumps(structural_stats)};"
-    except Exception:
-        pass  # Dashboard still works without structural stats
+    if data.get("structural_stats"):
+        injections += f"\nwindow.__STRUCTURAL_STATS__ = {json.dumps(data['structural_stats'])};"
 
     html = html.replace(
         "// ─── Boot ─────────────────────────────────────────────────────────────────────",
@@ -390,7 +341,13 @@ def handler(args: dict, **kwargs) -> str:
     )
 
     # Name temp file after the story title
-    project_name = (yaml_data.get("project", {}).get("name") or project).strip()
+    project_name = ""
+    for row in data.get("story_data", []):
+        if row.get("type") == "project" and row.get("name"):
+            project_name = row["name"]
+            break
+    if not project_name:
+        project_name = project
     safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in project_name).strip().replace(" ", "_")
     tmp_dir = Path(tempfile.gettempdir())
     tmp_path = tmp_dir / f"{safe_name}.html"

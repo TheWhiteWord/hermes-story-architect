@@ -1,14 +1,14 @@
 ---
+act_objective: Kael discovers the truth about the door.
+climax_scene_id: central-room-night
 id: act-1
-type: act
-title: "Act One"
 order: 1
 status: in-progress
-value: "Trust"
-value_open: "positive"
-value_close: "negative"
-climax_scene_id: central-room-night
-act_objective: Kael discovers the truth about the door.
+title: Act One
+type: act
+value: Trust
+value_close: negative
+value_open: positive
 ---
 
 ## Summary

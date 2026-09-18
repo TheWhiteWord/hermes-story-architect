@@ -72,20 +72,6 @@ def _build_tool_schema(name: str) -> dict:
                 "required": ["project"],
             },
         },
-        "story_index": {
-            "name": "story_index",
-            "description": "Regenerate the project index from existing files. Errors if project.md or memory.md are missing.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project": {
-                        "type": "string",
-                        "description": "Project slug or name",
-                    },
-                },
-                "required": ["project"],
-            },
-        },
         "story_retrieve": {
             "name": "story_retrieve",
             "description": "Get specific sections from a note.",
@@ -190,7 +176,7 @@ SCHEMA = {
             "type": "array",
             "items": {
                 "type": "string",
-                "enum": ["story_create", "story_load", "story_index", "story_retrieve", "story_search", "story_edit", "story_dashboard"],
+                "enum": ["story_create", "story_load", "story_retrieve", "story_search", "story_edit", "story_dashboard"],
             },
             "description": "Tool names to describe. Omit for all tools.",
         },
@@ -217,7 +203,7 @@ def handler(args: dict, **kwargs) -> str:
                 tools[name] = schema
     else:
         tools = {name: _build_tool_schema(name) for name in
-                 ["story_create", "story_load", "story_index", "story_retrieve",
+                 ["story_create", "story_load", "story_retrieve",
                   "story_search", "story_edit", "story_dashboard"]
                  if _build_tool_schema(name)}
 

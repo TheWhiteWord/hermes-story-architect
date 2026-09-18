@@ -1,25 +1,27 @@
 ---
-id: the-core-day
-type: scene
-title: "The Core - Day"
-order: 3
-status: written
-heading: "EXT. THE CORE - DAY"
-location: the-garden
-time_of_day: DAY
-sequence_id: seq-discovery
 act_id: act-1
-characters: [kael, mira]
-plots: []
-value: "Trust"
-value_open: "positive"
-value_close: "positive"
-conflict_levels: [extra-personal]
+characters:
+- kael
+- mira
+conflict_levels:
+- extra-personal
 dramatic_role: resolution
+heading: EXT. THE CORE - DAY
+id: the-core-day
+is_act_climax: false
 is_inciting_incident: false
 is_sequence_climax: false
-is_act_climax: false
 is_story_climax: false
+location: the-garden
+order: 3
+sequence_id: seq-discovery
+status: written
+time_of_day: DAY
+title: The Core - Day
+type: scene
+value: Trust
+value_close: positive
+value_open: positive
 ---
 
 ## Description

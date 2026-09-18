@@ -1,6 +1,7 @@
 """Screenplay integration — Fountain parsing via Better Fountain port.
 
-Single source of truth — no screenplay-tools dependency.
+Retained for future "import entities/stats from existing .fountain script" feature.
+Not currently consumed by any tool handler. Pure functions only — no DB, no tool imports.
 """
 import re
 from .constants import FUZZY_THRESHOLD

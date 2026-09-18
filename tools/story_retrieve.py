@@ -1,9 +1,6 @@
 """story_retrieve tool — get specific sections from project notes."""
 import json
-import frontmatter
 from pathlib import Path
-from core.paths import find_entity_path
-from core.section_parser import get_section, list_sections
 
 SCHEMA = {
     "type": "object",
@@ -35,50 +32,94 @@ def handler(args: dict, **kwargs) -> str:
     """Retrieve specific sections from a story note."""
     from core.config import load_plugin_config
     from .story_resolve import resolve_project
-    
+
     config = load_plugin_config()
     vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
     project = args["project"]
     entity_type = args["entity_type"]
     slug = args["slug"]
     sections = args["sections"]
-    
+
     # Resolve project path
     try:
         project_path = resolve_project(project, vault_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
-    
-    # Resolve file path
-    if entity_type == "project":
-        file_path = project_path / "project.md"
-    else:
-        file_path = find_entity_path(project_path, entity_type, slug)
-        if not file_path:
-            return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
 
-    # Read file
-    post = frontmatter.load(file_path)
-    body = post.content
-    
-    # Retrieve sections
+    # Phase 2: Try DB first
+    db_path = project_path / ".story" / "story.db"
+    if db_path.exists():
+        from core.db import has_schema, get_entity_sections
+        import sqlite3
+        conn = None
+        try:
+            conn = sqlite3.connect(str(db_path))
+            if has_schema(conn):
+                entity_id = _entity_id_for(conn, entity_type, slug)
+                if entity_id:
+                    db_sections = get_entity_sections(project_path, entity_id)
+                    if db_sections:
+                        conn.close()
+                        return _format_sections(entity_type, slug, sections, db_sections, project_path)
+        except Exception:
+            pass
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    # No DB or no schema — error
+    return json.dumps({"error": "Database not found. Run story_import first."})
+
+
+def _entity_id_for(conn, entity_type: str, slug: str) -> str | None:
+    """Map entity_type + slug to DB entity id."""
+    if entity_type == "arc":
+        # arc PK is "{char_slug}-{beat_id}"
+        # Try direct match first
+        row = conn.execute(
+            "SELECT id FROM entities WHERE type='arc' AND id=?", (slug,)
+        ).fetchone()
+        if row:
+            return row[0]
+        # Try pattern match for {char}-{beat} — slug is the beat_id, entity_id is {char_slug}-{beat_id}
+        row = conn.execute(
+            "SELECT id FROM entities WHERE type='arc' AND id LIKE ?", (f"%-{slug}",)
+        ).fetchone()
+        return row[0] if row else None
+    else:
+        row = conn.execute(
+            "SELECT id FROM entities WHERE type=? AND id=?", (entity_type, slug)
+        ).fetchone()
+        return row[0] if row else None
+
+
+def _format_sections(entity_type: str, slug: str, sections: list, db_sections: dict, project_path: Path) -> str:
+    """Format DB sections to match the old file-based response."""
+    from core.section_parser import list_sections
+
     if sections == ["all"]:
+        # All sections: return headings + content
+        all_content = "\n\n".join(
+            f"## {heading}\n{body}" for heading, body in db_sections.items()
+        )
         return json.dumps({
             "entity_type": entity_type,
             "slug": slug,
-            "sections": list_sections(body),
-            "content": body
+            "sections": list(db_sections.keys()),
+            "content": all_content
         })
-    
+
     results = {}
     for section in sections:
-        content = get_section(body, section)
-        if content:
-            results[section] = content
+        if section in db_sections:
+            results[section] = f"## {section}\n{db_sections[section]}"
         else:
-            available = list_sections(body)
+            available = list(db_sections.keys())
             results[section] = f"Section '{section}' not found. Available: {available}"
-    
+
     return json.dumps({
         "entity_type": entity_type,
         "slug": slug,

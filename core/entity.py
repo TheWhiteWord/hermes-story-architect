@@ -1,4 +1,5 @@
-"""Entity extraction — parse story entity notes."""
+"""Entity extraction, validation, and DB column/relation mapping."""
+import json
 import frontmatter
 from pathlib import Path
 from .constants import (
@@ -13,7 +14,7 @@ from .section_parser import list_sections
 
 def extract_entity(note_path: Path, entity_type: str) -> dict:
     """Extract entity data from a note file.
-    
+
     Returns dict with:
     - id: note stem (slug)
     - all frontmatter fields
@@ -113,3 +114,203 @@ def update_sections(note_path: Path, sections: list[str]) -> None:
     post["sections"] = sections
     with open(note_path, 'w') as f:
         frontmatter.dump(post, f)
+
+
+# ─── DB column/relation mapping (Phase 3) ───
+
+# FM field name → DB column name, per entity type
+ENTITY_COLUMN_MAP = {
+    "project": {"name": "name", "logline": "one_sentence"},
+    "character": {"name": "name", "one_sentence": "one_sentence"},
+    "location": {"name": "name", "one_sentence": "one_sentence"},
+    "world": {"name": "name", "one_sentence": "one_sentence"},
+    "plot": {"name": "name", "one_sentence": "one_sentence", "status": "status"},
+    "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
+    "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
+    "act": {"title": "name", "order": "order_key", "status": "status"},
+    "arc": {"label": "name", "order": "order_key", "character": "parent_id"},
+}
+
+FIELDS_TO_SKIP = {"id", "type"}
+
+# Fields that become relations rows (not extra JSON or columns)
+# Maps field name → (kind, is_list)
+_RELATION_FIELDS = {
+    "scene": {"characters": ("character_scene", True)},
+    "plot": {
+        "setups": ("plot_setup", True),
+        "payoffs": ("plot_payoff", True),
+    },
+    "character": {"relationships": ("character_relationship", True)},
+    "arc": {"scene": ("arc_beat", False)},
+}
+
+
+def standard_sections(entity_type: str) -> list[str]:
+    """Standard body sections for an entity type."""
+    sections = {
+        "project": ["Synopsis", "Themes", "Structure", "Notes"],
+        "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
+        "location": ["Description", "History", "Scenes"],
+        "world": ["Description", "History", "Conflict"],
+        "plot": ["Summary", "Obstacles", "Stakes"],
+        "scene": ["Description", "Dramatic Function", "Notes", "Content"],
+        "sequence": ["Summary", "Scene Order", "Notes"],
+        "act": ["Summary", "Thematic Function", "Notes"],
+        "arc": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+    }
+    return sections.get(entity_type, [])
+
+
+def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
+    """Map frontmatter to entity columns for INSERT.
+
+    Returns dict with keys: id, type, name, one_sentence, order_key,
+    status, parent_id, location_id, extra.
+    """
+    column_map = ENTITY_COLUMN_MAP.get(entity_type, {})
+    relation_fields = _RELATION_FIELDS.get(entity_type, {})
+
+    columns = {
+        "id": slug,
+        "type": entity_type,
+        "name": "",
+        "one_sentence": "",
+        "order_key": 0,
+        "status": "",
+        "parent_id": None,
+        "location_id": None,
+    }
+    extra = {}
+
+    for key, value in fm.items():
+        if key in FIELDS_TO_SKIP:
+            continue
+        if key in relation_fields:
+            continue  # handled separately as relations
+        if key in column_map:
+            columns[column_map[key]] = value
+        else:
+            extra[key] = value
+
+    # Arc: construct full ID from character + beat_id
+    if entity_type == "arc":
+        char_slug = fm.get("character", "")
+        beat_id = fm.get("id", slug)
+        columns["id"] = f"{char_slug}-{beat_id}" if char_slug else beat_id
+        columns["parent_id"] = char_slug or None
+
+    columns["extra"] = json.dumps(extra) if extra else "{}"
+    return columns
+
+
+def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
+    """Build relation rows from frontmatter for INSERT.
+
+    Returns list of dicts with keys: from_id, to_id, kind, note, order.
+    """
+    relation_fields = _RELATION_FIELDS.get(entity_type, {})
+    relations = []
+
+    for field, (kind, is_list) in relation_fields.items():
+        value = fm.get(field, [])
+        if not value:
+            continue
+        if is_list:
+            for i, item in enumerate(value):
+                if isinstance(item, dict):
+                    if kind in ("plot_setup", "plot_payoff"):
+                        to_id = item.get("scene_id", "")
+                        note = item.get("description", "")
+                    elif kind == "character_relationship":
+                        to_id = item.get("id", "")
+                        label = item.get("label", "")
+                        feeling = item.get("feeling", "")
+                        note = f"{label} — {feeling}" if feeling else label
+                    else:
+                        to_id = str(item)
+                        note = ""
+                else:
+                    to_id = str(item)
+                    note = ""
+                if to_id:
+                    relations.append({
+                        "from_id": slug,
+                        "to_id": to_id,
+                        "kind": kind,
+                        "note": note,
+                        "order": i + 1,
+                    })
+        else:
+            # arc_beat: from_id = character slug, to_id = scene slug
+            if kind == "arc_beat":
+                char_slug = fm.get("character", "")
+                scene_slug = str(value)
+                if char_slug and scene_slug:
+                    relations.append({
+                        "from_id": char_slug,
+                        "to_id": scene_slug,
+                        "kind": kind,
+                        "note": fm.get("label", ""),
+                        "order": fm.get("order", 0),
+                    })
+
+    return relations
+
+
+def validate_scene_act_id(project_path, sequence_id: str, act_id: str) -> None:
+    """Raise ValueError if sequence's act_id doesn't match the provided act_id."""
+    from core.db import get_db
+    conn = get_db(project_path)
+    try:
+        row = conn.execute(
+            "SELECT parent_id FROM entities WHERE id=? AND type='sequence'",
+            (sequence_id,),
+        ).fetchone()
+        if row and row[0] and row[0] != act_id:
+            raise ValueError(
+                f"Sequence {sequence_id} belongs to act {row[0]}, not {act_id}"
+            )
+    finally:
+        conn.close()
+
+
+def validate_arc_parents(project_path, character: str, scene: str) -> None:
+    """Raise ValueError if character or scene doesn't exist in DB."""
+    from core.db import get_db
+    conn = get_db(project_path)
+    try:
+        if character:
+            row = conn.execute(
+                "SELECT id FROM entities WHERE id=? AND type='character'",
+                (character,),
+            ).fetchone()
+            if not row:
+                raise ValueError(f"Character not found: {character}")
+        if scene:
+            row = conn.execute(
+                "SELECT id FROM entities WHERE id=? AND type='scene'",
+                (scene,),
+            ).fetchone()
+            if not row:
+                raise ValueError(f"Scene not found: {scene}")
+    finally:
+        conn.close()
+
+
+def validate_plot_characters(project_path, characters: list) -> None:
+    """Raise ValueError if any character slug doesn't exist in DB."""
+    from core.db import get_db
+    if not characters:
+        return
+    conn = get_db(project_path)
+    try:
+        for char_slug in characters:
+            row = conn.execute(
+                "SELECT id FROM entities WHERE id=? AND type='character'",
+                (char_slug,),
+            ).fetchone()
+            if not row:
+                raise ValueError(f"Character not found: {char_slug}")
+    finally:
+        conn.close()

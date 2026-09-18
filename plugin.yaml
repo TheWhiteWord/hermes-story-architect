@@ -7,11 +7,13 @@ provides_tools:
   - story_describe
   - story_load
   - story_retrieve
-  - story_index
   - story_search
   - story_edit
   - story_create
   - story_dashboard
+  - story_import
+  - story_export
+  - story_backup
 provides_skills:
   - hermes-story-architect
 provides_hooks:

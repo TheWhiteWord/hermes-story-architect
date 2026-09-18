@@ -535,43 +535,4 @@ class TestHtmlRendering:
         assert "fountain-action" in html
 
 
-# ---- Integration with Index ----
 
-class TestIndexIntegration:
-    def test_generate_index_with_new_lexer(self, tmp_path):
-        """Test that index generation works with the new lexer."""
-        # Create a minimal project
-        project = tmp_path / "test-project"
-        project.mkdir()
-        
-        # Create characters folder
-        chars = project / "characters"
-        chars.mkdir()
-        (chars / "kael.md").write_text("""---
-name: Kael
-story_role: Protagonist
-one_sentence: A young person who questions the system.
----
-
-## Personality
-Intense, curious, determined.
-""")
-        
-        # Create screenplay
-        (project / "screenplay.fountain").write_text("""INT. ROOM - DAY
-
-KAEL
-Something's wrong.
-
-INT. HALLWAY - DAY
-
-KAEL
-I was meant to find this.
-""")
-        
-        from core.index import generate_index
-        index = generate_index(project)
-        
-        # Phase 2: scenes come from files only, not screenplay merge
-        assert index["project"]["scene_count"] == 0
-        assert len(index["scenes"]) == 0

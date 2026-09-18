@@ -1,5 +1,9 @@
 """Fountain syntax validator — ensures screenplays follow Fountain conventions.
 
+Retained for future "import entities/stats from existing .fountain script" feature.
+Not currently consumed by any tool handler. Pure functions only — no DB, no tool imports.
+Pairs with core/screenplay.py for Fountain→entity extraction pipeline.
+
 Validates that a .fountain file follows proper syntax so it parses correctly.
 """
 import re

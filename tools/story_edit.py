@@ -1,8 +1,7 @@
 """story_edit tool — propose and apply edits (action protocol)."""
 import json
 from pathlib import Path
-from core.constants import ENTITY_FOLDERS, ENTITY_SCHEMAS
-from core.paths import find_entity_path
+from core.constants import ENTITY_SCHEMAS
 from core.section_parser import replace_section
 
 SCHEMA = {
@@ -43,28 +42,46 @@ SCHEMA = {
     "required": ["action", "target", "summary"]
 }
 
+# FM field name → DB column name, per entity type
+_ENTITY_COLUMN_MAP = {
+    "character": {"name": "name", "one_sentence": "one_sentence"},
+    "location": {"name": "name", "one_sentence": "one_sentence"},
+    "world": {"name": "name", "one_sentence": "one_sentence"},
+    "plot": {"name": "name", "one_sentence": "one_sentence", "status": "status"},
+    "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
+    "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
+    "act": {"title": "name", "order": "order_key", "status": "status"},
+    "arc": {"label": "name", "order": "order_key", "character": "parent_id"},
+}
+
+_FIELDS_TO_SKIP = {"id", "type"}
+
 
 def handler(args: dict, **kwargs) -> str:
     """Apply edit to project note."""
     from core.config import load_plugin_config
     from .story_resolve import resolve_project
-    
-    config = load_plugin_config()
-    vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
-    
+
+    _vault = kwargs.get("vault_path")
+    if _vault:
+        vault_path = Path(_vault)
+    else:
+        config = load_plugin_config()
+        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+
     action = args["action"]
     target = args["target"]
     data = args.get("data", {})
     summary = args["summary"]
-    
+
     # Resolve project
     try:
         project_path = resolve_project(target.get("project", ""), vault_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
-    
+
     if action == "edit_note":
-        result = _edit_note(project_path, target, data, summary)
+        result = _edit_note_db(project_path, target, data, summary)
     elif action == "delete_entity":
         result = _delete_entity(project_path, target, summary)
     elif action == "update_story_memory":
@@ -75,63 +92,120 @@ def handler(args: dict, **kwargs) -> str:
     else:
         return json.dumps({"error": f"Unknown action: {action}"})
 
-    # Refresh index so story_load reflects changes
-    try:
-        _refresh_index(project_path)
-    except Exception as e:
-        # Report failure but don't override the original result
-        if '"success": true' in result:
-            result = result.replace('"success": true', f'"success": true, "index_warning": "{e}"')
-
     return result
 
 
-def _refresh_index(project_path: Path) -> None:
-    """Refresh the index file to reflect changes.
-    Ensures .story/ directory exists before writing.
-    Raises exceptions on failure."""
-    from core.index import refresh_index
-    refresh_index(project_path)
+def _find_entity_id_db(conn, entity_type: str, slug: str) -> str | None:
+    """Map (entity_type, slug) to DB entity_id.
+
+    For arcs, entity_id = '{char_slug}-{beat_id}' and slug is the beat_id.
+    Tries exact match first (slug may already be full entity_id), then pattern.
+    """
+    if entity_type == "project":
+        row = conn.execute("SELECT id FROM entities WHERE type='project'").fetchone()
+        return row[0] if row else None
+    elif entity_type == "arc":
+        row = conn.execute(
+            "SELECT id FROM entities WHERE type='arc' AND id=?", (slug,)
+        ).fetchone()
+        if row:
+            return row[0]
+        row = conn.execute(
+            "SELECT id FROM entities WHERE type='arc' AND id LIKE ?",
+            (f"%-{slug}",)
+        ).fetchone()
+        return row[0] if row else None
+    else:
+        row = conn.execute(
+            "SELECT id FROM entities WHERE type=? AND id=?",
+            (entity_type, slug)
+        ).fetchone()
+        return row[0] if row else None
 
 
-def _edit_note(project_path: Path, target: dict, data: dict, summary: str) -> str:
-    """Edit an entity note using data bag. Key ∈ schema fields → frontmatter update. Key ∈ standard sections → body section update."""
-    import frontmatter
-    
+def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) -> str:
+    """Edit entity in DB: schema fields → entity columns/extra, sections → sections table.
+
+    Single transaction: BEGIN → updates → COMMIT, rollback on any error.
+    """
+    from core.db import get_db
+
     entity_type = target.get("entity_type") or ""
     slug = target.get("slug") or ""
-    file_path = find_entity_path(project_path, entity_type, slug)
 
-    if not file_path:
-        return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
+    conn = get_db(project_path)
+    try:
+        entity_id = _find_entity_id_db(conn, entity_type, slug)
+        if not entity_id:
+            return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
 
-    post = frontmatter.load(file_path)
-    schema_fields = set(ENTITY_SCHEMAS.get(entity_type, {}).keys())
-    standard_sections = set(_get_standard_sections(entity_type))
-    
-    for key, value in data.items():
-        if key in schema_fields:
-            post[key] = value
-        elif key in standard_sections:
-            post.content = replace_section(post.content, key, value)
+        standard_sections = set(_get_standard_sections(entity_type))
+        column_map = _ENTITY_COLUMN_MAP.get(entity_type, {})
 
-    with open(file_path, 'w') as f:
-        frontmatter.dump(post, f)
+        column_updates = {}
+        extra_updates = {}
+        section_updates = {}
+
+        for key, value in data.items():
+            if key in _FIELDS_TO_SKIP:
+                continue
+            if key in standard_sections:
+                section_updates[key] = value
+            elif key in column_map:
+                column_updates[column_map[key]] = value
+            else:
+                extra_updates[key] = value
+
+        conn.execute("BEGIN")
+
+        # Update entity columns
+        if column_updates:
+            set_clause = ", ".join(f"{col}=?" for col in column_updates)
+            values = list(column_updates.values()) + [entity_id]
+            conn.execute(f"UPDATE entities SET {set_clause} WHERE id=?", values)
+
+        # Update extra JSON
+        if extra_updates:
+            row = conn.execute(
+                "SELECT extra FROM entities WHERE id=?", (entity_id,)
+            ).fetchone()
+            extra = json.loads(row[0]) if row and row[0] else {}
+            extra.update(extra_updates)
+            conn.execute(
+                "UPDATE entities SET extra=? WHERE id=?",
+                (json.dumps(extra), entity_id)
+            )
+
+        # Upsert sections
+        for heading, body in section_updates.items():
+            conn.execute(
+                "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?) "
+                "ON CONFLICT(entity_id, heading) DO UPDATE SET body=excluded.body",
+                (entity_id, heading, body)
+            )
+
+        conn.execute("COMMIT")
+    except Exception as e:
+        conn.execute("ROLLBACK")
+        return json.dumps({"error": str(e)})
+    finally:
+        conn.close()
 
     return json.dumps({
         "success": True,
         "message": f"Applied: {summary}",
-        "file": str(file_path)
+        "entity_id": entity_id
     })
 
 
 def _reorder(project_path: Path, target: dict, order_context: dict, summary: str) -> str:
-    """Reorder scenes/sequences within their parent by renumbering order fields.
+    """Reorder scenes/sequences within their parent by renumbering order_key.
 
     The LLM provides the complete new ordering. All items must exist and
     belong to the same parent; order is renumbered 1, 2, 3, ... from the list.
+    Single DB transaction: BEGIN → UPDATE order_key for each item → COMMIT.
     """
-    import frontmatter
+    from core.db import get_db
 
     entity_type = target.get("entity_type")
     if entity_type not in ("scene", "sequence"):
@@ -141,36 +215,38 @@ def _reorder(project_path: Path, target: dict, order_context: dict, summary: str
     if not ordered_ids:
         return json.dumps({"error": "order_context.ordered_ids required"})
 
-    folder = ENTITY_FOLDERS[entity_type]
-    parent_field = "sequence_id" if entity_type == "scene" else "act_id"
+    conn = get_db(project_path)
+    try:
+        # Verify all entities exist and belong to the same parent
+        parent_id = None
+        for item_id in ordered_ids:
+            row = conn.execute(
+                "SELECT parent_id FROM entities WHERE type=? AND id=? AND is_deleted=0",
+                (entity_type, item_id),
+            ).fetchone()
+            if not row:
+                return json.dumps({"error": f"{entity_type} not found: {item_id}"})
+            if parent_id is None:
+                parent_id = row[0]
+            elif row[0] != parent_id:
+                return json.dumps({"error": f"{item_id} does not belong to {parent_id}"})
 
-    # Determine parent from first item
-    first_path = project_path / folder / f"{ordered_ids[0]}.md"
-    if not first_path.exists():
-        return json.dumps({"error": f"{entity_type} not found: {ordered_ids[0]}"})
+        if not parent_id:
+            return json.dumps({"error": f"{entity_type} {ordered_ids[0]} has no parent"})
 
-    first_post = frontmatter.load(first_path)
-    parent_id = first_post.get(parent_field, "")
-
-    if not parent_id:
-        return json.dumps({"error": f"{entity_type} {ordered_ids[0]} has no parent"})
-
-    # Verify all items exist and belong to same parent
-    for item_id in ordered_ids:
-        note_path = project_path / folder / f"{item_id}.md"
-        if not note_path.exists():
-            return json.dumps({"error": f"{entity_type} not found: {item_id}"})
-        post = frontmatter.load(note_path)
-        if post.get(parent_field) != parent_id:
-            return json.dumps({"error": f"{item_id} does not belong to {parent_id}"})
-
-    # Renumber: 1, 2, 3, ...
-    for i, item_id in enumerate(ordered_ids, 1):
-        note_path = project_path / folder / f"{item_id}.md"
-        post = frontmatter.load(note_path)
-        post["order"] = i
-        with open(note_path, "w") as f:
-            frontmatter.dump(post, f)
+        # Renumber: 1, 2, 3, ... in a single transaction
+        conn.execute("BEGIN")
+        for i, item_id in enumerate(ordered_ids, 1):
+            conn.execute(
+                "UPDATE entities SET order_key=? WHERE id=?",
+                (i, item_id),
+            )
+        conn.execute("COMMIT")
+    except Exception as e:
+        conn.execute("ROLLBACK")
+        return json.dumps({"error": str(e)})
+    finally:
+        conn.close()
 
     return json.dumps({
         "success": True,
@@ -179,62 +255,54 @@ def _reorder(project_path: Path, target: dict, order_context: dict, summary: str
 
 
 def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
-    """Move entity to _recycle-bin/. Blocks if structural types have children."""
-    import shutil
-    import frontmatter
+    """Soft-delete entity in DB: UPDATE entities SET is_deleted=1, deleted_at=timestamp.
+    Blocks if structural types have children."""
+    from core.db import get_db
 
     entity_type = target.get("entity_type") or ""
     slug = target.get("slug") or ""
-    file_path = find_entity_path(project_path, entity_type, slug)
 
-    if not file_path:
-        return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
-
-    # Cascade blocking for structural types (containment hierarchy)
+    conn = get_db(project_path)
     try:
+        entity_id = _find_entity_id_db(conn, entity_type, slug)
+        if not entity_id:
+            return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
+
+        # Cascade blocking for structural types (containment hierarchy)
         if entity_type == "sequence":
-            _check_no_children(project_path, "scenes", "sequence_id", slug, "scene")
+            children = conn.execute(
+                "SELECT id FROM entities WHERE type='scene' AND parent_id=? AND is_deleted=0",
+                (entity_id,)
+            ).fetchall()
+            if children:
+                ids = [r[0] for r in children[:5]]
+                raise ValueError(f"Cannot delete: {len(children)} scene(s) reference this: {', '.join(ids)}")
         elif entity_type == "act":
-            _check_no_children(project_path, "sequences", "act_id", slug, "sequence")
+            children = conn.execute(
+                "SELECT id FROM entities WHERE type='sequence' AND parent_id=? AND is_deleted=0",
+                (entity_id,)
+            ).fetchall()
+            if children:
+                ids = [r[0] for r in children[:5]]
+                raise ValueError(f"Cannot delete: {len(children)} sequence(s) reference this: {', '.join(ids)}")
+
+        conn.execute(
+            "UPDATE entities SET is_deleted=1, deleted_at=datetime('now') WHERE id=?",
+            (entity_id,)
+        )
+        conn.commit()
     except ValueError as e:
         return json.dumps({"error": str(e)})
-    # Non-structural types (character, location, world, plot): no cascade check
-
-    # Move to recycle bin
-    recycle_bin = project_path / "_recycle-bin" / entity_type
-    recycle_bin.mkdir(parents=True, exist_ok=True)
-
-    dest = recycle_bin / f"{slug}.md"
-    shutil.move(str(file_path), str(dest))
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        conn.close()
 
     return json.dumps({
         "success": True,
-        "message": f"Moved to recycle bin: {summary}",
-        "file": str(dest)
+        "message": f"Deleted: {summary}",
+        "entity_id": entity_id
     })
-
-
-def _check_no_children(project_path: Path, child_folder: str, parent_field: str, parent_id: str, child_name: str) -> None:
-    """Raise ValueError if any children reference this parent."""
-    import frontmatter
-
-    child_dir = project_path / child_folder
-    if not child_dir.exists():
-        return
-    children = []
-    for note in child_dir.glob("*.md"):
-        if note.name.startswith("_"):
-            continue
-        post = frontmatter.load(note)
-        if post.get(parent_field) == parent_id:
-            children.append(post.get("id", note.stem))
-    if children:
-        raise ValueError(
-            f"Cannot delete: {len(children)} {child_name}(s) reference this: {', '.join(children[:5])}"
-        )
-
-
-
 
 
 def _update_story_memory(project_path: Path, data: dict, summary: str) -> str:
