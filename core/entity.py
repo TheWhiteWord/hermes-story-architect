@@ -142,7 +142,7 @@ _RELATION_FIELDS = {
         "payoffs": ("plot_payoff", True),
     },
     "character": {"relationships": ("character_relationship", True)},
-    "arc": {"scene": ("arc_beat", False)},
+    "arc": {},
 }
 
 
@@ -197,18 +197,19 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
     for key, value in fm.items():
         if key in FIELDS_TO_SKIP:
             continue
-        if key in relation_fields:
+        # Arc keeps 'scene' as an extra attribute (which scene the beat occurs in)
+        # in addition to the arc_beat relation created separately
+        if key in relation_fields and not (entity_type == "arc" and key == "scene"):
             continue  # handled separately as relations
         if key in column_map:
             columns[column_map[key]] = value
         else:
             extra[key] = value
 
-    # Arc: construct full ID from character + beat_id
+    # Arc: entity_id is composite (character-slug + beat-slug, e.g. "kael-1")
     if entity_type == "arc":
         char_slug = fm.get("character", "")
-        beat_id = fm.get("id", slug)
-        columns["id"] = f"{char_slug}-{beat_id}" if char_slug else beat_id
+        columns["id"] = f"{char_slug}-{slug}" if char_slug else slug
         columns["parent_id"] = char_slug or None
 
     columns["extra"] = json.dumps(extra) if extra else "{}"
@@ -253,18 +254,7 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
                         "order": i + 1,
                     })
         else:
-            # arc_beat: from_id = character slug, to_id = scene slug
-            if kind == "arc_beat":
-                char_slug = fm.get("character", "")
-                scene_slug = str(value)
-                if char_slug and scene_slug:
-                    relations.append({
-                        "from_id": char_slug,
-                        "to_id": scene_slug,
-                        "kind": kind,
-                        "note": fm.get("label", ""),
-                        "order": fm.get("order", 0),
-                    })
+            pass
 
     return relations
 

@@ -13,8 +13,6 @@ CREATE TABLE IF NOT EXISTS entities (
     status TEXT NOT NULL DEFAULT '',
     parent_id TEXT,
     location_id TEXT,
-    is_deleted INTEGER NOT NULL DEFAULT 0,
-    deleted_at TEXT,
     extra JSON NOT NULL DEFAULT '{}'
 );
 
@@ -54,10 +52,15 @@ END;
 
 
 def get_db(project_path: Path) -> sqlite3.Connection:
-    """Open a short-lived connection with WAL mode and busy_timeout."""
+    """Open a short-lived connection with WAL mode and busy_timeout.
+
+    Uses autocommit mode (isolation_level=None) — callers explicitly
+    BEGIN/COMMIT/ROLLBACK for transactions. Avoids nested-transaction errors
+    from SQLite's implicit transaction behavior.
+    """
     db_path = project_path / ".story" / "story.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), isolation_level=None)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=3000")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -102,7 +105,7 @@ def get_project_summary(project_path: Path) -> dict:
         ent_cols = ["id", "type", "name", "one_sentence", "status", "order_key", "parent_id", "location_id", "extra"]
         ent_rows = conn.execute(
             "SELECT id, type, name, one_sentence, status, order_key, parent_id, location_id, extra "
-            "FROM entities WHERE is_deleted=0 ORDER BY type, id"
+            "FROM entities ORDER BY type, id"
         ).fetchall()
         entities = {
             "cols": ent_cols,
@@ -179,28 +182,252 @@ def get_dashboard_data(project_path: Path) -> dict:
     """
     conn = get_db(project_path)
     try:
-        # 1. story_data — column-oriented entities (active only)
+        # 1. story_data — denormalized projection per entity type
         ent_rows = conn.execute(
-            "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id "
-            "FROM entities WHERE is_deleted=0 ORDER BY type, id"
+            "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
+            "FROM entities ORDER BY type, id"
         ).fetchall()
-        story_data = [
-            {
+
+        # Load all relations for denormalization
+        rel_rows = conn.execute(
+            "SELECT from_id, to_id, kind FROM relations"
+        ).fetchall()
+        # Build lookup: entity_id -> {kind -> [target_ids]}
+        rel_map = {}
+        for from_id, to_id, kind in rel_rows:
+            if from_id not in rel_map:
+                rel_map[from_id] = {}
+            if kind not in rel_map[from_id]:
+                rel_map[from_id][kind] = []
+            rel_map[from_id][kind].append(to_id)
+
+        # Build entity lookup for cross-references
+        entity_by_id = {}
+        for r in ent_rows:
+            entity_by_id[r[0]] = {
                 "id": r[0], "type": r[1], "name": r[2], "one_sentence": r[3],
                 "order": r[4], "status": r[5], "parent_id": r[6], "location_id": r[7],
+                "extra": json.loads(r[8]) if r[8] else {},
             }
-            for r in ent_rows
-        ]
 
-        # 2. sections — {entity_id: {heading: body}}
+        # Denormalize: build per-type arrays with cross-references
+        def _entity_dict(e):
+            d = {
+                "id": e["id"],
+                "name": e["name"],
+                "one_sentence": e["one_sentence"],
+                "status": e["status"],
+                "order": e["order"],
+                "parent_id": e["parent_id"],
+            }
+            # Merge extra fields at top level
+            for k, v in e["extra"].items():
+                if k not in d:
+                    d[k] = v
+            return d
+
+        characters = []
+        scenes = []
+        locations = []
+        plots = []
+        worlds = []
+        acts = []
+        sequences = []
+        arcs = []
+
+        for e in ent_rows:
+            etype = e[1]
+            eid = e[0]
+            extra = json.loads(e[8]) if e[8] else {}
+
+            if etype == "character":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                # scenes: string[] of scene IDs (from character_scene relations)
+                d["scenes"] = rel_map.get(eid, {}).get("character_scene", [])
+                # relationships: denormalized from character_relationship
+                rels = []
+                for target in rel_map.get(eid, {}).get("character_relationship", []):
+                    if target in entity_by_id:
+                        t = entity_by_id[target]
+                        rels.append({
+                            "id": t["id"],
+                            "label": t["name"],
+                            "feeling": "",  # feeling not in extra for relation targets
+                        })
+                d["relationships"] = rels
+                characters.append(d)
+
+            elif etype == "scene":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                # characters from character_scene relations (reverse lookup)
+                char_ids = []
+                for cid, kinds in rel_map.items():
+                    if "character_scene" in kinds and eid in kinds["character_scene"]:
+                        char_ids.append(cid)
+                d["characters"] = char_ids
+                # locations from location_scene relations (reverse lookup)
+                loc_ids = []
+                for lid, kinds in rel_map.items():
+                    if "location_scene" in kinds and eid in kinds["location_scene"]:
+                        loc_ids.append(lid)
+                d["locations"] = loc_ids
+                # plots from plot_setup/plot_payoff relations (reverse lookup)
+                plot_ids = []
+                for pid, kinds in rel_map.items():
+                    if ("plot_setup" in kinds and eid in kinds["plot_setup"]) or \
+                       ("plot_payoff" in kinds and eid in kinds["plot_payoff"]):
+                        plot_ids.append(pid)
+                d["plots"] = plot_ids
+                scenes.append(d)
+
+            elif etype == "location":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                # scenes from location_scene relations
+                scene_ids = []
+                for sid, kinds in rel_map.items():
+                    if "location_scene" in kinds and eid in kinds["location_scene"]:
+                        scene_ids.append(sid)
+                d["scenes"] = scene_ids
+                locations.append(d)
+
+            elif etype == "plot":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                d["setups"] = rel_map.get(eid, {}).get("plot_setup", [])
+                d["payoffs"] = rel_map.get(eid, {}).get("plot_payoff", [])
+                # characters from character list (stored in extra.characters)
+                d["characters"] = extra.get("characters", [])
+                plots.append(d)
+
+            elif etype == "world":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                worlds.append(d)
+
+            elif etype == "act":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                acts.append(d)
+
+            elif etype == "sequence":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                sequences.append(d)
+
+            elif etype == "arc":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                # Denormalize all arc fields for dashboard (reads d.action, d.choice, etc.)
+                d["action"] = extra.get("action", "")
+                d["choice"] = extra.get("choice", "")
+                d["gap"] = extra.get("gap", "")
+                d["shift"] = extra.get("shift", "")
+                d["y"] = extra.get("y", 0.0)
+                d["is_crisis"] = extra.get("is_crisis", False)
+                d["is_climax"] = extra.get("is_climax", False)
+                d["character"] = extra.get("character", e[6] or "")
+                d["scene"] = extra.get("scene", "")
+                d["label"] = extra.get("label", e[2])  # label is stored in name column
+                arcs.append(d)
+
+        # Group arcs by character and attach as arc_beats_list (dashboard reads c.arc_beats_list)
+        # Derived from arc entities directly — no separate arc_beat relations needed
+        for a in arcs:
+            char_id = a.get("character") or a.get("parent_id")
+            if not char_id:
+                continue
+            for c in characters:
+                if c["id"] == char_id:
+                    if "arc_beats_list" not in c:
+                        c["arc_beats_list"] = []
+                    c["arc_beats_list"].append(a)
+                    break
+
+        # Sort each character's beats by order, set arc_beat_count
+        for c in characters:
+            if "arc_beats_list" in c:
+                c["arc_beats_list"].sort(key=lambda b: b.get("order", 0))
+                c["arc_beat_count"] = len(c["arc_beats_list"])
+
+        # Rename arcs to story.arcs for dashboard compatibility
+        story_arcs = arcs
+
+        # Project entity (for story_memory)
+        proj_row = conn.execute(
+            "SELECT name, one_sentence, extra FROM entities WHERE type='project'"
+        ).fetchone()
+        story_memory = {}
+        if proj_row:
+            story_memory = {
+                "name": proj_row[0],
+                "logline": proj_row[1],
+                "title_page": {
+                    "name": proj_row[0],
+                    "logline": proj_row[1],
+                    "screenplay_title": json.loads(proj_row[2]).get("screenplay_title", "") if proj_row[2] else "",
+                    "credit": json.loads(proj_row[2]).get("credit", "") if proj_row[2] else "",
+                    "author": json.loads(proj_row[2]).get("author", "") if proj_row[2] else "",
+                    "contact": json.loads(proj_row[2]).get("contact", "") if proj_row[2] else "",
+                    "draft_date": json.loads(proj_row[2]).get("draft_date", "") if proj_row[2] else "",
+                    "draft": json.loads(proj_row[2]).get("draft", "") if proj_row[2] else "",
+                },
+            }
+
+        # Project: dashboard reads p.logline (not one_sentence) and top-level extra fields
+        proj_dict = entity_by_id.get(conn.execute("SELECT id FROM entities WHERE type='project' LIMIT 1").fetchone()[0], {})
+        if proj_dict:
+            if not proj_dict.get("logline") and proj_dict.get("one_sentence"):
+                proj_dict["logline"] = proj_dict["one_sentence"]
+            # Flatten extra fields to top level for dashboard
+            for k, v in proj_dict.get("extra", {}).items():
+                if k not in proj_dict:
+                    proj_dict[k] = v
+
+        story_data = {
+            "project": proj_dict,
+            "characters": characters,
+            "scenes": scenes,
+            "locations": locations,
+            "plots": plots,
+            "worlds": worlds,
+            "acts": acts,
+            "sequences": sequences,
+            "arcs": story_arcs,
+            "story_memory": story_memory,
+        }
+
+        # 2. sections — {entity_type: {slug: {heading: body}}}
         sec_rows = conn.execute(
-            "SELECT entity_id, heading, body FROM sections ORDER BY entity_id, rowid"
+            "SELECT s.entity_id, s.heading, s.body, e.type "
+            "FROM sections s JOIN entities e ON s.entity_id = e.id "
+            "ORDER BY s.entity_id, s.rowid"
         ).fetchall()
         sections = {}
-        for entity_id, heading, body in sec_rows:
-            if entity_id not in sections:
-                sections[entity_id] = {}
-            sections[entity_id][heading] = body
+        for entity_id, heading, body, entity_type in sec_rows:
+            if entity_type not in sections:
+                sections[entity_type] = {}
+            if entity_id not in sections[entity_type]:
+                sections[entity_type][entity_id] = {}
+            sections[entity_type][entity_id][heading] = body
 
         # 3. screenplay_text — scene ## Content concatenated in order
         scene_content_rows = conn.execute(
@@ -208,45 +435,45 @@ def get_dashboard_data(project_path: Path) -> dict:
                FROM sections s
                JOIN entities e ON s.entity_id = e.id
                LEFT JOIN entities p ON e.parent_id = p.id
-               WHERE e.type='scene' AND s.heading='Content' AND e.is_deleted=0
+               WHERE e.type='scene' AND s.heading='Content'
                ORDER BY COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
         screenplay_text = "\n\n".join(r[0] for r in scene_content_rows)
 
         # 4. structural_stats
         status_rows = conn.execute(
-            "SELECT status, COUNT(*) FROM entities WHERE type='scene' AND is_deleted=0 GROUP BY status"
+            "SELECT status, COUNT(*) FROM entities WHERE type='scene' GROUP BY status"
         ).fetchall()
         scene_status = dict(status_rows)
 
         role_rows = conn.execute(
             "SELECT json_extract(extra, '$.dramatic_role'), COUNT(*) "
-            "FROM entities WHERE type='scene' AND is_deleted=0 "
+            "FROM entities WHERE type='scene' "
             "GROUP BY json_extract(extra, '$.dramatic_role')"
         ).fetchall()
         scene_roles = {r[0] or "unset": r[1] for r in role_rows}
 
         seq_count = conn.execute(
-            "SELECT COUNT(*) FROM entities WHERE type='sequence' AND is_deleted=0"
+            "SELECT COUNT(*) FROM entities WHERE type='sequence' "
         ).fetchone()[0]
         act_count = conn.execute(
-            "SELECT COUNT(*) FROM entities WHERE type='act' AND is_deleted=0"
+            "SELECT COUNT(*) FROM entities WHERE type='act' "
         ).fetchone()[0]
         scene_count = sum(scene_status.values())
 
         # Act stats — count scenes/sequences per act
         act_rows = conn.execute(
-            "SELECT id, name, order_key FROM entities WHERE type='act' AND is_deleted=0 ORDER BY order_key"
+            "SELECT id, name, order_key FROM entities WHERE type='act'  ORDER BY order_key"
         ).fetchall()
         acts_stats = []
         for act_id, act_name, act_order in act_rows:
             seq_c = conn.execute(
-                "SELECT COUNT(*) FROM entities WHERE type='sequence' AND parent_id=? AND is_deleted=0",
+                "SELECT COUNT(*) FROM entities WHERE type='sequence' AND parent_id=? ",
                 (act_id,)
             ).fetchone()[0]
             scene_c = conn.execute(
-                """SELECT COUNT(*) FROM entities WHERE type='scene' AND is_deleted=0
-                   AND parent_id IN (SELECT id FROM entities WHERE type='sequence' AND parent_id=? AND is_deleted=0)""",
+                """SELECT COUNT(*) FROM entities WHERE type='scene' 
+                   AND parent_id IN (SELECT id FROM entities WHERE type='sequence' AND parent_id=? )""",
                 (act_id,)
             ).fetchone()[0]
             acts_stats.append({
@@ -303,7 +530,7 @@ def get_screenplay_text(project_path: Path) -> str:
                JOIN entities e ON s.entity_id = e.id
                LEFT JOIN entities p ON e.parent_id = p.id
                LEFT JOIN entities pp ON p.parent_id = pp.id
-               WHERE e.type='scene' AND s.heading='Content' AND e.is_deleted=0
+               WHERE e.type='scene' AND s.heading='Content'
                ORDER BY COALESCE(pp.order_key, 0), COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
         return "\n\n".join(r[0] for r in rows)

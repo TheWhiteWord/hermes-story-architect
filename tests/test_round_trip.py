@@ -65,7 +65,8 @@ def test_round_trip_preserves_entities(fixture_path):
         assert (export_path / "characters" / "kael.md").exists()
         assert (export_path / "arcs" / "kael" / "1.md").exists()
         assert (export_path / "scenes" / "central-room-day.md").exists()
-        assert (export_path / "_recycle-bin" / "character" / "soren.md").exists()
+        # No recycle bin with hard delete — soren.md is simply absent
+        assert not (export_path / "_recycle-bin" / "character" / "soren.md").exists()
 
 
 def test_round_trip_preserves_data(fixture_path):
@@ -186,8 +187,8 @@ def test_fts5_populated_after_import(fixture_path):
         conn.close()
 
 
-def test_soft_delete_import(fixture_path):
-    """Recycle bin entity is imported with is_deleted=1."""
+def test_recycle_bin_not_imported(fixture_path):
+    """Recycle bin entities are NOT imported (hard delete means they're gone)."""
     with tempfile.TemporaryDirectory() as tmp:
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
@@ -197,8 +198,7 @@ def test_soft_delete_import(fixture_path):
         from core.db import get_db
         conn = get_db(project_path)
 
-        soren = conn.execute("SELECT id, type, is_deleted FROM entities WHERE id=?", ("soren",)).fetchone()
-        assert soren is not None
-        assert soren[2] == 1
+        soren = conn.execute("SELECT id FROM entities WHERE id=?", ("soren",)).fetchone()
+        assert soren is None
 
         conn.close()

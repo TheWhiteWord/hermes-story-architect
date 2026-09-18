@@ -72,7 +72,7 @@ class TestStoryLoadDB:
         kinds = {r[2] for r in relations}
         assert "character_scene" in kinds
         assert "plot_setup" in kinds
-        assert "arc_beat" in kinds
+        # arc_beat relations no longer exist — beats are derived from arc entities
         assert "location_scene" in kinds
 
     def test_load_memory_included(self, db_project):
@@ -272,8 +272,9 @@ class TestNavigationalQueries:
         """What arc beats does central-room-day host?"""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        relations = result["relations"]["rows"]
-        beats = [r[0] for r in relations if r[1] == "central-room-day" and r[2] == "arc_beat"]
+        entities = result["entities"]["rows"]
+        # Arc beats are derived from arc entities, not relations
+        beats = [r[0] for r in entities if r[1] == "arc" and r[8].get("scene") == "central-room-day"]
         assert len(beats) > 0
 
     def test_structure_hierarchy(self, db_project):

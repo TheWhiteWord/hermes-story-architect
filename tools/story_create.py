@@ -119,7 +119,9 @@ def handler(args: dict, **kwargs) -> str:
         entity_id = columns["id"]
 
         # Check uniqueness (PK will enforce, but give friendly error)
-        existing = conn.execute("SELECT id FROM entities WHERE id=?", (entity_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT id FROM entities WHERE id=?", (entity_id,)
+        ).fetchone()
         if existing:
             return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
 
@@ -163,10 +165,10 @@ def handler(args: dict, **kwargs) -> str:
             merged["order"] = next_order
 
         # Insert entity + sections + relations
+        # Using autocommit mode (get_db sets isolation_level=None) — no explicit transaction needed
         sections = _get_standard_sections(entity_type)
         relations = relations_for_insert(entity_type, slug, merged)
 
-        conn.execute("BEGIN")
         conn.execute(
             "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -189,8 +191,6 @@ def handler(args: dict, **kwargs) -> str:
                 "INSERT INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
                 (rel["from_id"], rel["to_id"], rel["kind"], rel["note"], rel["order"]),
             )
-
-        conn.execute("COMMIT")
     except Exception as e:
         conn.execute("ROLLBACK")
         return json.dumps({"error": str(e)})
@@ -216,7 +216,7 @@ def _validate_sequence_exists(conn, sequence_id: str) -> None:
 def _get_next_order_db(conn, entity_type: str, parent_id: str) -> int:
     """Compute next order value for a new child within its parent."""
     row = conn.execute(
-        "SELECT COALESCE(MAX(order_key), 0) + 1 FROM entities WHERE type=? AND parent_id=? AND is_deleted=0",
+        "SELECT COALESCE(MAX(order_key), 0) + 1 FROM entities WHERE type=? AND parent_id=?",
         (entity_type, parent_id),
     ).fetchone()
     return int(row[0]) if row else 1

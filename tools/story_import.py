@@ -69,7 +69,6 @@ def _import_all(conn, project_path: Path) -> None:
     _import_folder(conn, project_path, "sequences", "sequence")
     _import_folder(conn, project_path, "acts", "act")
     _import_arcs(conn, project_path)
-    _import_recycle_bin(conn, project_path)
 
 
 def _import_project(conn, project_path: Path) -> None:
@@ -148,55 +147,8 @@ def _import_arcs(conn, project_path: Path) -> None:
             beat_id = fm.get("id", note.stem)
             slug = f"{char_slug}-{beat_id}"
             _insert_entity(conn, "arc", slug, fm, body, char_slug=char_slug)
-            _insert_arc_relation(conn, slug, char_slug, fm)
 
 
-def _import_recycle_bin(conn, project_path: Path) -> None:
-    """Import deleted entities from _recycle-bin/."""
-    import frontmatter
-    from core.section_parser import list_sections, get_section
-
-    rb = project_path / "_recycle-bin"
-    if not rb.exists():
-        return
-
-    # Map subfolder names to entity types
-    folder_to_type = {
-        "character": "character",
-        "characters": "character",
-        "location": "location",
-        "locations": "location",
-        "world": "world",
-        "worlds": "world",
-        "plot": "plot",
-        "plots": "plot",
-        "scene": "scene",
-        "scenes": "scene",
-        "sequence": "sequence",
-        "sequences": "sequence",
-        "act": "act",
-        "acts": "act",
-    }
-
-    for subfolder in sorted(rb.iterdir()):
-        if not subfolder.is_dir():
-            continue
-        entity_type = folder_to_type.get(subfolder.name)
-        if not entity_type:
-            continue
-        for note in sorted(subfolder.glob("*.md")):
-            if note.name.startswith("_"):
-                continue
-            post = frontmatter.load(note)
-            fm = dict(post.metadata)
-            body = post.content
-            slug = note.stem
-            conn.execute(
-                "INSERT INTO entities (id, type, name, one_sentence, status, is_deleted, extra) VALUES (?, ?, ?, ?, ?, 1, ?)",
-                (slug, entity_type, fm.get("name", ""), fm.get("one_sentence", ""),
-                 fm.get("status", ""), json.dumps(_extra_for(entity_type, fm))),
-            )
-            _insert_sections(conn, slug, body)
 
 
 def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
@@ -360,11 +312,4 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                     )
 
 
-def _insert_arc_relation(conn, arc_slug: str, char_slug: str, fm: dict) -> None:
-    """Insert arc_beat relation for an arc beat."""
-    scene_id = fm.get("scene", "")
-    if scene_id:
-        conn.execute(
-            "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
-            (char_slug, scene_id, "arc_beat", fm.get("label", ""), fm.get("order", 0)),
-        )
+

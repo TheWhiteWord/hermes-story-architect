@@ -682,7 +682,7 @@ class TestPhase3ToolSurface:
         conn = get_db(project_path)
         try:
             rows = conn.execute(
-                "SELECT id, order_key FROM entities WHERE type='scene' AND is_deleted=0 ORDER BY order_key"
+                "SELECT id, order_key FROM entities WHERE type='scene' ORDER BY order_key"
             ).fetchall()
             assert [r[0] for r in rows] == ["scene-3", "scene-1", "scene-2"]
             assert [r[1] for r in rows] == [1, 2, 3]
@@ -718,11 +718,11 @@ class TestPhase3ToolSurface:
         assert "error" in parsed
         assert "Cannot delete" in parsed["error"] or "reference" in parsed["error"]
 
-        # Entity should NOT be soft-deleted
+        # Entity should still exist (delete was blocked)
         from core.db import get_db
         conn = get_db(project_path)
-        row = conn.execute("SELECT is_deleted FROM entities WHERE id='seq-1'").fetchone()
-        assert row[0] == 0
+        row = conn.execute("SELECT id FROM entities WHERE id='seq-1'").fetchone()
+        assert row is not None
         conn.close()
 
     def test_delete_act_with_sequences_blocked(self, tmp_path):
@@ -750,17 +750,17 @@ class TestPhase3ToolSurface:
         assert "error" in parsed
         assert "Cannot delete" in parsed["error"] or "reference" in parsed["error"]
 
-        # Entity should NOT be soft-deleted
+        # Entity should still exist (delete was blocked)
         from core.db import get_db
         conn = get_db(project_path)
-        row = conn.execute("SELECT is_deleted FROM entities WHERE id='act-1'").fetchone()
-        assert row[0] == 0
+        row = conn.execute("SELECT id FROM entities WHERE id='act-1'").fetchone()
+        assert row is not None
         conn.close()
 
 
 
-    def test_delete_character_soft_delete(self, tmp_path):
-        """Delete character without children → soft delete in DB."""
+    def test_delete_character_hard_delete(self, tmp_path):
+        """Delete character without children → hard delete from DB."""
         from tools.story_create import handler as create_handler
         from tools.story_edit import handler as edit_handler
 
@@ -779,13 +779,13 @@ class TestPhase3ToolSurface:
         parsed = json.loads(result)
         assert parsed["success"] is True
 
-        # Verify via direct sqlite3 connection (get_db uses WAL snapshot, may read stale)
+        # Verify entity is completely gone (hard delete)
         import sqlite3
         conn = sqlite3.connect(str(project_path / ".story" / "story.db"))
         conn.execute("PRAGMA journal_mode=WAL")
-        row = conn.execute("SELECT is_deleted FROM entities WHERE id='solo-char'").fetchone()
+        row = conn.execute("SELECT id FROM entities WHERE id='solo-char'").fetchone()
         conn.close()
-        assert row[0] == 1
+        assert row is None
 
     def test_create_scene_auto_order(self, tmp_path):
         """Create scene without order → auto-assigned next position."""

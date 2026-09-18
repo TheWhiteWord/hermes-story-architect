@@ -342,10 +342,14 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
 
     # Name temp file after the story title
     project_name = ""
-    for row in data.get("story_data", []):
-        if row.get("type") == "project" and row.get("name"):
-            project_name = row["name"]
-            break
+    sd = data.get("story_data", {})
+    if isinstance(sd, dict):
+        project_name = sd.get("project", {}).get("name", "")
+    else:
+        for row in sd:
+            if row.get("type") == "project" and row.get("name"):
+                project_name = row["name"]
+                break
     if not project_name:
         project_name = project
     safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in project_name).strip().replace(" ", "_")

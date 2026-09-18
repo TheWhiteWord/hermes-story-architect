@@ -10,7 +10,7 @@ SCHEMA = {
         "action": {
             "type": "string",
             "enum": ["edit_note", "delete_entity", "update_story_memory", "reorder"],
-            "description": "Action type: edit_note (edit entity frontmatter/body sections), delete_entity (move to recycle-bin, blocked if has children), update_story_memory, reorder (batch renumber order fields for scenes/sequences)"
+            "description": "Action type: edit_note (edit entity frontmatter/body sections), delete_entity (hard delete, blocked if has children), update_story_memory, reorder (batch renumber order fields for scenes/sequences)"
         },
         "target": {
             "type": "object",
@@ -186,7 +186,10 @@ def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) ->
 
         conn.execute("COMMIT")
     except Exception as e:
-        conn.execute("ROLLBACK")
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
         return json.dumps({"error": str(e)})
     finally:
         conn.close()
@@ -221,7 +224,7 @@ def _reorder(project_path: Path, target: dict, order_context: dict, summary: str
         parent_id = None
         for item_id in ordered_ids:
             row = conn.execute(
-                "SELECT parent_id FROM entities WHERE type=? AND id=? AND is_deleted=0",
+                "SELECT parent_id FROM entities WHERE type=? AND id=?",
                 (entity_type, item_id),
             ).fetchone()
             if not row:
@@ -243,7 +246,10 @@ def _reorder(project_path: Path, target: dict, order_context: dict, summary: str
             )
         conn.execute("COMMIT")
     except Exception as e:
-        conn.execute("ROLLBACK")
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
         return json.dumps({"error": str(e)})
     finally:
         conn.close()
@@ -255,8 +261,7 @@ def _reorder(project_path: Path, target: dict, order_context: dict, summary: str
 
 
 def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
-    """Soft-delete entity in DB: UPDATE entities SET is_deleted=1, deleted_at=timestamp.
-    Blocks if structural types have children."""
+    """Hard-delete entity and its dependencies. Blocks if structural types have children."""
     from core.db import get_db
 
     entity_type = target.get("entity_type") or ""
@@ -271,7 +276,7 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
         # Cascade blocking for structural types (containment hierarchy)
         if entity_type == "sequence":
             children = conn.execute(
-                "SELECT id FROM entities WHERE type='scene' AND parent_id=? AND is_deleted=0",
+                "SELECT id FROM entities WHERE type='scene' AND parent_id=?",
                 (entity_id,)
             ).fetchall()
             if children:
@@ -279,18 +284,17 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
                 raise ValueError(f"Cannot delete: {len(children)} scene(s) reference this: {', '.join(ids)}")
         elif entity_type == "act":
             children = conn.execute(
-                "SELECT id FROM entities WHERE type='sequence' AND parent_id=? AND is_deleted=0",
+                "SELECT id FROM entities WHERE type='sequence' AND parent_id=?",
                 (entity_id,)
             ).fetchall()
             if children:
                 ids = [r[0] for r in children[:5]]
                 raise ValueError(f"Cannot delete: {len(children)} sequence(s) reference this: {', '.join(ids)}")
 
-        conn.execute(
-            "UPDATE entities SET is_deleted=1, deleted_at=datetime('now') WHERE id=?",
-            (entity_id,)
-        )
-        conn.commit()
+        # Hard delete: entity + its sections + its relations
+        conn.execute("DELETE FROM sections WHERE entity_id=?", (entity_id,))
+        conn.execute("DELETE FROM relations WHERE from_id=? OR to_id=?", (entity_id, entity_id))
+        conn.execute("DELETE FROM entities WHERE id=?", (entity_id,))
     except ValueError as e:
         return json.dumps({"error": str(e)})
     except Exception as e:

@@ -44,12 +44,12 @@ def handler(args, **kwargs) -> str:
 def _export_all(conn, project_path: Path) -> None:
     """Export all entities to markdown files."""
     rows = conn.execute(
-        "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra, is_deleted "
+        "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
         "FROM entities ORDER BY type, id"
     ).fetchall()
 
     for row in rows:
-        entity_id, entity_type, name, one_sentence, order_key, status, parent_id, location_id, extra_json, is_deleted = row
+        entity_id, entity_type, name, one_sentence, order_key, status, parent_id, location_id, extra_json = row
         extra = json.loads(extra_json) if extra_json else {}
 
         # Denormalize from relations back to frontmatter
@@ -96,9 +96,6 @@ def _export_all(conn, project_path: Path) -> None:
             char_dir = project_path / "arcs" / parent_id
             char_dir.mkdir(parents=True, exist_ok=True)
             _write_note(char_dir / f"{beat_id}.md", fm, body)
-        elif is_deleted:
-            recycle_dir = project_path / "_recycle-bin" / entity_type
-            _write_note(recycle_dir / f"{entity_id}.md", fm, body)
         else:
             folder = _folder_for(entity_type)
             _write_note(project_path / folder / f"{entity_id}.md", fm, body)

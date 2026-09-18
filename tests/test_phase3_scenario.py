@@ -86,8 +86,7 @@ class Test3EditScenario:
         search_result = json.loads(search_handler({
             "project": str(proj), "query": "Temp", "vault_path": vault
         }))
-        # No results (FTS doesn't index soft-deleted entities since they're not in FTS)
-        # Actually FTS still has the data — soft delete doesn't remove from FTS
+        # No results (entity was hard-deleted, so FTS doesn't have it)
         # But at minimum, the entity shouldn't appear in the load
 
     def test_reorder_visible_in_load(self, db_project):
