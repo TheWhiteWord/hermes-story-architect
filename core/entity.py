@@ -238,9 +238,10 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
                         note = item.get("description", "")
                     elif kind == "character_relationship":
                         to_id = item.get("id", "")
-                        label = item.get("label", "")
-                        feeling = item.get("feeling", "")
-                        note = f"{label} — {feeling}" if feeling else label
+                        note = json.dumps({
+                            "label": item.get("label", ""),
+                            "feeling": item.get("feeling", ""),
+                        })
                     else:
                         to_id = str(item)
                         note = ""

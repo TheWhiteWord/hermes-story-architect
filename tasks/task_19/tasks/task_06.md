@@ -86,5 +86,17 @@ for act in acts:
 - [ ] Act panel (line ~2976): `act.plots` must render plot rows with beat labels
 - [ ] Act panel (line ~3003): `act.sequence_count` must show correct count
 
-## Deferred Issues
-None.
+## Verification Results
+- [x] `act.sequences_list` populated
+- [x] `act.scenes_list` populated via act→sequences→scenes traversal (fix applied after initial verification found empty lists)
+- [x] `act.sequence_count` and `act.scene_count` correct
+- [x] `act.plots` has beat flags
+
+Completed: 2026-09-18 — Fixed traversal + verified live plugin output.
+
+## Completed
+- **`core/db.py:488-524`** — Act enrichment block: `sequences_list`, `scenes_list` (via sequences), `sequence_count`, `scene_count`, and `plots` aggregation with beat flags. Reuses `plot_lookup` from Task 5.
+
+## Fix Applied
+- **Bug**: `act.scenes_list` was empty because scenes point to sequences (`parent_id`), not acts directly.
+- **Fix**: Changed traversal to `act → sequences → scenes` — gather scene IDs from child sequences' `scenes_list` (already sorted by scene.order). Plot aggregation updated to use the same traversal path.

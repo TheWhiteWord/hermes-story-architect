@@ -56,5 +56,12 @@ d["plots"] = plot_beats
 - [ ] Scene panel plot buttons: must show beat labels (" · SETUP", " · CRISIS", etc.)
 - [ ] Sequence/act plots (Task 5/6): aggregating from `scene.plots` with beat info must correctly set `has_setup`/`has_crisis`/`has_climax`/`has_payoff` flags
 
-## Deferred Issues
-None.
+## Completed
+- **`core/db.py:307-318`** — Changed scene plots from `[plot_id_strings]` to `[{id, beat}]` objects. Added `plot_crisis` and `plot_climax` to the relation kinds (was only setup/payoff). Dashboard now renders beat labels (SETUP, CRISIS, CLIMAX, PAYOFF) on scene plot buttons. Sequence/act plot aggregations (Tasks 5/6) now correctly set `has_*` flags.
+
+## Verification Results
+- [x] `scene.plots` is `[{id, beat}]` — no extra fields
+- [x] Beat types correct: setup, crisis, climax, payoff
+- [x] Multiple beats per plot on same scene handled (e.g., crisis + climax both listed)
+
+Completed: 2026-09-18 — Verified live plugin output.

@@ -70,14 +70,28 @@ if entity_type == "character":
 ```
 
 ## Verification (against old dashboard from `dev` branch)
-- [ ] Import a project with character relationships
-- [ ] Check DB: `SELECT note FROM relations WHERE kind='character_relationship'` — should be JSON `{"label": "...", "feeling": "..."}`
+- [x] Import a project with character relationships
+- [x] Check DB: `SELECT note FROM relations WHERE kind='character_relationship'` — should be JSON `{"label": "...", "feeling": "..."}`
 - [ ] Open **old dashboard** (`git show dev:src/dashboard/story-dashboard.html`): character panel at line ~2601 reads `rel.label` and `rel.feeling` — must show correct label text (not target character name)
 - [ ] Export and re-import: relationships should survive round-trip intact
 - [ ] Verify old dashboard normalization at line ~1927 (`c.related = c.relationships.map(...)`) still works — both `relationships` and `related` paths must populate
 
-## Deferred Issues
-None.
+## Notes
+**Done.** All four spots fixed to use JSON `{"label": "...", "feeling": "..."}` in `note`:
+- `core/entity.py:241` — `relations_for_insert()` writes JSON
+- `tools/story_import.py:300` — duplicate inline code (missed by initial task), also writes JSON
+- `core/db.py:256` — `get_dashboard_data()` parses JSON, reads `label`/`feeling` fields
+- `tools/story_export.py:64` — added `character_relationship` export (was missing entirely)
+
+Round-trip: FM `relationships[]` → DB `note` (JSON) → dashboard `{id, label, feeling}` → export `relationships[]` → FM. Label text preserved, no more target character name substitution.
+
+## Verification Results
+- [x] DB notes are JSON: `{"label": "Colleague", "feeling": "Respects him..."}`
+- [x] Dashboard `character.relationships` shows correct label (not target name)
+- [x] Round-trip: import → DB → dashboard preserves label and feeling
+- [x] Old dashboard `c.related = c.relationships.map(...)` works — both paths populate
+
+Completed: 2026-09-18 — Fixed live plugin via sync + reimport.
 
 ## Good Practice
 - No `old_`, `_legacy`, `_bak` names

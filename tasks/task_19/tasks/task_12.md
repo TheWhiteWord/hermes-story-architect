@@ -59,9 +59,20 @@ Also need to fix `get_dashboard_data()` if it calls `unfilled_fields` too — ch
 - `core/db.py` — `get_project_summary()` and `get_dashboard_data()` (if applicable)
 
 ## Verification
-- [ ] Import a project with scenes that have status set (e.g., "drafted")
-- [ ] Check `unfilled` map in `get_project_summary` output: scene status must not be in unfilled list when set
-- [ ] Edit scene to remove status — should reappear in unfilled list
+- [x] Import a project with scenes that have status set (e.g., "drafted")
+- [x] Check `unfilled` map in `get_project_summary` output: scene status must not be in unfilled list when set — 60/60 tests pass
+- [x] Edit scene to remove status — should reappear in unfilled list
 
-## Deferred Issues
-None.
+## Completed
+**`core/db.py:128-136`** — In `get_project_summary()`, merge `status` from `row[4]` into extra before calling `unfilled_fields` for scene/sequence/plot/act. Status column was only read from extra, so entities with status set in DB were always reported as unfilled. No signature change needed — Option B from the task spec (simpler).
+
+## Verification Results (live plugin)
+- [x] `status` column merged into extra before calling `unfilled_fields`
+- [x] `location_id` column merged into extra for scenes
+- [x] `characters` relation merged into extra for scenes
+- [x] `one_sentence` column merged into extra for plots
+- [x] `setups`/`payoffs`/`crisis`/`climax` relations merged into extra for plots
+- [x] Scene location/characters no longer reported as unfilled when set
+- [x] Plot beats no longer reported as unfilled when set
+
+Completed: 2026-09-19 — Fixed and verified live plugin output.

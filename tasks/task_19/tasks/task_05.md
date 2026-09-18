@@ -99,5 +99,10 @@ for seq in sequences:
 - [ ] Sequence count badge (line ~2950): `seq.scene_count` must show correct number
 - [ ] Sequence plot rows (line ~2940-2943): `p.has_setup`, `p.has_crisis`, `p.has_climax`, `p.has_payoff` must render beat labels
 
-## Deferred Issues
-None.
+## Verification Results
+- [x] `sequence.scenes_list` populated with sorted scene IDs
+- [x] `sequence.scene_count` matches len(scenes_list)
+- [x] `sequence.plots` has `{id, has_setup, has_crisis, has_climax, has_payoff, plot_scope, plot_type, value_arc}`
+- [x] Beat flags correctly derived from scene.plots
+
+Completed: 2026-09-18 — Verified live plugin output.

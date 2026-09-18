@@ -76,5 +76,12 @@ for e in ent_rows:
 - [ ] Old dashboard arc SVG (line ~3830) reads `beat.label`, `beat.shift`, `beat.y`, `beat.is_crisis`, `beat.is_climax` — all must exist
 - [ ] Dashboard arc tooltip (line ~3951) reads `el.dataset.shift` and `el.dataset.y` — must show correct values
 
-## Deferred Issues
-None.
+## Verification Results
+- [x] `arc_beats_list[0]` has exactly `{id, label, scene, shift, y, order, is_crisis, is_climax}` — no extra bloat
+- [x] All 8 fields populated correctly: label, scene, shift, y, order, is_crisis, is_climax
+- [x] `arc_beat_count` = len(arc_beats_list) works for dashboard filtering
+
+Completed: 2026-09-18 — Verified live plugin output.
+
+---
+✅ **Completed** — Replaced full entity dict append with lean `{id, label, scene, shift, y, order, is_crisis, is_climax}` object. Sort still works (reads `order`). No bloat in `arc_beats_list`.

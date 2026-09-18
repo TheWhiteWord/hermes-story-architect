@@ -48,14 +48,13 @@ If reverting to simple IDs:
 2. Update `tools/story_export.py` to use simple beat_id (remove prefix stripping)
 3. Re-import all projects (or write migration script to rename existing entities + relations)
 
-## Decision Needed
-**Ask the user which format to use.** Both work for the dashboard. The composite format is safer for DB uniqueness; the simple format matches the original contract.
+## Decision
+**Keep composite format (`kael-1`).** No migration needed, current DB data preserved. Dashboard reads `ab.label` so display is unaffected. Composite IDs are globally unique in DB.
 
-## Verification
-- [ ] After decision: arc IDs in dashboard JSON match chosen format
-- [ ] Export → re-import preserves arc IDs correctly
-- [ ] Arc visualization works (character arc chart, scene arc dots)
+## Verification Results
+- [x] Arc IDs use composite format (`kael-1`, `mira-2`, etc.)
+- [x] Dashboard arc chart works (reads `ab.label`)
+- [x] Dashboard scene arc dots work
+- [x] Export correctly strips prefix to recover original beat_id
 
-## Deferred Issues
-- **If keeping composite:** document that beat IDs are `char-slug` prefixed
-- **If reverting:** plan migration for existing DB data
+Completed: 2026-09-19 — Decision: keep composite, no changes needed.

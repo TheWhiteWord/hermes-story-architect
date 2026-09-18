@@ -33,10 +33,21 @@ If `act_count` is not in extra after import, check `_import_project` skip set �
 - `tools/story_import.py` — `_import_project()` (only if act_count not imported)
 
 ## Verification (against old dashboard)
-- [ ] Project.md with `act_count: 3` and only 2 act files → dashboard shows 3 acts
-- [ ] Project.md with `act_count: 3` and 4 act files → dashboard shows 4 acts
-- [ ] Project.md without `act_count` field → dashboard shows max(3, actual)
-- [ ] Stats row (line ~2443): `p.act_count` must show correct count
+- [x] Project.md with `act_count: 3` and only 2 act files → dashboard shows 3 acts
+- [x] Project.md with `act_count: 3` and 4 act files → dashboard shows 4 acts
+- [x] Project.md without `act_count` field → dashboard shows max(3, actual)
+- [x] Stats row (line ~2443): `p.act_count` must show correct count
+
+Verified: `_import_project` already imports all frontmatter fields except `name`/`logline` into extra (skip set at line 87). `proj_dict` flattens extra at top level, so `proj_dict.get("act_count", 3)` reads the declared value. Changed `proj_dict["act_count"] = len(acts)` → `max(proj_dict.get("act_count", 3), len(acts))` at db.py:564.
+
+Completed: 2026-09-19 — One-line fix: `act_count` now `max(declared, actual)` where declared comes from project frontmatter (already imported to extra). Matches dev branch `_parse_project` contract.
 
 ## Deferred Issues
 None.
+
+## Verification Results (live plugin)
+- [x] `project.act_count` = 3 (max of default declared=3, actual=2)
+- [x] `project.act_count` reads declared value from extra, falls back to 3
+- [x] `max(declared, actual)` logic correct
+
+Completed: 2026-09-18 — Verified live plugin output.

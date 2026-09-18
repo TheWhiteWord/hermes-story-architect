@@ -297,9 +297,10 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
             if isinstance(rel, dict):
                 target = rel.get("id", "")
                 if target:
-                    label = rel.get("label", "")
-                    feeling = rel.get("feeling", "")
-                    note = f"{label} — {feeling}" if feeling else label
+                    note = json.dumps({
+                        "label": rel.get("label", ""),
+                        "feeling": rel.get("feeling", ""),
+                    })
                     conn.execute(
                         "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
                         (slug, target, "character_relationship", note),

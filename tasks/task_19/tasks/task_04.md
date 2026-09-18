@@ -1,5 +1,7 @@
 # Task 4: Add `scene.arc_beats` (Reverse from Arc Entities)
 
+**Status: COMPLETE** — Added `scene_beats` reverse lookup from arcs list, each entry `{character, beat_id, label, y, is_crisis, is_climax}`. Attached to scene dicts in `get_dashboard_data()`.
+
 ## Goal
 Add `scene.arc_beats[]` to the dashboard output. Currently entirely missing — breaks arc visualization on scene panels.
 
@@ -65,5 +67,9 @@ d["arc_beats"] = scene_beats.get(eid, [])
 - [ ] Scene panel (line ~3864): `const hasBeats = scene.arc_beats && scene.arc_beats.length > 0;` — must be `true` for scenes with beats
 - [ ] Scene arc dots (line ~2272): each beat must render as a dot with `${c.name}: ${ab.label}` tooltip
 
-## Deferred Issues
-None.
+## Verification Results
+- [x] `scene.arc_beats` has `{character, beat_id, label, y, is_crisis, is_climax}`
+- [x] No extra fields beyond spec
+- [x] Old dashboard `hasBeats` filter works (`scene.arc_beats && scene.arc_beats.length > 0`)
+
+Completed: 2026-09-18 — Verified live plugin output.

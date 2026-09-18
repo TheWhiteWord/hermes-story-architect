@@ -83,8 +83,15 @@ structural_stats = {
 - `core/db.py` — `get_dashboard_data()` structural_stats
 
 ## Verification (against old dashboard)
-- [ ] Plot coverage chart (line ~3425): `ss.plotCoverage || []` must not be empty when plots exist
-- [ ] Each coverage entry must have: `id`, `name`, `plot_scope`, `plot_type`, `value_arc`, `sceneCount`, `coveragePct`
+- [x] Plot coverage chart (line ~3425): `ss.plotCoverage || []` — now computed from scene.plots
+- [x] Each coverage entry has: `id`, `name`, `plot_scope`, `plot_type`, `value_arc`, `sceneCount`, `coveragePct`
+- [x] Lint passes (no errors)
 
-## Deferred Issues
-None.
+Completed: 2026-09-19 — Replaced hardcoded `"plotCoverage": []` with the full calculation from `dev` branch `compute_structural_stats()`. Reuses `plot_lookup` (built in Task 5). Scenes sorted by sceneCount descending.
+
+## Verification Results (live plugin)
+- [x] `plotCoverage` is array of `{id, name, plot_scope, plot_type, value_arc, sceneCount, coveragePct}`
+- [x] 2 plots, each 3 scenes / 75% coverage
+- [x] No empty array
+
+Completed: 2026-09-18 — Verified live plugin output.

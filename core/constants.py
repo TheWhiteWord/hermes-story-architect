@@ -106,7 +106,7 @@ ENTITY_SCHEMAS = {
     "scene": {
         "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug reflecting dramatic function (e.g., 'mara-discovers-files'), NOT the physical heading"},
         "type": {"type": "string", "default": "scene", "optional": False, "description": "Always 'scene'"},
-        "title": {"type": "string", "default": "", "optional": False, "description": "Display name (freely editable)"},
+        "title": {"type": "string", "default": "", "optional": False, "description": "Display name (freely editable) reflecting dramatic function"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, drafted, written, locked"},
         "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},

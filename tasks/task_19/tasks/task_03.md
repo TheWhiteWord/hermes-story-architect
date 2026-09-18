@@ -91,10 +91,18 @@ No change needed — export writes frontmatter from DB. Character/location scene
 - `core/db.py` — `get_dashboard_data()` character + location denormalization
 
 ## Verification (against old dashboard)
-- [ ] Import a project, open dashboard
-- [ ] Check `character.scenes[0]` in dashboard JSON: must be `{id: "scene-slug", title: "Scene Title", heading: "INT. LOCATION - DAY"}`
-- [ ] Old dashboard scene count (line ~2582): `(char.scenes || []).map(sid => ...)` — must resolve correctly
-- [ ] Location panel (line ~2771-2775): `_scene_headings` must contain heading strings for matching
+- [x] Import a project, open dashboard
+- [x] Check `character.scenes[0]` in dashboard JSON: must be `{id: "scene-slug", title: "Scene Title", heading: "INT. LOCATION - DAY"}`
+- [x] Old dashboard scene count (line ~2582): `(char.scenes || []).map(sid => ...)` — must resolve correctly
+- [x] Location panel (line ~2771-2775): `_scene_headings` must contain heading strings for matching
+- [x] Self-check passes: `[{id, title, heading}]` shape for both character and location scenes
 
-## Deferred Issues
-None.
+Completed: 2026-09-18 — Replaced raw `character_scene` and `location_scene` relation lookups with full `{id, title, heading}` scene objects. Both shapes now match `dev` branch contract.
+
+## Verification Results
+- [x] Character scenes: `[{id, title, heading}]` objects (not `[to_id, note]` dicts)
+- [x] Location scenes: `[{id, title, heading}]` objects (not bare ID strings)
+- [x] No extra bloat fields — exactly `{id, title, heading}`
+- [x] Old dashboard `_scene_objs` + `_scene_headings` normalization works correctly
+
+Completed: 2026-09-18 — Synced live plugin, reimported, verified output.
