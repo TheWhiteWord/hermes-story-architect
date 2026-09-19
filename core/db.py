@@ -97,11 +97,11 @@ _PROJECT_DEFAULTS = {
 }
 
 
-def _build_memory_outline(project_path: Path) -> dict:
+def get_memory_outline(project_path: Path) -> dict:
     """Parse ## headings from .story/memory.md, return outline with preview lines."""
     memory_path = project_path / ".story" / "memory.md"
     if not memory_path.exists():
-        return {"status": "no_memory_file", "sections": []}
+        return {"status": "placeholder — design deferred, see §5", "sections": []}
 
     content = memory_path.read_text()
     sections = []
@@ -121,7 +121,7 @@ def _build_memory_outline(project_path: Path) -> dict:
     if current_heading is not None:
         sections.append({"heading": current_heading, "preview": preview})
 
-    return {"status": "ok" if sections else "empty", "sections": sections}
+    return {"status": "placeholder — design deferred, see §5", "sections": sections}
 
 
 def get_project_summary(project_path: Path) -> dict:
@@ -507,7 +507,7 @@ def get_project_summary(project_path: Path) -> dict:
         )
 
         # ── Memory outline ──
-        memory_outline = _build_memory_outline(project_path)
+        memory_outline = get_memory_outline(project_path)
 
         return {
             "loaded": True,

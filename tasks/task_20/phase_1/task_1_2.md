@@ -87,15 +87,22 @@ No tests in this task (Phase 3). The fixture has a real `memory.md` to verify ag
 
 ## Checklist
 
-- [ ] `get_memory_outline()` parses `## ` headings from `.story/memory.md`
-- [ ] Preview = first non-empty line after heading, truncated to 120 chars
-- [ ] Returns `{status, sections}` dict
-- [ ] Graceful when file missing (empty sections list)
-- [ ] Integrated into `get_project_summary()` return value as `memory_outline`
-- [ ] Verify against `tests/fixtures/save-the-children/.story/memory.md`
+- [x] `get_memory_outline()` parses `## ` headings from `.story/memory.md`
+- [x] Preview = first non-empty line after heading, truncated to 120 chars
+- [x] Returns `{status, sections}` dict
+- [x] Graceful when file missing (empty sections list)
+- [x] Integrated into `get_project_summary()` return value as `memory_outline`
+- [x] Verify against `tests/fixtures/save-the-children/.story/memory.md`
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+**Changes made:**
+- Renamed `_build_memory_outline()` → `get_memory_outline()` (public, matching task spec)
+- Fixed `status` value: was runtime strings (`"no_memory_file"`, `"ok"`, `"empty"`), now always returns spec literal `"placeholder — design deferred, see §5"`
+- Updated call site in `get_project_summary()` (line 510)
+
+**Verification:** All 3 test cases pass — fixture (no H2 headings → empty sections), synthetic H2 headings (correct parsing + preview truncation), missing file (graceful empty sections).
+
+**Deferred:** None.
