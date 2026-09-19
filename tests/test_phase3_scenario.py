@@ -31,6 +31,62 @@ def db_project(fixture_path):
     shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _find_entity_in_nested(result, entity_type, slug):
+    """Find an entity in the nested load result by type and slug."""
+    if entity_type == "character":
+        return result["characters"].get(slug)
+    elif entity_type == "plot":
+        return result["plots"].get(slug)
+    elif entity_type == "location":
+        return result["locations"].get(slug)
+    elif entity_type == "world":
+        return result["worlds"].get(slug)
+    elif entity_type == "act":
+        for act in result["acts"]:
+            if act.get("id") == slug:
+                return act
+    elif entity_type == "sequence":
+        for act in result["acts"]:
+            for seq in act.get("sequences", []):
+                if seq.get("id") == slug:
+                    return seq
+    elif entity_type == "scene":
+        for act in result["acts"]:
+            for seq in act.get("sequences", []):
+                for scene in seq.get("scenes", []):
+                    if isinstance(scene, dict) and scene.get("id") == slug:
+                        return scene
+    elif entity_type == "arc":
+        for char in result["characters"].values():
+            for beat in char.get("arc", []):
+                if isinstance(beat, dict) and beat.get("id") == slug:
+                    return beat
+    return None
+
+
+def _all_entity_ids(result):
+    """Collect all entity IDs from nested structure."""
+    ids = set()
+    for char in result["characters"]:
+        ids.add(char)
+    for plot in result["plots"]:
+        ids.add(plot)
+    for loc in result["locations"]:
+        ids.add(loc)
+    for world in result["worlds"]:
+        ids.add(world)
+    for act in result["acts"]:
+        ids.add(act["id"])
+        for seq in act.get("sequences", []):
+            ids.add(seq["id"])
+            for scene in seq.get("scenes", []):
+                if isinstance(scene, dict):
+                    ids.add(scene["id"])
+                else:
+                    ids.add(scene)
+    return ids
+
+
 class Test3EditScenario:
     """3-edit scenario: each edit → next load shows change immediately."""
 
@@ -51,10 +107,8 @@ class Test3EditScenario:
         # Load shows change
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert result["loaded"] is True
-        entities = result["entities"]["rows"]
-        kael_row = next(r for r in entities if r[0] == "kael")
-        # cols: id, type, name, one_sentence, status, order_key, parent_id, location_id, extra
-        assert kael_row[3] == "Updated description for kael."
+        kael = result["characters"]["kael"]
+        assert kael["one_sentence"] == "Updated description for kael."
 
     def test_delete_entity_excluded_from_load(self, db_project):
         """Delete a character → story_load excludes it. Arcs cascade-delete."""
@@ -87,8 +141,7 @@ class Test3EditScenario:
 
         # Load excludes deleted entity AND its arcs
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        entities = result["entities"]["rows"]
-        ids = [r[0] for r in entities]
+        ids = _all_entity_ids(result)
         assert "temp-char" not in ids
         assert "temp-char-1" not in ids, f"Arc beat not cascade-deleted: {ids}"
 
@@ -149,7 +202,7 @@ class Test3EditScenario:
 
         # All arcs gone
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        ids = [r[0] for r in result["entities"]["rows"]]
+        ids = _all_entity_ids(result)
         assert "cascade-char" not in ids
         for i in range(1, 4):
             assert f"cascade-char-{i}" not in ids, f"Arc {i} not cascade-deleted: {ids}"
@@ -186,11 +239,22 @@ class Test3EditScenario:
 
         # Load shows new order
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        entities = result["entities"]["rows"]
-        scenes = [r for r in entities if r[1] == "scene" and r[0] in ("scene-x", "scene-y", "scene-z")]
-        scenes_sorted = sorted(scenes, key=lambda r: r[5])  # order_key col
-        assert [r[0] for r in scenes_sorted] == ["scene-z", "scene-x", "scene-y"]
-        assert [r[5] for r in scenes_sorted] == [1, 2, 3]
+        # Find scenes in nested structure
+        scenes_found = {}
+        for act in result["acts"]:
+            for seq in act.get("sequences", []):
+                for scene in seq.get("scenes", []):
+                    if isinstance(scene, dict) and scene.get("id") in ("scene-x", "scene-y", "scene-z"):
+                        scenes_found[scene["id"]] = scene
+        assert len(scenes_found) == 3
+        # Order is implied by array position — find the sequence containing them
+        for act in result["acts"]:
+            for seq in act.get("sequences", []):
+                scene_ids = [s["id"] if isinstance(s, dict) else s for s in seq.get("scenes", [])]
+                if "scene-z" in scene_ids:
+                    # Verify order-z is first among the three
+                    ordered = [sid for sid in scene_ids if sid in ("scene-x", "scene-y", "scene-z")]
+                    assert ordered == ["scene-z", "scene-x", "scene-y"], f"Order wrong: {ordered}"
 
 
 class TestAppValidation:

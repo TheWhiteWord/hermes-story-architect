@@ -187,17 +187,25 @@ No code deletion — only test assertion updates.
 
 ## Checklist
 
-- [ ] `_find_entity_in_nested` helper added
-- [ ] `_all_entity_ids` helper added
-- [ ] `test_edit_note_visible_in_load` uses `result["characters"]["kael"]`
-- [ ] `test_delete_entity_excluded_from_load` uses `_all_entity_ids`
-- [ ] `test_delete_character_cascades_arcs` uses `_all_entity_ids`
-- [ ] `test_reorder_visible_in_load` verifies order via nested array position
-- [ ] No test references `result["entities"]["rows"]`
-- [ ] All tests pass against Phase 1+2 implementation
+- [x] `_find_entity_in_nested` helper added
+- [x] `_all_entity_ids` helper added
+- [x] `test_edit_note_visible_in_load` uses `result["characters"]["kael"]`
+- [x] `test_delete_entity_excluded_from_load` uses `_all_entity_ids`
+- [x] `test_delete_character_cascades_arcs` uses `_all_entity_ids`
+- [x] `test_reorder_visible_in_load` verifies order via nested array position
+- [x] No test references `result["entities"]["rows"]`
+- [x] All tests pass against Phase 1+2 implementation
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+Updated `tests/test_phase3_scenario.py` (9 tests, all pass):
+
+- Added `_find_entity_in_nested` and `_all_entity_ids` helpers
+- `test_edit_note_visible_in_load` — now asserts `result["characters"]["kael"]["one_sentence"]`
+- `test_delete_entity_excluded_from_load` — uses `_all_entity_ids(result)` for ID collection
+- `test_delete_character_cascades_arcs` — uses `_all_entity_ids(result)` for cascade verification
+- `test_reorder_visible_in_load` — traverses nested acts→sequences→scenes, asserts array-position order
+- `test_delete_sequence_with_scenes_blocked` — unchanged (no load assertion)
+- Verified zero references to `result["entities"]["rows"]` remain in file
