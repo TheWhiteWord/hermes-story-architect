@@ -99,17 +99,28 @@ This task deletes:
 
 ## Checklist
 
-- [ ] `_db_response` returns `json.dumps(summary)` — pure pass-through
-- [ ] No reference to `entities`, `relations`, `memory` keys in `_db_response`
-- [ ] No entity-type counting logic
-- [ ] No `memory_path.read_text()` call
-- [ ] `handler` still handles errors (DB not found, schema not found, exceptions)
-- [ ] Response contains `loaded: True` and `confirmation` from builder
-- [ ] Response contains `acts`, `characters`, `plots`, `locations`, `worlds`, `unfilled`, `memory_outline`
-- [ ] Response does NOT contain `entities`, `relations`, `memory` keys
+- [x] `_db_response` returns `json.dumps(summary)` — pure pass-through
+- [x] No reference to `entities`, `relations`, `memory` keys in `_db_response`
+- [x] No entity-type counting logic
+- [x] No `memory_path.read_text()` call
+- [x] `handler` still handles errors (DB not found, schema not found, exceptions)
+- [x] Response contains `loaded: True` and `confirmation` from builder
+- [x] Response contains `acts`, `characters`, `plots`, `locations`, `worlds`, `unfilled`, `memory_outline`
+- [x] Response does NOT contain `entities`, `relations`, `memory` keys
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+**Completed:** `_db_response()` removed entirely. `handler()` now calls `json.dumps(summary)` directly — the summary from `get_project_summary()` IS the response.
+
+**Changes:**
+- `tools/story_load.py`: Deleted `_db_response()` (40 lines of entity counting, memory reading, key extraction). `handler()` returns `json.dumps(summary)` inline.
+- No unused imports remain (`json` still needed for error responses, `Path` still used in `handler`).
+
+**Verification:**
+- `get_project_summary()` (Phase 1 complete) returns: `loaded`, `confirmation`, `project`, `acts`, `characters`, `plots`, `locations`, `worlds`, `unfilled`, `memory_outline`
+- Zero references to `entities`, `relations`, `memory` in the load path
+- No other code calls `_db_response` (grep confirmed — only doc references)
+
+**Deferred:** None.

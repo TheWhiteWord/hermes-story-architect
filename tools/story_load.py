@@ -49,7 +49,7 @@ def handler(args: dict, **kwargs) -> str:
             return json.dumps({"error": "Database schema not found. Run story_import first."})
         summary = get_project_summary(project_path)
         if summary:
-            return _db_response(summary, project_path)
+            return json.dumps(summary)
     except Exception as e:
         return json.dumps({"error": str(e)})
     finally:
@@ -60,45 +60,3 @@ def handler(args: dict, **kwargs) -> str:
                 pass
 
     return json.dumps({"error": "Failed to load project summary."})
-
-
-def _db_response(summary: dict, project_path: Path) -> str:
-    """Build JSON response from DB summary."""
-    project = summary.get("project", {})
-    entities = summary.get("entities", {"cols": [], "rows": []})
-    relations = summary.get("relations", {"cols": [], "rows": []})
-
-    # Count by entity type for confirmation message
-    type_counts = {}
-    for row in entities.get("rows", []):
-        # cols: id, type, name, one_sentence, status, order_key, parent_id, location_id, extra
-        if len(row) > 1:
-            t = row[1]
-            type_counts[t] = type_counts.get(t, 0) + 1
-
-    confirmation = (
-        f"Loaded {project.get('name', 'Unknown')} — "
-        f"{type_counts.get('arc', 0)} arc beats, "
-        f"{type_counts.get('scene', 0)} scenes, "
-        f"{type_counts.get('sequence', 0)} sequences, "
-        f"{type_counts.get('act', 0)} acts, "
-        f"{type_counts.get('character', 0)} characters, "
-        f"{type_counts.get('location', 0)} locations, "
-        f"{type_counts.get('plot', 0)} plots."
-    )
-
-    # Read memory
-    memory_path = project_path / ".story" / "memory.md"
-    memory = ""
-    if memory_path.exists():
-        memory = memory_path.read_text()
-
-    return json.dumps({
-        "loaded": True,
-        "confirmation": confirmation,
-        "project": project,
-        "entities": entities,
-        "relations": relations,
-        "memory": memory,
-        "unfilled": summary.get("unfilled", {}),
-    })
