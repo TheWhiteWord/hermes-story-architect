@@ -231,6 +231,7 @@ def get_project_summary(project_path: Path) -> dict:
             elif etype == "scene":
                 scenes[eid] = {
                     "id": eid, "title": name, "status": status,
+                    "one_sentence": one_sentence,
                     "dramatic_role": extra.get("dramatic_role", ""),
                     "_order_key": order_key, "_parent_id": parent_id,
                     "_extra": extra,
@@ -297,12 +298,13 @@ def get_project_summary(project_path: Path) -> dict:
                 "id": sid,
                 "title": s["title"],
                 "status": s["status"],
+                "one_sentence": s["one_sentence"],
                 "dramatic_role": s["dramatic_role"],
                 "chars": chars,
                 "loc": scene_loc.get(sid),
                 "climax": _climax_marker(s["_extra"]),
             }
-            return _omit(result, {"dramatic_role": "", "chars": [], "loc": None, "climax": None},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "chars": [], "loc": None, "climax": None},
                          always_keep={"status"})
 
         # ── Build sequence output ──

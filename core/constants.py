@@ -119,6 +119,7 @@ ENTITY_SCHEMAS = {
         "value_open": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, mixed, ironic"},
         "value_close": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, mixed, ironic"},
         "conflict_levels": {"type": "list", "default": [], "optional": True, "description": "Any of: inner, personal, extra-personal"},
+        "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the scene"},
         "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "One of: setup, complication, crisis, climax, resolution, transition, non-event"},
         "is_inciting_incident": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as the story's inciting incident"},
         "is_sequence_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as its sequence's climax"},
