@@ -200,9 +200,14 @@ def get_project_summary(project_path: Path) -> dict:
                     "label": parsed.get("label", ""),
                     "feeling": parsed.get("feeling", ""),
                 })
-            elif kind in ("plot_setup", "plot_crisis", "plot_climax", "plot_payoff"):
-                field = kind.replace("plot_", "")
-                plot_scenes.setdefault(from_id, {}).setdefault(field, []).append(to_id)
+            elif kind == "plot_setup":
+                plot_scenes.setdefault(from_id, {}).setdefault("setups", []).append(to_id)
+            elif kind == "plot_crisis":
+                plot_scenes.setdefault(from_id, {}).setdefault("crisis", []).append(to_id)
+            elif kind == "plot_climax":
+                plot_scenes.setdefault(from_id, {}).setdefault("climax", []).append(to_id)
+            elif kind == "plot_payoff":
+                plot_scenes.setdefault(from_id, {}).setdefault("payoffs", []).append(to_id)
 
         # ── Organize entities by type ──
         acts = {}
