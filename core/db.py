@@ -171,14 +171,6 @@ def get_project_summary(project_path: Path) -> dict:
             "SELECT from_id, to_id, kind, note FROM relations"
         ).fetchall()
 
-        # ── Sections per entity ──
-        sec_rows = conn.execute(
-            "SELECT entity_id, heading FROM sections ORDER BY entity_id, rowid"
-        ).fetchall()
-        sections_map = {}
-        for entity_id, heading in sec_rows:
-            sections_map.setdefault(entity_id, []).append(heading)
-
         # ── Build cross-reference maps ──
         scene_chars = {}  # scene_id -> [char_slug, ...]
         scene_loc = {}    # scene_id -> loc_slug
@@ -229,7 +221,6 @@ def get_project_summary(project_path: Path) -> dict:
                     "value_open": extra.get("value_open", ""),
                     "value_close": extra.get("value_close", ""),
                     "_order_key": order_key, "_parent_id": parent_id,
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "sequence":
                 sequences[eid] = {
@@ -238,7 +229,6 @@ def get_project_summary(project_path: Path) -> dict:
                     "value_open": extra.get("value_open", ""),
                     "value_close": extra.get("value_close", ""),
                     "_order_key": order_key, "_parent_id": parent_id,
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "scene":
                 scenes[eid] = {
@@ -246,7 +236,6 @@ def get_project_summary(project_path: Path) -> dict:
                     "dramatic_role": extra.get("dramatic_role", ""),
                     "_order_key": order_key, "_parent_id": parent_id,
                     "_extra": extra,
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "character":
                 characters[eid] = {
@@ -254,7 +243,6 @@ def get_project_summary(project_path: Path) -> dict:
                     "story_role": extra.get("story_role", ""),
                     "arc_type": extra.get("arc_type", "Arc type not set"),
                     "arc_complete": extra.get("arc_complete", False),
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "plot":
                 plots[eid] = {
@@ -264,17 +252,14 @@ def get_project_summary(project_path: Path) -> dict:
                     "plot_scope": extra.get("plot_scope", ""),
                     "value_arc": extra.get("value_arc", ""),
                     "characters": extra.get("characters", []),
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "location":
                 locations[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "world":
                 worlds[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
-                    "_sections": sections_map.get(eid, []),
                 }
             elif etype == "arc":
                 arcs_by_char.setdefault(parent_id, []).append({
@@ -285,7 +270,6 @@ def get_project_summary(project_path: Path) -> dict:
                     "is_crisis": extra.get("is_crisis", False),
                     "is_climax": extra.get("is_climax", False),
                     "_order_key": order_key,
-                    "_sections": sections_map.get(eid, []),
                 })
 
         # ── Helpers ──
@@ -327,8 +311,6 @@ def get_project_summary(project_path: Path) -> dict:
                 "loc": scene_loc.get(sid),
                 "climax": _climax_marker(s["_extra"]),
             }
-            if s["_sections"]:
-                result["sections"] = s["_sections"]
             return _omit(result, {"dramatic_role": "", "chars": [], "loc": None, "climax": None},
                          always_keep={"status"})
 
@@ -348,8 +330,6 @@ def get_project_summary(project_path: Path) -> dict:
                 "value_close": seq["value_close"],
                 "scenes": [_build_scene(sid) for sid in child_scene_ids],
             }
-            if seq["_sections"]:
-                result["sections"] = seq["_sections"]
             return _omit(result, {"value": "Value not set", "value_open": "", "value_close": ""},
                          always_keep={"status"})
 
@@ -369,8 +349,6 @@ def get_project_summary(project_path: Path) -> dict:
                 "value_close": act["value_close"],
                 "sequences": [_build_sequence(sid) for sid in child_seq_ids],
             }
-            if act["_sections"]:
-                result["sections"] = act["_sections"]
             return _omit(result, {"value": "Value not set", "value_open": "", "value_close": ""},
                          always_keep={"status"})
 
@@ -401,8 +379,6 @@ def get_project_summary(project_path: Path) -> dict:
                         "is_crisis": beat["is_crisis"],
                         "is_climax": beat["is_climax"],
                     }
-                    if beat["_sections"]:
-                        beat_obj["sections"] = beat["_sections"]
                     arc_list.append(beat_obj)
 
             result = {
@@ -414,8 +390,6 @@ def get_project_summary(project_path: Path) -> dict:
                 "rel": char_rels.get(char_id, []),
                 "arc": arc_list,
             }
-            if char["_sections"]:
-                result["sections"] = char["_sections"]
             return _omit(result, {"arc_type": "Arc type not set", "arc_complete": False, "rel": [], "arc": []})
 
         # ── Build plot output ──
@@ -435,8 +409,6 @@ def get_project_summary(project_path: Path) -> dict:
                 "climax": ps.get("climax", []),
                 "payoffs": ps.get("payoffs", []),
             }
-            if plot["_sections"]:
-                result["sections"] = plot["_sections"]
             return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "Value arc not set",
                                   "characters": [], "setups": [], "crisis": [], "climax": [], "payoffs": []},
                          always_keep={"status"})
@@ -444,17 +416,11 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build location/world output ──
         def _build_location(loc_id):
             loc = locations[loc_id]
-            result = {"name": loc["name"], "one_sentence": loc["one_sentence"]}
-            if loc["_sections"]:
-                result["sections"] = loc["_sections"]
-            return result
+            return {"name": loc["name"], "one_sentence": loc["one_sentence"]}
 
         def _build_world(world_id):
             w = worlds[world_id]
-            result = {"name": w["name"], "one_sentence": w["one_sentence"]}
-            if w["_sections"]:
-                result["sections"] = w["_sections"]
-            return result
+            return {"name": w["name"], "one_sentence": w["one_sentence"]}
 
         characters_dict = {cid: _build_character(cid) for cid in characters}
         plots_dict = {pid: _build_plot(pid) for pid in plots}

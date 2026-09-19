@@ -211,27 +211,34 @@ class TestEmbeddedCrossReferences:
 
 
 class TestSectionsPerEntity:
-    """Each entity has a sections array (omitted when empty)."""
+    """Sections are not included in load output (token budget)."""
 
-    def test_character_has_sections(self, db_project):
-        """Character with notes has sections array."""
+    def test_character_has_no_sections_key(self, db_project):
+        """Character in load output has no sections key."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         kael = result["characters"]["kael"]
-        assert "sections" in kael
-        assert isinstance(kael["sections"], list)
-        assert len(kael["sections"]) > 0
+        assert "sections" not in kael
 
-    def test_sections_omitted_when_empty(self, db_project):
-        """Entity with no sections written omits the sections key."""
+    def test_all_entities_have_no_sections_key(self, db_project):
+        """No entity type in load output has a sections key."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        # Find an entity with no sections (if any exist in fixture)
-        # This is a soft check — vacuous if all entities have sections
         for char in result["characters"].values():
-            if "sections" not in char:
-                return  # Found one — key is correctly omitted
-        # All have sections — vacuously true
+            assert "sections" not in char
+        for plot in result["plots"].values():
+            assert "sections" not in plot
+        for loc in result["locations"].values():
+            assert "sections" not in loc
+        for w in result["worlds"].values():
+            assert "sections" not in w
+        for act in result["acts"]:
+            assert "sections" not in act
+            for seq in act.get("sequences", []):
+                assert "sections" not in seq
+                for scene in seq.get("scenes", []):
+                    if isinstance(scene, dict):
+                        assert "sections" not in scene
 
 
 class TestUnfilledInverted:
