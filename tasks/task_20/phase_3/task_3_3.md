@@ -221,13 +221,18 @@ No code deletion — only test assertion updates.
 
 ## Checklist
 
-- [ ] `test_create_load_retrieve` finds entity in nested structure (not `entities.rows`)
-- [ ] `test_edit_all_field_types` verifies edits via nested dict (not `entities.rows`/`relations.rows`)
-- [ ] Plot relation check uses embedded `setups`/`crisis`/`climax`/`payoffs` arrays
-- [ ] All tests pass against Phase 1+2 implementation
+- [x] `test_create_load_retrieve` finds entity in nested structure (not `entities.rows`)
+- [x] `test_edit_all_field_types` verifies edits via nested dict (not `entities.rows`/`relations.rows`)
+- [x] Plot relation check uses embedded `setups`/`crisis`/`climax`/`payoffs` arrays
+- [x] All tests pass against Phase 1+2 implementation
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+- `test_create_load_retrieve`: updated to find entities in nested dicts (characters/plots/locations/worlds by key, scenes by nested iteration, arc beats by label match). Fixed `expected_id` initialization (moved after the search block, set to `slug` for non-arc, `parent-char-{slug}` for arc).
+- `test_edit_all_field_types`: entity lookup now uses nested dict access (characters/plots by key, scenes/arcs by iteration). Field assertions use direct dict keys instead of column-indexed rows. Plot relation check replaced with embedded `setups`/`crisis`/`climax`/`payoffs` array presence check.
+- **Code corrections found during verification:**
+  - Arc full-form beats have no `id` field in the nested structure — they're identified by `label` (db.py builder emits `label`, `scene`, `shift`, `y`, `is_crisis`, `is_climax` but not `id`). Both arc searches now match on `label` instead of `id`.
+  - `expected_id` was being used before assignment in the retrieve call — moved initialization before the retrieve call.
+- 12/12 tests pass.
