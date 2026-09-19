@@ -57,4 +57,28 @@ If any stale references found:
 
 ## Final Brief
 
-_To be filled after task completion._
+**Completed** — All verification checks pass.
+
+### Verification Results
+| Pattern | Files Checked | Result |
+|---------|---------------|--------|
+| `entities["rows"]` | `test_core.py`, `test_phase2_db_reads.py`, `test_field_coverage.py`, `test_phase3_scenario.py` | ✅ Zero references |
+| `relations["rows"]` | All test files | ✅ Zero references |
+| `result["memory"]` | `test_core.py`, `test_phase2_db_reads.py` | ✅ Zero references |
+| `"cols" in result["entities"]` | All test files | ✅ Zero references |
+| `"rows" in result["relations"]` | All test files | ✅ Zero references |
+| `load_result["entities"]["cols"]` | All test files | ✅ Zero references |
+
+### Legacy test names checked (all absent)
+- `test_load_no_derived_arrays` ✅ removed
+- `test_load_relations_completeness` ✅ removed
+- `test_load_returns_column_format` ✅ removed
+- `test_load_no_sections_list` ✅ removed
+
+### Positive assertions (correctly present)
+- `assert "entities" not in result` — present in `test_core.py:604` and `test_phase2_db_reads.py:95`
+- `assert "relations" not in result` — present in `test_core.py:605` and `test_phase2_db_reads.py:101`
+- `assert "memory" not in result` — present in `test_core.py:606` and `test_phase2_db_reads.py:107`
+- `assert "memory_outline" in result` — present in `test_core.py:602` and `test_phase2_db_reads.py:108`
+
+No stale references remain. Task complete.
