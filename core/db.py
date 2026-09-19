@@ -137,7 +137,7 @@ def get_project_summary(project_path: Path) -> dict:
             "SELECT id, name, one_sentence, extra FROM entities WHERE type='project'"
         ).fetchone()
         if row:
-            proj_id, proj_name, proj_one_sentence, proj_extra_json = row
+            proj_name, proj_one_sentence, proj_extra_json = row
             proj_extra = json.loads(proj_extra_json) if proj_extra_json else {}
             project = {
                 "name": proj_name,
