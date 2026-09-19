@@ -81,88 +81,446 @@ def has_schema(conn: sqlite3.Connection) -> bool:
     return {"entities", "relations", "sections", "sections_fts"}.issubset(tables)
 
 
-def get_project_summary(project_path: Path) -> dict:
-    """Return column-oriented project summary for story_load.
+_PROJECT_DEFAULTS = {
+    "logline": "logline not set",
+    "genre": "genre not set",
+    "setting": "not set",
+    "spine": "Spine not set",
+    "controlling_idea": "Controlling Idea not set",
+    "value": "Value not set",
+    "value_at_open": "Opening Value not set",
+    "value_at_close": "Closing Value not set",
+    "structure_type": "Structure Type not set",
+    "act_count": 3,
+    "inciting_incident_scene_id": "Inciting Incident Scene not set",
+    "story_climax_scene_id": "Story Climax Scene not set",
+}
 
-    Shape: {project: {...}, entities: {cols, rows}, relations: {cols, rows}}
-    Relations exclude the `note` field to save tokens.
+
+def _build_memory_outline(project_path: Path) -> dict:
+    """Parse ## headings from .story/memory.md, return outline with preview lines."""
+    memory_path = project_path / ".story" / "memory.md"
+    if not memory_path.exists():
+        return {"status": "no_memory_file", "sections": []}
+
+    content = memory_path.read_text()
+    sections = []
+    lines = content.split("\n")
+    current_heading = None
+    preview = ""
+
+    for line in lines:
+        if line.startswith("## "):
+            if current_heading is not None:
+                sections.append({"heading": current_heading, "preview": preview})
+            current_heading = line[3:].strip()
+            preview = ""
+        elif current_heading is not None and not preview and line.strip():
+            preview = line.strip()[:120]
+
+    if current_heading is not None:
+        sections.append({"heading": current_heading, "preview": preview})
+
+    return {"status": "ok" if sections else "empty", "sections": sections}
+
+
+def get_project_summary(project_path: Path) -> dict:
+    """Return nested project summary for story_load (spec §2).
+
+    Shape: {loaded, confirmation, project, acts, characters, plots,
+            locations, worlds, unfilled, memory_outline}
     """
     conn = get_db(project_path)
     try:
-        # Project metadata
+        # ── Project metadata ──
         row = conn.execute(
             "SELECT id, name, one_sentence, extra FROM entities WHERE type='project'"
         ).fetchone()
         if row:
             proj_id, proj_name, proj_one_sentence, proj_extra_json = row
             proj_extra = json.loads(proj_extra_json) if proj_extra_json else {}
-            project = {"name": proj_name, "logline": proj_one_sentence}
-            project.update(proj_extra)
+            project = {
+                "name": proj_name,
+                "logline": proj_one_sentence,
+                "status": proj_extra.get("status", ""),
+                "genre": proj_extra.get("genre", ""),
+                "setting": proj_extra.get("setting", ""),
+                "spine": proj_extra.get("spine", ""),
+                "controlling_idea": proj_extra.get("controlling_idea", ""),
+                "value": proj_extra.get("value", ""),
+                "value_at_open": proj_extra.get("value_at_open", ""),
+                "value_at_close": proj_extra.get("value_at_close", ""),
+                "structure_type": proj_extra.get("structure_type", ""),
+                "act_count": proj_extra.get("act_count", 3),
+                "inciting_incident_scene_id": proj_extra.get("inciting_incident_scene_id", ""),
+                "story_climax_scene_id": proj_extra.get("story_climax_scene_id", ""),
+            }
+            project = {k: v for k, v in project.items()
+                       if k in ("status", "act_count") or (v and v != _PROJECT_DEFAULTS.get(k))}
         else:
-            project = {"name": "Unknown", "logline": ""}
+            project = {"name": "Unknown", "logline": "", "status": ""}
 
-        # Entities table (flat, no derived arrays)
-        ent_cols = ["id", "type", "name", "one_sentence", "status", "order_key", "parent_id", "location_id", "extra"]
+        # ── All entities (excluding project) ──
         ent_rows = conn.execute(
-            "SELECT id, type, name, one_sentence, status, order_key, parent_id, location_id, extra "
-            "FROM entities ORDER BY type, id"
+            "SELECT id, type, name, one_sentence, status, order_key, parent_id, extra "
+            "FROM entities WHERE type != 'project'"
         ).fetchall()
-        entities = {
-            "cols": ent_cols,
-            "rows": [
-                list(r[:8]) + [json.loads(r[8]) if r[8] else {}]
-                for r in ent_rows
-            ],
-        }
 
-        # Relations table (no note field)
-        rel_cols = ["from_id", "to_id", "kind"]
+        # ── All relations ──
         rel_rows = conn.execute(
-            "SELECT from_id, to_id, kind FROM relations ORDER BY kind, from_id, to_id"
+            "SELECT from_id, to_id, kind, note FROM relations"
         ).fetchall()
-        relations = {
-            "cols": rel_cols,
-            "rows": [list(r) for r in rel_rows],
-        }
 
-        # Unfilled fields per entity (merge column-stored fields into extra for unfilled check)
-        from .entity import unfilled_fields
-        # Load relations for character/plot-beat merge (same pattern as status merge)
-        rel_rows = conn.execute("SELECT from_id, to_id, kind FROM relations").fetchall()
-        scene_chars = {}
-        plot_beats = {}
-        for from_id, to_id, kind in rel_rows:
+        # ── Sections per entity ──
+        sec_rows = conn.execute(
+            "SELECT entity_id, heading FROM sections ORDER BY entity_id, rowid"
+        ).fetchall()
+        sections_map = {}
+        for entity_id, heading in sec_rows:
+            sections_map.setdefault(entity_id, []).append(heading)
+
+        # ── Build cross-reference maps ──
+        scene_chars = {}  # scene_id -> [char_slug, ...]
+        scene_loc = {}    # scene_id -> loc_slug
+        char_rels = {}    # char_slug -> [{id, label, feeling}, ...]
+        plot_scenes = {}  # plot_slug -> {"setups": [], "crisis": [], "climax": [], "payoffs": []}
+
+        for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
                 scene_chars.setdefault(to_id, []).append(from_id)
+            elif kind == "location_scene":
+                scene_loc[to_id] = from_id
+            elif kind == "character_relationship":
+                try:
+                    parsed = json.loads(note) if note else {}
+                except (json.JSONDecodeError, TypeError):
+                    parsed = {}
+                char_rels.setdefault(from_id, []).append({
+                    "id": to_id,
+                    "label": parsed.get("label", ""),
+                    "feeling": parsed.get("feeling", ""),
+                })
             elif kind in ("plot_setup", "plot_crisis", "plot_climax", "plot_payoff"):
-                field = {"plot_setup": "setups", "plot_crisis": "crisis",
-                         "plot_climax": "climax", "plot_payoff": "payoffs"}[kind]
-                plot_beats.setdefault(from_id, {}).setdefault(field, []).append(to_id)
+                field = kind.replace("plot_", "")
+                plot_scenes.setdefault(from_id, {}).setdefault(field, []).append(to_id)
 
-        unfilled_map = {}
-        for row in entities["rows"]:
-            entity_type = row[1]
-            extra = row[8]  # Already parsed JSON dict from entities["rows"] construction
-            # Merge column-stored fields
-            if entity_type in ("scene", "sequence", "plot", "act") and row[4]:
-                extra = {**extra, "status": row[4]}
-            # Merge scene-specific: location_id column + characters relation
-            if entity_type == "scene":
-                eid = row[0]
-                if row[7]:  # location_id column
-                    extra = {**extra, "location": row[7]}
-                if eid in scene_chars:
-                    extra = {**extra, "characters": scene_chars[eid]}
-            # Merge plot-specific: one_sentence column + setups/payoffs/crisis/climax from relations
-            if entity_type == "plot":
-                eid = row[0]
-                if row[3]:  # one_sentence column
-                    extra = {**extra, "one_sentence": row[3]}
-                if eid in plot_beats:
-                    extra = {**extra, **plot_beats[eid]}
-            unfilled_map[row[0]] = unfilled_fields(entity_type, extra)
+        # ── Organize entities by type ──
+        acts = {}
+        sequences = {}
+        scenes = {}
+        characters = {}
+        plots = {}
+        locations = {}
+        worlds = {}
+        arcs_by_char = {}  # char_slug -> [arc_info, ...]
 
-        return {"project": project, "entities": entities, "relations": relations, "unfilled": unfilled_map}
+        for eid, etype, name, one_sentence, status, order_key, parent_id, extra_json in ent_rows:
+            extra = json.loads(extra_json) if extra_json else {}
+
+            if etype == "act":
+                acts[eid] = {
+                    "id": eid, "title": name, "status": status,
+                    "value": extra.get("value", "Value not set"),
+                    "value_open": extra.get("value_open", ""),
+                    "value_close": extra.get("value_close", ""),
+                    "_order_key": order_key, "_parent_id": parent_id,
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "sequence":
+                sequences[eid] = {
+                    "id": eid, "title": name, "status": status,
+                    "value": extra.get("value", "Value not set"),
+                    "value_open": extra.get("value_open", ""),
+                    "value_close": extra.get("value_close", ""),
+                    "_order_key": order_key, "_parent_id": parent_id,
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "scene":
+                scenes[eid] = {
+                    "id": eid, "title": name, "status": status,
+                    "dramatic_role": extra.get("dramatic_role", ""),
+                    "_order_key": order_key, "_parent_id": parent_id,
+                    "_extra": extra,
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "character":
+                characters[eid] = {
+                    "id": eid, "name": name, "one_sentence": one_sentence,
+                    "story_role": extra.get("story_role", ""),
+                    "arc_type": extra.get("arc_type", "absent"),
+                    "arc_complete": extra.get("arc_complete", False),
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "plot":
+                plots[eid] = {
+                    "id": eid, "name": name, "one_sentence": one_sentence,
+                    "status": status,
+                    "plot_type": extra.get("plot_type", ""),
+                    "plot_scope": extra.get("plot_scope", "sub"),
+                    "value_arc": extra.get("value_arc", ""),
+                    "characters": extra.get("characters", []),
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "location":
+                locations[eid] = {
+                    "id": eid, "name": name, "one_sentence": one_sentence,
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "world":
+                worlds[eid] = {
+                    "id": eid, "name": name, "one_sentence": one_sentence,
+                    "_sections": sections_map.get(eid, []),
+                }
+            elif etype == "arc":
+                arcs_by_char.setdefault(parent_id, []).append({
+                    "id": eid, "label": name,
+                    "scene": extra.get("scene", ""),
+                    "shift": extra.get("shift", ""),
+                    "y": extra.get("y", 0.0),
+                    "is_crisis": extra.get("is_crisis", False),
+                    "is_climax": extra.get("is_climax", False),
+                    "_order_key": order_key,
+                    "_sections": sections_map.get(eid, []),
+                })
+
+        # ── Helpers ──
+        def _is_scene_stub(s):
+            return s["status"] == "planned" or not s["dramatic_role"]
+
+        def _climax_marker(extra):
+            if extra.get("is_inciting_incident"):
+                return "inciting"
+            if extra.get("is_story_climax"):
+                return "story"
+            if extra.get("is_act_climax"):
+                return "act"
+            if extra.get("is_sequence_climax"):
+                return "seq"
+            return None
+
+        def _omit(d, defaults, always_keep=None):
+            always_keep = always_keep or set()
+            return {k: v for k, v in d.items()
+                    if k in always_keep or (v and v != defaults.get(k))}
+
+        # ── Build scene output ──
+        def _build_scene(sid):
+            s = scenes[sid]
+            stub = _is_scene_stub(s)
+            chars = scene_chars.get(sid, [])
+            if stub:
+                result = {"id": sid}
+                if chars:
+                    result["chars"] = chars
+                return result
+            result = {
+                "id": sid,
+                "title": s["title"],
+                "status": s["status"],
+                "dramatic_role": s["dramatic_role"],
+                "chars": chars,
+                "loc": scene_loc.get(sid),
+                "climax": _climax_marker(s["_extra"]),
+            }
+            if s["_sections"]:
+                result["sections"] = s["_sections"]
+            return _omit(result, {"dramatic_role": "", "chars": [], "loc": None, "climax": None},
+                         always_keep={"status"})
+
+        # ── Build sequence output ──
+        def _build_sequence(seq_id):
+            seq = sequences[seq_id]
+            child_scene_ids = sorted(
+                [sid for sid, s in scenes.items() if s["_parent_id"] == seq_id],
+                key=lambda sid: (scenes[sid]["_order_key"], sid)
+            )
+            result = {
+                "id": seq["id"],
+                "title": seq["title"],
+                "status": seq["status"],
+                "value": seq["value"],
+                "value_open": seq["value_open"],
+                "value_close": seq["value_close"],
+                "scenes": [_build_scene(sid) for sid in child_scene_ids],
+            }
+            if seq["_sections"]:
+                result["sections"] = seq["_sections"]
+            return _omit(result, {"value": "Value not set", "value_open": "", "value_close": ""},
+                         always_keep={"status"})
+
+        # ── Build act output ──
+        def _build_act(act_id):
+            act = acts[act_id]
+            child_seq_ids = sorted(
+                [sid for sid, s in sequences.items() if s["_parent_id"] == act_id],
+                key=lambda sid: (sequences[sid]["_order_key"], sid)
+            )
+            result = {
+                "id": act["id"],
+                "title": act["title"],
+                "status": act["status"],
+                "value": act["value"],
+                "value_open": act["value_open"],
+                "value_close": act["value_close"],
+                "sequences": [_build_sequence(sid) for sid in child_seq_ids],
+            }
+            if act["_sections"]:
+                result["sections"] = act["_sections"]
+            return _omit(result, {"value": "Value not set", "value_open": "", "value_close": ""},
+                         always_keep={"status"})
+
+        # Build top-level acts (those without parent_id or parent not in acts)
+        top_act_ids = sorted(
+            [aid for aid, a in acts.items() if not a["_parent_id"] or a["_parent_id"] not in acts],
+            key=lambda aid: (acts[aid]["_order_key"], aid)
+        )
+        acts_list = [_build_act(aid) for aid in top_act_ids]
+
+        # ── Build character output ──
+        def _build_character(char_id):
+            char = characters[char_id]
+            char_arcs = sorted(
+                arcs_by_char.get(char_id, []),
+                key=lambda a: (a["_order_key"], a["id"])
+            )
+            arc_list = []
+            for beat in char_arcs:
+                if not beat["label"]:
+                    arc_list.append(beat["id"])
+                else:
+                    beat_obj = {
+                        "label": beat["label"],
+                        "scene": beat["scene"],
+                        "shift": beat["shift"],
+                        "y": beat["y"],
+                        "is_crisis": beat["is_crisis"],
+                        "is_climax": beat["is_climax"],
+                    }
+                    if beat["_sections"]:
+                        beat_obj["sections"] = beat["_sections"]
+                    arc_list.append(beat_obj)
+
+            result = {
+                "name": char["name"],
+                "one_sentence": char["one_sentence"],
+                "story_role": char["story_role"],
+                "arc_type": char["arc_type"],
+                "arc_complete": char["arc_complete"],
+                "rel": char_rels.get(char_id, []),
+                "arc": arc_list,
+            }
+            if char["_sections"]:
+                result["sections"] = char["_sections"]
+            return _omit(result, {"arc_type": "absent", "arc_complete": False, "rel": [], "arc": []})
+
+        # ── Build plot output ──
+        def _build_plot(plot_id):
+            plot = plots[plot_id]
+            ps = plot_scenes.get(plot_id, {})
+            result = {
+                "name": plot["name"],
+                "one_sentence": plot["one_sentence"],
+                "status": plot["status"],
+                "plot_type": plot["plot_type"],
+                "plot_scope": plot["plot_scope"],
+                "value_arc": plot["value_arc"],
+                "characters": plot["characters"],
+                "setups": ps.get("setups", []),
+                "crisis": ps.get("crisis", []),
+                "climax": ps.get("climax", []),
+                "payoffs": ps.get("payoffs", []),
+            }
+            if plot["_sections"]:
+                result["sections"] = plot["_sections"]
+            return _omit(result, {"plot_type": "", "plot_scope": "sub", "value_arc": "Value arc not set",
+                                  "characters": [], "setups": [], "crisis": [], "climax": [], "payoffs": []},
+                         always_keep={"status"})
+
+        # ── Build location/world output ──
+        def _build_location(loc_id):
+            loc = locations[loc_id]
+            result = {"name": loc["name"], "one_sentence": loc["one_sentence"]}
+            if loc["_sections"]:
+                result["sections"] = loc["_sections"]
+            return result
+
+        def _build_world(world_id):
+            w = worlds[world_id]
+            result = {"name": w["name"], "one_sentence": w["one_sentence"]}
+            if w["_sections"]:
+                result["sections"] = w["_sections"]
+            return result
+
+        characters_dict = {cid: _build_character(cid) for cid in characters}
+        plots_dict = {pid: _build_plot(pid) for pid in plots}
+        locations_dict = {lid: _build_location(lid) for lid in locations}
+        worlds_dict = {wid: _build_world(wid) for wid in worlds}
+
+        # ── Unfilled (inverted) ──
+        from .entity import unfilled_fields
+
+        unfilled_inv = {}
+        for eid, etype, name, one_sentence, status, order_key, parent_id, extra_json in ent_rows:
+            extra = json.loads(extra_json) if extra_json else {}
+
+            # Determine if stub (skip stubs — maximally unfilled by definition)
+            is_stub = False
+            if etype == "scene":
+                dramatic_role = extra.get("dramatic_role", "")
+                is_stub = status == "planned" or not dramatic_role
+            elif etype == "arc":
+                is_stub = not name  # label stored in name column
+
+            if is_stub:
+                continue
+
+            # Merge column-stored fields into extra for unfilled check
+            if etype in ("scene", "sequence", "plot", "act") and status:
+                extra = {**extra, "status": status}
+            if etype == "plot" and one_sentence:
+                extra = {**extra, "one_sentence": one_sentence}
+            # Merge relation-sourced fields for accurate unfilled detection
+            if etype == "scene":
+                chars = scene_chars.get(eid, [])
+                if chars:
+                    extra = {**extra, "characters": chars}
+                loc = scene_loc.get(eid)
+                if loc:
+                    extra = {**extra, "location": loc}
+
+            fields = unfilled_fields(etype, extra)
+            for field in fields:
+                unfilled_inv.setdefault(field, []).append(eid)
+
+        # ── Confirmation string ──
+        total_scenes = len(scenes)
+        developed_scenes = sum(1 for s in scenes.values() if not _is_scene_stub(s))
+        confirmation = (
+            f"Loaded {project.get('name', 'Unknown')} — "
+            f"{total_scenes} scenes ({developed_scenes} developed), "
+            f"{len(sequences)} sequences, "
+            f"{len(acts)} acts, "
+            f"{len(characters)} characters, "
+            f"{len(locations)} locations, "
+            f"{len(plots)} plots, "
+            f"{len(worlds)} worlds."
+        )
+
+        # ── Memory outline ──
+        memory_outline = _build_memory_outline(project_path)
+
+        return {
+            "loaded": True,
+            "confirmation": confirmation,
+            "project": project,
+            "acts": acts_list,
+            "characters": characters_dict,
+            "plots": plots_dict,
+            "locations": locations_dict,
+            "worlds": worlds_dict,
+            "unfilled": unfilled_inv,
+            "memory_outline": memory_outline,
+        }
     finally:
         conn.close()
 
