@@ -1,0 +1,559 @@
+{
+  "loaded": true,
+  "confirmation": "Loaded Save the Children — 4 scenes (4 developed), 2 sequences, 2 acts, 6 characters, 2 locations, 2 plots, 2 worlds.",
+  "project": {
+    "name": "Save the Children",
+    "logline": "In a world where humanity survives only as consciousness inside a machine, a young person fights to escape an oppressive system — unaware that the rebellion itself, the system, and every feeling of purpose they have ever known are the inherited memories of the last scientists who built the world that imprisoned them.",
+    "status": "active",
+    "genre": "Sci-fi drama",
+    "setting": "The Institute — a decaying research facility, 400 years apart",
+    "spine": "A young person fights to escape an oppressive system — unaware that the rebellion itself is inherited from the last scientists who built it",
+    "controlling_idea": "Freedom requires the courage to leave what you know",
+    "value": "Trust",
+    "value_at_open": "positive",
+    "value_at_close": "ironic",
+    "structure_type": "Classical",
+    "act_count": 3,
+    "inciting_incident_scene_id": "central-room-day",
+    "story_climax_scene_id": "central-room-night"
+  },
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "status": "in-progress",
+      "value": "Trust",
+      "value_open": "positive",
+      "value_close": "negative",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "status": "in-progress",
+          "value": "Trust",
+          "value_open": "positive",
+          "value_close": "negative",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "status": "drafted",
+              "dramatic_role": "setup",
+              "chars": [
+                "kael",
+                "mira"
+              ],
+              "loc": "the-central-room",
+              "climax": "inciting",
+              "sections": [
+                "Description",
+                "Dramatic Function",
+                "Notes",
+                "Content"
+              ]
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "status": "drafted",
+              "dramatic_role": "climax",
+              "chars": [
+                "kael"
+              ],
+              "loc": "the-central-room",
+              "climax": "seq",
+              "sections": [
+                "Description",
+                "Dramatic Function",
+                "Notes",
+                "Content"
+              ]
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "status": "written",
+              "dramatic_role": "resolution",
+              "chars": [
+                "kael",
+                "mira"
+              ],
+              "loc": "the-garden",
+              "sections": [
+                "Description",
+                "Dramatic Function",
+                "Notes",
+                "Content"
+              ]
+            }
+          ],
+          "sections": [
+            "Summary",
+            "Scene Order",
+            "Notes"
+          ]
+        }
+      ],
+      "sections": [
+        "Summary",
+        "Thematic Function",
+        "Notes"
+      ]
+    },
+    {
+      "id": "act-2",
+      "title": "Act II",
+      "status": "planned",
+      "sequences": [
+        {
+          "id": "seq-confrontation",
+          "title": "The Confrontation",
+          "status": "planned",
+          "scenes": [
+            {
+              "id": "the-door-closes",
+              "title": "The Door Closes",
+              "status": "written",
+              "dramatic_role": "resolution",
+              "chars": [
+                "kael"
+              ],
+              "loc": "the-central-room",
+              "climax": "seq",
+              "sections": [
+                "Description",
+                "Dramatic Function",
+                "Notes",
+                "Content"
+              ]
+            }
+          ],
+          "sections": [
+            "Summary",
+            "Scene Order",
+            "Notes"
+          ]
+        }
+      ],
+      "sections": [
+        "Summary",
+        "Thematic Function",
+        "Notes"
+      ]
+    }
+  ],
+  "characters": {
+    "dr-elena-voss": {
+      "name": "Dr. Elena Voss",
+      "one_sentence": "Lead scientist on Project Save the Children — chose to preserve the minds even knowing the bodies would never come.",
+      "story_role": "Supporting",
+      "rel": [
+        {
+          "id": "marcus-chen",
+          "label": "Colleague",
+          "feeling": "Respects him more for disagreeing than she ever said"
+        },
+        {
+          "id": "kael",
+          "label": "The saved child",
+          "feeling": "Watches from the system, unable to intervene, unable to look away"
+        }
+      ],
+      "sections": [
+        "Personality",
+        "Background",
+        "Voice",
+        "Greatest Fear",
+        "Secrets",
+        "Arc"
+      ]
+    },
+    "kael": {
+      "name": "Kael",
+      "one_sentence": "A young person inside The I who begins to feel the system is wrong.",
+      "story_role": "Protagonist",
+      "arc_type": "positive",
+      "rel": [
+        {
+          "id": "mira",
+          "label": "Closest friend",
+          "feeling": "Trusts her feelings more than their own logic"
+        },
+        {
+          "id": "the-administrator",
+          "label": "Antagonist",
+          "feeling": "Pities them — which is worse than hate"
+        },
+        {
+          "id": "dr-elena-voss",
+          "label": "Watcher",
+          "feeling": "Senses her presence but cannot name it"
+        }
+      ],
+      "arc": [
+        {
+          "label": "The Unlocked Door",
+          "scene": "central-room-day",
+          "shift": "positive trust → suspicious doubt",
+          "y": 0.2,
+          "is_crisis": false,
+          "is_climax": false,
+          "sections": [
+            "Action",
+            "Gap",
+            "Choice",
+            "Shift",
+            "Development Log"
+          ]
+        },
+        {
+          "label": "The Administrator's Offer",
+          "scene": "central-room-night",
+          "shift": "suspicious doubt → active defiance",
+          "y": -0.3,
+          "is_crisis": true,
+          "is_climax": false,
+          "sections": [
+            "Action",
+            "Gap",
+            "Choice",
+            "Shift",
+            "Development Log"
+          ]
+        },
+        {
+          "label": "Into the Real",
+          "scene": "the-core-day",
+          "shift": "active defiance → grounded hope",
+          "y": 0.6,
+          "is_crisis": false,
+          "is_climax": true,
+          "sections": [
+            "Action",
+            "Gap",
+            "Choice",
+            "Shift",
+            "Development Log"
+          ]
+        },
+        {
+          "label": "The Point of No Return",
+          "scene": "the-door-closes",
+          "shift": "grounded hope → hard-won clarity",
+          "y": 0.4,
+          "is_crisis": false,
+          "is_climax": false,
+          "sections": [
+            "Action",
+            "Gap",
+            "Choice",
+            "Shift",
+            "Development Log"
+          ]
+        }
+      ],
+      "sections": [
+        "Personality",
+        "Background",
+        "Voice",
+        "Greatest Fear",
+        "Secrets",
+        "Arc"
+      ]
+    },
+    "marcus-chen": {
+      "name": "Marcus Chen",
+      "one_sentence": "Elena's colleague — believes the outsiders should be included, even at the cost of the project.",
+      "story_role": "Supporting",
+      "sections": [
+        "Personality",
+        "Background",
+        "Voice",
+        "Greatest Fear",
+        "Secrets",
+        "Arc",
+        "Relationships",
+        "Goals"
+      ]
+    },
+    "mira": {
+      "name": "Mira",
+      "one_sentence": "Kael's closest friend — believes in the feeling before believing in the cause.",
+      "story_role": "Supporting",
+      "arc_type": "positive",
+      "arc": [
+        {
+          "label": "Shared Dreams",
+          "scene": "central-room-night",
+          "shift": "fear → tentative trust",
+          "y": 0.2,
+          "is_crisis": false,
+          "is_climax": false,
+          "sections": [
+            "Action",
+            "Gap",
+            "Choice",
+            "Shift",
+            "Development Log"
+          ]
+        },
+        {
+          "label": "The Leap",
+          "scene": "the-core-day",
+          "shift": "tentative trust → grounded faith",
+          "y": 0.6,
+          "is_crisis": false,
+          "is_climax": true,
+          "sections": [
+            "Action",
+            "Gap",
+            "Choice",
+            "Shift",
+            "Development Log"
+          ]
+        }
+      ],
+      "sections": [
+        "Personality",
+        "Background",
+        "Voice",
+        "Greatest Fear",
+        "Secrets",
+        "Arc",
+        "Relationships",
+        "Goals"
+      ]
+    },
+    "the-administrator": {
+      "name": "The Administrator",
+      "one_sentence": "The face of the Institute's control — theatrical, precise, almost too perfect an opponent.",
+      "story_role": "Antagonist",
+      "sections": [
+        "Personality",
+        "Background",
+        "Voice",
+        "Greatest Fear",
+        "Secrets",
+        "Arc",
+        "Relationships",
+        "Goals"
+      ]
+    },
+    "the-outsider": {
+      "name": "The Outsider",
+      "one_sentence": "A dying human outside the Institute walls — represents what the children could become if they breach the door.",
+      "story_role": "Supporting",
+      "sections": [
+        "Personality",
+        "Background",
+        "Voice",
+        "Greatest Fear",
+        "Secrets",
+        "Arc",
+        "Relationships",
+        "Goals"
+      ]
+    }
+  },
+  "plots": {
+    "the-resistance": {
+      "name": "The Resistance",
+      "one_sentence": "Kael and Mira organize the children to breach the Central Room.",
+      "status": "active",
+      "plot_scope": "main",
+      "value_arc": "Maturation",
+      "characters": [
+        "kael",
+        "mira"
+      ],
+      "setups": [
+        "central-room-day"
+      ],
+      "crisis": [
+        "central-room-night"
+      ],
+      "climax": [
+        "central-room-night"
+      ],
+      "payoffs": [
+        "the-core-day"
+      ],
+      "sections": [
+        "Summary",
+        "Obstacles",
+        "Stakes"
+      ]
+    },
+    "the-scientists-last-stand": {
+      "name": "The Scientists' Last Stand",
+      "one_sentence": "400 years earlier, the scientists race to complete Project Save the Children as the outsiders gather.",
+      "status": "active",
+      "plot_type": "Contradictory",
+      "plot_scope": "sub",
+      "characters": [
+        "dr-elena-voss",
+        "marcus-chen",
+        "the-outsider"
+      ],
+      "setups": [
+        "central-room-day"
+      ],
+      "crisis": [
+        "central-room-night"
+      ],
+      "climax": [
+        "the-core-day"
+      ],
+      "payoffs": [
+        "the-core-day"
+      ],
+      "sections": [
+        "Summary",
+        "Obstacles",
+        "Stakes"
+      ]
+    }
+  },
+  "locations": {
+    "the-central-room": {
+      "name": "The Central Room",
+      "one_sentence": "The heart of the Institute — where children believe freedom waits beyond the door.",
+      "sections": [
+        "Description",
+        "History",
+        "Scenes"
+      ]
+    },
+    "the-garden": {
+      "name": "The Garden",
+      "one_sentence": "A simulated outdoor space where Kael dreams — the only place that feels real.",
+      "sections": [
+        "Description",
+        "History",
+        "Scenes"
+      ]
+    }
+  },
+  "worlds": {
+    "the-i": {
+      "name": "The I",
+      "one_sentence": "A simulation environment where developing consciousness forms.",
+      "sections": [
+        "Description",
+        "History",
+        "Conflict"
+      ]
+    },
+    "the-real-world": {
+      "name": "The Real World",
+      "one_sentence": "400 years after the Institute went silent — green, vast, indifferent.",
+      "sections": [
+        "Description",
+        "History",
+        "Conflict"
+      ]
+    }
+  },
+  "unfilled": {
+    "relationships": [
+      "dr-elena-voss",
+      "kael",
+      "marcus-chen",
+      "mira",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "goals_short": [
+      "dr-elena-voss",
+      "kael",
+      "marcus-chen",
+      "mira",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "goals_long": [
+      "dr-elena-voss",
+      "kael",
+      "marcus-chen",
+      "mira",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "arc_type": [
+      "dr-elena-voss",
+      "marcus-chen",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "arc_value": [
+      "dr-elena-voss",
+      "marcus-chen",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "arc_value_at_open": [
+      "dr-elena-voss",
+      "marcus-chen",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "arc_value_at_close": [
+      "dr-elena-voss",
+      "marcus-chen",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "knowledge": [
+      "marcus-chen",
+      "mira",
+      "the-administrator",
+      "the-outsider"
+    ],
+    "rules": [
+      "the-i",
+      "the-real-world"
+    ],
+    "plot_type": [
+      "the-resistance"
+    ],
+    "setups": [
+      "the-resistance",
+      "the-scientists-last-stand"
+    ],
+    "crisis": [
+      "the-resistance",
+      "the-scientists-last-stand"
+    ],
+    "climax": [
+      "the-resistance",
+      "the-scientists-last-stand"
+    ],
+    "payoffs": [
+      "the-resistance",
+      "the-scientists-last-stand"
+    ],
+    "value_arc": [
+      "the-scientists-last-stand"
+    ],
+    "value": [
+      "seq-confrontation",
+      "act-2"
+    ],
+    "value_open": [
+      "seq-confrontation",
+      "act-2"
+    ],
+    "value_close": [
+      "seq-confrontation",
+      "act-2"
+    ],
+    "climax_scene_id": [
+      "seq-confrontation",
+      "act-2"
+    ]
+  },
+  "memory_outline": {
+    "status": "placeholder — design deferred, see §5",
+    "sections": []
+  }
+}
