@@ -162,14 +162,24 @@ No code deletion — only test assertion updates.
 
 ## Checklist
 
-- [ ] `test_story_load_works_after_create` asserts nested keys (acts, characters, plots, locations, worlds, unfilled, memory_outline)
-- [ ] `test_story_load_works_after_create` asserts old keys gone (entities, relations, memory)
-- [ ] `test_get_project_summary_includes_unfilled` asserts inverted unfilled shape
-- [ ] `test_created_character_has_unfilled_fields` asserts inverted unfilled shape
-- [ ] All 3 tests pass against Phase 1+2 implementation
+- [x] `test_story_load_works_after_create` asserts nested keys (acts, characters, plots, locations, worlds, unfilled, memory_outline)
+- [x] `test_story_load_works_after_create` asserts old keys gone (entities, relations, memory)
+- [x] `test_get_project_summary_includes_unfilled` asserts inverted unfilled shape
+- [x] `test_created_character_has_unfilled_fields` asserts inverted unfilled shape
+- [x] All 3 tests pass against Phase 1+2 implementation
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+Updated 3 tests in `tests/test_core.py` to assert the new nested payload shape from Phase 1+2:
+
+1. **`test_story_load_works_after_create`** — expanded to assert all 7 nested keys present (`acts`, `characters`, `plots`, `locations`, `worlds`, `unfilled`, `memory_outline`) and 3 old keys gone (`entities`, `relations`, `memory`).
+
+2. **`test_get_project_summary_includes_unfilled`** — inverted from `{entity: [fields]}` to `{field: [entities]}`. Asserts `goals_short` is a top-level key in `unfilled` and `test-char` appears in its entity list.
+
+3. **`test_created_character_has_unfilled_fields`** — same inversion. Asserts both `goals_short` and `goals_long` map to lists containing `test-char`.
+
+**Issue found & fixed:** Task file line 109 had `assert "goals_long" in summary["unfilled"]["goals_short"]` — a typo that would have tested whether a field name was a member of an entity-slug list. Corrected to `assert "goals_long" in summary["unfilled"]`.
+
+All 3 tests pass against the Phase 1+2 implementation.

@@ -592,6 +592,18 @@ class TestProjectCreation:
         result = json.loads(load_handler(load_args, vault_path=str(tmp_path)))
         assert result["loaded"] is True
         assert result["project"]["name"] == "Test Project"
+        # Nested structure present
+        assert "acts" in result
+        assert "characters" in result
+        assert "plots" in result
+        assert "locations" in result
+        assert "worlds" in result
+        assert "unfilled" in result
+        assert "memory_outline" in result
+        # Old keys gone
+        assert "entities" not in result
+        assert "relations" not in result
+        assert "memory" not in result
 
 
 def _make_project_with_structure(tmp):
@@ -986,11 +998,10 @@ class TestUnfilledFields:
 
         summary = get_project_summary(project_path)
         assert "unfilled" in summary
-        # Character should have unfilled fields (e.g., goals_short, goals_long)
-        char_unfilled = summary["unfilled"].get("test-char", [])
-        assert len(char_unfilled) > 0
-        # goals_short defaults to "Goals not set", so it should be unfilled
-        assert "goals_short" in char_unfilled
+        # New: inverted shape — field name → [entity slugs]
+        assert "goals_short" in summary["unfilled"]
+        assert "test-char" in summary["unfilled"]["goals_short"]
+        assert "goals_long" in summary["unfilled"]
 
     def test_created_character_has_unfilled_fields(self, tmp_path):
         from tools.story_create import handler as create_handler
@@ -1007,11 +1018,10 @@ class TestUnfilledFields:
         json.loads(create_handler(char_args))
 
         summary = get_project_summary(project_path)
-        char_unfilled = summary["unfilled"].get("test-char", [])
-        # goals_short and goals_long should be unfilled (default "Goals not set")
-        assert "goals_short" in char_unfilled
-        assert "goals_long" in char_unfilled
-        # story_role is required and was provided, should NOT be unfilled
-        assert "story_role" not in char_unfilled
+        # New: inverted — field → [entities]
+        assert "goals_short" in summary["unfilled"]
+        assert "goals_long" in summary["unfilled"]
+        assert "test-char" in summary["unfilled"]["goals_short"]
+        assert "test-char" in summary["unfilled"]["goals_long"]
 
 
