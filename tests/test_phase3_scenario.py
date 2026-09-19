@@ -56,11 +56,6 @@ def _find_entity_in_nested(result, entity_type, slug):
                 for scene in seq.get("scenes", []):
                     if isinstance(scene, dict) and scene.get("id") == slug:
                         return scene
-    elif entity_type == "arc":
-        for char in result["characters"].values():
-            for beat in char.get("arc", []):
-                if isinstance(beat, dict) and beat.get("id") == slug:
-                    return beat
     return None
 
 

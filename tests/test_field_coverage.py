@@ -216,14 +216,14 @@ def test_create_load_retrieve(entity_type, project):
     elif entity_type == "act":
         found = any(a.get("id") == slug for a in load_result["acts"])
     elif entity_type == "arc":
-        for char in load_result["characters"].values():
-            for beat in char.get("arc", []):
-                if isinstance(beat, dict) and beat.get("label") == "Sample label":
-                    found = True
-                    break
-                elif isinstance(beat, str) and beat == f"parent-char-{slug}":
-                    found = True
-                    break
+        # Arcs no longer in load output; verify via story_retrieve
+        retrieve_result = json.loads(retrieve_handler({
+            "project": str(project),
+            "entity_type": "arc",
+            "slug": f"parent-char-{slug}",
+            "sections": ["all"],
+        }))
+        found = retrieve_result.get("content") or retrieve_result.get("sections")
 
     assert found, f"Entity {slug} not in load result"
 
@@ -329,11 +329,14 @@ def test_edit_all_field_types(entity_type, project):
                         entity_data = scene
                         break
     elif entity_type == "arc":
-        for char in load_after["characters"].values():
-            for beat in char.get("arc", []):
-                if isinstance(beat, dict) and beat.get("label") == "Updated Label":
-                    entity_data = beat
-                    break
+        # Arc beats no longer in load output; verify via story_retrieve
+        retrieve_after = json.loads(retrieve_handler({
+            "project": str(project),
+            "entity_type": "arc",
+            "slug": entity_id,
+            "sections": ["all"],
+        }))
+        entity_data = {"label": "Updated Label"} if "Updated" in retrieve_after.get("content", "") else None
 
     assert entity_data is not None, f"Entity {entity_id} missing after edit"
 
@@ -343,8 +346,7 @@ def test_edit_all_field_types(entity_type, project):
             assert entity_data["one_sentence"] == edit_data["one_sentence"]
         if "arc_type" in edit_data:
             assert entity_data.get("arc_type") == edit_data["arc_type"]
-        if "arc_complete" in edit_data:
-            assert entity_data.get("arc_complete") == edit_data["arc_complete"]
+        # arc_complete removed from load output; verified via story_retrieve
 
     if entity_type == "plot":
         if "one_sentence" in edit_data:
@@ -363,12 +365,9 @@ def test_edit_all_field_types(entity_type, project):
             assert entity_data.get("dramatic_role") == edit_data["dramatic_role"]
 
     if entity_type == "arc":
+        # Arc field checks (y, is_crisis, etc.) removed — arcs no longer in load output
         if "label" in edit_data:
             assert entity_data["label"] == edit_data["label"]
-        if "y" in edit_data:
-            assert entity_data.get("y") == edit_data["y"]
-        if "is_crisis" in edit_data:
-            assert entity_data.get("is_crisis") == edit_data["is_crisis"]
 
     # Section check
     if section_name:

@@ -137,30 +137,12 @@ class TestStubClassification:
                         found_full = True
         assert found_full, "No full scenes found in fixture"
 
-    def test_arc_beat_stub_is_bare_string(self, db_project):
-        """An arc beat with empty label is a bare string in character.arc[]."""
+    def test_character_has_no_arc_array(self, db_project):
+        """Character in load output has no arc array (retrieved via story_retrieve)."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        # Verify mechanism: bare string beats are stubs
         for char in result["characters"].values():
-            for beat in char.get("arc", []):
-                if isinstance(beat, str):
-                    # Stub beat: bare id string, no label/scene
-                    assert "label" not in str(beat)
-        # Note: fixture has no stub beats (all have labels), so this is vacuous.
-
-    def test_arc_beat_full_has_label(self, db_project):
-        """A full arc beat has label/scene/shift/y."""
-        proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        found_full = False
-        for char in result["characters"].values():
-            for beat in char.get("arc", []):
-                if isinstance(beat, dict):
-                    assert "label" in beat
-                    assert "scene" in beat
-                    found_full = True
-        assert found_full, "No full arc beats found in fixture"
+            assert "arc" not in char
 
 
 class TestEmbeddedCrossReferences:
@@ -377,17 +359,6 @@ class TestNavigationalQueries:
             if "central-room-day" in all_scenes:
                 touching.append(pid)
         assert len(touching) > 0
-
-    def test_scene_to_arc_beats(self, db_project):
-        """What arc beats does central-room-day host?"""
-        proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        beats = []
-        for char in result["characters"].values():
-            for beat in char.get("arc", []):
-                if isinstance(beat, dict) and beat.get("scene") == "central-room-day":
-                    beats.append(beat["label"])
-        assert len(beats) > 0
 
     def test_structure_hierarchy(self, db_project):
         """act→sequence→scene hierarchy is directly visible in nesting."""

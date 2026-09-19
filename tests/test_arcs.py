@@ -364,9 +364,8 @@ class TestArcLoadTool:
         data = json.loads(result)
         # New format: no arc count, but character count present
         assert "1 characters" in data["confirmation"]
-        # Arc beat is nested in character
+        # Arc beats no longer in load output; verified via story_retrieve
         assert "kael" in data["characters"]
-        assert len(data["characters"]["kael"]["arc"]) > 0
 
 
 class TestArcToolIntegrationFixture:
@@ -416,6 +415,5 @@ class TestArcToolIntegrationFixture:
         data = json.loads(result)
         # New format: character count instead of arc count
         assert "characters" in data["confirmation"]
-        # Arc beats are nested in characters
-        total_arcs = sum(len(c.get("arc", [])) for c in data["characters"].values())
-        assert total_arcs > 0
+        # Arc beats no longer in load output; verified via story_retrieve
+        assert "kael" in data["characters"]

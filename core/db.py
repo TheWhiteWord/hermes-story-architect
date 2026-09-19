@@ -209,8 +209,6 @@ def get_project_summary(project_path: Path) -> dict:
         plots = {}
         locations = {}
         worlds = {}
-        arcs_by_char = {}  # char_slug -> [arc_info, ...]
-
         for eid, etype, name, one_sentence, status, order_key, parent_id, extra_json in ent_rows:
             extra = json.loads(extra_json) if extra_json else {}
 
@@ -242,7 +240,9 @@ def get_project_summary(project_path: Path) -> dict:
                     "id": eid, "name": name, "one_sentence": one_sentence,
                     "story_role": extra.get("story_role", ""),
                     "arc_type": extra.get("arc_type", "Arc type not set"),
-                    "arc_complete": extra.get("arc_complete", False),
+                    "arc_value": extra.get("arc_value", "Arc value not set"),
+                    "arc_value_at_open": extra.get("arc_value_at_open", "Not set"),
+                    "arc_value_at_close": extra.get("arc_value_at_close", "Not set"),
                 }
             elif etype == "plot":
                 plots[eid] = {
@@ -261,16 +261,7 @@ def get_project_summary(project_path: Path) -> dict:
                 worlds[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
                 }
-            elif etype == "arc":
-                arcs_by_char.setdefault(parent_id, []).append({
-                    "id": eid, "label": name,
-                    "scene": extra.get("scene", ""),
-                    "shift": extra.get("shift", ""),
-                    "y": extra.get("y", 0.0),
-                    "is_crisis": extra.get("is_crisis", False),
-                    "is_climax": extra.get("is_climax", False),
-                    "_order_key": order_key,
-                })
+
 
         # ── Helpers ──
         def _is_scene_stub(s):
@@ -362,35 +353,18 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build character output ──
         def _build_character(char_id):
             char = characters[char_id]
-            char_arcs = sorted(
-                arcs_by_char.get(char_id, []),
-                key=lambda a: (a["_order_key"], a["id"])
-            )
-            arc_list = []
-            for beat in char_arcs:
-                if not beat["label"]:
-                    arc_list.append(beat["id"])
-                else:
-                    beat_obj = {
-                        "label": beat["label"],
-                        "scene": beat["scene"],
-                        "shift": beat["shift"],
-                        "y": beat["y"],
-                        "is_crisis": beat["is_crisis"],
-                        "is_climax": beat["is_climax"],
-                    }
-                    arc_list.append(beat_obj)
-
             result = {
                 "name": char["name"],
                 "one_sentence": char["one_sentence"],
                 "story_role": char["story_role"],
                 "arc_type": char["arc_type"],
-                "arc_complete": char["arc_complete"],
+                "arc_value": char["arc_value"],
+                "arc_value_at_open": char["arc_value_at_open"],
+                "arc_value_at_close": char["arc_value_at_close"],
                 "rel": char_rels.get(char_id, []),
-                "arc": arc_list,
             }
-            return _omit(result, {"arc_type": "Arc type not set", "arc_complete": False, "rel": [], "arc": []})
+            return _omit(result, {"arc_type": "Arc type not set", "arc_value": "Arc value not set",
+                                  "arc_value_at_open": "Not set", "arc_value_at_close": "Not set", "rel": []})
 
         # ── Build plot output ──
         def _build_plot(plot_id):
@@ -494,6 +468,44 @@ def get_project_summary(project_path: Path) -> dict:
         }
     finally:
         conn.close()
+
+
+def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
+    """Return arc beats for a character, ordered by order_key then id.
+
+    Used by story_retrieve to fetch arc details on demand.
+    """
+    import sqlite3
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return []
+    conn = None
+    try:
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute(
+            "SELECT id, name, extra, order_key FROM entities WHERE type='arc' AND parent_id=? ORDER BY order_key, id",
+            (char_id,),
+        ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "label": row[1],
+                "scene": json.loads(row[2]).get("scene", "") if row[2] else "",
+                "shift": json.loads(row[2]).get("shift", "") if row[2] else "",
+                "y": json.loads(row[2]).get("y", 0.0) if row[2] else 0.0,
+                "is_crisis": json.loads(row[2]).get("is_crisis", False) if row[2] else False,
+                "is_climax": json.loads(row[2]).get("is_climax", False) if row[2] else False,
+            }
+            for row in rows
+        ]
+    except Exception:
+        return []
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def get_entity_sections(project_path: Path, entity_id: str) -> dict:
