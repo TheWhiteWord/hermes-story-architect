@@ -9,7 +9,7 @@ Verify that `get_dashboard_data()` in `core/db.py` is completely unaffected by t
 
 ## Current State
 
-`get_dashboard_data()` at `core/db.py:204-742`:
+`get_dashboard_data()` at `core/db.py:567-1087`:
 - Uses its own entity query (separate from `get_project_summary()`)
 - Builds column-oriented denormalized output for dashboard
 - Uses `entities`, `relations` tables directly
@@ -20,14 +20,14 @@ Verify that `get_dashboard_data()` in `core/db.py` is completely unaffected by t
 ## Verification Checklist
 
 ### `get_dashboard_data()` still works:
-- [ ] Function still exists at `core/db.py:204`
-- [ ] Still returns `story_data`, `sections`, `screenplay_text`, `structural_stats`, `title_page`
-- [ ] Still uses `entities` and `relations` tables
-- [ ] No imports from `get_project_summary()` (independent)
+- [x] Function still exists at `core/db.py:567` (note: task doc said :204-742, pre-refactor line numbers; function intact at new location)
+- [x] Still returns `story_data`, `sections`, `screenplay_text`, `structural_stats`, `title_page` (line 1079-1085)
+- [x] Still uses `entities` and `relations` tables (lines 580-588)
+- [x] No imports from `get_project_summary()` (independent — opens its own connection, runs own queries)
 
 ### Dashboard tests still pass:
-- [ ] `tests/test_story_dashboard_stats.py` passes
-- [ ] `tests/test_story_dashboard_integration.py` passes
+- [x] `tests/test_story_dashboard_stats.py` passes (11/11)
+- [x] `tests/test_story_dashboard_integration.py` passes (18/18)
 
 ---
 
@@ -35,7 +35,7 @@ Verify that `get_dashboard_data()` in `core/db.py` is completely unaffected by t
 
 | What | Where |
 |---|---|
-| `get_dashboard_data()` | `core/db.py:204-742` |
+| `get_dashboard_data()` | `core/db.py:567-1087` |
 | Dashboard tests | `tests/test_story_dashboard_stats.py`, `tests/test_story_dashboard_integration.py` |
 
 ---
@@ -48,4 +48,16 @@ This is a **read-only verification** task. Do NOT modify `get_dashboard_data()` 
 
 ## Final Brief
 
-_To be filled after task completion._
+**Status: VERIFIED — no changes needed.**
+
+`get_dashboard_data()` at `core/db.py:567-1087` is a completely separate code path from `get_project_summary()` (line 127). Phase 1-3 changes only touched `get_project_summary()` and its helpers — the dashboard function was never modified.
+
+Key findings:
+- **Independent connection**: `get_dashboard_data()` opens its own DB connection (line 577), runs its own entity/relation queries (lines 580-588). No shared state with `get_project_summary()`.
+- **Column-oriented output intact**: builds `characters`, `scenes`, `locations`, `plots`, `worlds`, `acts`, `sequences`, `arcs` as flat arrays with denormalized cross-refs (lines 636-788).
+- **Returns all 5 expected keys**: `story_data`, `sections`, `screenplay_text`, `structural_stats`, `title_page` (lines 1079-1085).
+- **No Phase 1-3 leakage**: zero references to `memory_outline`, `unfilled` (inverted form), `confirmation`, `loaded`, or nested `acts[]` structure. The function is oblivious to the new payload shape.
+
+Tests: **29/29 passed** (11 stats + 18 integration). Dashboard is healthy.
+
+Deferred: none.
