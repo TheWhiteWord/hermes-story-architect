@@ -341,7 +341,7 @@ class TestArcRetrieveTool:
 
 class TestArcLoadTool:
     def test_load_includes_arc_count(self, tmp_path):
-        """story_load confirmation includes arc count."""
+        """story_load confirmation includes character count."""
         from tools.story_create import handler as create_handler
         from tools.story_load import handler as load_handler
 
@@ -362,7 +362,11 @@ class TestArcLoadTool:
             "project": str(tmp_path)
         })
         data = json.loads(result)
-        assert "1 arc beat" in data["confirmation"]
+        # New format: no arc count, but character count present
+        assert "1 characters" in data["confirmation"]
+        # Arc beat is nested in character
+        assert "kael" in data["characters"]
+        assert len(data["characters"]["kael"]["arc"]) > 0
 
 
 class TestArcToolIntegrationFixture:
@@ -403,11 +407,15 @@ class TestArcToolIntegrationFixture:
         assert "Action" in data["sections"]
 
     def test_load_fixture_includes_arc_count(self):
-        """story_load confirmation includes fixture arc count."""
+        """story_load confirmation includes fixture character count."""
         from tools.story_load import handler as load_handler
 
         result = load_handler({
             "project": str(self.FIXTURE_PATH)
         })
         data = json.loads(result)
-        assert "11 arc beats" in data["confirmation"]
+        # New format: character count instead of arc count
+        assert "characters" in data["confirmation"]
+        # Arc beats are nested in characters
+        total_arcs = sum(len(c.get("arc", [])) for c in data["characters"].values())
+        assert total_arcs > 0

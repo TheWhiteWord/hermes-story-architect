@@ -136,14 +136,19 @@ No code deletion — only test assertion updates.
 
 ## Checklist
 
-- [ ] `test_load_includes_arc_count` asserts new confirmation format
-- [ ] `test_load_fixture_includes_arc_count` asserts new confirmation format
-- [ ] Both tests verify arc beats via nested character structure
-- [ ] No test asserts "N arc beats" in confirmation
-- [ ] All tests pass against Phase 1+2 implementation
+- [x] `test_load_includes_arc_count` asserts new confirmation format
+- [x] `test_load_fixture_includes_arc_count` asserts new confirmation format
+- [x] Both tests verify arc beats via nested character structure
+- [x] No test asserts "N arc beats" in confirmation
+- [x] All tests pass against Phase 1+2 implementation
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+Updated both load tests in `tests/test_arcs.py` to match the new confirmation format (no arc count — arc beats are nested in characters):
+
+1. **`test_load_includes_arc_count`** — now asserts `"1 characters"` in confirmation, verifies arc beat is nested in `data["characters"]["kael"]["arc"]`.
+2. **`test_load_fixture_includes_arc_count`** — now asserts `"characters"` in confirmation, sums arc beats across all characters to verify > 0.
+
+All 23 tests in `test_arcs.py` pass.
