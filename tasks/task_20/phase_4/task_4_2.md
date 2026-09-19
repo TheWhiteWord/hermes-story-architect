@@ -9,7 +9,7 @@ Ensure `_db_response` and `handler` in `tools/story_load.py` have zero reference
 
 ## Current State (after Phase 2 implementation)
 
-`_db_response()` has been simplified (Task 2.1) to a pass-through. Need to verify:
+`_db_response()` was removed entirely in Phase 2 (Task 2.1). `handler()` returns `json.dumps(summary)` directly. Need to verify:
 
 1. No references to `entities`, `relations`, `memory` keys
 2. No dead code from the old wrapper remaining
@@ -21,20 +21,20 @@ Ensure `_db_response` and `handler` in `tools/story_load.py` have zero reference
 ## Verification Checklist
 
 ### No old keys in response builder:
-- [ ] No `entities` reference in `_db_response()` / `handler()`
-- [ ] No `relations` reference in `_db_response()` / `handler()`
-- [ ] No `memory` reference in `_db_response()` / `handler()` (only `memory_outline`)
-- [ ] No `summary.get("entities"...)` or `summary.get("relations"...)` calls
-- [ ] No `summary.get("memory"...)` call
+- [x] No `entities` reference in `_db_response()` / `handler()` — **PASS**: grep found zero hits (only docstrings, now updated)
+- [x] No `relations` reference in `_db_response()` / `handler()` — **PASS**: grep found zero hits
+- [x] No `memory` reference in `_db_response()` / `handler()` (only `memory_outline`) — **PASS**: grep found zero hits (docstrings updated)
+- [x] No `summary.get("entities"...)` or `summary.get("relations"...)` calls — **PASS**: none present
+- [x] No `summary.get("memory"...)` call — **PASS**: none present
 
 ### No dead code:
-- [ ] No entity-type counting logic (`type_counts`, `counts_arc`, etc.)
-- [ ] No `memory_path.read_text()` call
-- [ ] No `confirmation` recomputation from rows
+- [x] No entity-type counting logic (`type_counts`, `counts_arc`, etc.) — **PASS**: none present
+- [x] No `memory_path.read_text()` call — **PASS**: none present
+- [x] No `confirmation` recomputation from rows — **PASS**: none present
 
 ### Response shape:
-- [ ] `json.dumps(summary)` is the return value (pure pass-through)
-- [ ] `loaded: True` and `confirmation` come from the builder, not recomputed here
+- [x] `json.dumps(summary)` is the return value (pure pass-through) — **PASS**: line 52
+- [x] `loaded: True` and `confirmation` come from the builder, not recomputed here — **PASS**: handler is pure pass-through
 
 ---
 
@@ -42,7 +42,7 @@ Ensure `_db_response` and `handler` in `tools/story_load.py` have zero reference
 
 | What | Where |
 |---|---|
-| `_db_response()` | `tools/story_load.py:65` (simplified in Phase 2) |
+| `_db_response()` | **REMOVED** (Task 2.1) — handler inlines `json.dumps(summary)` |
 | `handler()` | `tools/story_load.py:18` |
 | `loaded` key | Set by builder (Phase 1), passed through |
 | `confirmation` key | Set by builder (Phase 1), passed through |
@@ -51,12 +51,22 @@ Ensure `_db_response` and `handler` in `tools/story_load.py` have zero reference
 
 ## Remediation (if issues found)
 
-If any old references found:
-- Remove dead code
-- Ensure pure pass-through of builder output
+Two stale docstring references found and fixed:
+- Module docstring: `"index and memory"` → `"nested index"`
+- Handler docstring: `"index and memory"` → `"nested index"`
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+**Status: COMPLETE ✅**
+
+`_db_response()` was already removed in Phase 2 (Task 2.1). `handler()` is a pure pass-through — it calls `get_project_summary()` and returns `json.dumps(summary)` with zero transformation. No references to `entities`, `relations`, or `memory` keys remain anywhere in the file (grep-verified).
+
+**Changes made:**
+- `tools/story_load.py:1` — module docstring: "index and memory" → "nested index"
+- `tools/story_load.py:19` — handler docstring: "index and memory" → "nested index"
+
+**Verification:** Full checklist passes. No dead code, no old key references, no entity counting, no memory file reads. Confirmation and `loaded` come from the builder (Phase 1), not recomputed here.
+
+**Deferred:** None.

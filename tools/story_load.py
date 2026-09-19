@@ -1,4 +1,4 @@
-"""story_load tool — load a project's index and memory into context."""
+"""story_load tool — load a project's nested index into context."""
 import json
 from pathlib import Path
 
@@ -16,7 +16,7 @@ SCHEMA = {
 
 
 def handler(args: dict, **kwargs) -> str:
-    """Load project index and memory into context."""
+    """Load project nested index into context."""
     from .story_resolve import resolve_project
 
     _vault = kwargs.get("vault_path")
