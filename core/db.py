@@ -252,7 +252,7 @@ def get_project_summary(project_path: Path) -> dict:
                 characters[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
                     "story_role": extra.get("story_role", ""),
-                    "arc_type": extra.get("arc_type", "absent"),
+                    "arc_type": extra.get("arc_type", "Arc type not set"),
                     "arc_complete": extra.get("arc_complete", False),
                     "_sections": sections_map.get(eid, []),
                 }
@@ -261,7 +261,7 @@ def get_project_summary(project_path: Path) -> dict:
                     "id": eid, "name": name, "one_sentence": one_sentence,
                     "status": status,
                     "plot_type": extra.get("plot_type", ""),
-                    "plot_scope": extra.get("plot_scope", "sub"),
+                    "plot_scope": extra.get("plot_scope", ""),
                     "value_arc": extra.get("value_arc", ""),
                     "characters": extra.get("characters", []),
                     "_sections": sections_map.get(eid, []),
@@ -416,7 +416,7 @@ def get_project_summary(project_path: Path) -> dict:
             }
             if char["_sections"]:
                 result["sections"] = char["_sections"]
-            return _omit(result, {"arc_type": "absent", "arc_complete": False, "rel": [], "arc": []})
+            return _omit(result, {"arc_type": "Arc type not set", "arc_complete": False, "rel": [], "arc": []})
 
         # ── Build plot output ──
         def _build_plot(plot_id):
@@ -437,7 +437,7 @@ def get_project_summary(project_path: Path) -> dict:
             }
             if plot["_sections"]:
                 result["sections"] = plot["_sections"]
-            return _omit(result, {"plot_type": "", "plot_scope": "sub", "value_arc": "Value arc not set",
+            return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "Value arc not set",
                                   "characters": [], "setups": [], "crisis": [], "climax": [], "payoffs": []},
                          always_keep={"status"})
 
@@ -857,7 +857,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                             "id": pid,
                             "has_setup": False, "has_crisis": False,
                             "has_climax": False, "has_payoff": False,
-                            "plot_scope": meta.get("plot_scope", "sub"),
+                            "plot_scope": meta.get("plot_scope", ""),
                             "plot_type": meta.get("plot_type", ""),
                             "value_arc": meta.get("value_arc", ""),
                         }
@@ -896,7 +896,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                             "id": pid,
                             "has_setup": False, "has_crisis": False,
                             "has_climax": False, "has_payoff": False,
-                            "plot_scope": meta.get("plot_scope", "sub"),
+                            "plot_scope": meta.get("plot_scope", ""),
                             "plot_type": meta.get("plot_type", ""),
                             "value_arc": meta.get("value_arc", ""),
                         }
@@ -1040,7 +1040,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             plot_coverage.append({
                 "id": pid,
                 "name": pl.get("name", pid),
-                "plot_scope": pl.get("plot_scope", "sub"),
+                "plot_scope": pl.get("plot_scope", ""),
                 "plot_type": pl.get("plot_type", ""),
                 "value_arc": pl.get("value_arc", ""),
                 "sceneCount": len(scene_set),

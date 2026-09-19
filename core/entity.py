@@ -154,7 +154,12 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     unfilled = []
     for field, meta in schema.items():
-        if meta.get("optional", True) and extra.get(field, meta["default"]) == meta["default"]:
+        # status: workflow state, always emitted, never "unfilled"
+        # boolean/number: binary or scalar values, not "unfilled"
+        if (field != "status"
+            and meta.get("optional", True)
+            and meta["type"] not in ("boolean", "number")
+            and extra.get(field, meta["default"]) == meta["default"]):
             unfilled.append(field)
     return unfilled
 

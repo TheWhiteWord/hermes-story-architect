@@ -279,6 +279,23 @@ class TestUnfilledInverted:
         assert "goals_short" in unfilled
         assert "unfilled-test" in unfilled["goals_short"]
 
+    def test_unfilled_excludes_status_booleans_numbers(self, db_project):
+        """unfilled must not contain status, booleans, or numbers — only string/placeholder fields."""
+        proj, vault = db_project
+        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        unfilled = result["unfilled"]
+        # No boolean fields
+        assert "is_crisis" not in unfilled
+        assert "is_climax" not in unfilled
+        assert "arc_complete" not in unfilled
+        # No numeric fields
+        assert "y" not in unfilled
+        assert "act_count" not in unfilled
+        # No status fields
+        assert "status" not in unfilled
+        # String placeholder fields should still be there
+        assert "goals_short" in unfilled
+
 
 class TestConfirmationFormat:
     """Confirmation string matches new format."""

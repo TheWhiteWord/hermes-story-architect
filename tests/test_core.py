@@ -965,6 +965,52 @@ class TestUnfilledFields:
         assert "action" in result
         assert "gap" in result
 
+    def test_unfilled_fields_skips_status(self):
+        """status is a workflow state, never reported as unfilled."""
+        from core.entity import unfilled_fields
+        extra = {"status": "planned", "value": "Value not set", "dramatic_role": ""}
+        result = unfilled_fields("scene", extra)
+        assert "status" not in result
+        assert "value" in result
+        assert "dramatic_role" in result
+
+    def test_unfilled_fields_skips_booleans(self):
+        """Boolean fields (is_crisis, is_climax, arc_complete) are not 'unfilled'."""
+        from core.entity import unfilled_fields
+        extra = {"is_crisis": False, "is_climax": False, "action": "Action not described"}
+        result = unfilled_fields("arc", extra)
+        assert "is_crisis" not in result
+        assert "is_climax" not in result
+        assert "action" in result
+
+    def test_unfilled_fields_skips_numbers(self):
+        """Numeric fields (y, act_count) are not 'unfilled'."""
+        from core.entity import unfilled_fields
+        extra = {"y": 0.0, "action": "Action not described"}
+        result = unfilled_fields("arc", extra)
+        assert "y" not in result
+        assert "action" in result
+
+    def test_unfilled_fields_arc_type_placeholder(self):
+        """arc_type at placeholder default is flagged; at 'absent' is not."""
+        from core.entity import unfilled_fields
+        extra_placeholder = {"arc_type": "Arc type not set"}
+        result = unfilled_fields("character", extra_placeholder)
+        assert "arc_type" in result
+        extra_absent = {"arc_type": "absent"}
+        result = unfilled_fields("character", extra_absent)
+        assert "arc_type" not in result
+
+    def test_unfilled_fields_plot_scope_empty(self):
+        """plot_scope at empty default is flagged; at 'main' is not."""
+        from core.entity import unfilled_fields
+        extra_empty = {"plot_scope": ""}
+        result = unfilled_fields("plot", extra_empty)
+        assert "plot_scope" in result
+        extra_main = {"plot_scope": "main"}
+        result = unfilled_fields("plot", extra_main)
+        assert "plot_scope" not in result
+
     def test_unfilled_fields_sequence(self):
         from core.entity import unfilled_fields
         extra = {"value": "Value not set", "purpose": "Purpose not set", "primary_plot": ""}
