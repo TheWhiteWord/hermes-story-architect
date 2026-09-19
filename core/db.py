@@ -134,7 +134,7 @@ def get_project_summary(project_path: Path) -> dict:
     try:
         # ── Project metadata ──
         row = conn.execute(
-            "SELECT id, name, one_sentence, extra FROM entities WHERE type='project'"
+            "SELECT name, one_sentence, extra FROM entities WHERE type='project'"
         ).fetchone()
         if row:
             proj_name, proj_one_sentence, proj_extra_json = row

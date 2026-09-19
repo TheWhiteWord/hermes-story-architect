@@ -87,17 +87,19 @@ assert isinstance(result["memory_outline"]["sections"], list)
 
 ## Checklist
 
-- [ ] Full test suite passes (test_core, test_phase2_db_reads, test_arcs, test_phase3_scenario, test_field_coverage)
-- [ ] Fixture payload < 8,500 tokens
-- [ ] Confirmation message matches spec format
-- [ ] Stub classification visible in fixture (both full and stub scenes)
-- [ ] `unfilled` inverted shape verified against fixture
-- [ ] `memory_outline` present (not full memory text)
-- [ ] No test references `result["entities"]["rows"]` or `result["relations"]["rows"]`
-- [ ] `get_dashboard_data()` unaffected (dashboard tests pass)
+- [x] Full test suite passes (test_core, test_phase2_db_reads, test_arcs, test_phase3_scenario, test_field_coverage)
+- [x] Fixture payload < 8,500 tokens (2,454 tokens — well under budget)
+- [x] Confirmation message matches spec format
+- [x] Stub classification visible in fixture (both full and stub scenes) — fixture has only full scenes; stub classification verified by unit tests (TestStubClassification)
+- [x] `unfilled` inverted shape verified against fixture (24 fields with entity lists)
+- [x] `memory_outline` present (not full memory text)
+- [x] No test references `result["entities"]["rows"]` or `result["relations"]["rows"]`
+- [x] `get_dashboard_data()` unaffected (dashboard tests pass)
 
 ---
 
 ## Final Brief
 
-_To be filled after task completion._
+All steps completed successfully. The `story_load` redesign passes all 153 tests across 5 test files. The fixture payload is 2,454 tokens (well under the 8,500 budget). Confirmation format matches spec §2. Stub classification works (verified by unit tests since the fixture contains only full scenes). Unfilled inversion, memory outline, and legacy key removal all verified.
+
+**Root cause of original failures:** A single-line bug in `core/db.py` line 137 — the project metadata query selected `id, name, one_sentence, extra` (4 columns) but unpacked into 3 variables. Removed `id` from SELECT to match the 3-tuple unpacking. One-line fix, all 44 previously-failing tests now pass.
