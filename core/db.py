@@ -424,7 +424,7 @@ def get_project_summary(project_path: Path) -> dict:
             # Merge column-stored fields into extra for unfilled check
             if etype in ("scene", "sequence", "plot", "act") and status:
                 extra = {**extra, "status": status}
-            if etype == "plot" and one_sentence:
+            if etype in ("scene", "plot") and one_sentence:
                 extra = {**extra, "one_sentence": one_sentence}
             # Merge relation-sourced fields for accurate unfilled detection
             if etype == "scene":
