@@ -55,33 +55,33 @@ class TestNestedStructure:
             assert isinstance(seq["scenes"], list)
 
     def test_load_characters_keyed_by_slug(self, db_project):
-        """characters is a dict keyed by slug."""
+        """characters is a list with explicit id field."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert "characters" in result
-        assert isinstance(result["characters"], dict)
-        assert "kael" in result["characters"]
+        assert isinstance(result["characters"], list)
+        assert any(e["id"] == "kael" for e in result["characters"])
 
     def test_load_plots_keyed_by_slug(self, db_project):
-        """plots is a dict keyed by slug."""
+        """plots is a list with explicit id field."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert "plots" in result
-        assert isinstance(result["plots"], dict)
+        assert isinstance(result["plots"], list)
 
     def test_load_locations_keyed_by_slug(self, db_project):
-        """locations is a dict keyed by slug."""
+        """locations is a list with explicit id field."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert "locations" in result
-        assert isinstance(result["locations"], dict)
+        assert isinstance(result["locations"], list)
 
     def test_load_worlds_keyed_by_slug(self, db_project):
-        """worlds is a dict keyed by slug."""
+        """worlds is a list with explicit id field."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert "worlds" in result
-        assert isinstance(result["worlds"], dict)
+        assert isinstance(result["worlds"], list)
 
     def test_no_entities_key(self, db_project):
         """Old flat entities key is gone."""
@@ -136,7 +136,7 @@ class TestStubClassification:
         """Character in load output has no arc array (retrieved via story_retrieve)."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        for char in result["characters"].values():
+        for char in result["characters"]:
             assert "arc" not in char
 
 
@@ -172,7 +172,7 @@ class TestEmbeddedCrossReferences:
         """character.rel populated from character_relationship relations."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        for char in result["characters"].values():
+        for char in result["characters"]:
             if "rel" in char:
                 for rel in char["rel"]:
                     assert "id" in rel
@@ -182,7 +182,7 @@ class TestEmbeddedCrossReferences:
         """plot.setups populated from plot_setup relations."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        for plot in result["plots"].values():
+        for plot in result["plots"]:
             if "setups" in plot:
                 assert isinstance(plot["setups"], list)
 
@@ -194,20 +194,20 @@ class TestSectionsPerEntity:
         """Character in load output has no sections key."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        kael = result["characters"]["kael"]
+        kael = next(e for e in result["characters"] if e["id"] == "kael")
         assert "sections" not in kael
 
     def test_all_entities_have_no_sections_key(self, db_project):
         """No entity type in load output has a sections key."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        for char in result["characters"].values():
+        for char in result["characters"]:
             assert "sections" not in char
-        for plot in result["plots"].values():
+        for plot in result["plots"]:
             assert "sections" not in plot
-        for loc in result["locations"].values():
+        for loc in result["locations"]:
             assert "sections" not in loc
-        for w in result["worlds"].values():
+        for w in result["worlds"]:
             assert "sections" not in w
         for act in result["acts"]:
             assert "sections" not in act
@@ -316,7 +316,7 @@ class TestNavigationalQueries:
         """Which scenes does 'the-resistance' plot touch?"""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        plot = result["plots"]["the-resistance"]
+        plot = next(p for p in result["plots"] if p["id"] == "the-resistance")
         scenes = (
             plot.get("setups", [])
             + plot.get("crisis", [])
@@ -329,7 +329,7 @@ class TestNavigationalQueries:
         """What scenes has Kael been in?"""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        kael = result["characters"]["kael"]
+        kael = next(e for e in result["characters"] if e["id"] == "kael")
         # Navigate: find scenes where kael is in chars
         kael_scenes = []
         for act in result["acts"]:
@@ -344,7 +344,7 @@ class TestNavigationalQueries:
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         touching = []
-        for pid, plot in result["plots"].items():
+        for plot in result["plots"]:
             all_scenes = (
                 plot.get("setups", [])
                 + plot.get("crisis", [])
@@ -352,7 +352,7 @@ class TestNavigationalQueries:
                 + plot.get("payoffs", [])
             )
             if "central-room-day" in all_scenes:
-                touching.append(pid)
+                touching.append(plot["id"])
         assert len(touching) > 0
 
     def test_structure_hierarchy(self, db_project):

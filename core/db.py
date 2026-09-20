@@ -356,6 +356,7 @@ def get_project_summary(project_path: Path) -> dict:
         def _build_character(char_id):
             char = characters[char_id]
             result = {
+                "id": char_id,
                 "name": char["name"],
                 "one_sentence": char["one_sentence"],
                 "story_role": char["story_role"],
@@ -373,6 +374,7 @@ def get_project_summary(project_path: Path) -> dict:
             plot = plots[plot_id]
             ps = plot_scenes.get(plot_id, {})
             result = {
+                "id": plot_id,
                 "name": plot["name"],
                 "one_sentence": plot["one_sentence"],
                 "status": plot["status"],
@@ -392,16 +394,16 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build location/world output ──
         def _build_location(loc_id):
             loc = locations[loc_id]
-            return {"name": loc["name"], "one_sentence": loc["one_sentence"]}
+            return {"id": loc_id, "name": loc["name"], "one_sentence": loc["one_sentence"]}
 
         def _build_world(world_id):
             w = worlds[world_id]
-            return {"name": w["name"], "one_sentence": w["one_sentence"]}
+            return {"id": world_id, "name": w["name"], "one_sentence": w["one_sentence"]}
 
-        characters_dict = {cid: _build_character(cid) for cid in characters}
-        plots_dict = {pid: _build_plot(pid) for pid in plots}
-        locations_dict = {lid: _build_location(lid) for lid in locations}
-        worlds_dict = {wid: _build_world(wid) for wid in worlds}
+        characters_list = [_build_character(cid) for cid in characters]
+        plots_list = [_build_plot(pid) for pid in plots]
+        locations_list = [_build_location(lid) for lid in locations]
+        worlds_list = [_build_world(wid) for wid in worlds]
 
         # ── Unfilled (inverted) ──
         from .entity import unfilled_fields
@@ -461,10 +463,10 @@ def get_project_summary(project_path: Path) -> dict:
             "confirmation": confirmation,
             "project": project,
             "acts": acts_list,
-            "characters": characters_dict,
-            "plots": plots_dict,
-            "locations": locations_dict,
-            "worlds": worlds_dict,
+            "characters": characters_list,
+            "plots": plots_list,
+            "locations": locations_list,
+            "worlds": worlds_list,
             "unfilled": unfilled_inv,
             "memory_outline": memory_outline,
         }

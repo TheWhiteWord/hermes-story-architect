@@ -190,13 +190,13 @@ def test_create_load_retrieve(entity_type, project):
     # Find entity in nested structure
     found = False
     if entity_type == "character":
-        found = slug in load_result["characters"]
+        found = any(e["id"] == slug for e in load_result["characters"])
     elif entity_type == "plot":
-        found = slug in load_result["plots"]
+        found = any(e["id"] == slug for e in load_result["plots"])
     elif entity_type == "location":
-        found = slug in load_result["locations"]
+        found = any(e["id"] == slug for e in load_result["locations"])
     elif entity_type == "world":
-        found = slug in load_result["worlds"]
+        found = any(e["id"] == slug for e in load_result["worlds"])
     elif entity_type == "scene":
         for act in load_result["acts"]:
             for seq in act.get("sequences", []):
@@ -318,9 +318,9 @@ def test_edit_all_field_types(entity_type, project):
     # Find entity in nested structure
     entity_data = None
     if entity_type == "character":
-        entity_data = load_after["characters"].get(entity_id)
+        entity_data = next((e for e in load_after["characters"] if e["id"] == entity_id), None)
     elif entity_type == "plot":
-        entity_data = load_after["plots"].get(entity_id)
+        entity_data = next((e for e in load_after["plots"] if e["id"] == entity_id), None)
     elif entity_type == "scene":
         for act in load_after["acts"]:
             for seq in act.get("sequences", []):

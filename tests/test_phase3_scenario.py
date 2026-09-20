@@ -28,13 +28,13 @@ def db_project(fixture_path):
 def _find_entity_in_nested(result, entity_type, slug):
     """Find an entity in the nested load result by type and slug."""
     if entity_type == "character":
-        return result["characters"].get(slug)
+        return next((e for e in result["characters"] if e["id"] == slug), None)
     elif entity_type == "plot":
-        return result["plots"].get(slug)
+        return next((e for e in result["plots"] if e["id"] == slug), None)
     elif entity_type == "location":
-        return result["locations"].get(slug)
+        return next((e for e in result["locations"] if e["id"] == slug), None)
     elif entity_type == "world":
-        return result["worlds"].get(slug)
+        return next((e for e in result["worlds"] if e["id"] == slug), None)
     elif entity_type == "act":
         for act in result["acts"]:
             if act.get("id") == slug:
@@ -57,13 +57,13 @@ def _all_entity_ids(result):
     """Collect all entity IDs from nested structure."""
     ids = set()
     for char in result["characters"]:
-        ids.add(char)
+        ids.add(char["id"])
     for plot in result["plots"]:
-        ids.add(plot)
+        ids.add(plot["id"])
     for loc in result["locations"]:
-        ids.add(loc)
+        ids.add(loc["id"])
     for world in result["worlds"]:
-        ids.add(world)
+        ids.add(world["id"])
     for act in result["acts"]:
         ids.add(act["id"])
         for seq in act.get("sequences", []):
@@ -96,7 +96,7 @@ class Test3EditScenario:
         # Load shows change
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert result["loaded"] is True
-        kael = result["characters"]["kael"]
+        kael = next(e for e in result["characters"] if e["id"] == "kael")
         assert kael["one_sentence"] == "Updated description for kael."
 
     def test_delete_entity_excluded_from_load(self, db_project):

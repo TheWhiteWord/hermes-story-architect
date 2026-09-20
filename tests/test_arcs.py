@@ -365,7 +365,7 @@ class TestArcLoadTool:
         # New format: no arc count, but character count present
         assert "1 characters" in data["confirmation"]
         # Arc beats no longer in load output; verified via story_retrieve
-        assert "kael" in data["characters"]
+        assert any(c["id"] == "kael" for c in data["characters"])
 
 
 class TestArcToolIntegrationFixture:
@@ -424,4 +424,4 @@ class TestArcToolIntegrationFixture:
         # New format: character count instead of arc count
         assert "characters" in data["confirmation"]
         # Arc beats no longer in load output; verified via story_retrieve
-        assert "kael" in data["characters"]
+        assert any(c["id"] == "kael" for c in data["characters"])
