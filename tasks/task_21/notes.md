@@ -115,3 +115,74 @@ Arc beats are stored in the `entities` table with:
 4. **New:** When retrieving a character, optionally include their arc beats (or a summary) so the LLM knows what arcs exist
 
 **Status:** placeholder — to be expanded when implementing.
+---
+### example
+```
+"arc": [
+        {
+          "label": "The Unlocked Door",
+          "scene": "central-room-day",
+          "shift": "positive trust → suspicious doubt",
+          "y": 0.2,
+          "is_crisis": false, //no need fo this - only true fields required//
+          "is_climax": false, //no need fo this - only true fields required//
+        },
+        {
+          "label": "The Administrator's Offer",
+          "scene": "central-room-night",
+          "shift": "suspicious doubt → active defiance",
+          "y": -0.3,
+          "is_crisis": true,
+          "is_climax": false, //no need fo this - only true fields required//
+        },
+        {
+          "label": "Into the Real",
+          "scene": "the-core-day",
+          "shift": "active defiance → grounded hope",
+          "y": 0.6,
+          "is_crisis": false,  //no need fo this - only true fields required//
+          "is_climax": true,
+        },
+        {
+          "label": "The Point of No Return",
+          "scene": "the-door-closes",
+          "shift": "grounded hope → hard-won clarity",
+          "y": 0.4,
+          "is_crisis": false, //no need fo this - only true fields required//
+          "is_climax": false, //no need fo this - only true fields required//
+        }
+      ]
+    },
+```
+---
+
+## story_retrieve: dropped fields call patterns
+
+After the load redesign, fields marked "drop" in the spec are no longer in `story_load` output. The agent must generate `story_retrieve` calls to access them on demand. Map of dropped fields → required retrieve calls:
+
+| Dropped field(s) | Retrieve call |
+|---|---|
+| Character goals | `story_retrieve("character", slug, sections=["Goals"])` |
+| Character knowledge/background | `story_retrieve("character", slug, sections=["Background"])` |
+| Character arc_value* | `story_retrieve("character", slug, sections=["Arc"])` |
+| Scene heading/content/value | `story_retrieve("scene", slug, sections=["Description","Content"])` |
+| Arc beat action/gap/choice | `story_retrieve("arc", slug, sections=["Action","Gap","Choice"])` |
+| Plot obstacles/stakes | `story_retrieve("plot", slug, sections=["Summary","Obstacles"])` |
+| Sequence/act purpose | `story_retrieve("sequence"/"act", slug, sections=["Summary"])` |
+| World rules | **no current retrieve path — needs expansion** |
+| Project title-page fields | **no current retrieve path — needs expansion** |
+| Plot beat descriptions | **no current retrieve path — needs expansion** |
+| Memory detail | **no current retrieve path — flagged backlog** |
+
+---
+
+## story_retrieve: expansion for relation notes and frontmatter extra
+
+Several dropped fields are stored as relation `note` (JSON on the relation row) or frontmatter `extra` JSON — **not** as section bodies in the `sections` table. The current `story_retrieve` tool only returns section bodies from the `sections` table. After the redesign, these fields become inaccessible until `story_retrieve` expands to cover:
+
+- Relation notes (e.g., character relationship `{label, feeling}` sub-fields stored in `relations.note` JSON)
+- Frontmatter `extra` JSON fields (e.g., world `rules`, project title-page fields, plot beat descriptions)
+
+This is a known gap. As the redesign is implemented, additional retrieval gaps may surface — capture them in the same backlog.
+
+**Status:** notes captured — to be expanded when implementing.
