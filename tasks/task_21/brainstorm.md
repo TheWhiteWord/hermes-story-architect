@@ -19,11 +19,13 @@ Usefull when wanting an understanding of what has been defined. Its  is a more g
   - cross entities
 
 - d) Partial Structured: Selected frontmatter field/s (SEE MORE BELOW in 3.)
-Specific details about an entity values. Needed for thingl like targeted decisions and changes or specific relational comparison
+Specific details about an entity values. Needed for things like targeted decisions and changes or specific relational comparison
   - multiple at the time (one or more for each entity and for multiple entities)
-  - can alos be one single fsection for one entity
+  - can also be one single section for one entity
   - cross entities
-  
+
+### Entities level "unfilled"
+Is important that when we pass structured and section content we also pass the empty and defauklt fields.(see 1.) We should not omit thsoe fields there, as this allows us to skip having an unfilled list as entity level, while allowing the model to clearly see what has been left unfilled, or not set (default vlaues that state not set, already express this in the very sentence they pass)
 
 
 ## 2. The ARC special cases (structural and relational elements)
@@ -59,7 +61,7 @@ All existing scenes should appear (in the most compact way (id or title _ needs 
 Drammatic function should always be included, even if empty for each.
 Organized is a structured manner Act taht incldues sequences taht includes scenes. Dteils on each level about existing field values. (similar to the current way we prtesnet the act/sequence/scene structure on story_load, but minimal and focsed on structural elements)
 
-### STRUCTURAL ELEMENTS with plots
+#### STRUCTURAL ELEMENTS with plots
 This should have an option for full structural elements taht:
 THis should also include plots values (setups, crisis, climax, payoffs) and differentiate by plot type (main plot vs subplot)
 This would be useful to make sure that structural elements are not only consisten on a story level, but they also match at some level the plot structural elements. Even thou a subplot, or a main plot may non necessarely match their climax, some of them shouold always match (eg: main plot climax geenrally matches story climax).
@@ -67,14 +69,175 @@ We dont need to do this verufication ourself, but the existance of this presenta
 
 NOTE: no need to expose FALSE values, TRUE only. (eg: is_story_climax=true is meaningfull, while is_story_climax=false is not. THese false or positive are already exposed at scene level)
 
-## 3. Unfilled fields
+## 3. Partial Structured: Selected frontmatter field/s
+
+Instead of pasing single fields, we could consider grouping them in such a way that we optimized for both exposure oflimited ammount of fields (a compromise to single field load) while at teh same time allowing us to provide a sltuoin that allows fo some level of relation between fields to be mantaind, and also functions that cna be than resued in more complex solutions above
+
+FOr example, if the agent want to look at the field "arc_value" for a character, instead of passing that single fiels we could pass all of:
+
+      "arc_type": "(value)" or "" or "Default",
+      "arc_value": "(value)" or "" or "Default",
+      "arc_value_at_open": "(value)" or "" or "Default",
+      "arc_value_at_close": "(value)" or "" or "Default"
+
+So thsi way we cna group all fields based on some categorization and gain:
+- have less paramathers the llm needs to ba aware
+- mantain a level of relationship the llm may wrongly ignore
+- maybe help pther more complex functions
+
+And lose:
+- specific granularity to single field level
+- add more context (acccaptable if solves more porblems than creates and is well categorized so the grouping is not too big)
+
+## 4. Unfilled fields
 
 Right now we have all Unfilled fields at Story_load level
 
-We should consider movign that functionality to a specific retrival check and remove it from the Story_load payload.
+We should consider movign that functionality to a specific retrival or load check and remove it from the Story_load payload.
 
-### Entities level "unfilled"
-Is important that when we pass structured and section content we also pass the empty and defauklt fields.(see 1.) We should not omit thsoe fields there, as this allows us to skip having an unfilled list as entity level, while allowing the model to clearly see what has been left unfilled, or not set (default vlaues that state not set, already express this in the very sentence they pass)
 
 ## QUESTIONS STILL REMAINING
-1) how do we make it so that the model is aware of those fields that are not in Story_load but are avaible without having to load a full reference at skill level?
+1) Which of these functionalitooes above belong to story_load and which to Story_retieve? There is  a case to be made that Stroy_load may have to handle all of SECTION 2 and 3, as they are relational
+2) is there any real need to distinguis story load from story_retrieve? Should be instead one tool?
+3) How doe we handle: 1- retrival/load (depending on above questions) for each entity type (characters, word, scene, etc etc), but laso multiple retrivals with an elegant soution?
+4) How do we handle
+      "arc_value_at_close": "(value)" or "" or "Default"
+
+So thsi way we cna group all fields based on some categorization and gain:
+- have less paramathers the llm needs to ba aware
+- mantain a level of relationship the llm may wrongly ignore
+- maybe help pther more complex functions
+
+And lose:
+- specific granularity to single field level
+- add more context (acccaptable if solves more porblems than creates and is well categorized so the grouping is not too bi)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

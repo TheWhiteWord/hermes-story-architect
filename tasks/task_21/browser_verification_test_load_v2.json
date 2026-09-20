@@ -45,7 +45,7 @@
                 "mira"
               ],
               "loc": "the-central-room",
-              "climax": "inciting"
+              "milestone": "inciting incident"
             },
             {
               "id": "central-room-night",
@@ -57,7 +57,7 @@
                 "kael"
               ],
               "loc": "the-central-room",
-              "climax": "seq"
+              "milestone": "sequence climax"
             },
             {
               "id": "the-core-day",
@@ -93,15 +93,16 @@
                 "kael"
               ],
               "loc": "the-central-room",
-              "climax": "seq"
+              "milestone": "sequence climax"
             }
           ]
         }
       ]
     }
   ],
-  "characters": {
-    "dr-elena-voss": {
+  "characters": [
+    {
+      "id": "dr-elena-voss",
       "name": "Dr. Elena Voss",
       "one_sentence": "Lead scientist on Project Save the Children \u2014 chose to preserve the minds even knowing the bodies would never come.",
       "story_role": "Supporting",
@@ -118,7 +119,8 @@
         }
       ]
     },
-    "kael": {
+    {
+      "id": "kael",
       "name": "Kael",
       "one_sentence": "A young person inside The I who begins to feel the system is wrong.",
       "story_role": "Protagonist",
@@ -144,12 +146,14 @@
         }
       ]
     },
-    "marcus-chen": {
+    {
+      "id": "marcus-chen",
       "name": "Marcus Chen",
       "one_sentence": "Elena's colleague \u2014 believes the outsiders should be included, even at the cost of the project.",
       "story_role": "Supporting"
     },
-    "mira": {
+    {
+      "id": "mira",
       "name": "Mira",
       "one_sentence": "Kael's closest friend \u2014 believes in the feeling before believing in the cause.",
       "story_role": "Supporting",
@@ -158,19 +162,22 @@
       "arc_value_at_open": "negative",
       "arc_value_at_close": "positive"
     },
-    "the-administrator": {
+    {
+      "id": "the-administrator",
       "name": "The Administrator",
       "one_sentence": "The face of the Institute's control \u2014 theatrical, precise, almost too perfect an opponent.",
       "story_role": "Antagonist"
     },
-    "the-outsider": {
+    {
+      "id": "the-outsider",
       "name": "The Outsider",
       "one_sentence": "A dying human outside the Institute walls \u2014 represents what the children could become if they breach the door.",
       "story_role": "Supporting"
     }
-  },
-  "plots": {
-    "the-resistance": {
+  ],
+  "plots": [
+    {
+      "id": "the-resistance",
       "name": "The Resistance",
       "one_sentence": "Kael and Mira organize the children to breach the Central Room.",
       "status": "active",
@@ -193,7 +200,8 @@
         "the-core-day"
       ]
     },
-    "the-scientists-last-stand": {
+    {
+      "id": "the-scientists-last-stand",
       "name": "The Scientists' Last Stand",
       "one_sentence": "400 years earlier, the scientists race to complete Project Save the Children as the outsiders gather.",
       "status": "active",
@@ -217,27 +225,31 @@
         "the-core-day"
       ]
     }
-  },
-  "locations": {
-    "the-central-room": {
+  ],
+  "locations": [
+    {
+      "id": "the-central-room",
       "name": "The Central Room",
       "one_sentence": "The heart of the Institute \u2014 where children believe freedom waits beyond the door."
     },
-    "the-garden": {
+    {
+      "id": "the-garden",
       "name": "The Garden",
       "one_sentence": "A simulated outdoor space where Kael dreams \u2014 the only place that feels real."
     }
-  },
-  "worlds": {
-    "the-i": {
+  ],
+  "worlds": [
+    {
+      "id": "the-i",
       "name": "The I",
       "one_sentence": "A simulation environment where developing consciousness forms."
     },
-    "the-real-world": {
+    {
+      "id": "the-real-world",
       "name": "The Real World",
       "one_sentence": "400 years after the Institute went silent \u2014 green, vast, indifferent."
     }
-  },
+  ],
   "unfilled": {
     "relationships": [
       "dr-elena-voss",
