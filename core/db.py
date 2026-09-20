@@ -268,15 +268,15 @@ def get_project_summary(project_path: Path) -> dict:
         def _is_scene_stub(s):
             return s["status"] == "planned" or not s["dramatic_role"]
 
-        def _climax_marker(extra):
+        def _milestone_marker(extra):
             if extra.get("is_inciting_incident"):
-                return "inciting"
+                return "inciting incident"
             if extra.get("is_story_climax"):
-                return "story"
+                return "story climax"
             if extra.get("is_act_climax"):
-                return "act"
+                return "act climax"
             if extra.get("is_sequence_climax"):
-                return "seq"
+                return "sequence climax"
             return None
 
         def _omit(d, defaults, always_keep=None):
@@ -302,9 +302,9 @@ def get_project_summary(project_path: Path) -> dict:
                 "dramatic_role": s["dramatic_role"],
                 "chars": chars,
                 "loc": scene_loc.get(sid),
-                "climax": _climax_marker(s["_extra"]),
+                "milestone": _milestone_marker(s["_extra"]),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "chars": [], "loc": None, "climax": None},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "chars": [], "loc": None, "milestone": None},
                          always_keep={"status"})
 
         # ── Build sequence output ──
