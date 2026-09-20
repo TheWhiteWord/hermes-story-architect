@@ -417,7 +417,7 @@ def get_project_summary(project_path: Path) -> dict:
             if etype == "scene":
                 dramatic_role = extra.get("dramatic_role", "")
                 is_stub = status == "planned" or not dramatic_role
-            elif etype == "arc":
+            elif etype == "arc_beat":
                 is_stub = not name  # label stored in name column
 
             if is_stub:
@@ -487,7 +487,7 @@ def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
     try:
         conn = sqlite3.connect(str(db_path))
         rows = conn.execute(
-            "SELECT id, name, extra, order_key FROM entities WHERE type='arc' AND parent_id=? ORDER BY order_key, id",
+            "SELECT id, name, extra, order_key FROM entities WHERE type='arc_beat' AND parent_id=? ORDER BY order_key, id",
             (char_id,),
         ).fetchall()
         return [
@@ -751,7 +751,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["act_id"] = e[6]  # alias for dashboard (reads seq.act_id)
                 sequences.append(d)
 
-            elif etype == "arc":
+            elif etype == "arc_beat":
                 d = _entity_dict({
                     "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
                     "status": e[5], "parent_id": e[6], "extra": extra,

@@ -48,7 +48,7 @@ def _build_schema() -> dict:
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["project", "character", "location", "world", "plot", "scene", "sequence", "act", "arc"],
+                "enum": ["project", "character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat"],
                 "description": "Type of entity to create",
             },
             "slug": {
@@ -126,7 +126,7 @@ def handler(args: dict, **kwargs) -> str:
             return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
 
         # Parent validation for arc type
-        if entity_type == "arc":
+        if entity_type == "arc_beat":
             from core.entity import validate_arc_parents
             try:
                 validate_arc_parents(
@@ -314,6 +314,6 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
-        "arc": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+        "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
     }
     return sections.get(entity_type, [])

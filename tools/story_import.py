@@ -146,7 +146,7 @@ def _import_arcs(conn, project_path: Path) -> None:
             char_slug = char_folder.name
             beat_id = fm.get("id", note.stem)
             slug = f"{char_slug}-{beat_id}"
-            _insert_entity(conn, "arc", slug, fm, body, char_slug=char_slug)
+            _insert_entity(conn, "arc_beat", slug, fm, body, char_slug=char_slug)
 
 
 
@@ -233,13 +233,13 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": None, "location_id": None,
             "extra": _extra_for("act", fm),
         }
-    elif entity_type == "arc":
+    elif entity_type == "arc_beat":
         return {
-            "id": slug, "type": "arc",
+            "id": slug, "type": "arc_beat",
             "name": fm.get("label", ""), "one_sentence": "",
             "order_key": fm.get("order", 0), "status": "",
             "parent_id": char_slug, "location_id": None,
-            "extra": _extra_for("arc", fm),
+            "extra": _extra_for("arc_beat", fm),
         }
     return {"id": slug, "type": entity_type, "name": "", "one_sentence": "",
             "order_key": 0, "status": "", "parent_id": None, "location_id": None, "extra": {}}
@@ -256,7 +256,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
-        "arc": {"id", "label", "order", "character"},
+        "arc_beat": {"id", "label", "order", "character"},
     }
     s = skip.get(entity_type, set())
     extra = {}

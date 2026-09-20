@@ -25,7 +25,7 @@ REQUIRED_FIELDS = {
     "scene": ["title", "sequence_id", "act_id"],
     "sequence": ["title", "act_id"],
     "act": ["title"],
-    "arc": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
+    "arc_beat": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
 }
 
 ENTITY_LABELS = {
@@ -37,7 +37,7 @@ ENTITY_LABELS = {
     "scene": "Scene",
     "sequence": "Sequence",
     "act": "Act",
-    "arc": "Arc Beat",
+    "arc_beat": "Arc Beat",
 }
 
 # Full field schemas — used by story_create and story_edit to ensure all fields
@@ -152,7 +152,7 @@ ENTITY_SCHEMAS = {
         "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this act's major reversal lands"},
         "act_objective": {"type": "string", "default": "Objective not set", "optional": True, "description": "Protagonist's immediate goal for this act"},
     },
-    "arc": {
+    "arc_beat": {
         "id": {"type": "string", "default": "", "optional": False, "description": "Beat slug (unique within character)"},
         "character": {"type": "string", "default": "", "optional": False, "description": "Character slug this beat belongs to"},
         "scene": {"type": "string", "default": "", "optional": False, "description": "Scene slug where this beat occurs"},

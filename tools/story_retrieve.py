@@ -11,7 +11,7 @@ SCHEMA = {
         },
         "entity_type": {
             "type": "string",
-            "enum": ["character", "location", "world", "plot", "project", "scene", "sequence", "act", "arc"],
+            "enum": ["character", "location", "world", "plot", "project", "scene", "sequence", "act", "arc_beat"],
             "description": "Type of entity"
         },
         "slug": {
@@ -89,17 +89,17 @@ def _unfilled_for_entity(conn, entity_id: str) -> list[str]:
 
 def _entity_id_for(conn, entity_type: str, slug: str) -> str | None:
     """Map entity_type + slug to DB entity id."""
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         # arc PK is "{char_slug}-{beat_id}"
         # Try direct match first
         row = conn.execute(
-            "SELECT id FROM entities WHERE type='arc' AND id=?", (slug,)
+            "SELECT id FROM entities WHERE type='arc_beat' AND id=?", (slug,)
         ).fetchone()
         if row:
             return row[0]
         # Try pattern match for {char}-{beat} — slug is the beat_id, entity_id is {char_slug}-{beat_id}
         row = conn.execute(
-            "SELECT id FROM entities WHERE type='arc' AND id LIKE ?", (f"%-{slug}",)
+            "SELECT id FROM entities WHERE type='arc_beat' AND id LIKE ?", (f"%-{slug}",)
         ).fetchone()
         return row[0] if row else None
     else:

@@ -16,7 +16,7 @@ SCHEMA = {
             "type": "object",
             "description": "Target entity (omit for update_story_memory)",
             "properties": {
-                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc"]},
+                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat"]},
                 "slug": {"type": "string"}
             }
         },
@@ -51,7 +51,7 @@ _ENTITY_COLUMN_MAP = {
     "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
-    "arc": {"label": "name", "order": "order_key", "character": "parent_id"},
+    "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
 }
 
 _FIELDS_TO_SKIP = {"id", "type"}
@@ -104,14 +104,14 @@ def _find_entity_id_db(conn, entity_type: str, slug: str) -> str | None:
     if entity_type == "project":
         row = conn.execute("SELECT id FROM entities WHERE type='project'").fetchone()
         return row[0] if row else None
-    elif entity_type == "arc":
+    elif entity_type == "arc_beat":
         row = conn.execute(
-            "SELECT id FROM entities WHERE type='arc' AND id=?", (slug,)
+            "SELECT id FROM entities WHERE type='arc_beat' AND id=?", (slug,)
         ).fetchone()
         if row:
             return row[0]
         row = conn.execute(
-            "SELECT id FROM entities WHERE type='arc' AND id LIKE ?",
+            "SELECT id FROM entities WHERE type='arc_beat' AND id LIKE ?",
             (f"%-{slug}",)
         ).fetchone()
         return row[0] if row else None
@@ -370,6 +370,6 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
-        "arc": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+        "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
     }
     return sections.get(entity_type, [])

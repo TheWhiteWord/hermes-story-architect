@@ -402,7 +402,7 @@ class TestStoryRetrieveDB:
         proj, vault = db_project
         result = json.loads(retrieve_handler({
             "project": str(proj),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": "kael-1",
             "sections": ["Action"],
             "vault_path": vault

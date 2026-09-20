@@ -13,11 +13,11 @@ class TestArcValidation:
             "gap": "Expected answers, got silence", "choice": "Pushes harder",
             "shift": "positive → mixed", "y": 0.5, "order": 1,
         }
-        warnings = validate_entity("arc", fm)
+        warnings = validate_entity("arc_beat", fm)
         assert warnings == []
 
     def test_validate_arc_missing_required(self):
-        warnings = validate_entity("arc", {"id": "beat-1"})
+        warnings = validate_entity("arc_beat", {"id": "beat-1"})
         assert any("character" in w for w in warnings)
         assert any("scene" in w for w in warnings)
         assert any("order" in w for w in warnings)
@@ -25,19 +25,19 @@ class TestArcValidation:
     def test_validate_arc_y_out_of_range(self):
         fm = {"id": "b1", "character": "k", "scene": "s", "label": "L",
               "action": "a", "gap": "g", "choice": "c", "shift": "s", "y": 2.0, "order": 1}
-        warnings = validate_entity("arc", fm)
+        warnings = validate_entity("arc_beat", fm)
         assert any("y out of range" in w for w in warnings)
 
     def test_validate_arc_y_negative_ok(self):
         fm = {"id": "b1", "character": "k", "scene": "s", "label": "L",
               "action": "a", "gap": "g", "choice": "c", "shift": "s", "y": -1.0, "order": 1}
-        warnings = validate_entity("arc", fm)
+        warnings = validate_entity("arc_beat", fm)
         assert not any("y out of range" in w for w in warnings)
 
     def test_validate_arc_order_not_numeric(self):
         fm = {"id": "b1", "character": "k", "scene": "s", "label": "L",
               "action": "a", "gap": "g", "choice": "c", "shift": "s", "y": 0.0, "order": "first"}
-        warnings = validate_entity("arc", fm)
+        warnings = validate_entity("arc_beat", fm)
         assert any("order" in w and "must be a number" in w for w in warnings)
 
     def test_validate_character_arc_type_valid(self):
@@ -60,7 +60,7 @@ class TestArcValidation:
         assert not any("Invalid" in w for w in warnings)
 
     def test_arc_schema_has_all_fields(self):
-        arc_schema = ENTITY_SCHEMAS["arc"]
+        arc_schema = ENTITY_SCHEMAS["arc_beat"]
         assert "character" in arc_schema
         assert "scene" in arc_schema
         assert "y" in arc_schema
@@ -80,7 +80,7 @@ import json
 
 class TestArcCreateTool:
     def test_create_arc_beat(self, tmp_path):
-        """story_create with entity_type='arc' creates DB entity."""
+        """story_create with entity_type='arc_beat' creates DB entity."""
         from tools.story_create import handler as create_handler
         from core.db import get_db
 
@@ -91,7 +91,7 @@ class TestArcCreateTool:
         })
 
         result = create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "First Doubt", "action": "Kael questions",
@@ -110,7 +110,7 @@ class TestArcCreateTool:
             ).fetchone()
             assert row is not None
             assert row[0] == "kael-1"
-            assert row[1] == "arc"
+            assert row[1] == "arc_beat"
             assert row[2] == "First Doubt"
             assert row[3] == "kael"
         finally:
@@ -127,7 +127,7 @@ class TestArcCreateTool:
         })
 
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "First Doubt", "action": "a", "gap": "g",
@@ -155,7 +155,7 @@ class TestArcCreateTool:
         from tools.story_create import handler as create_handler
 
         result = create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "nonexistent",
                 "label": "Test", "action": "a", "gap": "g",
@@ -176,7 +176,7 @@ class TestArcCreateTool:
         })
 
         result = create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael", "scene": "nonexistent-scene",
                 "label": "Test", "action": "a", "gap": "g",
@@ -200,7 +200,7 @@ class TestArcEditTool:
             "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
         })
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "First Doubt", "action": "a", "gap": "g",
@@ -210,7 +210,7 @@ class TestArcEditTool:
 
         result = edit_handler({
             "action": "edit_note",
-            "target": {"entity_type": "arc", "slug": "1", "project": str(tmp_path)},
+            "target": {"entity_type": "arc_beat", "slug": "1", "project": str(tmp_path)},
             "data": {"label": "Updated Label", "y": -0.3},
             "summary": "Update label and y"
         })
@@ -239,7 +239,7 @@ class TestArcEditTool:
             "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
         })
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "First Doubt", "action": "a", "gap": "g",
@@ -249,7 +249,7 @@ class TestArcEditTool:
 
         result = edit_handler({
             "action": "edit_note",
-            "target": {"entity_type": "arc", "slug": "1", "project": str(tmp_path)},
+            "target": {"entity_type": "arc_beat", "slug": "1", "project": str(tmp_path)},
             "data": {"Action": "New action content here."},
             "summary": "Update action section"
         })
@@ -277,7 +277,7 @@ class TestArcRetrieveTool:
             "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
         })
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "First Doubt", "action": "Kael questions the system",
@@ -288,12 +288,12 @@ class TestArcRetrieveTool:
 
         result = retrieve_handler({
             "project": str(tmp_path),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": "1",
             "sections": ["all"]
         })
         data = json.loads(result)
-        assert data["entity_type"] == "arc"
+        assert data["entity_type"] == "arc_beat"
         assert data["slug"] == "1"
         assert "## Action" in data["content"]
         assert "## Development Log" in data["content"]
@@ -308,7 +308,7 @@ class TestArcRetrieveTool:
             "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
         })
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "First Doubt", "action": "a", "gap": "g",
@@ -318,7 +318,7 @@ class TestArcRetrieveTool:
 
         result = retrieve_handler({
             "project": str(tmp_path),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": "1",
             "sections": ["Action"]
         })
@@ -331,7 +331,7 @@ class TestArcRetrieveTool:
 
         result = retrieve_handler({
             "project": str(tmp_path),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": "999",
             "sections": ["all"]
         })
@@ -350,7 +350,7 @@ class TestArcLoadTool:
             "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
         })
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael",
                 "label": "Beat", "action": "a", "gap": "g",
@@ -382,13 +382,13 @@ class TestArcToolIntegrationFixture:
 
         result = retrieve_handler({
             "project": str(fixture_path),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": "1",
             "sections": ["all"],
             "vault_path": fixture_path.parent,
         })
         data = json.loads(result)
-        assert data["entity_type"] == "arc"
+        assert data["entity_type"] == "arc_beat"
         assert data["slug"] == "1"
         assert "## Action" in data["content"]
 
@@ -401,7 +401,7 @@ class TestArcToolIntegrationFixture:
 
         result = retrieve_handler({
             "project": str(fixture_path),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": "2",
             "sections": ["Action"],
             "vault_path": fixture_path.parent,

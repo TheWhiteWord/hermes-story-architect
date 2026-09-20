@@ -104,7 +104,7 @@ def _export_all(conn, project_path: Path) -> None:
 
         if entity_type == "project":
             _write_note(project_path / "project.md", fm, body)
-        elif entity_type == "arc":
+        elif entity_type == "arc_beat":
             # Derive beat_id from composite entity_id + parent_id
             beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
             char_dir = project_path / "arcs" / parent_id
@@ -181,7 +181,7 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
         fm.update(extra)
         return fm
 
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         # Derive beat_id from composite entity_id + parent_id (no extra storage needed)
         beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
         fm["id"] = beat_id

@@ -961,7 +961,7 @@ class TestUnfilledFields:
     def test_unfilled_fields_arc_action(self):
         from core.entity import unfilled_fields
         extra = {"action": "Action not described", "gap": "Gap not defined"}
-        result = unfilled_fields("arc", extra)
+        result = unfilled_fields("arc_beat", extra)
         assert "action" in result
         assert "gap" in result
 
@@ -978,7 +978,7 @@ class TestUnfilledFields:
         """Boolean fields (is_crisis, is_climax, arc_complete) are not 'unfilled'."""
         from core.entity import unfilled_fields
         extra = {"is_crisis": False, "is_climax": False, "action": "Action not described"}
-        result = unfilled_fields("arc", extra)
+        result = unfilled_fields("arc_beat", extra)
         assert "is_crisis" not in result
         assert "is_climax" not in result
         assert "action" in result
@@ -987,7 +987,7 @@ class TestUnfilledFields:
         """Numeric fields (y, act_count) are not 'unfilled'."""
         from core.entity import unfilled_fields
         extra = {"y": 0.0, "action": "Action not described"}
-        result = unfilled_fields("arc", extra)
+        result = unfilled_fields("arc_beat", extra)
         assert "y" not in result
         assert "action" in result
 

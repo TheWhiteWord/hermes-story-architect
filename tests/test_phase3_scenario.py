@@ -110,7 +110,7 @@ class Test3EditScenario:
             "vault_path": vault
         })
         create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(proj),
+            "entity_type": "arc_beat", "slug": "1", "project": str(proj),
             "frontmatter": {
                 "id": "1", "character": "temp-char",
                 "label": "Beat", "action": "a", "gap": "g",
@@ -171,7 +171,7 @@ class Test3EditScenario:
         })
         for i in range(1, 4):
             create_handler({
-                "entity_type": "arc", "slug": str(i), "project": str(proj),
+                "entity_type": "arc_beat", "slug": str(i), "project": str(proj),
                 "frontmatter": {
                     "id": str(i), "character": "cascade-char",
                     "label": f"Beat {i}", "action": "a", "gap": "g",
@@ -285,7 +285,7 @@ class TestAppValidation:
     def test_arc_unknown_character_rejected(self, tmp_path):
         """Create arc with non-existent character → error."""
         result = create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "nonexistent",
                 "label": "Test", "action": "a", "gap": "g",
@@ -303,7 +303,7 @@ class TestAppValidation:
             "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
         })
         result = create_handler({
-            "entity_type": "arc", "slug": "1", "project": str(tmp_path),
+            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
             "frontmatter": {
                 "id": "1", "character": "kael", "scene": "nonexistent-scene",
                 "label": "Test", "action": "a", "gap": "g",

@@ -345,12 +345,10 @@ Single or multiple entity focus. Returns sections (prose) and/or frontmatter fie
 
 **Parameters:**
 - `project` (required)
-- `entity_type` (required) — character|location|world|plot|project|scene|sequence|act|arc
+- `entity_type` (required) — character|location|world|plot|project|scene|sequence|act|arc_beat
 - `id` (required) — list of entity slugs/ids (from story_load output `id` field)
 - `sections` (optional) — section names to retrieve. `["all"]` for all sections.
 - `fields` (optional) — FM field names to retrieve. No grouping — agent names exactly what it wants.
-
-**Note on `arc`:** The entity type is `arc`, but each entry is an individual *beat* (e.g., `kael-1`, `kael-2`). Retrieving `entity_type="arc"` returns the specified beats, not a whole arc as a sequence. To get all beats for a character, use `story_load(view="arc", character="kael")`.
 
 **Call patterns (from brainstorm):**
 
@@ -463,29 +461,3 @@ The agent requests exactly what it needs.
 - Grouping is a return-shape concern, not a request concern
 
 ---
-
-## 6. Unfilled Fields
-
-**In load:** included as a small `unfilled` key in base view (~180 tokens). Inverted field→entity list.
-
-**In retrieve:** included when `fields` is requested. Shows which FM fields are still at default for this entity.
-
-**Not a separate tool.** Unfilled is a data-quality signal, not a domain concern.
-
----
-
-## 7. Open Questions
-
-1. **Batch retrieve** — skip for now. Agent drills one entity at a time. Add `slugs=[...]` when a real need surfaces.
-2. **Memory retrieval** — deferred. No clean path yet.
-3. **World rules retrieval** — stored as frontmatter, not section. Future expansion.
-4. **Plot beat descriptions** — stored as relation notes, not sections. Future expansion.
-
----
-
-## 8. Migration Notes
-
-- Current `story_load` base view already close — remove plot scene arrays, remove arc beats from characters, remove climax/dramatic_role from scenes
-- Current `story_retrieve` needs FM field support added (currently sections-only)
-- Extended views (`arc`, `story_value`, `dramatic_elements`) are new — no migration needed
-- Unfilled fields stay in load but may move to a separate `story_status` tool later

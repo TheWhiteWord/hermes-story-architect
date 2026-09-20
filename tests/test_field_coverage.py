@@ -97,7 +97,7 @@ def project(tmp_path):
 
 def _create_parents(project, entity_type):
     """Create required parent entities for structural types."""
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         create_handler({
             "entity_type": "character", "slug": "parent-char",
             "project": str(project),
@@ -148,7 +148,7 @@ def _create_parents(project, entity_type):
 
 def _prepare_frontmatter(entity_type, slug, fm):
     """Add parent references to frontmatter based on entity type."""
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         fm["character"] = "parent-char"
         fm["scene"] = "beat-scene"
         fm["id"] = slug
@@ -215,11 +215,11 @@ def test_create_load_retrieve(entity_type, project):
                     break
     elif entity_type == "act":
         found = any(a.get("id") == slug for a in load_result["acts"])
-    elif entity_type == "arc":
+    elif entity_type == "arc_beat":
         # Arcs no longer in load output; verify via story_retrieve
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": f"parent-char-{slug}",
             "sections": ["all"],
         }))
@@ -229,7 +229,7 @@ def test_create_load_retrieve(entity_type, project):
 
     # Retrieve → sections present
     expected_id = slug
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         expected_id = f"parent-char-{slug}"
     retrieve_result = json.loads(retrieve_handler({
         "project": str(project),
@@ -247,7 +247,7 @@ def test_create_load_retrieve(entity_type, project):
 # ─── Phase 2: Edit every field type ──────────────────────────────────────────
 
 
-@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "arc"])
+@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "arc_beat"])
 def test_edit_all_field_types(entity_type, project):
     """Edit column, extra, section, and relation fields for an entity type."""
     slug = f"edit-{entity_type}"
@@ -264,7 +264,7 @@ def test_edit_all_field_types(entity_type, project):
     })
     assert json.loads(result).get("success"), f"Create failed: {result}"
 
-    entity_id = f"parent-char-{slug}" if entity_type == "arc" else slug
+    entity_id = f"parent-char-{slug}" if entity_type == "arc_beat" else slug
 
     # Build edit payload covering all field categories
     edit_data = {}
@@ -273,7 +273,7 @@ def test_edit_all_field_types(entity_type, project):
         "character": {"one_sentence": "Updated one sentence"},
         "plot": {"one_sentence": "Updated plot summary", "status": "resolved"},
         "scene": {"title": "Updated Title", "status": "written"},
-        "arc": {"label": "Updated Label"},
+        "arc_beat": {"label": "Updated Label"},
     }
     edit_data.update(column_fields.get(entity_type, {}))
 
@@ -281,7 +281,7 @@ def test_edit_all_field_types(entity_type, project):
         "character": {"arc_type": "negative", "arc_complete": True},
         "plot": {"plot_type": "Resonant", "value_arc": "Maturation"},
         "scene": {"dramatic_role": "crisis", "value": "Betrayal"},
-        "arc": {"action": "Updated action", "y": -0.7, "is_crisis": True},
+        "arc_beat": {"action": "Updated action", "y": -0.7, "is_crisis": True},
     }
     edit_data.update(extra_fields.get(entity_type, {}))
 
@@ -289,7 +289,7 @@ def test_edit_all_field_types(entity_type, project):
         "character": "Personality",
         "plot": "Summary",
         "scene": "Description",
-        "arc": "Action",
+        "arc_beat": "Action",
     }.get(entity_type)
     if section_name:
         edit_data[section_name] = f"Updated {section_name} content via edit."
@@ -328,11 +328,11 @@ def test_edit_all_field_types(entity_type, project):
                     if isinstance(scene, dict) and scene.get("id") == entity_id:
                         entity_data = scene
                         break
-    elif entity_type == "arc":
+    elif entity_type == "arc_beat":
         # Arc beats no longer in load output; verify via story_retrieve
         retrieve_after = json.loads(retrieve_handler({
             "project": str(project),
-            "entity_type": "arc",
+            "entity_type": "arc_beat",
             "slug": entity_id,
             "sections": ["all"],
         }))
@@ -364,7 +364,7 @@ def test_edit_all_field_types(entity_type, project):
         if "dramatic_role" in edit_data:
             assert entity_data.get("dramatic_role") == edit_data["dramatic_role"]
 
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         # Arc field checks (y, is_crisis, etc.) removed — arcs no longer in load output
         if "label" in edit_data:
             assert entity_data["label"] == edit_data["label"]
@@ -389,7 +389,7 @@ def test_edit_all_field_types(entity_type, project):
 # ─── Phase 3: Dashboard renders without error ────────────────────────────────
 
 
-@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "arc", "location", "world", "sequence", "act"])  # project excluded — it's the root entity, not a child
+@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "arc_beat", "location", "world", "sequence", "act"])  # project excluded — it's the root entity, not a child
 def test_dashboard_renders_with_entity(entity_type, project):
     """Dashboard renders HTML without error for each entity type."""
     slug = f"dash-{entity_type}"

@@ -78,7 +78,7 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         _validate_numeric(frontmatter, "y", warnings)
         _validate_numeric(frontmatter, "order", warnings)
         if "y" in frontmatter:
@@ -128,7 +128,7 @@ ENTITY_COLUMN_MAP = {
     "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
-    "arc": {"label": "name", "order": "order_key", "character": "parent_id"},
+    "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
 }
 
 FIELDS_TO_SKIP = {"id", "type"}
@@ -144,7 +144,7 @@ _RELATION_FIELDS = {
         "payoffs": ("plot_payoff", True),
     },
     "character": {"relationships": ("character_relationship", True)},
-    "arc": {},
+    "arc_beat": {},
 }
 
 
@@ -175,7 +175,7 @@ def standard_sections(entity_type: str) -> list[str]:
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
-        "arc": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+        "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
     }
     return sections.get(entity_type, [])
 
@@ -206,7 +206,7 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
             continue
         # Arc keeps 'scene' as an extra attribute (which scene the beat occurs in)
         # in addition to the arc_beat relation created separately
-        if key in relation_fields and not (entity_type == "arc" and key == "scene"):
+        if key in relation_fields and not (entity_type == "arc_beat" and key == "scene"):
             continue  # handled separately as relations
         if key in column_map:
             columns[column_map[key]] = value
@@ -214,7 +214,7 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
             extra[key] = value
 
     # Arc: entity_id is composite (character-slug + beat-slug, e.g. "kael-1")
-    if entity_type == "arc":
+    if entity_type == "arc_beat":
         char_slug = fm.get("character", "")
         columns["id"] = f"{char_slug}-{slug}" if char_slug else slug
         columns["parent_id"] = char_slug or None
