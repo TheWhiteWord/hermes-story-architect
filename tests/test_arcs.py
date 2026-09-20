@@ -369,48 +369,56 @@ class TestArcLoadTool:
 
 
 class TestArcToolIntegrationFixture:
-    """Integration tests using save-the-children fixture (read-only)."""
+    """Integration tests using save-the-children fixture (read-only). Each test
+    copies the fixture to a temp dir so no .story/story.db is created in the repo."""
 
-    FIXTURE_PATH = Path(__file__).parent / "fixtures" / "save-the-children"
-
-    def test_retrieve_arc_from_fixture(self):
+    def test_retrieve_arc_from_fixture(self, fixture_path):
         """story_retrieve loads existing arc beat from fixture."""
         from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
 
-        # Import fixture to DB
-        import_handler({"project": str(self.FIXTURE_PATH)})
+        # Import fixture to DB (in temp)
+        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
 
         result = retrieve_handler({
-            "project": str(self.FIXTURE_PATH),
+            "project": str(fixture_path),
             "entity_type": "arc",
             "slug": "1",
-            "sections": ["all"]
+            "sections": ["all"],
+            "vault_path": fixture_path.parent,
         })
         data = json.loads(result)
         assert data["entity_type"] == "arc"
         assert data["slug"] == "1"
         assert "## Action" in data["content"]
 
-    def test_retrieve_arc_action_section_from_fixture(self):
+    def test_retrieve_arc_action_section_from_fixture(self, fixture_path):
         """story_retrieve loads specific section from fixture arc beat."""
+        from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
 
+        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+
         result = retrieve_handler({
-            "project": str(self.FIXTURE_PATH),
+            "project": str(fixture_path),
             "entity_type": "arc",
             "slug": "2",
-            "sections": ["Action"]
+            "sections": ["Action"],
+            "vault_path": fixture_path.parent,
         })
         data = json.loads(result)
         assert "Action" in data["sections"]
 
-    def test_load_fixture_includes_arc_count(self):
+    def test_load_fixture_includes_arc_count(self, fixture_path):
         """story_load confirmation includes fixture character count."""
+        from tools.story_import import handler as import_handler
         from tools.story_load import handler as load_handler
 
+        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+
         result = load_handler({
-            "project": str(self.FIXTURE_PATH)
+            "project": str(fixture_path),
+            "vault_path": fixture_path.parent,
         })
         data = json.loads(result)
         # New format: character count instead of arc count

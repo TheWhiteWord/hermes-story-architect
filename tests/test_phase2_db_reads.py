@@ -16,11 +16,6 @@ from tools.story_edit import handler as edit_handler
 
 
 @pytest.fixture
-def fixture_path():
-    return Path(__file__).parent / "fixtures" / "save-the-children"
-
-
-@pytest.fixture
 def db_project(fixture_path):
     """Create a temp project with DB imported from fixture."""
     tmp = tempfile.mkdtemp()

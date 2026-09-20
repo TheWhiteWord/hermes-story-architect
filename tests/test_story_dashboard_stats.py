@@ -142,11 +142,14 @@ class TestStatsInjection:
 class TestStructuralStats:
     """Regression tests for dashboard structural stats from DB."""
 
-    def test_structural_stats_scene_roles(self):
+    def test_structural_stats_scene_roles(self, fixture_path):
         """get_dashboard_data returns correct role counts (not all 'unset')."""
+        from tools.story_import import handler as import_handler
         from core.db import get_dashboard_data
 
-        data = get_dashboard_data(FIXTURE_PATH)
+        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+
+        data = get_dashboard_data(fixture_path)
         stats = data["structural_stats"]
         roles = stats["sceneRoles"]
 

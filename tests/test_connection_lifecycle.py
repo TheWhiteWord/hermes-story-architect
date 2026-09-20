@@ -11,11 +11,6 @@ from tools.story_export import handler as export_handler
 from tools.story_backup import handler as backup_handler
 
 
-@pytest.fixture
-def fixture_path():
-    return Path(__file__).parent / "fixtures" / "save-the-children"
-
-
 def test_import_does_not_leak_connections(fixture_path):
     """Import opens and closes its own connection."""
     with tempfile.TemporaryDirectory() as tmp:

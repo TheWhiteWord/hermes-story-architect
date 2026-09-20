@@ -11,12 +11,6 @@ from tools.story_load import handler as load_handler
 from tools.story_retrieve import handler as retrieve_handler
 from tools.story_create import handler as create_handler
 from tools.story_edit import handler as edit_handler
-from tools.story_search import handler as search_handler
-
-
-@pytest.fixture
-def fixture_path():
-    return Path(__file__).parent / "fixtures" / "save-the-children"
 
 
 @pytest.fixture

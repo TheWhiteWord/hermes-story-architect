@@ -9,11 +9,6 @@ from tools.story_import import handler as import_handler
 from tools.story_export import handler as export_handler
 
 
-@pytest.fixture
-def fixture_path():
-    return Path(__file__).parent / "fixtures" / "save-the-children"
-
-
 def test_import_creates_schema_and_entities(fixture_path):
     """Import creates schema and populates all tables."""
     with tempfile.TemporaryDirectory() as tmp:
