@@ -122,7 +122,7 @@ def update_sections(note_path: Path, sections: list[str]) -> None:
 ENTITY_COLUMN_MAP = {
     "project": {"name": "name", "logline": "one_sentence"},
     "character": {"name": "name", "one_sentence": "one_sentence"},
-    "location": {"name": "name", "one_sentence": "one_sentence"},
+    "location": {"name": "name", "one_sentence": "one_sentence", "world": "parent_id"},
     "world": {"name": "name", "one_sentence": "one_sentence"},
     "plot": {"name": "name", "one_sentence": "one_sentence", "status": "status"},
     "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
@@ -144,6 +144,8 @@ _RELATION_FIELDS = {
         "payoffs": ("plot_payoff", True),
     },
     "character": {"relationships": ("character_relationship", True)},
+    "location": {"variant_of": ("location_variant", False)},
+    "world": {"variant_of": ("world_variant", False)},
     "arc_beat": {},
 }
 
@@ -169,8 +171,8 @@ def standard_sections(entity_type: str) -> list[str]:
     sections = {
         "project": ["Synopsis", "Themes", "Structure", "Notes"],
         "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
-        "location": ["Description", "History", "Scenes"],
-        "world": ["Description", "History", "Conflict"],
+        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function"],
+        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict"],
         "plot": ["Summary", "Obstacles", "Stakes"],
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],
@@ -262,7 +264,16 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
                         "order": i + 1,
                     })
         else:
-            pass
+            # Non-list: single string value
+            value = fm.get(field)
+            if value:
+                relations.append({
+                    "from_id": slug,
+                    "to_id": str(value),
+                    "kind": kind,
+                    "note": "",
+                    "order": 1,
+                })
 
     return relations
 

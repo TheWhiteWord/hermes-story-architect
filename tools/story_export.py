@@ -135,13 +135,22 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
     if entity_type == "location":
         fm["name"] = name
         fm["one_sentence"] = one_sentence
+        # Merge extra fields (mood, dramatic_function, variant_of)
+        for k, v in extra.items():
+            if k not in fm:
+                fm[k] = v
+        # World from parent_id
+        if parent_id:
+            fm["world"] = parent_id
         return fm
 
     if entity_type == "world":
         fm["name"] = name
         fm["one_sentence"] = one_sentence
-        if "rules" in extra:
-            fm["rules"] = extra["rules"]
+        # Merge extra fields (rules, period, values, power, variant_of)
+        for k, v in extra.items():
+            if k not in fm:
+                fm[k] = v
         return fm
 
     if entity_type == "plot":

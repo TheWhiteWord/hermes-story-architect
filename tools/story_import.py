@@ -192,7 +192,7 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
         return {
             "id": slug, "type": "location",
             "name": fm.get("name", ""), "one_sentence": fm.get("one_sentence", ""),
-            "order_key": 0, "status": "", "parent_id": None, "location_id": None,
+            "order_key": 0, "status": "", "parent_id": fm.get("world"), "location_id": None,
             "extra": _extra_for("location", fm),
         }
     elif entity_type == "world":
@@ -250,8 +250,8 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     # Fields that go to columns or relations (not extra)
     skip = {
         "character": {"name", "one_sentence", "id", "relationships"},
-        "location": {"name", "one_sentence", "id"},
-        "world": {"name", "one_sentence", "id"},
+        "location": {"name", "one_sentence", "id", "world", "variant_of"},
+        "world": {"name", "one_sentence", "id", "variant_of"},
         "plot": {"name", "one_sentence", "status", "id", "setups", "payoffs", "crisis", "climax"},
         "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters"},
         "sequence": {"title", "order", "status", "act_id", "id"},
@@ -305,6 +305,20 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                         "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
                         (slug, target, "character_relationship", note),
                     )
+    elif entity_type == "location":
+        target = fm.get("variant_of")
+        if target:
+            conn.execute(
+                "INSERT OR IGNORE INTO relations (from_id, to_id, kind) VALUES (?, ?, ?)",
+                (slug, target, "location_variant"),
+            )
+    elif entity_type == "world":
+        target = fm.get("variant_of")
+        if target:
+            conn.execute(
+                "INSERT OR IGNORE INTO relations (from_id, to_id, kind) VALUES (?, ?, ?)",
+                (slug, target, "world_variant"),
+            )
 
 
 

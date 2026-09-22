@@ -308,8 +308,8 @@ def _get_standard_sections(entity_type: str) -> list[str]:
     sections = {
         "project": ["Synopsis", "Themes", "Structure", "Notes"],
         "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
-        "location": ["Description", "History", "Scenes"],
-        "world": ["Description", "History", "Conflict"],
+        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function"],
+        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict"],
         "plot": ["Summary", "Obstacles", "Stakes"],
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],

@@ -596,8 +596,8 @@ class TestProjectCreation:
         assert "acts" in result
         assert "characters" in result
         assert "plots" in result
-        assert "locations" in result
         assert "worlds" in result
+        assert "orphaned_locations" not in result or isinstance(result["orphaned_locations"], list)
         assert "unfilled" in result
         assert "memory_outline" in result
         # Old keys gone

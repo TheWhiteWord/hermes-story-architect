@@ -176,6 +176,7 @@ def get_project_summary(project_path: Path) -> dict:
         scene_loc = {}    # scene_id -> loc_slug
         char_rels = {}    # char_slug -> [{id, label, feeling}, ...]
         plot_scenes = {}  # plot_slug -> {"setups": [], "crisis": [], "climax": [], "payoffs": []}
+        variant_of = {}   # entity_id -> base_slug (location_variant / world_variant)
 
         for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
@@ -200,6 +201,8 @@ def get_project_summary(project_path: Path) -> dict:
                 plot_scenes.setdefault(from_id, {}).setdefault("climax", []).append(to_id)
             elif kind == "plot_payoff":
                 plot_scenes.setdefault(from_id, {}).setdefault("payoffs", []).append(to_id)
+            elif kind in ("location_variant", "world_variant"):
+                variant_of[from_id] = to_id
 
         # ── Organize entities by type ──
         acts = {}
@@ -257,10 +260,18 @@ def get_project_summary(project_path: Path) -> dict:
             elif etype == "location":
                 locations[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
+                    "mood": extra.get("mood", ""),
+                    "dramatic_function": extra.get("dramatic_function", ""),
+                    "_order_key": order_key, "_parent_id": parent_id,
                 }
             elif etype == "world":
                 worlds[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
+                    "rules": extra.get("rules", []),
+                    "period": extra.get("period", ""),
+                    "values": extra.get("values", []),
+                    "power": extra.get("power", []),
+                    "_order_key": order_key, "_parent_id": parent_id,
                 }
 
 
@@ -394,20 +405,39 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build location/world output ──
         def _build_location(loc_id):
             loc = locations[loc_id]
-            return {"id": loc_id, "name": loc["name"], "one_sentence": loc["one_sentence"]}
+            result = {"id": loc_id, "name": loc["name"], "one_sentence": loc["one_sentence"]}
+            if loc_id in variant_of:
+                result["variant_of"] = variant_of[loc_id]
+            return result
 
         def _build_world(world_id):
             w = worlds[world_id]
-            return {"id": world_id, "name": w["name"], "one_sentence": w["one_sentence"]}
+            child_loc_ids = sorted(
+                [lid for lid, loc in locations.items() if loc.get("_parent_id") == world_id],
+                key=lambda lid: (locations[lid]["_order_key"], lid),
+            )
+            locations_list = [_build_location(lid) for lid in child_loc_ids]
+            result = {"id": world_id, "name": w["name"], "one_sentence": w["one_sentence"], "locations": locations_list}
+            if w.get("period"):
+                result["period"] = w["period"]
+            if world_id in variant_of:
+                result["variant_of"] = variant_of[world_id]
+            return result
 
         characters_list = [_build_character(cid) for cid in characters]
         plots_list = [_build_plot(pid) for pid in plots]
-        locations_list = [_build_location(lid) for lid in locations]
         worlds_list = [_build_world(wid) for wid in worlds]
+
+        # Orphaned locations (no world, or world doesn't exist) — top-level array
+        orphaned_loc_ids = sorted(
+            [lid for lid, loc in locations.items()
+             if not loc.get("_parent_id") or loc["_parent_id"] not in worlds],
+            key=lambda lid: (locations[lid]["_order_key"], lid),
+        )
+        orphaned_locations = [_build_location(lid) for lid in orphaned_loc_ids]
 
         # ── Unfilled (inverted) ──
         from .entity import unfilled_fields
-
         unfilled_inv = {}
         for eid, etype, name, one_sentence, status, order_key, parent_id, extra_json in ent_rows:
             extra = json.loads(extra_json) if extra_json else {}
@@ -442,6 +472,7 @@ def get_project_summary(project_path: Path) -> dict:
                 unfilled_inv.setdefault(field, []).append(eid)
 
         # ── Confirmation string ──
+        total_locations = len(locations)
         total_scenes = len(scenes)
         developed_scenes = sum(1 for s in scenes.values() if not _is_scene_stub(s))
         confirmation = (
@@ -450,7 +481,7 @@ def get_project_summary(project_path: Path) -> dict:
             f"{len(sequences)} sequences, "
             f"{len(acts)} acts, "
             f"{len(characters)} characters, "
-            f"{len(locations)} locations, "
+            f"{total_locations} locations, "
             f"{len(plots)} plots, "
             f"{len(worlds)} worlds."
         )
@@ -458,18 +489,20 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Memory outline ──
         memory_outline = get_memory_outline(project_path)
 
-        return {
+        result = {
             "loaded": True,
             "confirmation": confirmation,
             "project": project,
             "acts": acts_list,
             "characters": characters_list,
             "plots": plots_list,
-            "locations": locations_list,
             "worlds": worlds_list,
             "unfilled": unfilled_inv,
             "memory_outline": memory_outline,
         }
+        if orphaned_locations:
+            result["orphaned_locations"] = orphaned_locations
+        return result
     finally:
         conn.close()
 
@@ -564,6 +597,15 @@ def get_dashboard_data(project_path: Path) -> dict:
             "FROM entities ORDER BY type, id"
         ).fetchall()
 
+        # Build entity lookup for cross-references (must precede rel lookups)
+        entity_by_id = {}
+        for r in ent_rows:
+            entity_by_id[r[0]] = {
+                "id": r[0], "type": r[1], "name": r[2], "one_sentence": r[3],
+                "order": r[4], "status": r[5], "parent_id": r[6], "location_id": r[7],
+                "extra": json.loads(r[8]) if r[8] else {},
+            }
+
         # Load all relations for denormalization (include note for plot beat descriptions)
         rel_rows = conn.execute(
             "SELECT from_id, to_id, kind, note FROM relations"
@@ -581,23 +623,26 @@ def get_dashboard_data(project_path: Path) -> dict:
         scene_chars = {}
         scene_locs = {}
         scene_plots = {}
+        char_scenes = {}  # character_id → [scene_id, ...]
+        variant_map = {}  # entity_id → variant_of (location_variant / world_variant)
         for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
-                scene_chars.setdefault(to_id, []).append(from_id)
+                # Relation may be stored character→scene OR scene→character
+                # (import vs story_create conventions). Detect by checking
+                # which side is a character vs scene entity.
+                if from_id in entity_by_id and entity_by_id[from_id]["type"] == "character":
+                    scene_chars.setdefault(to_id, []).append(from_id)
+                    char_scenes.setdefault(from_id, []).append(to_id)
+                elif to_id in entity_by_id and entity_by_id[to_id]["type"] == "character":
+                    scene_chars.setdefault(from_id, []).append(to_id)
+                    char_scenes.setdefault(to_id, []).append(from_id)
             elif kind == "location_scene":
                 scene_locs.setdefault(to_id, []).append(from_id)
             elif kind in ("plot_setup", "plot_crisis", "plot_climax", "plot_payoff"):
                 beat = kind.replace("plot_", "")
                 scene_plots.setdefault(to_id, []).append({"id": from_id, "beat": beat})
-
-        # Build entity lookup for cross-references
-        entity_by_id = {}
-        for r in ent_rows:
-            entity_by_id[r[0]] = {
-                "id": r[0], "type": r[1], "name": r[2], "one_sentence": r[3],
-                "order": r[4], "status": r[5], "parent_id": r[6], "location_id": r[7],
-                "extra": json.loads(r[8]) if r[8] else {},
-            }
+            elif kind in ("location_variant", "world_variant"):
+                variant_map[from_id] = to_id
 
         # Denormalize: build per-type arrays with cross-references
         def _entity_dict(e):
@@ -636,8 +681,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                 })
                 # scenes: [{id, title, heading}] (from character_scene relations)
                 scene_objs = []
-                for rel in rel_map.get(eid, {}).get("character_scene", []):
-                    sid = rel.get("to_id", "") if isinstance(rel, dict) else rel
+                for sid in char_scenes.get(eid, []):
                     if sid in entity_by_id:
                         s = entity_by_id[sid]
                         s_extra = s.get("extra", {})
@@ -677,6 +721,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                 # characters, locations, plots — O(1) reverse lookups
                 d["characters"] = scene_chars.get(eid, [])
                 d["locations"] = scene_locs.get(eid, [])
+                if e[7] and e[7] not in d["locations"]:
+                    d["locations"].append(e[7])
                 d["plots"] = scene_plots.get(eid, [])
                 scenes.append(d)
 
@@ -685,6 +731,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                     "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
                     "status": e[5], "parent_id": e[6], "extra": extra,
                 })
+                if eid in variant_map:
+                    d["variant_of"] = variant_map[eid]
                 # scenes: [{id, title, heading}] (from location_scene relations)
                 scene_objs = []
                 for rel in rel_map.get(eid, {}).get("location_scene", []):
@@ -732,6 +780,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                     "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
                     "status": e[5], "parent_id": e[6], "extra": extra,
                 })
+                if eid in variant_map:
+                    d["variant_of"] = variant_map[eid]
                 worlds.append(d)
 
             elif etype == "act":

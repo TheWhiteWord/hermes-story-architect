@@ -32,7 +32,11 @@ def _find_entity_in_nested(result, entity_type, slug):
     elif entity_type == "plot":
         return next((e for e in result["plots"] if e["id"] == slug), None)
     elif entity_type == "location":
-        return next((e for e in result["locations"] if e["id"] == slug), None)
+        for world in result["worlds"]:
+            found = next((loc for loc in world.get("locations", []) if loc["id"] == slug), None)
+            if found:
+                return found
+        return None
     elif entity_type == "world":
         return next((e for e in result["worlds"] if e["id"] == slug), None)
     elif entity_type == "act":
@@ -58,12 +62,14 @@ def _all_entity_ids(result):
     ids = set()
     for char in result["characters"]:
         ids.add(char["id"])
+    for loc in result.get("orphaned_locations", []):
+        ids.add(loc["id"])
     for plot in result["plots"]:
         ids.add(plot["id"])
-    for loc in result["locations"]:
-        ids.add(loc["id"])
     for world in result["worlds"]:
         ids.add(world["id"])
+        for loc in world.get("locations", []):
+            ids.add(loc["id"])
     for act in result["acts"]:
         ids.add(act["id"])
         for seq in act.get("sequences", []):

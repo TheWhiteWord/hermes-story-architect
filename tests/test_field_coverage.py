@@ -194,7 +194,12 @@ def test_create_load_retrieve(entity_type, project):
     elif entity_type == "plot":
         found = any(e["id"] == slug for e in load_result["plots"])
     elif entity_type == "location":
-        found = any(e["id"] == slug for e in load_result["locations"])
+        # Locations can be nested inside worlds or at top level (orphaned)
+        found = any(loc["id"] == slug
+                     for w in load_result["worlds"]
+                     for loc in w.get("locations", []))
+        if not found:
+            found = any(loc["id"] == slug for loc in load_result.get("orphaned_locations", []))
     elif entity_type == "world":
         found = any(e["id"] == slug for e in load_result["worlds"])
     elif entity_type == "scene":

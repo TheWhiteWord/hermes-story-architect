@@ -197,3 +197,97 @@ def test_recycle_bin_not_imported(fixture_path):
         assert soren is None
 
         conn.close()
+
+
+def test_world_fields_round_trip(fixture_path):
+    """World with new fields (period, values, power, rules) survives import→export."""
+    import frontmatter
+
+    with tempfile.TemporaryDirectory() as tmp:
+        project_path = Path(tmp) / "save-the-children"
+        shutil.copytree(str(fixture_path), str(project_path))
+
+        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+
+        export_dir = Path(tmp) / "exported"
+        export_dir.mkdir()
+        shutil.copytree(str(project_path), str(export_dir / "proj"))
+        export_path = export_dir / "proj"
+        for f in export_path.rglob("*.md"):
+            f.unlink()
+        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+
+        orig = frontmatter.load(project_path / "worlds" / "the-i.md")
+        exported = frontmatter.load(export_path / "worlds" / "the-i.md")
+
+        # FM keys match
+        assert set(orig.metadata.keys()) == set(exported.metadata.keys())
+        # Specific new fields preserved
+        assert exported.metadata["period"] == "+400y after the collapse"
+        assert isinstance(exported.metadata["values"], list)
+        assert len(exported.metadata["values"]) == 2
+        assert isinstance(exported.metadata["power"], list)
+        assert len(exported.metadata["power"]) == 2
+
+
+def test_location_world_and_variant_fields_round_trip(fixture_path):
+    """Location with world, mood, dramatic_function, variant_of survives import→export."""
+    import frontmatter
+
+    with tempfile.TemporaryDirectory() as tmp:
+        project_path = Path(tmp) / "save-the-children"
+        shutil.copytree(str(fixture_path), str(project_path))
+
+        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+
+        export_dir = Path(tmp) / "exported"
+        export_dir.mkdir()
+        shutil.copytree(str(project_path), str(export_dir / "proj"))
+        export_path = export_dir / "proj"
+        for f in export_path.rglob("*.md"):
+            f.unlink()
+        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+
+        orig = frontmatter.load(project_path / "locations" / "the-central-room.md")
+        exported = frontmatter.load(export_path / "locations" / "the-central-room.md")
+
+        # FM keys match
+        assert set(orig.metadata.keys()) == set(exported.metadata.keys())
+        # World field preserved
+        assert exported.metadata["world"] == "the-i"
+        # New fields preserved
+        assert exported.metadata["mood"] == "oppressive stillness"
+        assert exported.metadata["dramatic_function"] == "where the children's hope is tested"
+
+
+def test_world_variant_of_round_trip(fixture_path):
+    """World with variant_of creates a relation row that exports back to FM."""
+    import frontmatter
+
+    with tempfile.TemporaryDirectory() as tmp:
+        project_path = Path(tmp) / "save-the-children"
+        shutil.copytree(str(fixture_path), str(project_path))
+
+        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+
+        # Verify relation row was created
+        from core.db import get_db
+        conn = get_db(project_path)
+        rel = conn.execute(
+            "SELECT to_id FROM relations WHERE from_id='the-real-world' AND kind='world_variant'"
+        ).fetchone()
+        assert rel is not None
+        assert rel[0] == "the-i"
+        conn.close()
+
+        # Export and verify variant_of appears in FM
+        export_dir = Path(tmp) / "exported"
+        export_dir.mkdir()
+        shutil.copytree(str(project_path), str(export_dir / "proj"))
+        export_path = export_dir / "proj"
+        for f in export_path.rglob("*.md"):
+            f.unlink()
+        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+
+        exported = frontmatter.load(export_path / "worlds" / "the-real-world.md")
+        assert exported.metadata["variant_of"] == "the-i"

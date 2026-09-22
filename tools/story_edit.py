@@ -45,7 +45,7 @@ SCHEMA = {
 # FM field name → DB column name, per entity type
 _ENTITY_COLUMN_MAP = {
     "character": {"name": "name", "one_sentence": "one_sentence"},
-    "location": {"name": "name", "one_sentence": "one_sentence"},
+    "location": {"name": "name", "one_sentence": "one_sentence", "world": "parent_id"},
     "world": {"name": "name", "one_sentence": "one_sentence"},
     "plot": {"name": "name", "one_sentence": "one_sentence", "status": "status"},
     "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
@@ -176,31 +176,38 @@ def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) ->
                 (json.dumps(extra), entity_id)
             )
 
-        # Create relation rows for plot beat fields (setups, crisis, climax, payoffs)
+        # Create/update relation rows for all _RELATION_FIELDS of this entity type
         from core.entity import _RELATION_FIELDS
-        plot_rel_fields = _RELATION_FIELDS.get("plot", {})
-        for field, (kind, _) in plot_rel_fields.items():
+        rel_fields = _RELATION_FIELDS.get(entity_type, {})
+        for field, (kind, is_list) in rel_fields.items():
             if field not in data:
-                continue
-            beats = data[field]
-            if not isinstance(beats, list):
                 continue
             # Delete old relations of this kind for this entity
             conn.execute(
                 "DELETE FROM relations WHERE from_id=? AND kind=?", (entity_id, kind)
             )
-            # Insert new relations
-            for i, beat in enumerate(beats):
-                if isinstance(beat, dict):
-                    scene_id = beat.get("scene_id", "")
-                    description = beat.get("description", "")
-                else:
-                    scene_id = str(beat)
-                    description = ""
-                if scene_id:
+            value = data[field]
+            if is_list:
+                if not isinstance(value, list):
+                    continue
+                for i, beat in enumerate(value):
+                    if isinstance(beat, dict):
+                        to_id = beat.get("scene_id", str(beat))
+                        note = beat.get("description", "")
+                    else:
+                        to_id = str(beat)
+                        note = ""
+                    if to_id:
+                        conn.execute(
+                            "INSERT INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
+                            (entity_id, to_id, kind, note, i + 1)
+                        )
+            else:
+                # Non-list: single string value
+                if value:
                     conn.execute(
-                        "INSERT INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
-                        (entity_id, scene_id, kind, description, i + 1)
+                        "INSERT INTO relations (from_id, to_id, kind) VALUES (?, ?, ?)",
+                        (entity_id, str(value), kind)
                     )
 
         # Upsert sections
@@ -364,8 +371,8 @@ def _get_standard_sections(entity_type: str) -> list[str]:
     """Get standard sections for an entity type."""
     sections = {
         "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
-        "location": ["Description", "History", "Scenes"],
-        "world": ["Description", "History", "Conflict"],
+        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function"],
+        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict"],
         "plot": ["Summary", "Obstacles", "Stakes"],
         "scene": ["Description", "Dramatic Function", "Notes", "Content"],
         "sequence": ["Summary", "Scene Order", "Notes"],

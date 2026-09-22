@@ -348,6 +348,12 @@ html, body {
 .tag-location { background: rgba(107,191,176,0.12); color: #6bbfb0; }
 .tag-struct { background: rgba(255, 150, 50, 0.18); color: #e0a86b; }
 .tag-char { background: rgba(107,191,176,0.1); color: var(--muted-foreground); border: 1px solid var(--border); }
+.tag-mood { background: rgba(176, 123, 224, 0.12); color: #b07be0; }
+.tag-variant { background: rgba(224, 168, 107, 0.12); color: #e0a86b; font-style: italic; }
+.tag-period { background: rgba(123, 156, 240, 0.12); color: #7b9cf0; }
+.tag-value { background: rgba(224, 112, 112, 0.12); color: #e07070; }
+.tag-power { background: rgba(255, 200, 50, 0.18); color: #ffc832; }
+.tag-rule { background: rgba(107, 191, 122, 0.12); color: #6bbf7a; }
 
 .status-badge {
   display: inline-flex;
@@ -2319,13 +2325,21 @@ function buildLocationsView() {
     const sceneTags = sceneHeadings.slice(0, 4).map(h =>
       `<span class="tag tag-scene">${h}</span>`
     ).join('');
+    const metaTags = [];
+    if (l.mood) metaTags.push(`<span class="tag tag-mood">${l.mood}</span>`);
+    if (l.variant_of) {
+      const v = findLocation(l.variant_of);
+      metaTags.push(`<span class="tag tag-variant">${v ? `variant of ${v.name}` : `variant of ${l.variant_of}`}</span>`);
+    }
     return `
       <div class="entity-card" data-id="${l.id}" onclick="showLocationPanel('${l.id}')">
         <div class="entity-card-pip" style="background:#6bbfb0"></div>
         <div class="entity-card-body">
           <div class="entity-card-name">${l.name}</div>
           <div class="entity-card-sub">${l.one_sentence || ''}</div>
+          ${l.dramatic_function ? `<div class="entity-card-sub" style="font-style:italic;margin-top:2px">${l.dramatic_function}</div>` : ''}
           ${sceneTags ? `<div class="entity-card-meta">${sceneTags}</div>` : ''}
+          ${metaTags.length ? `<div class="entity-card-meta">${metaTags.join('')}</div>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -2409,14 +2423,22 @@ function buildWorldsView() {
     return;
   }
   list.innerHTML = worlds.map(w => {
-    const ruleCount = (w.rules || []).length;
+    const metaTags = [];
+    if (w.period) metaTags.push(`<span class="tag tag-period">${w.period}</span>`);
+    if ((w.rules || []).length) metaTags.push(`<span class="tag tag-rule">${w.rules.length} rule${w.rules.length !== 1 ? 's' : ''}</span>`);
+    if ((w.values || []).length) metaTags.push(`<span class="tag tag-value">${w.values.length} values</span>`);
+    if ((w.power || []).length) metaTags.push(`<span class="tag tag-power">${w.power.length} power</span>`);
+    if (w.variant_of) {
+      const v = (story.worlds || []).find(x => x.id === w.variant_of);
+      metaTags.push(`<span class="tag tag-variant">${v ? `variant of ${v.name}` : `variant of ${w.variant_of}`}</span>`);
+    }
     return `
       <div class="entity-card" data-id="${w.id}" onclick="showWorldPanel('${w.id}')">
         <div class="entity-card-pip" style="background:#e0a86b"></div>
         <div class="entity-card-body">
           <div class="entity-card-name">${w.name}</div>
           <div class="entity-card-sub">${w.one_sentence || ''}</div>
-          ${ruleCount ? `<div class="entity-card-meta"><span class="tag tag-plot">${ruleCount} rule${ruleCount !== 1 ? 's' : ''}</span></div>` : ''}
+          ${metaTags.length ? `<div class="entity-card-meta">${metaTags.join('')}</div>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -2806,6 +2828,25 @@ function showLocationPanel(locId) {
       <div class="panel-section-title">In one sentence</div>
       <div class="panel-text">${loc.one_sentence || '—'}</div>
     </div>
+    ${loc.mood ? `<div>
+      <div class="panel-section-title">Mood</div>
+      <div class="panel-text" style="font-style:italic">${loc.mood}</div>
+    </div>` : ''}
+    ${loc.dramatic_function ? `<div>
+      <div class="panel-section-title">Dramatic function</div>
+      <div class="panel-text">${loc.dramatic_function}</div>
+    </div>` : ''}
+    ${loc.world ? `<div>
+      <div class="panel-section-title">World</div>
+      <div class="panel-text">${loc.world}</div>
+    </div>` : ''}
+    ${loc.variant_of ? `<div>
+      <div class="panel-section-title">Variant of</div>
+      ${(() => {
+        const v = findLocation(loc.variant_of);
+        return v ? `<button class="entity-link" onclick="showLocationPanel('${v.id}')">${v.name}</button>` : `<div class="panel-text" style="color:#e0a86b">${loc.variant_of}</div>`;
+      })()}
+    </div>` : ''}
     ${charLinks ? `<div>
       <div class="panel-section-title">Characters here</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
@@ -3041,9 +3082,28 @@ function showWorldPanel(worldId) {
       <div class="panel-section-title">In one sentence</div>
       <div class="panel-text">${world.one_sentence || '—'}</div>
     </div>
+    ${world.period ? `<div>
+      <div class="panel-section-title">Period</div>
+      <div class="panel-text">${world.period}</div>
+    </div>` : ''}
+    ${(world.values && world.values.length) ? `<div>
+      <div class="panel-section-title">Values</div>
+      <div class="panel-text">${world.values.map(v => `<div class="world-rule">${v}</div>`).join('')}</div>
+    </div>` : ''}
+    ${(world.power && world.power.length) ? `<div>
+      <div class="panel-section-title">Power</div>
+      <div class="panel-text">${world.power.map(p => `<div class="world-rule">${p}</div>`).join('')}</div>
+    </div>` : ''}
     ${rules ? `<div>
       <div class="panel-section-title">Rules</div>
       ${rules}
+    </div>` : ''}
+    ${world.variant_of ? `<div>
+      <div class="panel-section-title">Variant of</div>
+      ${(() => {
+        const v = (story.worlds || []).find(w => w.id === world.variant_of);
+        return v ? `<button class="entity-link" onclick="showWorldPanel('${v.id}')">${v.name}</button>` : `<div class="panel-text" style="color:#e0a86b">${world.variant_of}</div>`;
+      })()}
     </div>` : ''}
     ${plotLinks ? `<div>
       <div class="panel-section-title">Plot threads</div>

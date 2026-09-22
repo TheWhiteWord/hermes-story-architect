@@ -70,18 +70,28 @@ class TestNestedStructure:
         assert isinstance(result["plots"], list)
 
     def test_load_locations_keyed_by_slug(self, db_project):
-        """locations is a list with explicit id field."""
-        proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        assert "locations" in result
-        assert isinstance(result["locations"], list)
-
-    def test_load_worlds_keyed_by_slug(self, db_project):
-        """worlds is a list with explicit id field."""
+        """locations nested inside worlds, each with explicit id field."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert "worlds" in result
         assert isinstance(result["worlds"], list)
+        # Locations are nested inside worlds
+        all_locs = []
+        for w in result["worlds"]:
+            all_locs.extend(w.get("locations", []))
+        assert len(all_locs) > 0
+        assert all("id" in loc for loc in all_locs)
+
+    def test_load_worlds_keyed_by_slug(self, db_project):
+        """worlds is a list with explicit id field, contains locations."""
+        proj, vault = db_project
+        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        assert "worlds" in result
+        assert isinstance(result["worlds"], list)
+        assert all("id" in w for w in result["worlds"])
+        # Each world has a locations array
+        for w in result["worlds"]:
+            assert "locations" in w
 
     def test_no_entities_key(self, db_project):
         """Old flat entities key is gone."""
@@ -205,10 +215,10 @@ class TestSectionsPerEntity:
             assert "sections" not in char
         for plot in result["plots"]:
             assert "sections" not in plot
-        for loc in result["locations"]:
-            assert "sections" not in loc
         for w in result["worlds"]:
             assert "sections" not in w
+            for loc in w.get("locations", []):
+                assert "sections" not in loc
         for act in result["acts"]:
             assert "sections" not in act
             for seq in act.get("sequences", []):

@@ -62,11 +62,19 @@ ENTITY_SCHEMAS = {
     "location": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
         "one_sentence": {"type": "string", "default": "", "optional": False, "description": "One-sentence summary for index label"},
+        "mood": {"type": "string", "default": "", "optional": True, "description": "Emotional register of the place, generalized (e.g. 'oppressive domesticity')"},
+        "dramatic_function": {"type": "string", "default": "", "optional": True, "description": "Why this place exists in the story (e.g. 'where the protagonist's past catches up')"},
+        "world": {"type": "string", "default": "", "optional": True, "description": "World slug this location belongs to"},
+        "variant_of": {"type": "string", "default": "", "optional": True, "description": "Slug of the base location this is a variant of. Empty on base locations."},
     },
     "world": {
         "name": {"type": "string", "default": "", "optional": False, "description": "World display name"},
         "one_sentence": {"type": "string", "default": "", "optional": False, "description": "One-sentence summary for index label"},
         "rules": {"type": "list", "default": [], "optional": True, "description": "World rules. Each entry is a string."},
+        "period": {"type": "string", "default": "", "optional": True, "description": "When this world exists (e.g. '2040s', '+400y after the collapse')"},
+        "values": {"type": "list", "default": [], "optional": True, "description": "What this world holds sacred/moral (e.g. 'truth is sacred')"},
+        "power": {"type": "list", "default": [], "optional": True, "description": "Who holds power and how (e.g. 'the Church sanctions all tech')"},
+        "variant_of": {"type": "string", "default": "", "optional": True, "description": "Slug of the base world this is a version of. Empty on base worlds."},
     },
     "plot": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
