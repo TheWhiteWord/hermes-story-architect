@@ -92,18 +92,24 @@ The slim structural overview. No extended fields, no arc beats, no plot scene ar
       "characters": ["kael", "mira"]
     }
   ],
-  "locations": [
-    {
-      "id": "the-central-room",
-      "name": "The Central Room",
-      "one_sentence": "..."
-    }
-  ],
   "worlds": [
     {
       "id": "the-i",
       "name": "The I",
-      "one_sentence": "..."
+      "one_sentence": "A simulation environment where developing consciousness forms.",
+      "locations": [
+        {
+          "id": "the-central-room",
+          "name": "The Central Room",
+          "one_sentence": "The heart of the Institute — where children believe freedom waits beyond the door."
+        },
+        {
+          "id": "the-garden",
+          "name": "The Garden",
+          "one_sentence": "A simulated outdoor space where Kael dreams — the only place that feels real."
+        }
+      ],
+      "period": "+400y after the collapse"
     }
   ],
   "unfilled": {
