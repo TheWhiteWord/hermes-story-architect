@@ -343,6 +343,51 @@ Returns dramatic markers per scene + which plots reference each scene in which s
 - Plot markers: only TRUE structural roles shown (setups/crisis/climax/payoffs) — omit FALSE
 - Enables cross-verification: "story_climax_scene_id is X — does main plot's climax array include X?"
 
+### 3.4 `view="relationship"` — Full Relationship Graph
+
+Returns all relationship entities with full perspective data. This is the only view that exposes the complete relationship graph — the base view keeps only per-character computed summaries.
+
+**Parameters:**
+- `project` (required)
+- `view="relationship"` (required)
+
+```json
+{
+  "view": "relationship",
+  "relationships": {
+    "kael-mira": {
+      "id": "kael-mira",
+      "name": "Kael & Mira",
+      "characters": ["kael", "mira"],
+      "perspectives": {
+        "kael": {
+          "label": "Closest friend",
+          "feeling": "Trusts her feelings more than their own logic",
+          "type": "family",
+          "strength": 0.9
+        },
+        "mira": {
+          "label": "Friend, anchor",
+          "feeling": "Understands his silences better than his words",
+          "type": "romantic",
+          "strength": 0.7,
+          "secret": true
+        }
+      },
+      "scenes": ["central-room-day", "central-room-night"],
+      "status": "active"
+    }
+  }
+}
+```
+
+**Field notes:**
+- Each relationship contains both character perspectives (direction-dependent qualities)
+- `secret` omitted when FALSE — only TRUE values emitted
+- `strength` range: -1.0 (antagonistic) to 1.0 (bonded); 0.0 = neutral/unknown
+- `scenes` list is populated from relationship entity frontmatter (optional)
+- For network graph rendering: each relationship → one or two directed edges; color by `type`, thickness by `strength`, dashed if `secret`
+
 ---
 
 ## 4. `story_retrieve` — Entity Drill-Down

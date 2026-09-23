@@ -509,7 +509,6 @@ def get_project_summary(project_path: Path) -> dict:
             "characters": characters_list,
             "plots": plots_list,
             "worlds": worlds_list,
-            "relationships": relationships,
             "unfilled": unfilled_inv,
             "memory_outline": memory_outline,
         }
