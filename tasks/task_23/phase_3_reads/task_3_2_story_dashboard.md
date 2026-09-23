@@ -68,8 +68,23 @@ python -c "from core.db import get_dashboard_data; print('OK')"
 ```
 
 ## Checklist
-- [ ] Relationship entities built in dashboard data
-- [ ] Richer computed character relationship summary (with `strength`)
-- [ ] `relationships` field added to character output
-- [ ] `relationships` array in `story_data`
-- [ ] Import check passes
+- [x] Relationship entities built in dashboard data
+- [x] Richer computed character relationship summary (with `strength`)
+- [x] `relationships` field added to character output
+- [x] `relationships` array in `story_data`
+- [x] Import check passes
+
+## Completion Brief
+
+All 4 steps in `get_dashboard_data`:
+
+1. **Relationship entities**: Added `relationships = []` init + `elif etype == "relationship"` branch. Entity dict built via `_entity_dict`, then enriched with `characters`, `perspectives`, `scenes`, `history` from extra JSON.
+
+2. **Computed summary with `strength`**: After entity loop, built `char_rel_summary` mapping each character to their relationship views (includes `strength`). Applied directly to `c["relationships"]` for each character.
+
+3. **Character output**: Handled by the post-loop assignment in 3.2.2.
+
+4. **Top-level `relationships` array**: Added to `story_data` dict.
+
+Import check passes. For projects without relationships, the array is empty and characters get `relationships: []`.
+

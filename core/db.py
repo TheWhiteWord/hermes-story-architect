@@ -212,6 +212,7 @@ def get_project_summary(project_path: Path) -> dict:
         plots = {}
         locations = {}
         worlds = {}
+        relationships = {}
         for eid, etype, name, one_sentence, status, order_key, parent_id, extra_json in ent_rows:
             extra = json.loads(extra_json) if extra_json else {}
 
@@ -272,6 +273,14 @@ def get_project_summary(project_path: Path) -> dict:
                     "values": extra.get("values", []),
                     "power": extra.get("power", []),
                     "_order_key": order_key, "_parent_id": parent_id,
+                }
+            elif etype == "relationship":
+                relationships[eid] = {
+                    "id": eid, "name": name, "status": status,
+                    "characters": extra.get("characters", []),
+                    "perspectives": extra.get("perspectives", {}),
+                    "scenes": extra.get("scenes", []),
+                    "history": extra.get("history", ""),
                 }
 
 
@@ -363,6 +372,20 @@ def get_project_summary(project_path: Path) -> dict:
         )
         acts_list = [_build_act(aid) for aid in top_act_ids]
 
+        # ── Computed character relationship summary (CONVENTION_computed_fields) ──
+        char_rel_summary = {}
+        for rel in relationships.values():
+            for char_id in rel["characters"]:
+                others = [c for c in rel["characters"] if c != char_id]
+                if not others:
+                    continue
+                p = rel["perspectives"].get(char_id, {})
+                char_rel_summary.setdefault(char_id, []).append({
+                    "with": others[0],
+                    "label": p.get("label", ""),
+                    "type": p.get("type", ""),
+                })
+
         # ── Build character output ──
         def _build_character(char_id):
             char = characters[char_id]
@@ -376,9 +399,10 @@ def get_project_summary(project_path: Path) -> dict:
                 "arc_value_at_open": char["arc_value_at_open"],
                 "arc_value_at_close": char["arc_value_at_close"],
                 "rel": char_rels.get(char_id, []),
+                "relationships": char_rel_summary.get(char_id, []),
             }
             return _omit(result, {"arc_type": "Arc type not set", "arc_value": "Arc value not set",
-                                  "arc_value_at_open": "Not set", "arc_value_at_close": "Not set", "rel": []})
+                                  "arc_value_at_open": "Not set", "arc_value_at_close": "Not set", "rel": [], "relationships": []})
 
         # ── Build plot output ──
         def _build_plot(plot_id):
@@ -497,6 +521,7 @@ def get_project_summary(project_path: Path) -> dict:
             "characters": characters_list,
             "plots": plots_list,
             "worlds": worlds_list,
+            "relationships": relationships,
             "unfilled": unfilled_inv,
             "memory_outline": memory_outline,
         }
@@ -668,6 +693,7 @@ def get_dashboard_data(project_path: Path) -> dict:
         acts = []
         sequences = []
         arcs = []
+        relationships = []
 
         for e in ent_rows:
             etype = e[1]
@@ -819,6 +845,17 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["label"] = extra.get("label", e[2])  # label is stored in name column
                 arcs.append(d)
 
+            elif etype == "relationship":
+                d = _entity_dict({
+                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
+                    "status": e[5], "parent_id": e[6], "extra": extra,
+                })
+                d["characters"] = extra.get("characters", [])
+                d["perspectives"] = extra.get("perspectives", {})
+                d["scenes"] = extra.get("scenes", [])
+                d["history"] = extra.get("history", "")
+                relationships.append(d)
+
         # Group arcs by character and attach as arc_beats_list (dashboard reads c.arc_beats_list)
         # Derived from arc entities directly — no separate arc_beat relations needed
         for a in arcs:
@@ -846,6 +883,23 @@ def get_dashboard_data(project_path: Path) -> dict:
             if "arc_beats_list" in c:
                 c["arc_beats_list"].sort(key=lambda b: b.get("order", 0))
                 c["arc_beat_count"] = len(c["arc_beats_list"])
+
+        # Computed character relationship summary for dashboard (richer than load — includes strength)
+        char_rel_summary = {}
+        for rel in relationships:
+            for char_id in rel["characters"]:
+                others = [c for c in rel["characters"] if c != char_id]
+                if not others:
+                    continue
+                p = rel["perspectives"].get(char_id, {})
+                char_rel_summary.setdefault(char_id, []).append({
+                    "with": others[0],
+                    "label": p.get("label", ""),
+                    "type": p.get("type", ""),
+                    "strength": p.get("strength", 0),
+                })
+        for c in characters:
+            c["relationships"] = char_rel_summary.get(c["id"], [])
 
         # Rename arcs to story.arcs for dashboard compatibility
         story_arcs = arcs
@@ -989,6 +1043,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             "acts": acts,
             "sequences": sequences,
             "arcs": story_arcs,
+            "relationships": relationships,
             "story_memory": story_memory,
         }
 

@@ -70,8 +70,22 @@ python -c "from core.db import get_project_summary; print('OK')"
 ```
 
 ## Checklist
-- [ ] Relationship entities built from DB rows
-- [ ] Computed character relationship summary
-- [ ] `relationships` field added to character output
-- [ ] Top-level `relationships` dict in load result
-- [ ] Import check passes
+- [x] Relationship entities built from DB rows
+- [x] Computed character relationship summary
+- [x] `relationships` field added to character output
+- [x] Top-level `relationships` dict in load result
+- [x] Import check passes
+
+## Completion Brief
+
+All 4 steps implemented in `core/db.py` (`get_project_summary`):
+
+1. **Relationship entities** (line ~215): Added `relationships = {}` dict and `elif etype == "relationship"` branch in the entity organization loop. Extracts `characters`, `perspectives`, `scenes`, `history` from `extra` JSON.
+
+2. **Computed summary** (line ~372): Added `char_rel_summary` dict built after the entity loop. Iterates relationships, for each character in a relationship, finds the other character and pulls `label`/`type` from their perspective. Used `others[0]` instead of list comprehension indexing for clarity.
+
+3. **Character output** (line ~399): Added `"relationships": char_rel_summary.get(char_id, [])` to `_build_character` result. Added `"relationships": []` to `_omit` defaults. Kept `rel` for backward compat (Phase 4 removes it).
+
+4. **Top-level output** (line ~521): Added `"relationships": relationships` to the `result` dict.
+
+Import check passes. No behavioral change for projects without relationship entities (empty dict, empty summaries).
