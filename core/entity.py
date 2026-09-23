@@ -170,6 +170,9 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     unfilled = []
     for field, meta in schema.items():
+        # Skip computed fields — derived at read time, not persisted
+        if meta.get("computed"):
+            continue
         # status: workflow state, always emitted, never "unfilled"
         # boolean/number: binary or scalar values, not "unfilled"
         if (field != "status"

@@ -2159,20 +2159,41 @@ function buildGraphView() {
   const edges = [];
   const rels = story.relationships || [];
 
+  // Average all strength values per character pair (both directions, all rels)
+  const pairStrength = {};
+  rels.forEach(rel => {
+    if (!rel.characters || rel.characters.length < 2) return;
+    const [a, b] = rel.characters;
+    const key = [a, b].sort().join('::');
+    const pa = (rel.perspectives || {})[a] || {};
+    const pb = (rel.perspectives || {})[b] || {};
+    pairStrength[key] = pairStrength[key] || [];
+    if (pa.strength !== undefined) pairStrength[key].push(pa.strength);
+    if (pb.strength !== undefined) pairStrength[key].push(pb.strength);
+  });
+  const avgStrength = {};
+  for (const key in pairStrength) {
+    const vals = pairStrength[key];
+    avgStrength[key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+
   rels.forEach(rel => {
     if (!rel.characters || rel.characters.length < 2) return;
     const [a, b] = rel.characters;
     const pa = (rel.perspectives || {})[a] || {};
     const pb = (rel.perspectives || {})[b] || {};
+    const fontCfg = { color: mutedColor, size: 9, align: 'middle', strokeWidth: 2, strokeColor: '#1a1a1a' };
+    const key = [a, b].sort().join('::');
+    const spring = 300 - (avgStrength[key] || 0) * 250;
 
     edges.push({
       from: a, to: b,
       label: pa.label || '',
       color: { color: relTypeColor(pa.type) + 'aa', highlight: relTypeColor(pa.type) },
-      font: { color: mutedColor, size: 9, align: 'middle', strokeWidth: 0 },
-      width: 1 + ((pa.strength || 0) + 1) * 2,
+      font: fontCfg,
+      width: 1.5,
       dashes: pa.secret || false,
-      smooth: { type: 'curvedCW', roundness: 0.2 },
+      length: spring,
       relId: rel.id
     });
 
@@ -2180,10 +2201,10 @@ function buildGraphView() {
       from: b, to: a,
       label: pb.label || '',
       color: { color: relTypeColor(pb.type) + 'aa', highlight: relTypeColor(pb.type) },
-      font: { color: mutedColor, size: 9, align: 'middle', strokeWidth: 0 },
-      width: 1 + ((pb.strength || 0) + 1) * 2,
+      font: fontCfg,
+      width: 1.5,
       dashes: pb.secret || false,
-      smooth: { type: 'curvedCCW', roundness: 0.2 },
+      length: spring,
       relId: rel.id
     });
   });
@@ -2196,8 +2217,8 @@ function buildGraphView() {
     edges: { arrows: { to: { enabled: true, scaleFactor: 0.5 } } },
     physics: {
       enabled: true,
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.01, springLength: 120, springConstant: 0.08, damping: 0.4 }
+      solver: 'barnesHut',
+      barnesHut: { gravitationalConstant: -500, centralGravity: 0.01, springConstant: 0.15, springLength: 150, damping: 0.4 }
     },
     interaction: { hover: true, tooltipDelay: 200, hideEdgesOnDrag: false },
     layout: { randomSeed: 42 }
@@ -2205,20 +2226,10 @@ function buildGraphView() {
 
   network = new vis.Network(container, { nodes, edges: edgeDataSet }, options);
 
-  // Fix: center graph after physics stabilization (was missing — caused spawn-off-center bug)
+  // Fit after initial stabilization
   network.once('stabilizationIterationsDone', () => {
-    network.setOptions({ physics: { enabled: false } });
-    setTimeout(() => network.fit({
-      animation: { duration: 400, easingFunction: 'easeInOutQuad' }
-    }), 100);
+    network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
   });
-  // Fallback in case stabilization fires before the handler above attaches
-  setTimeout(() => {
-    if (network) {
-      network.setOptions({ physics: { enabled: false } });
-      network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
-    }
-  }, 3000);
 
   network.on('hoverNode', params => {
     const nodeId = params.node;

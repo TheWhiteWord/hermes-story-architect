@@ -320,14 +320,6 @@
     }
   ],
   "unfilled": {
-    "relationships": [
-      "dr-elena-voss",
-      "kael",
-      "marcus-chen",
-      "mira",
-      "the-administrator",
-      "the-outsider"
-    ],
     "goals_short": [
       "dr-elena-voss",
       "kael",
@@ -365,14 +357,6 @@
     "arc_value_at_close": [
       "dr-elena-voss",
       "marcus-chen",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "arc_beats_list": [
-      "dr-elena-voss",
-      "kael",
-      "marcus-chen",
-      "mira",
       "the-administrator",
       "the-outsider"
     ],
