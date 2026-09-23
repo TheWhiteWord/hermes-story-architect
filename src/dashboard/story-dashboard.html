@@ -2184,7 +2184,7 @@ function buildGraphView() {
     const pb = (rel.perspectives || {})[b] || {};
     const fontCfg = { color: mutedColor, size: 9, align: 'middle', strokeWidth: 2, strokeColor: '#1a1a1a' };
     const key = [a, b].sort().join('::');
-    const spring = 300 - (avgStrength[key] || 0) * 250;
+    const spring = Math.max(200, 300 - (avgStrength[key] || 0) * 250);
 
     edges.push({
       from: a, to: b,
