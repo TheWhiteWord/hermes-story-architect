@@ -4,7 +4,9 @@ import re
 from pathlib import Path
 
 CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css", "graph.css"]
-JS_ORDER = ["core.js"]
+JS_ORDER = [
+    "core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
+]
 
 SCHEMA = {
     "type": "object",

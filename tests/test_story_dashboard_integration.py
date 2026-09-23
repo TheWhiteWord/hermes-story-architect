@@ -47,34 +47,34 @@ class TestDashboardIntegration:
     def test_build_script_view_function(self, dashboard_html):
         """buildScriptView function is defined."""
         js_content = Path("src/dashboard/js/core.js").read_text()
-        assert 'function buildScriptView()' in js_content
+        assert 'DASH.buildScriptView' in js_content
 
     def test_open_stats_panel_function(self, dashboard_html):
         """openStatsPanel function is defined."""
         js_content = Path("src/dashboard/js/core.js").read_text()
-        assert 'function openStatsPanel()' in js_content
+        assert 'DASH.openStatsPanel' in js_content
 
     def test_d3_charts_functions(self, dashboard_html):
         """D3 chart rendering functions are defined."""
         js_content = Path("src/dashboard/js/core.js").read_text()
-        assert 'function renderDurationChart(' in js_content
-        assert 'function renderCharacterChart(' in js_content
-        assert 'function renderBarcodeChart(' in js_content
+        assert 'DASH.renderDurationChart' in js_content
+        assert 'DASH.renderCharacterChart' in js_content
+        assert 'DASH.renderBarcodeChart' in js_content
 
     def test_sort_table_function(self, dashboard_html):
         """sortTable function is defined."""
         js_content = Path("src/dashboard/js/core.js").read_text()
-        assert 'function sortTable(' in js_content
+        assert 'DASH.sortTable' in js_content
 
     def test_switch_view_wrapper(self, dashboard_html):
         """switchView is wrapped (not replaced)."""
-        js_content = Path("src/dashboard/js/core.js").read_text()
-        assert 'const _origSwitchView = switchView;' in js_content
+        js_content = Path("src/dashboard/js/navigation.js").read_text()
+        assert 'DASH._origSwitchView = DASH.switchView;' in js_content
 
     def test_scene_click_matching(self, dashboard_html):
         """Scene heading click matching logic present."""
         js_content = Path("src/dashboard/js/core.js").read_text()
-        assert 'showScenePanel(matched.id)' in js_content
+        assert 'DASH.showScenePanel(matched.id)' in js_content or 'showScenePanel(matched.id)' in js_content
 
     def test_no_new_inline_fountain_css(self, dashboard_html):
         """New CSS (after narrow layout) does not redefine standalone .fountain-* classes."""
@@ -106,7 +106,9 @@ class TestDashboardIntegration:
         """All inline event handlers must use DASH.* prefix (not bare globals)."""
         import re
         index_html = Path("src/dashboard/index.html").read_text()
-        js_content = Path("src/dashboard/js/core.js").read_text()
+        js_content = ""
+        for js_file in ["core.js", "colors.js", "utils.js", "navigation.js", "data-load.js"]:
+            js_content += Path(f"src/dashboard/js/{js_file}").read_text() + "\n"
         all_content = index_html + js_content
         handler_fns = [
             "switchView", "showScenePanel", "showCharacterPanel", "showLocationPanel",
