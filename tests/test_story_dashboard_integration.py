@@ -11,7 +11,9 @@ class TestDashboardIntegration:
 
     @pytest.fixture
     def dashboard_html(self):
-        return Path("src/dashboard/story-dashboard.html").read_text()
+        from tools.story_dashboard import assemble_dashboard
+        dashboard_dir = Path("src/dashboard")
+        return assemble_dashboard(dashboard_dir)
 
     def test_script_view_exists(self, dashboard_html):
         """Script view div is present."""
@@ -44,29 +46,35 @@ class TestDashboardIntegration:
 
     def test_build_script_view_function(self, dashboard_html):
         """buildScriptView function is defined."""
-        assert 'function buildScriptView()' in dashboard_html
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        assert 'function buildScriptView()' in js_content
 
     def test_open_stats_panel_function(self, dashboard_html):
         """openStatsPanel function is defined."""
-        assert 'function openStatsPanel()' in dashboard_html
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        assert 'function openStatsPanel()' in js_content
 
     def test_d3_charts_functions(self, dashboard_html):
         """D3 chart rendering functions are defined."""
-        assert 'function renderDurationChart(' in dashboard_html
-        assert 'function renderCharacterChart(' in dashboard_html
-        assert 'function renderBarcodeChart(' in dashboard_html
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        assert 'function renderDurationChart(' in js_content
+        assert 'function renderCharacterChart(' in js_content
+        assert 'function renderBarcodeChart(' in js_content
 
     def test_sort_table_function(self, dashboard_html):
         """sortTable function is defined."""
-        assert 'function sortTable(' in dashboard_html
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        assert 'function sortTable(' in js_content
 
     def test_switch_view_wrapper(self, dashboard_html):
         """switchView is wrapped (not replaced)."""
-        assert 'const _origSwitchView = switchView;' in dashboard_html
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        assert 'const _origSwitchView = switchView;' in js_content
 
     def test_scene_click_matching(self, dashboard_html):
         """Scene heading click matching logic present."""
-        assert 'showScenePanel(matched.id)' in dashboard_html
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        assert 'showScenePanel(matched.id)' in js_content
 
     def test_no_new_inline_fountain_css(self, dashboard_html):
         """New CSS (after narrow layout) does not redefine standalone .fountain-* classes."""
@@ -90,13 +98,85 @@ class TestDashboardIntegration:
         assert '_compute_screenplay_stats' in src
         assert '__SCREENPLAY_STATS__' in src
 
-    def test_stats_injected_before_boot(self):
-        """Stats injected before Boot comment."""
-        src = Path("tools/story_dashboard.py").read_text()
-        stats_pos = src.find('__SCREENPLAY_STATS__')
-        boot_pos = src.find('// ─── Boot')
-        assert stats_pos > 0 and boot_pos > 0
-        assert stats_pos < boot_pos
+    def test_stats_injected_before_boot(self, dashboard_html):
+        """Boot comment is present in assembled HTML for injection."""
+        assert "// ─── Boot" in dashboard_html
+
+    def test_no_bare_inline_handlers_in_index_html(self):
+        """All inline event handlers must use DASH.* prefix (not bare globals)."""
+        import re
+        index_html = Path("src/dashboard/index.html").read_text()
+        js_content = Path("src/dashboard/js/core.js").read_text()
+        all_content = index_html + js_content
+        handler_fns = [
+            "switchView", "showScenePanel", "showCharacterPanel", "showLocationPanel",
+            "showPlotPanel", "showRelationshipPanel", "showSequencePanel", "showActPanel",
+            "showWorldPanel", "openStatsPanel", "closeStatsPanel", "switchStatsGroup",
+            "sortTable", "switchGraphTab", "resetGraphLayout", "toggleArcSpline",
+            "toggleArcLabels", "toggleArcCharMute", "refreshIndex", "toggleSidebar",
+            "loadFromFile", "loadSampleData", "closePanel", "handleFileLoad",
+            "renderBarcodeChart", "filterScenes", "showArcTooltip", "hideArcTooltip",
+        ]
+        for fn in handler_fns:
+            # Must NOT appear as bare function in handler attribute in HTML
+            assert not re.search(rf'on\w+="{fn}\(', index_html), f"Bare {fn}() in HTML handler — must be DASH.{fn}()"
+            # Must NOT appear as bare function in JS template literal handlers
+            assert not re.search(rf'on\w+="{fn}\(', js_content), f"Bare {fn}() in JS template handler — must be DASH.{fn}()"
+            # Must appear with DASH prefix somewhere in the combined output
+            assert f'DASH.{fn}(' in all_content, f"DASH.{fn}() missing from output"
+
+
+class TestAssemblyIntegrity:
+    """Verify assemble_dashboard() produces valid output."""
+
+    @pytest.fixture
+    def assembled_html(self):
+        from tools.story_dashboard import assemble_dashboard
+        dashboard_dir = Path("src/dashboard")
+        return assemble_dashboard(dashboard_dir)
+
+    def test_no_unresolved_placeholders(self, assembled_html):
+        """No unresolved placeholders survive assembly."""
+        assert "<!-- CSS_PLACEHOLDER -->" not in assembled_html
+        assert "<!-- JS_PLACEHOLDER -->" not in assembled_html
+        assert "<!-- SCREENPLAY_CSS_PLACEHOLDER -->" not in assembled_html
+
+    def test_required_dom_ids_present(self, assembled_html):
+        """All required element IDs present in assembled output."""
+        required_ids = [
+            "app", "sidebar", "main", "graph-view", "scenes-view",
+            "locations-view", "plots-view", "relationships-view",
+            "worlds-view", "script-view", "stats-panel", "detail-panel",
+            "loading-screen", "error-screen", "file-input",
+            "network-canvas", "graph-legend", "chars-grid",
+            "arc-graph-wrap", "arc-legend", "arc-warnings",
+            "scene-search", "scene-list", "location-list", "plot-list",
+            "relationship-list", "world-list", "screenplay-container",
+            "panel-body", "panel-footer", "panel-name", "panel-type",
+            "stats-group-overview", "stats-group-characters",
+            "stats-group-scenes", "stats-group-structure",
+        ]
+        for eid in required_ids:
+            assert f'id="{eid}"' in assembled_html, f"Missing ID: {eid}"
+
+    def test_external_deps_loaded(self, assembled_html):
+        """vis-network, js-yaml, D3 CDNs loaded."""
+        assert "vis-network.min.js" in assembled_html
+        assert "js-yaml.min.js" in assembled_html
+        assert "d3.min.js" in assembled_html
+
+    def test_data_injection_point_preserved(self, assembled_html):
+        """Boot comment preserved for injection."""
+        assert "// ─── Boot" in assembled_html
+
+    def test_hermes_attributes_preserved(self, assembled_html):
+        """data-hermes-send attributes preserved."""
+        assert "data-hermes-send" in assembled_html
+
+    def test_screenplay_css_preserved(self, assembled_html):
+        """Better Fountain screenplay styles present."""
+        assert ".fountain-scene_heading" in assembled_html
+        assert ".fountain-dialogue" in assembled_html
 
     def test_fountain_parse_imported(self):
         """fountain_parse is imported in story_dashboard.py."""

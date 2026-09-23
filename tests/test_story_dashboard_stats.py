@@ -134,9 +134,11 @@ class TestStatsInjection:
     """Test that story_dashboard injects stats correctly."""
 
     def test_stats_injected_before_boot(self):
-        """window.__SCREENPLAY_STATS__ is injected before Boot comment."""
-        src = Path("src/dashboard/story-dashboard.html").read_text()
-        assert "// ─── Boot" in src
+        """Boot comment is present in assembled HTML for injection."""
+        from tools.story_dashboard import assemble_dashboard
+        dashboard_dir = Path("src/dashboard")
+        html = assemble_dashboard(dashboard_dir)
+        assert "// ─── Boot" in html
 
 
 class TestStructuralStats:

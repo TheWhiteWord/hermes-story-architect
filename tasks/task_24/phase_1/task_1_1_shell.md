@@ -6,14 +6,17 @@ Extract the HTML shell from the monolith into `src/dashboard/index.html` with CS
 
 ## Baseline Reference
 
-**File:** `tasks/task_24/phase_0/baseline.json`
+**File:** `/media/theww/AI/Projects/Plugins/Hermes/hermes-story-architect/tasks/task_24/phase_0/baseline.json`
 
 After assembly, verify the assembled HTML matches baseline:
 - All 103 static DOM IDs present
+- All 9 dynamic template IDs preserved
 - All 3 CDNs present
 - Boot comment string intact
 - screenplay.css styles present
 - No unresolved placeholders
+
+**Note:** Baseline onclick count is 62, but total inline handlers = 68 (includes 3 onchange, 1 oninput, 1 onmouseenter, 1 onmouseleave).
 
 ## Verification Against Code
 
@@ -25,7 +28,7 @@ Not every function becomes `DASH.foo`. Only functions at the **HTML ↔ JS bound
 
 ### Step 1: Enumerate all inline handlers
 
-Found 66 total inline handlers using 28 unique functions (verified against actual monolith):
+Found 68 total inline handlers using 28 unique dashboard functions (verified against actual monolith):
 
 | Function | Handler Types | Count |
 |----------|---------------|-------|
@@ -70,11 +73,14 @@ Replace `foo(` → `DASH.foo(` for the 28 functions above **only in inline handl
 
 ### Step 3: Post-replacement verification
 
-After all replacements, search the entire `index.html` for any remaining bare handler references inside HTML attributes:
+After all replacements, verify no bare handler references remain in any HTML attributes:
+
 ```bash
-grep -nP 'on\w+="[^"]*\b(switchView|showScenePanel|...)\b[^."]' index.html
+# Check ALL inline handler types for bare function names
+grep -nP 'on\w+="[^"]*\b(switchView|showScenePanel|showCharacterPanel|showLocationPanel|showPlotPanel|showRelationshipPanel|showSequencePanel|showActPanel|showWorldPanel|openStatsPanel|closeStatsPanel|switchStatsGroup|sortTable|switchGraphTab|resetGraphLayout|toggleArcSpline|toggleArcLabels|toggleArcCharMute|refreshIndex|toggleSidebar|loadFromFile|loadSampleData|closePanel|handleFileLoad|renderBarcodeChart|filterScenes|showArcTooltip|hideArcTooltip)\b[^."]?[^"]*"' index.html
 ```
-Should return zero hits. Any hit means a handler was missed.
+
+Should return **zero hits**. Any hit means a handler was missed.
 
 ### Step 4: Add regression test
 
@@ -135,23 +141,83 @@ let arcMutedChars = new Set(); // graph/arc-graph.js → DASH.arcMutedChars
 
 ## Checklist
 
-- [ ] Create `src/dashboard/css/` and `src/dashboard/js/` directories
-- [ ] Create `src/dashboard/index.html`:
-  - Extract HTML shell from monolith (lines 1–1823 of original)
-  - Remove `<style>...</style>` block → replace with `<!-- CSS_PLACEHOLDER -->`
-  - Remove `<script>...</script>` block → replace with `<!-- JS_PLACEHOLDER -->`
-  - Remove `<link rel="stylesheet" href="screenplay.css">` → replace with `<!-- SCREENPLAY_CSS_PLACEHOLDER -->`
-  - **Update 66 inline handlers** (28 unique functions): `foo(` → `DASH.foo(` only in HTML attributes
-  - Keep CDNs in place (vis-network, js-yaml, D3)
-  - Add regression test for bare handler detection
-- [ ] Verify no bare handlers remain (post-replacement grep check)
-- [ ] Update `tools/story_dashboard.py`:
-  - Add `CSS_ORDER`, `JS_ORDER` lists
-  - Add `assemble_dashboard()` function reading from files
-  - Replace string-replace logic with placeholder replacement
-  - Boot comment injection point preserved
-- [ ] Verify: tests pass, dashboard renders, no behavioral change
-- [ ] Capture assembled artifact as baseline for Phase 2+
+- [x] Create `src/dashboard/css/` and `src/dashboard/js/` directories
+- [x] Create `src/dashboard/index.html`:
+  - [x] Extract HTML shell from monolith (lines 1–1823 of original)
+  - [x] Remove `<style>...</style>` block → replace with `<!-- CSS_PLACEHOLDER -->`
+  - [x] Remove `<script>...</script>` block → replace with `<!-- JS_PLACEHOLDER -->`
+  - [x] Remove `<link rel="stylesheet" href="screenplay.css">` → replace with `<!-- SCREENPLAY_CSS_PLACEHOLDER -->`
+  - [x] **Update 68 inline handlers** (28 unique functions): `foo(` → `DASH.foo(` only in HTML attributes
+  - [x] Keep CDNs in place (vis-network, js-yaml, D3)
+  - [x] Add regression test for bare handler detection
+- [x] Verify no bare handlers remain (post-replacement grep check)
+- [x] Update `tools/story_dashboard.py`:
+  - [x] Add `CSS_ORDER`, `JS_ORDER` lists
+  - [x] Add `assemble_dashboard()` function reading from files
+  - [x] Replace string-replace logic with placeholder replacement
+  - [x] Boot comment injection point preserved
+- [x] Verify: tests pass, dashboard renders, no behavioral change
+- [x] Capture assembled artifact and compare against `phase_0/baseline.json`:
+  - [x] All 103 static DOM IDs present
+  - [x] All 9 dynamic template IDs preserved
+  - [x] All 3 CDNs present
+  - [x] Boot comment string intact
+  - [x] screenplay.css styles present
+  - [x] No unresolved placeholders (`CSS_PLACEHOLDER`, `JS_PLACEHOLDER`, `SCREENPLAY_CSS_PLACEHOLDER`)
+
+## Final Report
+
+### What Was Done
+
+1. **Created directory structure**: `src/dashboard/css/` and `src/dashboard/js/` (already existed, now populated)
+
+2. **Extracted `src/dashboard/index.html`** (25,054 chars):
+   - HTML shell from monolith (head + body)
+   - `<style>` block → `<!-- CSS_PLACEHOLDER -->`
+   - `<script>` block → `<!-- JS_PLACEHOLDER -->`
+   - `<link rel="stylesheet" href="screenplay.css">` → `<!-- SCREENPLAY_CSS_PLACEHOLDER -->`
+   - All 3 CDN `<script>` tags preserved in head
+   - All 68 inline handlers (28 unique functions) prefixed with `DASH.`
+
+3. **Created `src/dashboard/css/base.css`** (34,283 chars):
+   - Full CSS block extracted from monolith (lines 18–1332)
+   - Single file for now; will be split in Phase 2
+
+4. **Created `src/dashboard/js/core.js`** (110,541 chars):
+   - Full JS block extracted from monolith (lines 1824–4327)
+   - Dead code removed: `buildSequencesView()`, `buildActsView()`
+   - `switchView` wrapper preserved at end of file
+   - Template literal handlers also prefixed with `DASH.`
+
+5. **Updated `tools/story_dashboard.py`**:
+   - Added `CSS_ORDER = ["base.css"]` and `JS_ORDER = ["core.js"]` constants
+   - Added `assemble_dashboard()` function that reads modular files and inlines them
+   - Replaced string-replace logic in `_render_dashboard()` with `assemble_dashboard()` call
+
+6. **Updated tests**:
+   - `test_story_dashboard_integration.py`: Fixture now uses `assemble_dashboard()`; function-definition tests read from `js/core.js`; added `test_no_bare_inline_handlers_in_index_html` regression test; added `TestAssemblyIntegrity` class with 6 assembly validation tests
+   - `test_story_dashboard_stats.py`: `test_stats_injected_before_boot` now uses `assemble_dashboard()`
+
+### Verification Results
+
+| Check | Result |
+|-------|--------|
+| Static DOM IDs | 103/103 present |
+| Dynamic template IDs | 9/9 present |
+| External CDNs | 3/3 loaded |
+| Boot comment | Present |
+| Screenplay CSS | Present |
+| Placeholders | All resolved |
+| data-hermes-send attrs | 12 preserved |
+| Live functions | 74/74 present |
+| Inline handlers | 68 total (matches baseline) |
+| Tests | 25/25 integration + 11/11 stats pass |
+
+### Notes
+
+- The assembled HTML is structurally equivalent to the baseline monolith
+- CSS and JS remain as single files (`base.css`, `core.js`) — modular extraction into multiple files happens in later phases
+- The `DASH.*` prefix is applied only to HTML-facing functions in inline handlers; JS-to-JS calls within the script remain unprefixed (correct — they resolve via closure scope, not `DASH.*`)
 
 ## Expected Output
 

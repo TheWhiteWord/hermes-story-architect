@@ -3,6 +3,9 @@ import json
 import re
 from pathlib import Path
 
+CSS_ORDER = ["base.css"]
+JS_ORDER = ["core.js"]
+
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -245,6 +248,29 @@ def _parse_scene_location(heading):
     }
 
 
+def assemble_dashboard(dashboard_dir: Path) -> str:
+    """Assemble modular dashboard source into final HTML string."""
+    html = (dashboard_dir / "index.html").read_text(encoding="utf-8")
+
+    # Inline CSS
+    css = "\n".join(
+        (dashboard_dir / "css" / f).read_text(encoding="utf-8") for f in CSS_ORDER
+    )
+    html = html.replace("<!-- CSS_PLACEHOLDER -->", f"<style>\n{css}\n</style>")
+
+    # Inline JS
+    js = "\n".join(
+        (dashboard_dir / "js" / f).read_text(encoding="utf-8") for f in JS_ORDER
+    )
+    html = html.replace("<!-- JS_PLACEHOLDER -->", f"<script>\n{js}\n</script>")
+
+    # Inline screenplay.css
+    screenplay_css = (dashboard_dir / "screenplay.css").read_text(encoding="utf-8")
+    html = html.replace("<!-- SCREENPLAY_CSS_PLACEHOLDER -->", f"<style>\n{screenplay_css}\n</style>")
+
+    return html
+
+
 def handler(args: dict, **kwargs) -> str:
     """Open project dashboard in preview pane."""
     import tempfile
@@ -294,16 +320,11 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
     import tempfile
     import frontmatter as fm
 
-    dashboard_src = Path(__file__).parent.parent / "src" / "dashboard" / "story-dashboard.html"
-    if not dashboard_src.exists():
+    dashboard_dir = Path(__file__).parent.parent / "src" / "dashboard"
+    if not (dashboard_dir / "index.html").exists():
         return json.dumps({"error": "Dashboard file not found in plugin"})
 
-    screenplay_css_src = dashboard_src.parent / "screenplay.css"
-    if not screenplay_css_src.exists():
-        return json.dumps({"error": "Screenplay CSS file not found in plugin"})
-
-    html = dashboard_src.read_text(encoding="utf-8")
-    css = screenplay_css_src.read_text(encoding="utf-8")
+    html = assemble_dashboard(dashboard_dir)
 
     # Read project.md directly for title page fields (output-only, not in DB title_page)
     try:
@@ -311,12 +332,6 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
         project_frontmatter = dict(project_fm.metadata)
     except Exception:
         project_frontmatter = {}
-
-    # Replace the external CSS link with inline CSS
-    html = html.replace(
-        '<link rel="stylesheet" href="screenplay.css">',
-        f"<style>\n{css}\n</style>"
-    )
 
     # Build all injections from get_dashboard_data output
     injections = f"window.__STORY_DATA__ = {json.dumps(data['story_data'])};"
