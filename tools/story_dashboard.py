@@ -8,6 +8,7 @@ JS_ORDER = [
     "core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
     "views/scenes.js", "views/locations.js", "views/plots.js",
     "views/relationships.js", "views/worlds.js", "views/story.js",
+    "panels/panel-manager.js", "panels/entity-panels.js",
 ]
 
 SCHEMA = {

@@ -109,7 +109,8 @@ class TestDashboardIntegration:
         js_content = ""
         for js_file in ["core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
                         "views/scenes.js", "views/locations.js", "views/plots.js",
-                        "views/relationships.js", "views/worlds.js", "views/story.js"]:
+                        "views/relationships.js", "views/worlds.js", "views/story.js",
+                        "panels/panel-manager.js", "panels/entity-panels.js"]:
             js_content += Path(f"src/dashboard/js/{js_file}").read_text() + "\n"
         all_content = index_html + js_content
         handler_fns = [

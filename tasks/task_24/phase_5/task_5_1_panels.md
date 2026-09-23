@@ -43,20 +43,20 @@ Panels call each other freely (`showScenePanel` → `showCharacterPanel` → `sh
 
 ## Checklist
 
-- [ ] Create `src/dashboard/js/panels/` directory
-- [ ] Create `js/panels/panel-manager.js`:
+- [x] Create `src/dashboard/js/panels/` directory
+- [x] Create `js/panels/panel-manager.js`:
   - `window.DASH = window.DASH || {};`
   - `DASH.openPanel = function() { ... }`
   - `DASH.closePanel = function() { ... }`
   - `DASH.renderSectionsHtml = function(entityType, slug) { ... }`
   - `DASH.arcSectionHtml = function(char) { ... }`
-- [ ] Create `js/panels/entity-panels.js`:
+- [x] Create `js/panels/entity-panels.js`:
   - `window.DASH = window.DASH || {};`
   - All 8 `show*Panel` functions
   - Internal calls use `DASH.*`
-- [ ] Update `tools/story_dashboard.py`:
+- [x] Update `tools/story_dashboard.py`:
   - `JS_ORDER` includes `panels/*.js` after `views/*.js`
-- [ ] Verify: tests pass, all panels open/close/content
+- [x] Verify: tests pass, all panels open/close/content
 
 ## Issues Found
 
@@ -76,3 +76,26 @@ After Phase 5:
 ## Next Steps
 
 After Phase 5 approval: Phase 6 (Extract JS — Graph: network, arc-graph).
+
+## Final Report
+
+**Status:** Complete — all checklist items verified.
+
+**What was done:**
+- Extracted 4 functions (`openPanel`, `closePanel`, `renderSectionsHtml`, `arcSectionHtml`) from `core.js` → `js/panels/panel-manager.js`
+- Extracted 8 functions (`showCharacterPanel`, `showScenePanel`, `showLocationPanel`, `showPlotPanel`, `showRelationshipPanel`, `showSequencePanel`, `showActPanel`, `showWorldPanel`) from `core.js` → `js/panels/entity-panels.js`
+- Removed all 12 functions from `core.js` (now 1164 lines, down from 1812)
+- Updated `JS_ORDER` in `story_dashboard.py` to include `panels/panel-manager.js` and `panels/entity-panels.js` after views
+- Updated `test_story_dashboard_integration.py` to include panel files in the bare-handler check
+
+**Verification:**
+- 25/25 integration tests pass
+- 284/285 total tests pass (1 pre-existing failure in `test_field_coverage.py` — unrelated, fails on pristine branch too)
+- All 12 functions confirmed removed from `core.js`
+- All 12 functions confirmed present in their new files
+
+**Notes:**
+- No issues found. Panel interdependency (panels calling each other) is safe with classic scripts — all functions are hoisted and available before any user interaction.
+- `arcSectionHtml` uses `DASH.roleColor` (from colors.js) — dependency preserved via load order.
+- `renderSectionsHtml` uses `DASH.escapeHtml` (from utils.js) — dependency preserved.
+- Entity panels use `DASH.escapeHtml`, `DASH.findLocation`, `DASH.roleColor`, `DASH.relTypeColor` — all loaded before panels in JS_ORDER.
