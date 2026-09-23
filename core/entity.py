@@ -86,6 +86,19 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
             if isinstance(y_val, (int, float)) and not (-1.0 <= float(y_val) <= 1.0):
                 warnings.append(f"y out of range: {y_val} (must be -1.0 to +1.0)")
 
+    if entity_type == "relationship":
+        chars = frontmatter.get("characters", [])
+        if len(chars) != 2:
+            warnings.append(f"relationship requires exactly 2 characters, got {len(chars)}")
+        perspectives = frontmatter.get("perspectives", {})
+        for char in chars:
+            if char not in perspectives:
+                warnings.append(f"Missing perspective for character: {char}")
+        for char, p in perspectives.items():
+            if "strength" in p and isinstance(p["strength"], (int, float)):
+                if not (-1.0 <= float(p["strength"]) <= 1.0):
+                    warnings.append(f"strength out of range for {char}: {p['strength']}")
+
     return warnings
 
 
@@ -129,6 +142,7 @@ ENTITY_COLUMN_MAP = {
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
     "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
+    "relationship": {"name": "name", "type": "type", "status": "status"},
 }
 
 FIELDS_TO_SKIP = {"id", "type"}
@@ -147,6 +161,7 @@ _RELATION_FIELDS = {
     "location": {"variant_of": ("location_variant", False)},
     "world": {"variant_of": ("world_variant", False)},
     "arc_beat": {},
+    "relationship": {},
 }
 
 
@@ -178,6 +193,7 @@ def standard_sections(entity_type: str) -> list[str]:
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
         "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+        "relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"],
     }
     return sections.get(entity_type, [])
 

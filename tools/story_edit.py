@@ -52,6 +52,7 @@ _ENTITY_COLUMN_MAP = {
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
     "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
+    "relationship": {"name": "name", "status": "status"},
 }
 
 _FIELDS_TO_SKIP = {"id", "type"}
@@ -141,6 +142,7 @@ def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) ->
 
         standard_sections = set(_get_standard_sections(entity_type))
         column_map = _ENTITY_COLUMN_MAP.get(entity_type, {})
+        schema = ENTITY_SCHEMAS.get(entity_type, {})
 
         column_updates = {}
         extra_updates = {}
@@ -149,6 +151,8 @@ def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) ->
         for key, value in data.items():
             if key in _FIELDS_TO_SKIP:
                 continue
+            if schema.get(key, {}).get("computed"):
+                continue  # Read-only field — derived from other entities
             if key in standard_sections:
                 section_updates[key] = value
             elif key in column_map:
@@ -378,5 +382,6 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
         "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+        "relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"],
     }
     return sections.get(entity_type, [])

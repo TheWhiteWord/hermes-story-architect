@@ -82,8 +82,21 @@ python -c "from tools.story_create import handler; from tools.story_edit import 
 ```
 
 ## Checklist
-- [ ] `story_create.py` skips computed fields in merge
-- [ ] `story_edit.py` skips computed fields in update loop
-- [ ] `story_describe.py` marks computed fields in output
-- [ ] `story_export.py` strips computed fields from extra
-- [ ] All imports pass
+- [x] `story_create.py` skips computed fields in merge
+- [x] `story_edit.py` skips computed fields in update loop
+- [x] `story_describe.py` marks computed fields in output
+- [x] `story_export.py` strips computed fields from extra
+- [x] All imports pass
+
+## Completion Brief
+
+All 4 sub-tasks implemented:
+
+1. **`story_create.py:114`** — merge dict now skips computed fields (`if not meta.get("computed")`).
+2. **`story_edit.py:149-157`** — added `schema = ENTITY_SCHEMAS.get(entity_type, {})` lookup and `if schema.get(key, {}).get("computed"): continue` guard before the standard_sections/column_map checks. Only 4 lines added (schema + guard).
+3. **`story_describe.py`** — added `computed` marker propagation in two places:
+   - `_all_fields()`: adds `"computed": True` to all_fields entry when `meta.get("computed")` (only on first entity type encounter, avoids duplicate keys).
+   - `handler()` entity schema output (both filtered and unfiltered branches): appends `" (read-only, computed)"` to description and adds `"computed": True` key.
+4. **`story_export.py`** — imported `ENTITY_SCHEMAS` from `core.constants`. Character branch in `_frontmatter_for()` now strips computed fields from extra before building frontmatter.
+
+Verification: All imports pass.

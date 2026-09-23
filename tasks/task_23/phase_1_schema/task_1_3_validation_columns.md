@@ -64,9 +64,21 @@ python -c "from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS, standard
 ```
 
 ## Checklist
-- [ ] Relationship validation in `validate_entity()`
-- [ ] Column mapping for relationship
-- [ ] Relation fields mapping (empty — all extra)
-- [ ] Standard sections in all 3 files
-- [ ] `story_edit.py` column map updated
-- [ ] Import check passes
+- [x] Relationship validation in `validate_entity()`
+- [x] Column mapping for relationship
+- [x] Relation fields mapping (empty — all extra)
+- [x] Standard sections in all 3 files
+- [x] `story_edit.py` column map updated
+- [x] Import check passes
+
+## Completion Brief
+
+All 5 sub-tasks implemented:
+
+1. **`validate_entity()`** — Added relationship validation block after arc_beat: checks exactly 2 characters, each character has a perspective, and strength values are in [-1.0, 1.0].
+2. **`ENTITY_COLUMN_MAP`** — Added `"relationship": {"name": "name", "type": "type", "status": "status"}`.
+3. **`_RELATION_FIELDS`** — Added `"relationship": {}` (empty — all data goes into extra JSON).
+4. **Standard sections** — Added `"relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"]` in all 3 locations: `core/entity.py:standard_sections`, `tools/story_create.py:_get_standard_sections`, `tools/story_edit.py:_get_standard_sections`.
+5. **`story_edit.py` `_ENTITY_COLUMN_MAP`** — Added `"relationship": {"name": "name", "status": "status"}`.
+
+Verification: All checks passed (column map, relation fields, standard sections, validation rules, edit column map).

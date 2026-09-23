@@ -111,7 +111,7 @@ def handler(args: dict, **kwargs) -> str:
 
         # Merge frontmatter over schema defaults
         schema = ENTITY_SCHEMAS.get(entity_type, {})
-        merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+        merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items() if not meta.get("computed")}
 
         # Map to columns
         from core.entity import columns_for_insert, relations_for_insert
@@ -315,5 +315,6 @@ def _get_standard_sections(entity_type: str) -> list[str]:
         "sequence": ["Summary", "Scene Order", "Notes"],
         "act": ["Summary", "Thematic Function", "Notes"],
         "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
+        "relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"],
     }
     return sections.get(entity_type, [])

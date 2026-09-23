@@ -26,6 +26,7 @@ REQUIRED_FIELDS = {
     "sequence": ["title", "act_id"],
     "act": ["title"],
     "arc_beat": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
+    "relationship": ["name", "characters", "perspectives"],
 }
 
 ENTITY_LABELS = {
@@ -38,6 +39,7 @@ ENTITY_LABELS = {
     "sequence": "Sequence",
     "act": "Act",
     "arc_beat": "Arc Beat",
+    "relationship": "Relationship",
 }
 
 # Full field schemas — used by story_create and story_edit to ensure all fields
@@ -49,7 +51,7 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Character display name"},
         "story_role": {"type": "string", "default": "", "optional": False, "description": "One of: Protagonist, Antagonist, Supporting, Minor, Cameo"},
         "one_sentence": {"type": "string", "default": "", "optional": False, "description": "One-sentence summary for index label"},
-        "relationships": {"type": "list", "default": [], "optional": True, "description": "Unidirectional relationships", "sub_fields": {"id": "Character slug", "label": "Relationship label (e.g. Partner)", "feeling": "Feeling towards them (e.g. Wary respect)"}},
+        "relationships": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed summary of relationship entities (read-only, derived from relationships/)"},
         "goals_short": {"type": "string", "default": "Goals not set", "optional": True, "description": "Short-term goal (flat form; nested goals.short also accepted)"},
         "goals_long": {"type": "string", "default": "Goals not set", "optional": True, "description": "Long-term goal (flat form; nested goals.long also accepted)"},
         "knowledge": {"type": "list", "default": [], "optional": True, "description": "Facts the character knows. Each entry is a string."},
@@ -58,6 +60,7 @@ ENTITY_SCHEMAS = {
         "arc_value_at_open": {"type": "string", "default": "Not set", "optional": True, "description": "Value charge at arc open (positive/negative/mixed/ironic)"},
         "arc_value_at_close": {"type": "string", "default": "Not set", "optional": True, "description": "Value charge at arc close (positive/negative/mixed/ironic)"},
         "arc_complete": {"type": "boolean", "default": False, "optional": True, "description": "Whether this character's arc is complete"},
+        "arc_beats_list": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed list of arc beats for this character (read-only, derived from arc_beat entities)"},
     },
     "location": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
@@ -173,5 +176,20 @@ ENTITY_SCHEMAS = {
         "y": {"type": "number", "default": 0.0, "optional": True, "description": "Value charge (-1.0 to +1.0)"},
         "is_crisis": {"type": "boolean", "default": False, "optional": True, "description": "Marks a crisis beat"},
         "is_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks a climax beat"},
+    },
+    "relationship": {
+        "name": {"type": "string", "default": "", "optional": False, "description": "Display name (e.g. 'Kael & Mira')"},
+        "type": {"type": "string", "default": "relationship", "optional": False, "description": "Always 'relationship'"},
+        "characters": {"type": "list", "default": [], "optional": False, "description": "Exactly two character slugs"},
+        "perspectives": {"type": "object", "default": {}, "optional": False, "description": "Per-character relationship view", "sub_fields": {
+            "label": {"type": "string", "description": "Relationship label from this character's POV"},
+            "feeling": {"type": "string", "description": "Emotional stance"},
+            "type": {"type": "string", "description": "Category: ally/enemy/family/romantic/professional/mentor/rival/custom"},
+            "strength": {"type": "number", "description": "Intensity -1.0 to 1.0"},
+            "secret": {"type": "boolean", "description": "Hidden from other character"},
+        }},
+        "scenes": {"type": "list", "default": [], "optional": True, "description": "Scenes where this relationship is featured"},
+        "status": {"type": "string", "default": "active", "optional": True, "description": "active/resolved/complex"},
+        "history": {"type": "string", "default": "", "optional": True, "description": "How this relationship evolved"},
     },
 }

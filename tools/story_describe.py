@@ -16,6 +16,8 @@ def _all_fields() -> dict:
                     "optional": meta.get("optional", True),
                     "_entity_types": [entity_type],
                 }
+                if meta.get("computed"):
+                    all_fields[field]["computed"] = True
             else:
                 all_fields[field]["_entity_types"].append(entity_type)
     return all_fields
@@ -215,7 +217,8 @@ def handler(args: dict, **kwargs) -> str:
                     "type": meta["type"],
                     "default": meta["default"],
                     "optional": meta.get("optional", True),
-                    "description": meta["description"],
+                    "description": meta["description"] + (" (read-only, computed)" if meta.get("computed") else ""),
+                    **({"computed": True} if meta.get("computed") else {}),
                 }
                 for field, meta in ENTITY_SCHEMAS[entity_type_filter].items()
             }
@@ -227,7 +230,8 @@ def handler(args: dict, **kwargs) -> str:
                     "type": meta["type"],
                     "default": meta["default"],
                     "optional": meta.get("optional", True),
-                    "description": meta["description"],
+                    "description": meta["description"] + (" (read-only, computed)" if meta.get("computed") else ""),
+                    **({"computed": True} if meta.get("computed") else {}),
                 }
                 for field, meta in fields.items()
             }

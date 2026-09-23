@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from core.constants import ENTITY_SCHEMAS
+
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -138,6 +140,8 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
     if entity_type == "character":
         fm["name"] = name
         fm["one_sentence"] = one_sentence
+        char_schema = ENTITY_SCHEMAS.get("character", {})
+        extra = {k: v for k, v in extra.items() if not char_schema.get(k, {}).get("computed")}
         fm.update(extra)
         return fm
 

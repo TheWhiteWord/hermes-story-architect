@@ -63,9 +63,21 @@ python -c "from core.constants import ENTITY_SCHEMAS; print('relationship' in EN
 ```
 
 ## Checklist
-- [ ] `relationship` entity schema added to `ENTITY_SCHEMAS`
-- [ ] Character `relationships` field marked as `computed: True`
-- [ ] `arc_beats_list` added as computed field on character
-- [ ] `ENTITY_LABELS` includes `"relationship"`
-- [ ] `REQUIRED_FIELDS` includes `"relationship"`
-- [ ] Import check passes
+- [x] `relationship` entity schema added to `ENTITY_SCHEMAS`
+- [x] Character `relationships` field marked as `computed: True`
+- [x] `arc_beats_list` added as computed field on character
+- [x] `ENTITY_LABELS` includes `"relationship"`
+- [x] `REQUIRED_FIELDS` includes `"relationship"`
+- [x] Import check passes
+
+## Completion Brief
+
+All 5 sub-tasks implemented in `core/constants.py`:
+
+1. **`relationship` entity schema** added after `arc_beat` with full field definition: `name`, `type`, `characters`, `perspectives` (with sub_fields: label/feeling/type/strength/secret), `scenes`, `status`, `history`.
+2. **Character `relationships` field** replaced: old writable list with sub_fields → computed summary field (`computed: True`, description notes read-only derivation).
+3. **`arc_beats_list` computed field** added on character schema — was previously implicit in `db.py:822-842` only; now discoverable via schema and properly marked read-only.
+4. **`ENTITY_LABELS`**: added `"relationship": "Relationship"`.
+5. **`REQUIRED_FIELDS`**: added `"relationship": ["name", "characters", "perspectives"]`.
+
+Verification: `python -c "from core.constants import ENTITY_SCHEMAS, ENTITY_LABELS, REQUIRED_FIELDS; ..."` — ALL CHECKS PASSED.
