@@ -122,3 +122,5 @@ DASH.initStory = function(data) {
   DASH.buildWorldsView();
   DASH.buildStoryView();
 }
+
+DASH.boot();
