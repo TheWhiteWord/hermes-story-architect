@@ -16,7 +16,7 @@ SCHEMA = {
             "type": "object",
             "description": "Target entity (omit for update_story_memory)",
             "properties": {
-                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat"]},
+                "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat", "relationship"]},
                 "slug": {"type": "string"}
             }
         },

@@ -11,7 +11,7 @@ SCHEMA = {
         },
         "entity_type": {
             "type": "string",
-            "enum": ["character", "location", "world", "plot", "project", "scene", "sequence", "act", "arc_beat"],
+            "enum": ["character", "location", "world", "plot", "project", "scene", "sequence", "act", "arc_beat", "relationship"],
             "description": "Type of entity"
         },
         "slug": {

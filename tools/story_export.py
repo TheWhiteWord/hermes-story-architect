@@ -215,6 +215,13 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
         fm.update(arc_extra)
         return fm
 
+    if entity_type == "relationship":
+        fm["name"] = name
+        if status:
+            fm["status"] = status
+        fm.update(extra)
+        return fm
+
     fm.update(extra)
     return fm
 
@@ -228,6 +235,7 @@ def _folder_for(entity_type: str) -> str:
         "scene": "scenes",
         "sequence": "sequences",
         "act": "acts",
+        "relationship": "relationships",
     }.get(entity_type, entity_type)
 
 

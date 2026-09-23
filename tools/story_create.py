@@ -48,7 +48,7 @@ def _build_schema() -> dict:
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["project", "character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat"],
+                "enum": ["project", "character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat", "relationship"],
                 "description": "Type of entity to create",
             },
             "slug": {

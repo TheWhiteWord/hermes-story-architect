@@ -78,10 +78,21 @@ print('retrieve:', 'relationship' in RETRIEVE_SCHEMA['properties']['entity_type'
 ```
 
 ## Checklist
-- [ ] `story_create.py` enum includes `"relationship"`
-- [ ] `story_edit.py` enum includes `"relationship"`
-- [ ] `story_import.py` imports relationships folder
-- [ ] `story_export.py` exports relationships folder
-- [ ] `story_retrieve.py` enum includes `"relationship"`
-- [ ] `story_describe.py` enums include `"relationship"`
-- [ ] All imports pass
+- [x] `story_create.py` enum includes `"relationship"`
+- [x] `story_edit.py` enum includes `"relationship"`
+- [x] `story_import.py` imports relationships folder
+- [x] `story_export.py` exports relationships folder
+- [x] `story_retrieve.py` enum includes `"relationship"`
+- [x] `story_describe.py` enums include `"relationship"` (auto via `ENTITY_SCHEMAS.keys()`)
+- [x] All imports pass
+
+## Final Brief
+All 6 CRUD tools now accept `"relationship"` as a first-class entity type:
+- `story_create.py:51` — enum updated; generic handler works (no `_RELATION_FIELDS`, all data in extra JSON)
+- `story_edit.py:19` — enum updated; generic handler updates extra JSON via `else` branch in `_edit_note_db`
+- `story_import.py:72` — added `_import_folder(conn, project_path, "relationships", "relationship")`
+- `story_export.py` — added `"relationship": "relationships"` to `_folder_for()` and `relationship` case in `_frontmatter_for()` (name + status + extra passthrough)
+- `story_retrieve.py:14` — enum updated; generic handler reads sections by entity_id
+- `story_describe.py` — auto-updates via `list(ENTITY_SCHEMAS.keys())` (no manual change needed)
+
+No inconsistencies found during verification. All handlers are fully generic — no special-casing required for the relationship entity type.

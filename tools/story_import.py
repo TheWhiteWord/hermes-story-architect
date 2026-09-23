@@ -69,6 +69,7 @@ def _import_all(conn, project_path: Path) -> None:
     _import_folder(conn, project_path, "sequences", "sequence")
     _import_folder(conn, project_path, "acts", "act")
     _import_arcs(conn, project_path)
+    _import_folder(conn, project_path, "relationships", "relationship")
 
 
 def _import_project(conn, project_path: Path) -> None:
