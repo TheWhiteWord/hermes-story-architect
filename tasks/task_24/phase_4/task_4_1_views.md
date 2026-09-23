@@ -50,8 +50,8 @@ After extraction, verify:
 
 ## Checklist
 
-- [ ] Create `src/dashboard/js/views/` directory
-- [ ] Create `js/views/scenes.js`:
+- [x] Create `src/dashboard/js/views/` directory
+- [x] Create `js/views/scenes.js`:
   - `window.DASH = window.DASH || {};`
   - `DASH.allScenes = [];`
   - `DASH.buildScenesView = function() { ... }`
@@ -59,22 +59,54 @@ After extraction, verify:
   - `DASH.renderSceneItem = function(s) { ... }`
   - `DASH.filterScenes = function(query) { ... }`
   - Internal calls use `DASH.*`
-- [ ] Create `js/views/locations.js`:
+- [x] Create `js/views/locations.js`:
   - `DASH.buildLocationsView = function() { ... }`
-- [ ] Create `js/views/plots.js`:
-  - `DASH.PLOT_TYPE_COLORS = { ... }`
+- [x] Create `js/views/plots.js`:
+  - `DASH.PLOT_TYPE_COLORS` (already in colors.js — referenced, not redefined)
   - `DASH.plotScopeBadge = function(pl) { ... }`
   - `DASH.buildPlotsView = function() { ... }`
-- [ ] Create `js/views/relationships.js`:
+- [x] Create `js/views/relationships.js`:
   - `DASH.buildRelationshipsView = function() { ... }`
-- [ ] Create `js/views/worlds.js`:
+- [x] Create `js/views/worlds.js`:
   - `DASH.buildWorldsView = function() { ... }`
-- [ ] Create `js/views/story.js`:
+- [x] Create `js/views/story.js`:
   - `DASH.buildStoryView = function() { ... }`
-- [ ] Delete `buildSequencesView` and `buildActsView` from `core.js`
-- [ ] Update `tools/story_dashboard.py`:
+- [x] Delete `buildSequencesView` and `buildActsView` from `core.js` — already absent (dead code only in old unused monolith)
+- [x] Update `tools/story_dashboard.py`:
   - `JS_ORDER` includes `views/*.js` after `data-load.js`
-- [ ] Verify: tests pass, all views render
+- [x] Verify: tests pass (25 integration + 11 stats = 36 total), all views render
+
+## Final Brief
+
+**Status:** COMPLETE
+
+**What was done:**
+- Extracted 6 view modules from `core.js` (392 lines removed, 1812 remaining)
+- Each view file attaches to `window.DASH = window.DASH || {};`
+- `DASH.allScenes` state moved to `scenes.js`
+- `DASH.PLOT_TYPE_COLORS` referenced from `colors.js` (not redefined in `plots.js`)
+- `JS_ORDER` updated: views load after `data-load.js`, before panels
+- Test `test_no_bare_inline_handlers_in_index_html` updated to scan view files
+
+**Files changed:**
+- `src/dashboard/js/core.js` — view function definitions removed
+- `src/dashboard/js/views/scenes.js` — created
+- `src/dashboard/js/views/locations.js` — created
+- `src/dashboard/js/views/plots.js` — created
+- `src/dashboard/js/views/relationships.js` — created
+- `src/dashboard/js/views/worlds.js` — created
+- `src/dashboard/js/views/story.js` — created
+- `tools/story_dashboard.py` — `JS_ORDER` updated
+- `tests/test_story_dashboard_integration.py` — scan list updated
+
+**Verification:**
+- `assemble_dashboard()` produces valid output, no unresolved placeholders
+- All 36 tests pass (25 integration + 11 stats)
+- Boot injection point, CDNs, Hermes attributes all preserved
+- `initStory()` calls to view builders remain in `core.js` (dispatch to extracted modules via `DASH.*`)
+
+**Notes:**
+- Dead code (`buildSequencesView`, `buildActsView`) was already absent from `core.js` — only existed in the old `story-dashboard.html` monolith which is not part of the assembly pipeline
 
 ## Issues Found
 
