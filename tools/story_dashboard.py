@@ -11,6 +11,7 @@ JS_ORDER = [
     "panels/panel-manager.js", "panels/entity-panels.js",
     "graph/network.js", "graph/arc-graph.js",
     "statistics/statistics.js", "statistics/charts.js",
+    "script-view.js",
 ]
 
 SCHEMA = {

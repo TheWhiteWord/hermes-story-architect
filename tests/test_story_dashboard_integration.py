@@ -46,7 +46,7 @@ class TestDashboardIntegration:
 
     def test_build_script_view_function(self, dashboard_html):
         """buildScriptView function is defined."""
-        js_content = Path("src/dashboard/js/core.js").read_text()
+        js_content = Path("src/dashboard/js/script-view.js").read_text()
         assert 'DASH.buildScriptView' in js_content
 
     def test_open_stats_panel_function(self, dashboard_html):
@@ -73,7 +73,7 @@ class TestDashboardIntegration:
 
     def test_scene_click_matching(self, dashboard_html):
         """Scene heading click matching logic present."""
-        js_content = Path("src/dashboard/js/core.js").read_text()
+        js_content = Path("src/dashboard/js/script-view.js").read_text()
         assert 'DASH.showScenePanel(matched.id)' in js_content or 'showScenePanel(matched.id)' in js_content
 
     def test_no_new_inline_fountain_css(self, dashboard_html):
@@ -111,7 +111,9 @@ class TestDashboardIntegration:
                         "views/scenes.js", "views/locations.js", "views/plots.js",
                         "views/relationships.js", "views/worlds.js", "views/story.js",
                         "panels/panel-manager.js", "panels/entity-panels.js",
-                        "graph/network.js", "graph/arc-graph.js"]:
+                        "graph/network.js", "graph/arc-graph.js",
+                        "statistics/statistics.js", "statistics/charts.js",
+                        "script-view.js"]:
             js_content += Path(f"src/dashboard/js/{js_file}").read_text() + "\n"
         all_content = index_html + js_content
         handler_fns = [
