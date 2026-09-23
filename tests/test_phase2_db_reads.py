@@ -179,14 +179,15 @@ class TestEmbeddedCrossReferences:
                             assert isinstance(scene["loc"], str)
 
     def test_character_has_rel(self, db_project):
-        """character.rel populated from character_relationship relations."""
+        """character.relationships populated from relationship entities."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         for char in result["characters"]:
-            if "rel" in char:
-                for rel in char["rel"]:
-                    assert "id" in rel
+            if "relationships" in char:
+                for rel in char["relationships"]:
+                    assert "with" in rel
                     assert "label" in rel
+                    assert "type" in rel
 
     def test_plot_has_setups(self, db_project):
         """plot.setups populated from plot_setup relations."""
@@ -471,6 +472,17 @@ class TestStoryDashboardDB:
         assert "__SECTIONS__" in html
         assert "__SCREENPLAY_STATS__" in html
         assert "__STRUCTURAL_STATS__" in html
+
+    def test_dashboard_has_relationships(self, db_project):
+        """Dashboard includes relationship entities."""
+        proj, vault = db_project
+        result = json.loads(dashboard_handler({
+            "project": str(proj),
+            "vault_path": vault
+        }))
+        assert result["success"] is True
+        html = Path(result["dashboard_url"].replace("file://", "")).read_text()
+        assert "relationships" in html
 
 
 class TestAutoReimport:

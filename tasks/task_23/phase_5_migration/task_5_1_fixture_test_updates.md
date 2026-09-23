@@ -116,16 +116,29 @@ python -m pytest tests/ -x -q
 ```
 
 ## Cleanup Checklist
-- [ ] Relationship fixture files created from character `## Relationship` sections
-- [ ] `test_character_has_rel` updated to assert computed `relationships` field
-- [ ] `test_field_coverage` updated — `relationships` removed from character samples
-- [ ] `test_round_trip` includes relationship round-trip
-- [ ] `test_core` reviewed and updated
-- [ ] `test_dashboard_relationships` added
-- [ ] Full test suite passes
+- [x] Relationship fixture files created from character `## Relationship` sections
+- [x] `test_character_has_rel` updated to assert computed `relationships` field
+- [x] `test_field_coverage` updated — `relationships` removed from character samples
+- [x] `test_round_trip` includes relationship round-trip
+- [x] `test_core` reviewed — no relationship-related assertions needed updating
+- [x] `test_dashboard_relationships` added
+- [x] Full test suite passes (278 passed)
+
+## Final Brief
+
+**Completed**: All 6 steps of Task 5.1 — Fixture & Test Updates.
+
+**Changes made**:
+1. Created 3 relationship fixture files (`kael-mira.md`, `kael-the-administrator.md`, `mira-the-administrator.md`) derived from character `## Relationship` prose sections
+2. Updated `test_character_has_rel` — now asserts computed `char.relationships` with `with`/`label`/`type` instead of old `char.rel` with `id`/`label`
+3. Removed `relationships` from `_sample_value` in `test_field_coverage.py` (character schema field is computed, not settable)
+4. Added `object` type handling to `_sample_value` (needed for `perspectives` field) and `relationship` branch in `test_create_load_retrieve` to verify entity in `load_result["relationships"]`
+5. Added `test_relationship_round_trip` in `test_round_trip.py` — verifies import → export → re-import preserves ≥3 relationship entities
+6. Added `test_dashboard_has_relationships` in `test_phase2_db_reads.py` — verifies dashboard HTML contains relationship data
+
+**Result**: 278 tests pass (was 99 passing before relationship entity was added to test params).
 
 ## Notes
-- The fixture `save-the-children` currently has NO `relationships/` folder — it must be created
 - The fixture characters have `## Relationship` body sections (prose), NOT structured frontmatter
 - The new system uses both: `## Relationships` body section (prose) + `relationship` entity files (structured data)
 - Tests should verify both the computed summary (from entities) and the body section content

@@ -260,6 +260,54 @@ def test_location_world_and_variant_fields_round_trip(fixture_path):
         assert exported.metadata["dramatic_function"] == "where the children's hope is tested"
 
 
+def test_relationship_round_trip(fixture_path):
+    """Relationship entities survive import → export → re-import."""
+    import frontmatter
+
+    with tempfile.TemporaryDirectory() as tmp:
+        project_path = Path(tmp) / "save-the-children"
+        shutil.copytree(str(fixture_path), str(project_path))
+
+        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+
+        # Export
+        export_dir = Path(tmp) / "exported"
+        export_dir.mkdir()
+        shutil.copytree(str(project_path), str(export_dir / "proj"))
+        export_path = export_dir / "proj"
+        for f in export_path.rglob("*.md"):
+            f.unlink()
+        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+
+        # Verify relationships/ folder has files
+        rel_dir = export_path / "relationships"
+        assert rel_dir.is_dir()
+        rel_files = list(rel_dir.glob("*.md"))
+        assert len(rel_files) >= 3
+
+        # Re-import from exported files
+        reimport_path = Path(tmp) / "reimported"
+        reimport_path.mkdir()
+        shutil.copytree(str(export_path), str(reimport_path / "save-the-children"))
+        reimport_proj = reimport_path / "save-the-children"
+
+        # Delete the story.db so we start fresh
+        db_path = reimport_proj / ".story" / "story.db"
+        if db_path.exists():
+            db_path.unlink()
+
+        import_handler({"project": str(reimport_proj), "vault_path": str(reimport_path)})
+
+        # Verify relationship entities in DB
+        from core.db import get_db
+        conn = get_db(reimport_proj)
+        rel_count = conn.execute(
+            "SELECT count(*) FROM entities WHERE type='relationship'"
+        ).fetchone()[0]
+        assert rel_count >= 3
+        conn.close()
+
+
 def test_world_variant_of_round_trip(fixture_path):
     """World with variant_of creates a relation row that exports back to FM."""
     import frontmatter

@@ -46,11 +46,11 @@ def _sample_value(field, meta):
         return 42
     if ftype == "boolean":
         return True
+    if ftype == "object":
+        return {}
     if ftype == "list":
         if field == "characters":
             return ["kael", "mira"]
-        if field == "relationships":
-            return [{"id": "mira", "label": "Friend", "feeling": "Trust"}]
         if field == "knowledge":
             return ["knows the truth"]
         if field == "rules":
@@ -229,6 +229,8 @@ def test_create_load_retrieve(entity_type, project):
             "sections": ["all"],
         }))
         found = retrieve_result.get("content") or retrieve_result.get("sections")
+    elif entity_type == "relationship":
+        found = slug in load_result.get("relationships", {})
 
     assert found, f"Entity {slug} not in load result"
 
