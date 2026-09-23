@@ -2216,6 +2216,28 @@ function buildGraphView() {
     });
   });
 
+  // Unlinked entities: add virtual neutral edges to protagonist(s) only
+  const linkedIds = new Set();
+  edges.forEach(e => { linkedIds.add(e.from); linkedIds.add(e.to); });
+  const protagonists = chars.filter(c => (c.role || c.story_role || '').toLowerCase().includes('protagonist'));
+  chars.forEach(c => {
+    if (linkedIds.has(c.id)) return;
+    protagonists.forEach(p => {
+      if (p.id === c.id) return;
+      edges.push({
+        from: c.id, to: p.id,
+        label: '',
+        color: { color: '#7a8a9a11', highlight: '#7a8a9a' },
+        font: { color: mutedColor, size: 9, align: 'middle', strokeWidth: 2, strokeColor: '#1a1a1a' },
+        width: 0.5,
+        dashes: true,
+        length: 80 + 50 * 1.5,
+        smooth: { enabled: false },
+        relId: '_virtual_'
+      });
+    });
+  });
+
   const edgeDataSet = new vis.DataSet(edges);
   const container = document.getElementById('network-canvas');
 
