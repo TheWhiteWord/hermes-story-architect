@@ -69,15 +69,29 @@ python -c "from core.entity import _RELATION_FIELDS; print('character' not in _R
 ```
 
 ## Cleanup Checklist
-- [ ] `char_rels` removed from `get_project_summary`
-- [ ] `rel` field removed from character output in load
-- [ ] `character_relationship` removed from `_RELATION_FIELDS`
-- [ ] `relationships` removed from import skip set
-- [ ] Character relationship denormalization removed from export
-- [ ] No references to `char_rels` remain in `db.py`
-- [ ] No references to `character_relationship` remain in entity.py
+- [x] `char_rels` removed from `get_project_summary`
+- [x] `rel` field removed from character output in load
+- [x] `character_relationship` removed from `_RELATION_FIELDS`
+- [x] `relationships` removed from import skip set
+- [x] Character relationship denormalization removed from export
+- [x] No references to `char_rels` remain in `db.py`
+- [x] No references to `character_relationship` remain in entity.py
 
 ## Notes
 - The `## Relationships` body section on characters remains as a standard section — it's prose, not structured data
 - The `relationships` field on character is now computed (Phase 1.2), so no explicit removal needed — the convention handles it
 - The old `character_relationship` relation kind may still exist in DBs created before this change — that's fine, the new code simply won't read or write it
+
+## Completion Summary
+
+All tasks completed. Changes made:
+
+1. **`core/db.py`**: Removed `char_rels = {}` initialization and the `character_relationship` branch from `get_project_summary`'s relations loop. Removed `"rel"` from `_build_character` result dict and `_omit` defaults. Removed stale `character_relationship` denormalization from `get_dashboard_data` (was overwriting the correct computed summary).
+
+2. **`core/entity.py`**: Removed `"character": {"relationships": ("character_relationship", True)}` from `_RELATION_FIELDS`. Removed dead `character_relationship` branch in `relations_for_insert`.
+
+3. **`tools/story_import.py`**: Removed `"relationships"` from character skip set in `_extra_for`. Removed dead `character` relationship insertion block from `_insert_relations`.
+
+4. **`tools/story_export.py`**: Removed character relationship denormalization block from `_export_all`.
+
+**Verification**: No references to `char_rels`, `character_relationship`, or `"rel"` field remain in `db.py`, `entity.py`, `story_import.py`, `story_export.py`, or `story_edit.py`. The `relationships` field on characters is now fully handled by the computed field convention (Phase 1.2).

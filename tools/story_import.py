@@ -250,7 +250,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     """Extract extra JSON fields for an entity type."""
     # Fields that go to columns or relations (not extra)
     skip = {
-        "character": {"name", "one_sentence", "id", "relationships"},
+        "character": {"name", "one_sentence", "id"},
         "location": {"name", "one_sentence", "id", "world", "variant_of"},
         "world": {"name", "one_sentence", "id", "variant_of"},
         "plot": {"name", "one_sentence", "status", "id", "setups", "payoffs", "crisis", "climax"},
@@ -291,20 +291,6 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                     conn.execute(
                         "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
                         (slug, sid, kind, desc),
-                    )
-    elif entity_type == "character":
-        # Structured relationships from frontmatter
-        for rel in fm.get("relationships", []):
-            if isinstance(rel, dict):
-                target = rel.get("id", "")
-                if target:
-                    note = json.dumps({
-                        "label": rel.get("label", ""),
-                        "feeling": rel.get("feeling", ""),
-                    })
-                    conn.execute(
-                        "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
-                        (slug, target, "character_relationship", note),
                     )
     elif entity_type == "location":
         target = fm.get("variant_of")

@@ -157,7 +157,6 @@ _RELATION_FIELDS = {
         "climax": ("plot_climax", True),
         "payoffs": ("plot_payoff", True),
     },
-    "character": {"relationships": ("character_relationship", True)},
     "location": {"variant_of": ("location_variant", False)},
     "world": {"variant_of": ("world_variant", False)},
     "arc_beat": {},
@@ -259,12 +258,6 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
                     if kind in ("plot_setup", "plot_payoff"):
                         to_id = item.get("scene_id", "")
                         note = item.get("description", "")
-                    elif kind == "character_relationship":
-                        to_id = item.get("id", "")
-                        note = json.dumps({
-                            "label": item.get("label", ""),
-                            "feeling": item.get("feeling", ""),
-                        })
                     else:
                         to_id = str(item)
                         note = ""

@@ -174,7 +174,6 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build cross-reference maps ──
         scene_chars = {}  # scene_id -> [char_slug, ...]
         scene_loc = {}    # scene_id -> loc_slug
-        char_rels = {}    # char_slug -> [{id, label, feeling}, ...]
         plot_scenes = {}  # plot_slug -> {"setups": [], "crisis": [], "climax": [], "payoffs": []}
         variant_of = {}   # entity_id -> base_slug (location_variant / world_variant)
 
@@ -183,16 +182,6 @@ def get_project_summary(project_path: Path) -> dict:
                 scene_chars.setdefault(to_id, []).append(from_id)
             elif kind == "location_scene":
                 scene_loc[to_id] = from_id
-            elif kind == "character_relationship":
-                try:
-                    parsed = json.loads(note) if note else {}
-                except (json.JSONDecodeError, TypeError):
-                    parsed = {}
-                char_rels.setdefault(from_id, []).append({
-                    "id": to_id,
-                    "label": parsed.get("label", ""),
-                    "feeling": parsed.get("feeling", ""),
-                })
             elif kind == "plot_setup":
                 plot_scenes.setdefault(from_id, {}).setdefault("setups", []).append(to_id)
             elif kind == "plot_crisis":
@@ -398,11 +387,10 @@ def get_project_summary(project_path: Path) -> dict:
                 "arc_value": char["arc_value"],
                 "arc_value_at_open": char["arc_value_at_open"],
                 "arc_value_at_close": char["arc_value_at_close"],
-                "rel": char_rels.get(char_id, []),
                 "relationships": char_rel_summary.get(char_id, []),
             }
             return _omit(result, {"arc_type": "Arc type not set", "arc_value": "Arc value not set",
-                                  "arc_value_at_open": "Not set", "arc_value_at_close": "Not set", "rel": [], "relationships": []})
+                                  "arc_value_at_open": "Not set", "arc_value_at_close": "Not set", "relationships": []})
 
         # ── Build plot output ──
         def _build_plot(plot_id):
@@ -717,23 +705,6 @@ def get_dashboard_data(project_path: Path) -> dict:
                             "heading": s_extra.get("heading", ""),
                         })
                 d["scenes"] = scene_objs
-                # relationships: denormalized from character_relationship
-                rels = []
-                for rel in rel_map.get(eid, {}).get("character_relationship", []):
-                    target_id = rel.get("to_id", "") if isinstance(rel, dict) else rel
-                    if target_id in entity_by_id:
-                        t = entity_by_id[target_id]
-                        note = rel.get("note", "") if isinstance(rel, dict) else ""
-                        try:
-                            parsed = json.loads(note) if note else {}
-                        except (json.JSONDecodeError, TypeError):
-                            parsed = {}
-                        rels.append({
-                            "id": t["id"],
-                            "label": parsed.get("label", ""),
-                            "feeling": parsed.get("feeling", ""),
-                        })
-                d["relationships"] = rels
                 characters.append(d)
 
             elif etype == "scene":

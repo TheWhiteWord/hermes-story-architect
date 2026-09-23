@@ -63,25 +63,6 @@ def _export_all(conn, project_path: Path) -> None:
             if chars:
                 extra["characters"] = [r[0] for r in chars]
 
-        if entity_type == "character":
-            rels = conn.execute(
-                "SELECT to_id, note FROM relations WHERE from_id=? AND kind='character_relationship'",
-                (entity_id,)
-            ).fetchall()
-            if rels:
-                relationships = []
-                for to_id, note in rels:
-                    try:
-                        parsed = json.loads(note) if note else {}
-                    except (json.JSONDecodeError, TypeError):
-                        parsed = {}
-                    relationships.append({
-                        "id": to_id,
-                        "label": parsed.get("label", ""),
-                        "feeling": parsed.get("feeling", ""),
-                    })
-                extra["relationships"] = relationships
-
         if entity_type == "location" or entity_type == "world":
             kind = "location_variant" if entity_type == "location" else "world_variant"
             var = conn.execute(
