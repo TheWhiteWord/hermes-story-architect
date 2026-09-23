@@ -2121,6 +2121,7 @@ const REL_TYPE_COLORS = {
   'mentor':       '#b07be0',
   'rival':        '#e0a86b',
   'custom':       '#8a8a8a',
+  'neutral':      '#7a8a9a',
 };
 
 function relTypeColor(type) {
@@ -2184,7 +2185,12 @@ function buildGraphView() {
     const pb = (rel.perspectives || {})[b] || {};
     const fontCfg = { color: mutedColor, size: 9, align: 'middle', strokeWidth: 2, strokeColor: '#1a1a1a' };
     const key = [a, b].sort().join('::');
-    const spring = Math.max(200, 300 - (avgStrength[key] || 0) * 250);
+    const TYPE_PROXIMITY = { family: 0, romantic: 10, ally: 40, neutral: 50, professional: 60, mentor: 70, rival: 80, enemy: 100, custom: 50 };
+    const typeOffset = Math.max(
+      TYPE_PROXIMITY[pa.type] ?? 40,
+      TYPE_PROXIMITY[pb.type] ?? 40
+    );
+    const spring = 80 + typeOffset * 1.5 + (1 - (avgStrength[key] || 0)) * 40;
 
     edges.push({
       from: a, to: b,
@@ -2194,6 +2200,7 @@ function buildGraphView() {
       width: 1.5,
       dashes: pa.secret || false,
       length: spring,
+      smooth: { enabled: false },
       relId: rel.id
     });
 

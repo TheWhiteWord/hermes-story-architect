@@ -184,7 +184,7 @@ ENTITY_SCHEMAS = {
         "perspectives": {"type": "object", "default": {}, "optional": False, "description": "Per-character relationship view", "sub_fields": {
             "label": {"type": "string", "description": "Relationship label from this character's POV"},
             "feeling": {"type": "string", "description": "Emotional stance"},
-            "type": {"type": "string", "description": "Category: ally/enemy/family/romantic/professional/mentor/rival/custom"},
+            "type": {"type": "string", "description": "Category: ally/enemy/family/romantic/professional/mentor/rival/custom/neutral"},
             "strength": {"type": "number", "description": "Intensity -1.0 to 1.0"},
             "secret": {"type": "boolean", "description": "Hidden from other character"},
         }},
