@@ -1,0 +1,227 @@
+{
+  "meta": {
+    "source_file": "src/dashboard/story-dashboard.html",
+    "total_lines": 4329,
+    "captured_at": "2026-09-23T_CEST"
+  },
+
+  "dom_ids": {
+    "count": 112,
+    "static_ids": [
+      "app", "arc-beat-tooltip", "arc-graph-wrap", "arc-legend", "arc-svg",
+      "arc-warnings", "btn-labels", "btn-spline",
+      "characterStats-count", "characterStats-lengthchart", "characterStats-monologues", "characterStats-table",
+      "chars-grid", "detail-panel",
+      "durationStats-action", "durationStats-dialogue", "durationStats-lengthchart", "durationStats-summary", "durationStats-total",
+      "error-screen", "file-input", "graph-legend", "graph-subtitle", "graph-tab-arcgraph", "graph-tab-network", "graph-view",
+      "lengthStats-characters", "lengthStats-lines", "lengthStats-pagesWhole", "lengthStats-scenes", "lengthStats-words",
+      "loading-screen", "location-list", "locations-subtitle", "locationStats-count", "locationStats-table", "locations-view",
+      "main", "network-canvas", "panel-body", "panel-footer", "panel-name", "panel-type",
+      "plot-list", "plots-subtitle", "plots-view",
+      "relationship-list", "relationships-subtitle", "relationships-view",
+      "scene-list", "sceneprop-time_dawn", "sceneprop-time_dawn_bar", "sceneprop-time_day",
+      "sceneprop-time_day_bar", "sceneprop-time_dusk", "sceneprop-time_dusk_bar", "sceneprop-time_evening",
+      "sceneprop-time_evening_bar", "sceneprop-time_morning", "sceneprop-time_morning_bar", "sceneprop-time_night",
+      "sceneprop-time_night_bar", "sceneprop-type_ext", "sceneprop-type_ext_bar", "sceneprop-type_int",
+      "sceneprop-type_int_bar", "sceneprop-type_mixed", "sceneprop-type_mixed_bar",
+      "scene-search", "scenes-subtitle", "sceneStats-count", "sceneStats-timechart", "scenes-view",
+      "screenplay-container", "script-subtitle", "script-view",
+      "sidebar",
+      "stats-group-characters", "stats-group-overview", "stats-group-scenes", "stats-group-structure", "stats-panel",
+      "story-body", "story-project-name", "story-subtitle", "story-view",
+      "structStats-act-list", "structStats-acts", "structStats-arc-summary", "structStats-plot-coverage",
+      "structStats-role-bars", "structStats-scenes", "structStats-sequences", "structStats-status-bars",
+      "tab-arcgraph", "tab-network",
+      "tt-char", "tt-label", "tt-shift", "tt-value",
+      "world-list", "worlds-subtitle", "worlds-view"
+    ],
+    "dynamic_template_ids": [
+      "id=\"${l.id}\"", "id=\"${locId}\"", "id=\"${pl.id}\"", "id=\"${plotId}\"",
+      "id=\"${rel.id}\"", "id=\"${sceneId}\"", "id=\"${s.id}\"", "id=\"${w.id}\"", "id=\"${worldId}\""
+    ]
+  },
+
+  "functions": {
+    "count": 77,
+    "list": [
+      "boot", "initStory", "normalise", "showError",
+      "loadFromFile", "handleFileLoad", "loadSampleData", "refreshIndex",
+      "switchView", "toggleSidebar", "switchGraphTab", "switchStatsGroup",
+      "buildGraphView", "resetGraphLayout",
+      "buildScenesView", "renderSceneList", "renderSceneItem", "filterScenes",
+      "buildLocationsView",
+      "buildPlotsView", "plotScopeBadge", "renderPlotCard",
+      "buildRelationshipsView",
+      "buildWorldsView",
+      "buildStoryView",
+      "buildSequencesView", "buildActsView",
+      "openPanel", "closePanel", "renderSectionsHtml", "arcSectionHtml",
+      "showCharacterPanel", "showScenePanel", "showLocationPanel",
+      "showPlotPanel", "showRelationshipPanel", "showSequencePanel", "showActPanel", "showWorldPanel",
+      "buildCharsGrid", "buildArcGraph", "catmullRomPath", "updateLegend",
+      "toggleArcCharMute", "toggleArcSpline", "toggleArcLabels",
+      "showArcTooltip", "hideArcTooltip", "positionArcTooltip",
+      "getArcTypeClass", "arcXScale", "arcYScale", "beatX", "renderBeats",
+      "openStatsPanel", "closeStatsPanel", "populateStats", "populateStructuralStats",
+      "_renderChartsForGroup", "sortTable",
+      "renderDurationChart", "_renderDurationChart", "_ensureChartRendered",
+      "renderCharacterChart", "renderBarcodeChart",
+      "escapeHtml", "normalizeLocs", "findLocation", "setEl", "setBar",
+      "fmtDuration", "fmtDurationShort",
+      "roleColor", "relTypeColor", "getRoleKey",
+      "perspectiveHtml"
+    ],
+    "nested": [
+      {"fn": "renderBeats", "parent": "buildArcGraph"},
+      {"fn": "perspectiveHtml", "parent": "renderSectionsHtml"},
+      {"fn": "arcXScale", "scope": "arc-graph (module-level, only used by arc)"},
+      {"fn": "arcYScale", "scope": "arc-graph (module-level, only used by arc)"},
+      {"fn": "beatX", "scope": "arc-graph (module-level, only used by arc)"}
+    ],
+    "note": "`of` was a false-positive grep hit from text 'dramatic function of'. True function count = 77."
+  },
+
+  "inline_onclick_handlers": {
+    "count": 62,
+    "static_handlers": [
+      "loadFromFile()", "loadSampleData()",
+      "switchView('story', this)", "switchView('graph', this)",
+      "switchView('relationships', this)", "switchView('scenes', this)",
+      "switchView('locations', this)", "switchView('plots', this)",
+      "switchView('worlds', this)", "switchView('script', this)",
+      "refreshIndex()", "toggleSidebar()", "resetGraphLayout()",
+      "switchGraphTab('network')", "switchGraphTab('arcgraph')",
+      "toggleArcSpline()", "toggleArcLabels()",
+      "openStatsPanel()", "closeStatsPanel()",
+      "switchStatsGroup('overview', this)", "switchStatsGroup('characters', this)",
+      "switchStatsGroup('scenes', this)", "switchStatsGroup('structure', this)",
+      "sortTable('characterStats-table',0)", "sortTable('characterStats-table',1)",
+      "sortTable('characterStats-table',2)", "sortTable('characterStats-table',3)",
+      "sortTable('characterStats-table',4)",
+      "sortTable('locationStats-table',0)", "sortTable('locationStats-table',1)",
+      "sortTable('locationStats-table',2)",
+      "closePanel()"
+    ],
+    "dynamic_template_handlers": [
+      "showSequencePanel('${seq.id}')",
+      "showActPanel('${act.id}')",
+      "showLocationPanel('${l.id}')",
+      "showPlotPanel('${pl.id}')",
+      "showRelationshipPanel(story.relationships.find(r=>r.id==='${rel.id}'))",
+      "showWorldPanel('${w.id}')",
+      "showScenePanel('${sid}')", "showScenePanel('${s.id}')", "showScenePanel('${sceneObj.id}')",
+      "showCharacterPanel(story.characters.find(x=>x.id==='${c.id}'))",
+      "showCharacterPanel(story.characters.find(x=>x.id==='${a}'))",
+      "showCharacterPanel(story.characters.find(x=>x.id==='${b}'))",
+      "toggleArcCharMute('${char.id}')"
+    ]
+  },
+
+  "external_cdns": [
+    {
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js",
+      "purpose": "Graph network visualization"
+    },
+    {
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js",
+      "purpose": "YAML parsing for file fallback"
+    },
+    {
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js",
+      "purpose": "Statistics charts"
+    }
+  ],
+
+  "screenplay_css": {
+    "link_string": "<link rel=\"stylesheet\" href=\"screenplay.css\">",
+    "replacement_pattern": "<style>\\n{css content}\\n</style>",
+    "source_file": "src/dashboard/screenplay.css"
+  },
+
+  "hermes_send_attributes": {
+    "count": 13,
+    "note": "13 occurrences across 12 unique prompt strings (one duplicate 'Give me an overview of ${p.name}.' exists).",
+    "unique_prompts": [
+      "Analyze the dialogue balance between characters in this screenplay...",
+      "Analyze the scene structure and pacing of this screenplay...",
+      "Analyze the dramatic structure of this story...",
+      "Give me an overview of ${p.name}.",
+      "Design a character arc for ${char.name} showing their value shift across the story.",
+      "Tell me more about ${char.name}'s character development.",
+      "What happens in ${scene.title || scene.id}?",
+      "Describe ${loc.name} and its role in the story.",
+      "Update the relationship between ${charA?.name || a} and ${charB?.name || b}...",
+      "What is the dramatic function of the sequence '${seq.title || seq.id}'?",
+      "What is the dramatic arc of '${act.title || act.id}'?",
+      "Design a character arc for the protagonist showing their value shift across the story."
+    ]
+  },
+
+  "global_state": {
+    "module_level": [
+      "let story = null;",
+      "let network = null;",
+      "let sidebarExpanded = false;",
+      "let currentView = 'graph';",
+      "let _scriptBuilt = false;",
+      "let _statsPopulated = false;"
+    ],
+    "color_const": [
+      "const ROLE_COLORS = {...}",
+      "const REL_TYPE_COLORS = {...}",
+      "const PLOT_TYPE_COLORS = {...}"
+    ],
+    "data_contract_globals": [
+      "window.__STORY_DATA__",
+      "window.__SECTIONS__",
+      "window.__SCREENPLAY_STATS__",
+      "window.__STRUCTURAL_STATS__"
+    ]
+  },
+
+  "boot_comment": {
+    "string": "// ─── Boot ─────────────────────────────────────────────────────────────────────",
+    "line": 1831,
+    "context": "Injected data (window.__*__) placed BEFORE this comment by story_dashboard.py"
+  },
+
+  "css_sections": {
+    "count_in_style_block": 21,
+    "count_js_comment_dividers": 6,
+    "note": "Only 21 dividers are inside <style> (lines 19-1332). The other 6 (lines 4022-4301) are in JavaScript comments — NOT CSS.",
+    "sections": [
+      {"name": "Reset & Base", "line": 19},
+      {"name": "Layout Shell", "line": 67},
+      {"name": "Sidebar", "line": 76},
+      {"name": "Main Content", "line": 132},
+      {"name": "View Header", "line": 144},
+      {"name": "Graph View", "line": 169},
+      {"name": "Scenes View", "line": 205},
+      {"name": "Story View", "line": 256},
+      {"name": "Tags & Chips", "line": 336},
+      {"name": "Buttons", "line": 378},
+      {"name": "Detail Panel", "line": 407},
+      {"name": "Loading & Empty States", "line": 535},
+      {"name": "Scrollbar", "line": 585},
+      {"name": "Search", "line": 591},
+      {"name": "Entity List Views (locations, plots, worlds)", "line": 615},
+      {"name": "Script View", "line": 818},
+      {"name": "Statistics Panel", "line": 913},
+      {"name": "Graph Tabs", "line": 1107},
+      {"name": "Section Labels", "line": 1132},
+      {"name": "Cast / Char cards (inside Arc graph tab)", "line": 1146},
+      {"name": "Arc Graph Panel", "line": 1192}
+    ]
+  },
+
+  "dead_code": [
+    {"fn": "buildSequencesView", "line": "before 2487", "body": "{/* removed */}"},
+    {"fn": "buildActsView", "line": "before 2487", "body": "{/* removed */}"}
+  ],
+
+  "structure": {
+    "style_block": {"start": 18, "end": 1332},
+    "html_body": {"start": 1333, "end": 1823},
+    "script_block": {"start": 1824, "end": 4327}
+  }
+}
