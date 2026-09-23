@@ -80,6 +80,15 @@ def _export_all(conn, project_path: Path) -> None:
                     })
                 extra["relationships"] = relationships
 
+        if entity_type == "location" or entity_type == "world":
+            kind = "location_variant" if entity_type == "location" else "world_variant"
+            var = conn.execute(
+                f"SELECT to_id FROM relations WHERE from_id=? AND kind='{kind}'",
+                (entity_id,)
+            ).fetchone()
+            if var:
+                extra["variant_of"] = var[0]
+
         if entity_type == "plot":
             for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"), ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
                 rows = conn.execute(
