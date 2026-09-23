@@ -45,8 +45,8 @@ After extraction, verify:
 
 ## Checklist
 
-- [ ] Create `src/dashboard/js/statistics/` directory
-- [ ] Create `js/statistics/statistics.js`:
+- [x] Create `src/dashboard/js/statistics/` directory
+- [x] Create `js/statistics/statistics.js`:
   - `window.DASH = window.DASH || {};`
   - `DASH._statsPopulated = false;`
   - `DASH._structuralStatsPopulated = false;`
@@ -59,7 +59,7 @@ After extraction, verify:
   - `DASH.sortTable = function(tableId, colIdx) { ... }`
   - Internal calls use `DASH.*`
   - `openStatsPanel` checks `DASH._scriptBuilt` and calls `DASH.buildScriptView()` if needed
-- [ ] Create `js/statistics/charts.js`:
+- [x] Create `js/statistics/charts.js`:
   - `window.DASH = window.DASH || {};`
   - `DASH._currentBarcodeMode = 'type';`
   - `DASH._chartObservers = {};`
@@ -69,13 +69,27 @@ After extraction, verify:
   - `DASH.renderCharacterChart = function(stats) { ... }`
   - `DASH.renderBarcodeChart = function(mode) { ... }`
   - Internal calls use `DASH.*`
-- [ ] Update `tools/story_dashboard.py`:
+- [x] Update `tools/story_dashboard.py`:
   - `JS_ORDER` includes `statistics/*.js` after `graph/*.js`
-- [ ] Update tests:
+- [x] Update tests:
   - `test_open_stats_panel_function` → reads `js/statistics/statistics.js`
   - `test_d3_charts_functions` → reads `js/statistics/charts.js`
   - `test_sort_table_function` → reads `js/statistics/statistics.js`
-- [ ] Verify: tests pass, stats panel works, charts draw
+- [x] Verify: tests pass, stats panel works, charts draw
+
+## Implementation Summary
+
+**Files created:**
+- `src/dashboard/js/statistics/statistics.js` — stats panel lifecycle (`openStatsPanel`, `closeStatsGroup`, `switchStatsGroup`, `_renderChartsForGroup`), stat population (`populateStats`, `populateStructuralStats`), `sortTable`. State: `_statsPopulated`, `_structuralStatsPopulated`.
+- `src/dashboard/js/statistics/charts.js` — D3 chart implementations (`renderDurationChart`, `_renderDurationChart`, `renderCharacterChart`, `renderBarcodeChart`, `_ensureChartRendered`). State: `_currentBarcodeMode`, `_chartObservers`.
+
+**Files modified:**
+- `src/dashboard/js/core.js` — stripped all stats/chart code (~340 lines removed: `_ensureChartRendered`, `_renderChartsForGroup`, `_renderDurationChart`, `renderDurationChart`, `renderCharacterChart`, `renderBarcodeChart`, `openStatsPanel`, `closeStatsPanel`, `populateStats`, `populateStructuralStats`, `sortTable`). Removed 5 state variables (`_statsPopulated`, `_structuralStatsPopulated`, `_currentBarcodeMode`, `_chartObservers`). Down to ~220 lines (boot + normalise + buildScriptView).
+- `src/dashboard/js/navigation.js` — removed `switchStatsGroup` (moved to statistics.js).
+- `tools/story_dashboard.py` — `JS_ORDER` extended with `statistics/statistics.js` and `statistics/charts.js`.
+- `tests/test_story_dashboard_integration.py` — 3 tests updated to read from `statistics/statistics.js` and `statistics/charts.js` instead of `core.js`.
+
+**Verification:** All 25 dashboard integration tests pass. Full suite: 284 passed, 1 pre-existing failure (`test_field_coverage[relationship]` — unrelated to dashboard, fails on clean checkout).
 
 ## Issues Found
 

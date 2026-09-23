@@ -40,13 +40,4 @@ DASH.switchGraphTab = function(tab) {
   if (tab === 'arcgraph') { DASH.buildCharsGrid(); DASH.buildArcGraph(); DASH.updateLegend(); }
 }
 
-DASH.switchStatsGroup = function(group, btn) {
-  document.querySelectorAll('.stats-group').forEach(g => g.classList.remove('active'));
-  document.querySelectorAll('.stats-tab').forEach(b => b.classList.remove('active'));
-  document.getElementById('stats-group-' + group).classList.add('active');
-  btn.classList.add('active');
-  // Charts must be drawn into a visible container
-  requestAnimationFrame(() => DASH._renderChartsForGroup(group));
-}
-
 DASH._origSwitchView = DASH.switchView;

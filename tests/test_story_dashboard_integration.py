@@ -51,19 +51,19 @@ class TestDashboardIntegration:
 
     def test_open_stats_panel_function(self, dashboard_html):
         """openStatsPanel function is defined."""
-        js_content = Path("src/dashboard/js/core.js").read_text()
+        js_content = Path("src/dashboard/js/statistics/statistics.js").read_text()
         assert 'DASH.openStatsPanel' in js_content
 
     def test_d3_charts_functions(self, dashboard_html):
         """D3 chart rendering functions are defined."""
-        js_content = Path("src/dashboard/js/core.js").read_text()
+        js_content = Path("src/dashboard/js/statistics/charts.js").read_text()
         assert 'DASH.renderDurationChart' in js_content
         assert 'DASH.renderCharacterChart' in js_content
         assert 'DASH.renderBarcodeChart' in js_content
 
     def test_sort_table_function(self, dashboard_html):
         """sortTable function is defined."""
-        js_content = Path("src/dashboard/js/core.js").read_text()
+        js_content = Path("src/dashboard/js/statistics/statistics.js").read_text()
         assert 'DASH.sortTable' in js_content
 
     def test_switch_view_wrapper(self, dashboard_html):
