@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 
-CSS_ORDER = ["base.css"]
+CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css", "graph.css"]
 JS_ORDER = ["core.js"]
 
 SCHEMA = {

@@ -1,0 +1,251 @@
+/* ─── Graph View ─── */
+#graph-view .view-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#network-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+
+/* ─── Graph Tabs ─── */
+.graph-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--card);
+}
+.graph-tab {
+  padding: 8px 14px;
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.12s;
+  user-select: none;
+}
+.graph-tab:hover { color: var(--foreground); }
+.graph-tab.active { color: var(--foreground); border-bottom-color: var(--accent); }
+.graph-tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+.graph-tab-content.active { display: flex; }
+#graph-tab-network { position: relative; }
+
+
+/* ─── Cast / Char cards (inside Arc graph tab) ─── */
+.chars-section { padding: 16px; }
+.chars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.char-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 120ms;
+  position: relative;
+}
+.char-card:hover { background: var(--card-hover); border-color: var(--border-hover); }
+.char-card.selected { border-color: rgba(123,156,240,0.4); background: rgba(123,156,240,0.06); }
+.char-name { font-size: var(--font-size-base); font-weight: 600; margin-bottom: 2px; }
+.char-role {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  display: flex; align-items: center; gap: 5px;
+}
+.char-role-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.char-arc-type {
+  font-size: var(--font-size-xs);
+  margin-top: 8px;
+  display: flex; align-items: center; gap: 4px;
+}
+.arc-type-badge {
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.arc-type-negative { background: rgba(224,112,112,0.15); color: #e07070; }
+.arc-type-positive { background: rgba(107,191,176,0.15); color: #6bbfb0; }
+.arc-type-flat { background: rgba(138,138,138,0.15); color: #8a8a8a; }
+.arc-type-ironic { background: rgba(224,168,107,0.15); color: #e0a86b; }
+.arc-type-absent { background: rgba(80,80,80,0.15); color: #555; }
+.char-beat-count { font-size: var(--font-size-xs); color: var(--muted-foreground); margin-top: 3px; }
+
+
+/* ─── Arc Graph Panel ─── */
+.arc-graph-section { padding: 0 16px 16px; }
+.arc-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.arc-graph-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--foreground);
+}
+.arc-controls { display: flex; gap: 6px; align-items: center; }
+.arc-graph-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+}
+.arc-graph {
+  width: 100%;
+  display: block;
+  cursor: crosshair;
+}
+.arc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.arc-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 120ms;
+}
+.arc-legend .legend-item:hover, .arc-legend .legend-item.active { color: var(--foreground); }
+.arc-legend .legend-item.muted { opacity: 0.35; }
+.arc-legend .legend-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.arc-legend .legend-line {
+  width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0;
+}
+.arc-legend .legend-arc-type { font-size: 9px; color: var(--muted-foreground); }
+
+/* Sanity warnings */
+.arc-warnings { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.arc-warning {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,217,61,0.08);
+  border: 1px solid rgba(255,217,61,0.2);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: var(--font-size-xs);
+  color: #ffd93d;
+}
+.arc-warning-icon { font-size: 10px; flex-shrink: 0; }
+
+/* Empty state */
+.arc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  gap: 12px;
+}
+.arc-empty-icon { font-size: 28px; opacity: 0.25; }
+.arc-empty-title { font-size: var(--font-size-base); font-weight: 600; color: var(--foreground); }
+.arc-empty-text { font-size: var(--font-size-sm); color: var(--muted-foreground); max-width: 260px; line-height: 1.5; }
+
+/* SVG Arc graph elements */
+.arc-grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
+.arc-zero-line { stroke: rgba(255,255,255,0.12); stroke-width: 1; }
+.arc-act-line { stroke: rgba(255,255,255,0.1); stroke-width: 1; stroke-dasharray: 4 4; }
+.arc-act-band.even { fill: rgba(255,255,255,0.02); }
+.arc-act-band.odd { fill: rgba(255,255,255,0.04); }
+.arc-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: opacity 200ms; }
+.arc-line.muted { opacity: 0.15; }
+.arc-beat-dot { cursor: pointer; transition: r 150ms, opacity 200ms; }
+.arc-beat-dot:hover { r: 7; }
+.arc-beat-dot.muted { opacity: 0.15; }
+.arc-beat-dot.crisis { filter: drop-shadow(0 0 4px rgba(255,217,61,0.6)); }
+.arc-beat-dot.climax { filter: drop-shadow(0 0 6px currentColor); }
+.beat-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.55);
+  pointer-events: none;
+  font-family: inherit;
+}
+.arc-axis-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.28);
+  font-family: inherit;
+}
+.arc-act-label {
+  font-size: 9px;
+  fill: rgba(255,255,255,0.2);
+  font-family: inherit;
+}
+
+/* Beat tooltip */
+#arc-beat-tooltip {
+  position: fixed;
+  background: #222;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+  max-width: 200px;
+  z-index: 1000;
+  line-height: 1.5;
+}
+#arc-beat-tooltip.visible { opacity: 1; }
+#arc-beat-tooltip .tt-label { font-weight: 600; margin-bottom: 2px; }
+#arc-beat-tooltip .tt-char { color: var(--muted-foreground); font-size: var(--font-size-xs); }
+#arc-beat-tooltip .tt-shift { font-size: var(--font-size-xs); margin-top: 2px; font-style: italic; color: var(--muted-foreground); }
+#arc-beat-tooltip .tt-value { margin-top: 3px; font-variant-numeric: tabular-nums; font-size: var(--font-size-xs); }
+
+/* Arc beat indicator dots on scene cards */
+.arc-beat-dot-scene {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-left: 2px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  cursor: default;
+}
+
