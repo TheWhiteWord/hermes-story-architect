@@ -9,6 +9,7 @@ JS_ORDER = [
     "views/scenes.js", "views/locations.js", "views/plots.js",
     "views/relationships.js", "views/worlds.js", "views/story.js",
     "panels/panel-manager.js", "panels/entity-panels.js",
+    "graph/network.js", "graph/arc-graph.js",
 ]
 
 SCHEMA = {
