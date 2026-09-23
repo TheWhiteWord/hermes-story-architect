@@ -1,0 +1,13 @@
+/* ============================================================================
+   RELATIONSHIP UI — CSS PATCH
+   Location: add after the existing .relationship-row styles, around line 772
+   Action:   ADD (no existing rule to replace)
+   ============================================================================ */
+
+/* Perspective panels in relationship panel */
+.panel-perspective {
+  padding: 10px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}

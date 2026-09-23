@@ -242,6 +242,14 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": char_slug, "location_id": None,
             "extra": _extra_for("arc_beat", fm),
         }
+    elif entity_type == "relationship":
+        return {
+            "id": slug, "type": "relationship",
+            "name": fm.get("name", ""), "one_sentence": "",
+            "order_key": 0, "status": fm.get("status", ""),
+            "parent_id": None, "location_id": None,
+            "extra": _extra_for("relationship", fm),
+        }
     return {"id": slug, "type": entity_type, "name": "", "one_sentence": "",
             "order_key": 0, "status": "", "parent_id": None, "location_id": None, "extra": {}}
 
@@ -258,6 +266,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
         "arc_beat": {"id", "label", "order", "character"},
+        "relationship": {"name", "status", "id"},
     }
     s = skip.get(entity_type, set())
     extra = {}

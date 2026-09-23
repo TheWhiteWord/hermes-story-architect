@@ -1,7 +1,7 @@
 # Task 7.1: Dashboard UI Brief for Relationship Refactor
 
 ## Goal
-Produce a complete brief for a UI specialist agent to update the dashboard's relationship visualization. The brief provides everything needed: current UI context, new data structures, specific changes, and drop-in code replacements.
+Produce a complete brief for a UI specialist agent to update the dashboard's relationship visualization. The brief provides everything needed: current UI context, new data structures, specific changes, and full code for the Network graph rebuild.
 
 ## Deliverable
 A self-contained document the UI specialist can work from without reading the codebase.
@@ -17,7 +17,7 @@ A self-contained document the UI specialist can work from without reading the co
 - js-yaml (CDN) for sample data loading
 - No build step — plain HTML/CSS/JS injected with `window.__STORY_DATA__`
 
-### CSS Design System (relevant tokens)
+### CSS Design System (verified tokens)
 ```
 --foreground: #e8e8e8 (main text)
 --muted-foreground: #8a8a8a (secondary text)
@@ -28,18 +28,20 @@ A self-contained document the UI specialist can work from without reading the co
 --radius: 6px
 --gap: 12px
 --font-size-xs: 10px, sm: 11px, base: 13px, lg: 15px
+--tag-gap: 4px
 ```
 
 ### Existing Relationship UI
 
 **Network Graph** (`buildGraphView`, line ~2064):
 - Characters are nodes (circles with labels)
-- Edges come from `c.related` array on each character
+- Edges come from `c.related` array on each character (normalizer maps `relationships` → `related`)
 - Old data shape: `{ id: "mara", label: "Partner", feeling: "Wary respect" }`
 - Each relationship creates ONE edge from `char.id` → `rel.id`
 - Edge label shows `rel.label`
 - Multiple relationships between same pair: vis-network renders parallel curves
-- Dedup: `[from, to].sort()` was used to collapse bidirectional edges
+- Dedup: `[from, to].sort()` was used to collapse bidirectional edges (line 2096)
+- **NO `network.fit()` call exists** — graph never auto-centers on spawn
 
 **Character Panel** (`showCharacterPanel`, line ~2599):
 - Shows character details in right-side panel
@@ -144,45 +146,21 @@ Relationships move from being embedded in character files to **first-class entit
 
 ## Part 3: Required UI Changes
 
-### 3.1 Network Graph — Read from `story.relationships`
+### 3.1 Network Graph — Read from `story.relationships` (CRITICAL)
 
 **Current** (`buildGraphView`, line ~2064):
-```javascript
-// OLD: iterates characters, reads c.related
-(c.related || []).forEach(rel => {
-    edges.push({ from: c.id, to: rel.id, label: rel.label, ... });
-});
-```
+- Iterates characters, reads `c.related`
+- Uses `[from, to].sort()` dedup (collapses bidirectional edges)
+- No `network.fit()` — graph spawns off-center
 
-**New**: Iterate `story.relationships` instead:
-```javascript
-// NEW: iterate relationship entities
-(story.relationships || []).forEach(rel => {
-    const [a, b] = rel.characters;
-    const pa = rel.perspectives[a];
-    const pb = rel.perspectives[b];
+**New**: Iterate `story.relationships` instead, with directed edges per perspective, and call `network.fit()` after stabilization.
 
-    // Edge a → b with a's perspective
-    edges.push({
-        from: a, to: b,
-        label: pa?.label || '',
-        color: relTypeColor(pa?.type),
-        width: 1 + (pa?.strength || 0) * 2,
-        dashes: pa?.secret || false,
-    });
-
-    // Edge b → a with b's perspective (if asymmetric)
-    if (pb && (pb.label !== pa?.label || pb.feeling !== pa?.feeling)) {
-        edges.push({
-            from: b, to: a,
-            label: pb.label || '',
-            color: relTypeColor(pb.type),
-            width: 1 + (pb.strength || 0) * 2,
-            dashes: pb.secret || false,
-        });
-    }
-});
-```
+The full replacement for `buildGraphView` is in the **Reference Code** file. Key differences:
+1. Iterate `story.relationships` (not `c.related`)
+2. Each relationship creates TWO directed edges (A→B and B→A) when perspectives differ
+3. Edge color by `type`, thickness by `strength`, dashed if `secret`
+4. Remove the `[from, to].sort()` dedup entirely
+5. Call `network.fit()` after physics stabilization to center the graph
 
 **Edge styling by type** (suggested color mapping):
 ```
@@ -256,7 +234,7 @@ Clicking a relationship (edge or list item) should open a panel showing:
     <div class="panel-entity-type">Relationship</div>
     <div class="panel-name">Kael & Mira</div>
   </div>
-  <button class="panel-close">✕</button>
+  <button class="panel-close" onclick="closePanel()">✕</button>
 </div>
 <div class="panel-body">
   <div class="panel-section-title">Characters</div>
@@ -335,39 +313,7 @@ relationships: [{ with: "mara", label: "Partner", type: "ally", strength: 0.5 }]
 
 ---
 
-## Part 4: Drop-In Replacements
-
-### Replacement 1: `buildGraphView` edge construction
-**Location**: Inside `buildGraphView()` function
-**Replace**: The `(c.related || []).forEach(...)` loop
-**With**: New iteration over `story.relationships` as shown in 3.1
-
-### Replacement 2: Character panel relationship section
-**Location**: Inside `showCharacterPanel()` function
-**Replace**: `(char.related || []).map(rel => { ... })` block
-**With**: New iteration over `char.relationships` as shown in 3.2
-
-### Replacement 3: Normalizer relationship mapping
-**Location**: `normalise()` function
-**Replace**: `if (c.relationships && !c.related) { ... }` block
-**With**: Updated mapping as shown in 3.5
-
-### Replacement 4: `loadSampleData()` sample characters
-**Location**: `loadSampleData()` function
-**Replace**: `relationships: [{ id: "mara", feeling: "...", label: "Partner" }]` entries
-**With**: `relationships: [{ with: "mara", label: "Partner", type: "ally", strength: 0.5 }]` entries
-
-### Replacement 5: Add sidebar button
-**Location**: In `<nav id="sidebar">`, after the Characters button
-**Add**: Relationships nav button as shown in 3.4
-
-### Replacement 6: Add relationships view
-**Location**: In `<main id="main">`, after the graph view
-**Add**: Relationships view div as shown in 3.4
-
----
-
-## Part 5: Design Notes & Freedom
+## Part 4: Design Notes & Freedom
 
 ### What the UI specialist should feel free to improve:
 - **Edge rendering**: Current graph uses simple arrows. Consider curved edges for bidirectional relationships, or color-coded edges by type.
@@ -393,17 +339,17 @@ relationships: [{ with: "mara", label: "Partner", type: "ally", strength: 0.5 }]
 
 ---
 
-## Part 6: File Locations
+## Part 5: File Locations
 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `src/dashboard/story-dashboard.html` | ~762-772 | `.relationship-row` CSS classes |
 | `src/dashboard/story-dashboard.html` | ~1858-1913 | `loadSampleData()` sample data |
 | `src/dashboard/story-dashboard.html` | ~1925-1989 | `normalise()` function |
-| `src/dashboard/story-dashboard.html` | ~2064-2100 | `buildGraphView()` function |
-| `src/dashboard/story-dashboard.html` | ~2599-2630 | `showCharacterPanel()` function |
+| `src/dashboard/story-dashboard.html` | ~2064-2177 | `buildGraphView()` function |
+| `src/dashboard/story-dashboard.html` | ~2599-2677 | `showCharacterPanel()` function |
 | `src/dashboard/story-dashboard.html` | ~1356-1444 | Sidebar navigation HTML |
-| `src/dashboard/story-dashboard.html` | ~1459-1537 | View containers HTML |
+| `src/dashboard/story-dashboard.html` | ~1459-1581 | View containers HTML |
 
 ---
 
@@ -423,8 +369,11 @@ relationships: [{ with: "mara", label: "Partner", type: "ally", strength: 0.5 }]
 - [ ] Normalizer handles both old and new format
 - [ ] Sample data updated to new format
 - [ ] Old `[from, to].sort()` dedup removed
+- [ ] Graph centers on spawn via `network.fit()`
 - [ ] Dashboard renders without errors
 - [ ] Manual testing with sample data
+
+---
 
 ## Verification for Backend
 ```bash
