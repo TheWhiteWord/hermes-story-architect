@@ -44,6 +44,7 @@ DASH.showActPanel = function(actId) {
     })()}
     ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
     ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div>${seqRows}</div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
+    ${DASH.renderSectionsHtml('act', actId)}
   `;
 
   document.getElementById('panel-footer').innerHTML = `
@@ -489,6 +490,7 @@ DASH.showScenePanel = function(sceneId) {
       <div class="panel-section-title">Content</div>
       ${contentHtml}
     </div>
+    ${DASH.renderSectionsHtml('scene', sceneId, ['Content'])}
   `;
 
   document.getElementById('panel-footer').innerHTML = `
@@ -535,6 +537,7 @@ DASH.showSequencePanel = function(seqId) {
     <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
     ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
     ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div>${sceneRows}</div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
+    ${DASH.renderSectionsHtml('sequence', seqId)}
   `;
 
   document.getElementById('panel-footer').innerHTML = `
