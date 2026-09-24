@@ -162,12 +162,13 @@ def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
          columns["order_key"], columns["status"], columns["parent_id"],
          columns["location_id"], json.dumps(columns["extra"])),
     )
-    _insert_sections(conn, columns["id"], body)
+    _insert_sections(conn, columns["id"], body, entity_type)
 
 
-def _insert_sections(conn, entity_id: str, body: str) -> None:
-    """Parse and insert body sections."""
+def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
+    """Insert all standard sections for entity type, empty body if missing from note."""
     from core.section_parser import list_sections, get_section
+    from core.entity import standard_sections
 
     headings = list_sections(body)
     for h in headings:
@@ -178,6 +179,13 @@ def _insert_sections(conn, entity_id: str, body: str) -> None:
             "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
             (entity_id, h, body_text),
         )
+    # Ensure all standard sections exist (e.g. scene Content is a structural invariant)
+    for section in standard_sections(entity_type):
+        if section not in headings:
+            conn.execute(
+                "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
+                (entity_id, section, ""),
+            )
 
 
 def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -> dict:

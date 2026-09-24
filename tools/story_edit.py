@@ -140,7 +140,8 @@ def _edit_note_db(project_path: Path, target: dict, data: dict, summary: str) ->
         if not entity_id:
             return json.dumps({"error": f"Entity not found: {entity_type}/{slug}"})
 
-        standard_sections = set(_get_standard_sections(entity_type))
+        from core.entity import standard_sections as get_std_sections
+        standard_sections = set(get_std_sections(entity_type))
         column_map = _ENTITY_COLUMN_MAP.get(entity_type, {})
         schema = ENTITY_SCHEMAS.get(entity_type, {})
 
@@ -371,17 +372,4 @@ def _update_story_memory(project_path: Path, data: dict, summary: str) -> str:
     })
 
 
-def _get_standard_sections(entity_type: str) -> list[str]:
-    """Get standard sections for an entity type."""
-    sections = {
-        "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
-        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function"],
-        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict"],
-        "plot": ["Summary", "Obstacles", "Stakes"],
-        "scene": ["Description", "Dramatic Function", "Notes", "Content"],
-        "sequence": ["Summary", "Scene Order", "Notes"],
-        "act": ["Summary", "Thematic Function", "Notes"],
-        "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
-        "relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"],
-    }
-    return sections.get(entity_type, [])
+

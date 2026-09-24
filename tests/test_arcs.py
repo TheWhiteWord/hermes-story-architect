@@ -143,10 +143,10 @@ class TestArcCreateTool:
             ).fetchall()
             headings = [r[0] for r in rows]
             assert "Action" in headings
-            assert "Gap" in headings
+            assert "The Gap" in headings
             assert "Choice" in headings
-            assert "Shift" in headings
-            assert "Development Log" in headings
+            assert "Value Shift" in headings
+            assert "Notes" in headings
         finally:
             conn.close()
 
@@ -296,7 +296,7 @@ class TestArcRetrieveTool:
         assert data["entity_type"] == "arc_beat"
         assert data["slug"] == "1"
         assert "## Action" in data["content"]
-        assert "## Development Log" in data["content"]
+        assert "## Notes" in data["content"]
 
     def test_retrieve_arc_specific_section(self, tmp_path):
         """story_retrieve can load specific arc beat section."""

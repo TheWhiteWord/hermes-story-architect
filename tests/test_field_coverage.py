@@ -293,9 +293,9 @@ def test_edit_all_field_types(entity_type, project):
     edit_data.update(extra_fields.get(entity_type, {}))
 
     section_name = {
-        "character": "Personality",
+        "character": "Identity",
         "plot": "Summary",
-        "scene": "Description",
+        "scene": "Content",
         "arc_beat": "Action",
     }.get(entity_type)
     if section_name:

@@ -388,12 +388,12 @@ class TestStoryRetrieveDB:
             "project": str(proj),
             "entity_type": "character",
             "slug": "kael",
-            "sections": ["Personality", "Background"],
+            "sections": ["Identity", "Background"],
             "vault_path": vault
         }))
         assert result["entity_type"] == "character"
         assert result["slug"] == "kael"
-        assert "Personality" in result["sections"]
+        assert "Identity" in result["sections"]
         assert "Background" in result["sections"]
 
     def test_retrieve_all_sections(self, db_project):
@@ -407,7 +407,7 @@ class TestStoryRetrieveDB:
         }))
         assert "content" in result
         assert "sections" in result
-        assert "Personality" in result["sections"]
+        assert "Identity" in result["sections"]
 
     def test_retrieve_arc_beat(self, db_project):
         proj, vault = db_project

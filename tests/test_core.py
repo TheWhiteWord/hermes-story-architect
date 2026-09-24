@@ -245,14 +245,15 @@ class TestNoteCreation:
                 "SELECT heading FROM sections WHERE entity_id='test-char' ORDER BY rowid"
             ).fetchall()
             headings = [r[0] for r in rows]
-            assert "Personality" in headings
+            assert "Identity" in headings
+            assert "Desires" in headings
             assert "Background" in headings
-            assert "Voice" in headings
-            assert "Greatest Fear" in headings
-            assert "Secrets" in headings
+            assert "Contradictions" in headings
+            assert "Psychology" in headings
             assert "Arc" in headings
             assert "Relationships" in headings
-            assert "Goals" in headings
+            assert "Voice" in headings
+            assert "Notes" in headings
         finally:
             conn.close()
 
@@ -310,8 +311,11 @@ class TestNoteCreation:
             ).fetchall()
             headings = [r[0] for r in rows]
             assert "Summary" in headings
-            assert "Obstacles" in headings
-            assert "Stakes" in headings
+            assert "Role" in headings
+            assert "Threads" in headings
+            assert "Value" in headings
+            assert "Characters" in headings
+            assert "Notes" in headings
         finally:
             conn.close()
 
@@ -406,10 +410,14 @@ class TestNoteCreation:
                 "SELECT heading FROM sections WHERE entity_id='test-scene' ORDER BY rowid"
             ).fetchall()
             headings = [r[0] for r in sec_rows]
-            assert "Description" in headings
-            assert "Dramatic Function" in headings
-            assert "Notes" in headings
             assert "Content" in headings
+            assert "Objective" in headings
+            assert "Conflict" in headings
+            assert "Beats" in headings
+            assert "Value Turn" in headings
+            assert "Dramatic Function" in headings
+            assert "Production" in headings
+            assert "Notes" in headings
         finally:
             conn.close()
 
@@ -452,7 +460,11 @@ class TestNoteCreation:
             ).fetchall()
             headings = [r[0] for r in sec_rows]
             assert "Summary" in headings
-            assert "Scene Order" in headings
+            assert "Purpose" in headings
+            assert "Value Arc" in headings
+            assert "Progression" in headings
+            assert "Sequence Climax" in headings
+            assert "Plots" in headings
             assert "Notes" in headings
         finally:
             conn.close()
@@ -489,7 +501,9 @@ class TestNoteCreation:
             ).fetchall()
             headings = [r[0] for r in sec_rows]
             assert "Summary" in headings
-            assert "Thematic Function" in headings
+            assert "Objective" in headings
+            assert "Value Arc" in headings
+            assert "Reversal" in headings
             assert "Notes" in headings
         finally:
             conn.close()
@@ -522,7 +536,7 @@ class TestProjectCreation:
         post = frontmatter.load(tmp_path / "projects" / "test-proj" / "project.md")
         for field in ENTITY_SCHEMAS["project"]:
             assert field in post.metadata, f"Missing field: {field}"
-        assert "## Synopsis" in post.content
+        assert "## Premise" in post.content
         assert "## Notes" in post.content
 
     def test_create_project_creates_memory_md(self, tmp_path):
@@ -643,8 +657,8 @@ class TestPhase3ToolSurface:
         result = edit_handler({
             "action": "edit_note",
             "target": {"entity_type": "scene", "slug": "test-scene", "project": str(project_path)},
-            "data": {"status": "written", "Description": "Updated description text."},
-            "summary": "Update status and description"
+            "data": {"status": "written", "Content": "Updated content text."},
+            "summary": "Update status and content"
         })
         assert json.loads(result)["success"] is True
 
@@ -654,9 +668,9 @@ class TestPhase3ToolSurface:
         row = conn.execute("SELECT status FROM entities WHERE id='test-scene'").fetchone()
         assert row[0] == "written"
         sec_row = conn.execute(
-            "SELECT body FROM sections WHERE entity_id='test-scene' AND heading='Description'"
+            "SELECT body FROM sections WHERE entity_id='test-scene' AND heading='Content'"
         ).fetchone()
-        assert "Updated description text." in sec_row[0]
+        assert "Updated content text." in sec_row[0]
         conn.close()
 
     def test_reorder_scene_within_sequence(self, tmp_path):

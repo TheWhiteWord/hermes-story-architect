@@ -114,7 +114,7 @@ def handler(args: dict, **kwargs) -> str:
         merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items() if not meta.get("computed")}
 
         # Map to columns
-        from core.entity import columns_for_insert, relations_for_insert
+        from core.entity import columns_for_insert, relations_for_insert, standard_sections
         columns = columns_for_insert(entity_type, slug, merged)
         entity_id = columns["id"]
 
@@ -166,7 +166,7 @@ def handler(args: dict, **kwargs) -> str:
 
         # Insert entity + sections + relations
         # Using autocommit mode (get_db sets isolation_level=None) — no explicit transaction needed
-        sections = _get_standard_sections(entity_type)
+        sections = standard_sections(entity_type)
         relations = relations_for_insert(entity_type, slug, merged)
 
         conn.execute(
@@ -243,10 +243,12 @@ def _create_project(slug, frontmatter_data, vault_path):
     # Merge frontmatter over schema defaults
     merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
 
+    from core.entity import standard_sections
+
     # Create project.md + memory.md (project.md still needed for story_resolve)
     project_path.mkdir(parents=True, exist_ok=True)
     post = frontmatter.Post("", **merged)
-    sections = _get_standard_sections("project")
+    sections = standard_sections("project")
     post.content = "\n".join(f"## {s}\n" for s in sections)
     with open(project_path / "project.md", 'w') as f:
         frontmatter.dump(post, f)
@@ -303,18 +305,4 @@ def _create_project(slug, frontmatter_data, vault_path):
     })
 
 
-def _get_standard_sections(entity_type: str) -> list[str]:
-    """Get standard sections for an entity type."""
-    sections = {
-        "project": ["Synopsis", "Themes", "Structure", "Notes"],
-        "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
-        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function"],
-        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict"],
-        "plot": ["Summary", "Obstacles", "Stakes"],
-        "scene": ["Description", "Dramatic Function", "Notes", "Content"],
-        "sequence": ["Summary", "Scene Order", "Notes"],
-        "act": ["Summary", "Thematic Function", "Notes"],
-        "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
-        "relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"],
-    }
-    return sections.get(entity_type, [])
+
