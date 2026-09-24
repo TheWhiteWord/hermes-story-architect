@@ -26,7 +26,7 @@ REQUIRED_FIELDS = {
     "sequence": ["title", "act_id"],
     "act": ["title"],
     "arc_beat": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
-    "relationship": ["name", "characters", "perspectives"],
+    "relationship": ["name", "characters"],
 }
 
 ENTITY_LABELS = {
@@ -181,7 +181,7 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Display name (e.g. 'Kael & Mira')"},
         "type": {"type": "string", "default": "relationship", "optional": False, "description": "Always 'relationship'"},
         "characters": {"type": "list", "default": [], "optional": False, "description": "Exactly two character slugs"},
-        "perspectives": {"type": "object", "default": {}, "optional": False, "description": "Per-character relationship view", "sub_fields": {
+        "perspectives": {"type": "object", "default": {}, "optional": True, "description": "Per-character relationship view", "sub_fields": {
             "label": {"type": "string", "description": "Relationship label from this character's POV"},
             "feeling": {"type": "string", "description": "Emotional stance"},
             "type": {"type": "string", "description": "Category: ally/enemy/family/romantic/professional/mentor/rival/custom/neutral"},

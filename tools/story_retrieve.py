@@ -83,8 +83,18 @@ def _unfilled_for_entity(conn, entity_id: str) -> list[str]:
     ).fetchone()
     if not row:
         return []
-    extra = json.loads(row[1]) if row[1] else {}
-    return unfilled_fields(row[0], extra)
+    etype, extra_json = row
+    extra = json.loads(extra_json) if extra_json else {}
+    if etype == "plot":
+        # Plot beats live in relations, not extra — merge for unfilled check
+        for kind, field in (("plot_setup", "setups"), ("plot_crisis", "crisis"),
+                            ("plot_climax", "climax"), ("plot_payoff", "payoffs")):
+            ids = [to_id for (to_id,) in conn.execute(
+                "SELECT to_id FROM relations WHERE from_id=? AND kind=?", (entity_id, kind)
+            ).fetchall()]
+            if ids:
+                extra = {**extra, field: ids}
+    return unfilled_fields(etype, extra)
 
 
 def _entity_id_for(conn, entity_type: str, slug: str) -> str | None:

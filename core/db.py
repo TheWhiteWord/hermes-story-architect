@@ -128,7 +128,7 @@ def get_project_summary(project_path: Path) -> dict:
     """Return nested project summary for story_load (spec §2).
 
     Shape: {loaded, confirmation, project, acts, characters, plots,
-            locations, worlds, unfilled, memory_outline}
+            locations, worlds, memory_outline}
     """
     conn = get_db(project_path)
     try:
@@ -448,41 +448,6 @@ def get_project_summary(project_path: Path) -> dict:
         )
         orphaned_locations = [_build_location(lid) for lid in orphaned_loc_ids]
 
-        # ── Unfilled (inverted) ──
-        from .entity import unfilled_fields
-        unfilled_inv = {}
-        for eid, etype, name, one_sentence, status, order_key, parent_id, extra_json in ent_rows:
-            extra = json.loads(extra_json) if extra_json else {}
-
-            # Determine if stub (skip stubs — maximally unfilled by definition)
-            is_stub = False
-            if etype == "scene":
-                dramatic_role = extra.get("dramatic_role", "")
-                is_stub = status == "planned" or not dramatic_role
-            elif etype == "arc_beat":
-                is_stub = not name  # label stored in name column
-
-            if is_stub:
-                continue
-
-            # Merge column-stored fields into extra for unfilled check
-            if etype in ("scene", "sequence", "plot", "act") and status:
-                extra = {**extra, "status": status}
-            if etype in ("scene", "plot") and one_sentence:
-                extra = {**extra, "one_sentence": one_sentence}
-            # Merge relation-sourced fields for accurate unfilled detection
-            if etype == "scene":
-                chars = scene_chars.get(eid, [])
-                if chars:
-                    extra = {**extra, "characters": chars}
-                loc = scene_loc.get(eid)
-                if loc:
-                    extra = {**extra, "location": loc}
-
-            fields = unfilled_fields(etype, extra)
-            for field in fields:
-                unfilled_inv.setdefault(field, []).append(eid)
-
         # ── Confirmation string ──
         total_locations = len(locations)
         total_scenes = len(scenes)
@@ -509,8 +474,6 @@ def get_project_summary(project_path: Path) -> dict:
             "characters": characters_list,
             "plots": plots_list,
             "worlds": worlds_list,
-            "relationships": relationships,
-            "unfilled": unfilled_inv,
             "memory_outline": memory_outline,
         }
         if orphaned_locations:
@@ -520,13 +483,92 @@ def get_project_summary(project_path: Path) -> dict:
         conn.close()
 
 
+def get_unfilled_map(project_path: Path) -> dict:
+    """Return inverted unfilled map: {field_name: [entity_id, ...]}.
+
+    Backend for the planned story_load view="unfilled" (tasks/task_21*/spec.md
+    §3.5) — the "what to work on next" overview, on demand. Not yet wired to
+    any tool. Skips stubs (planned scenes, unlabeled arc beats) — maximally
+    unfilled by definition.
+    """
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return {}
+    conn = None
+    try:
+        conn = sqlite3.connect(str(db_path))
+        ent_rows = conn.execute(
+            "SELECT id, type, name, one_sentence, status, extra FROM entities WHERE type != 'project'"
+        ).fetchall()
+        # Relation-sourced fields (scene chars/loc, plot beats) for accurate unfilled detection
+        scene_chars = {}
+        scene_loc = {}
+        plot_beats = {}
+        for from_id, to_id, kind in conn.execute(
+            "SELECT from_id, to_id, kind FROM relations"
+        ).fetchall():
+            if kind == "character_scene":
+                scene_chars.setdefault(to_id, []).append(from_id)
+            elif kind == "location_scene":
+                scene_loc[to_id] = from_id
+            elif kind == "plot_setup":
+                plot_beats.setdefault(from_id, {}).setdefault("setups", []).append(to_id)
+            elif kind == "plot_crisis":
+                plot_beats.setdefault(from_id, {}).setdefault("crisis", []).append(to_id)
+            elif kind == "plot_climax":
+                plot_beats.setdefault(from_id, {}).setdefault("climax", []).append(to_id)
+            elif kind == "plot_payoff":
+                plot_beats.setdefault(from_id, {}).setdefault("payoffs", []).append(to_id)
+
+        from .entity import unfilled_fields
+        unfilled_inv = {}
+        for eid, etype, name, one_sentence, status, extra_json in ent_rows:
+            extra = json.loads(extra_json) if extra_json else {}
+
+            if etype == "scene":
+                if status == "planned" or not extra.get("dramatic_role", ""):
+                    continue  # stub
+                if status:
+                    extra = {**extra, "status": status}
+                if one_sentence:
+                    extra = {**extra, "one_sentence": one_sentence}
+                if scene_chars.get(eid):
+                    extra = {**extra, "characters": scene_chars[eid]}
+                if scene_loc.get(eid):
+                    extra = {**extra, "location": scene_loc[eid]}
+            elif etype == "arc_beat":
+                if not name:
+                    continue  # stub — label stored in name column
+            elif etype in ("sequence", "plot", "act"):
+                if status:
+                    extra = {**extra, "status": status}
+                if etype == "plot":
+                    if one_sentence:
+                        extra = {**extra, "one_sentence": one_sentence}
+                    # Plot beats live in relations, not extra — merge for unfilled check
+                    for beat_field, ids in plot_beats.get(eid, {}).items():
+                        if ids:
+                            extra = {**extra, beat_field: ids}
+
+            for field in unfilled_fields(etype, extra):
+                unfilled_inv.setdefault(field, []).append(eid)
+        return unfilled_inv
+    except Exception:
+        return {}
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
     """Return arc beats for a character, ordered by order_key then id.
 
     Backend for the planned story_load view="arc" (tasks/task_21*/spec.md §3.1)
     — one character's arc beats, on demand. Not yet wired to any tool.
     """
-    import sqlite3
     db_path = project_path / ".story" / "story.db"
     if not db_path.exists():
         return []

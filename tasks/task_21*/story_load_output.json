@@ -83,16 +83,18 @@
           "status": "planned",
           "scenes": [
             {
-              "id": "garden-day-act2",
-              "title": "Garden - Day (Act 2)",
+              "id": "garden-day",
+              "title": "Garden - Day",
               "status": "drafted",
-              "dramatic_role": "setup"
+              "dramatic_role": "setup",
+              "loc": "the-garden"
             },
             {
-              "id": "garden-dream-act2",
-              "title": "Garden Dream - Day (Act 2)",
+              "id": "garden-dream",
+              "title": "Garden Dream",
               "status": "drafted",
-              "dramatic_role": "setup"
+              "dramatic_role": "setup",
+              "loc": "the-garden-dream"
             },
             {
               "id": "the-door-closes",
@@ -116,16 +118,16 @@
       "name": "Dr. Elena Voss",
       "one_sentence": "Lead scientist on Project Save the Children — chose to preserve the minds even knowing the bodies would never come.",
       "story_role": "Supporting",
-      "rel": [
+      "relationships": [
         {
-          "id": "marcus-chen",
+          "with": "marcus-chen",
           "label": "Colleague",
-          "feeling": "Respects him more for disagreeing than she ever said"
+          "type": "ally"
         },
         {
-          "id": "kael",
+          "with": "kael",
           "label": "The saved child",
-          "feeling": "Watches from the system, unable to intervene, unable to look away"
+          "type": "ally"
         }
       ]
     },
@@ -138,21 +140,26 @@
       "arc_value": "Freedom",
       "arc_value_at_open": "negative",
       "arc_value_at_close": "positive",
-      "rel": [
+      "relationships": [
         {
-          "id": "mira",
-          "label": "Closest friend",
-          "feeling": "Trusts her feelings more than their own logic"
-        },
-        {
-          "id": "the-administrator",
-          "label": "Antagonist",
-          "feeling": "Pities them — which is worse than hate"
-        },
-        {
-          "id": "dr-elena-voss",
+          "with": "dr-elena-voss",
           "label": "Watcher",
-          "feeling": "Senses her presence but cannot name it"
+          "type": "ally"
+        },
+        {
+          "with": "mira",
+          "label": "Closest friend",
+          "type": "family"
+        },
+        {
+          "with": "the-administrator",
+          "label": "Antagonist",
+          "type": "enemy"
+        },
+        {
+          "with": "marcus-chen",
+          "label": "Unknown",
+          "type": "ally"
         }
       ]
     },
@@ -160,7 +167,19 @@
       "id": "marcus-chen",
       "name": "Marcus Chen",
       "one_sentence": "Elena's colleague — believes the outsiders should be included, even at the cost of the project.",
-      "story_role": "Supporting"
+      "story_role": "Supporting",
+      "relationships": [
+        {
+          "with": "dr-elena-voss",
+          "label": "Colleague, friend",
+          "type": "ally"
+        },
+        {
+          "with": "kael",
+          "label": "Proof",
+          "type": "ally"
+        }
+      ]
     },
     {
       "id": "mira",
@@ -170,13 +189,37 @@
       "arc_type": "positive",
       "arc_value": "Trust",
       "arc_value_at_open": "negative",
-      "arc_value_at_close": "positive"
+      "arc_value_at_close": "positive",
+      "relationships": [
+        {
+          "with": "kael",
+          "label": "Friend, anchor",
+          "type": "romantic"
+        },
+        {
+          "with": "the-administrator",
+          "label": "Adversary",
+          "type": "enemy"
+        }
+      ]
     },
     {
       "id": "the-administrator",
       "name": "The Administrator",
       "one_sentence": "The face of the Institute's control — theatrical, precise, almost too perfect an opponent.",
-      "story_role": "Antagonist"
+      "story_role": "Antagonist",
+      "relationships": [
+        {
+          "with": "kael",
+          "label": "Anomaly",
+          "type": "rival"
+        },
+        {
+          "with": "mira",
+          "label": "Wildcard",
+          "type": "rival"
+        }
+      ]
     },
     {
       "id": "the-outsider",
@@ -245,12 +288,10 @@
         {
           "id": "the-garden-dream",
           "name": "The Garden (dream)",
-          "one_sentence": "A dreamlike echo of the Garden — where Kael's subconscious reshapes memory into landscape.",
-          "variant_of": "the-garden"
+          "one_sentence": "A dreamlike echo of the Garden — where Kael's subconscious reshapes memory into landscape."
         }
       ],
-      "period": "+400y after the collapse (overlapping)",
-      "variant_of": "the-i"
+      "period": "+400y after the collapse (overlapping)"
     },
     {
       "id": "the-i",
@@ -278,148 +319,6 @@
       "period": "+400y after the collapse"
     }
   ],
-  "unfilled": {
-    "relationships": [
-      "dr-elena-voss",
-      "kael",
-      "marcus-chen",
-      "mira",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "goals_short": [
-      "dr-elena-voss",
-      "kael",
-      "marcus-chen",
-      "mira",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "goals_long": [
-      "dr-elena-voss",
-      "kael",
-      "marcus-chen",
-      "mira",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "arc_type": [
-      "dr-elena-voss",
-      "marcus-chen",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "arc_value": [
-      "dr-elena-voss",
-      "marcus-chen",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "arc_value_at_open": [
-      "dr-elena-voss",
-      "marcus-chen",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "arc_value_at_close": [
-      "dr-elena-voss",
-      "marcus-chen",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "knowledge": [
-      "marcus-chen",
-      "mira",
-      "the-administrator",
-      "the-outsider"
-    ],
-    "world": [
-      "the-central-room",
-      "the-garden",
-      "the-garden-dream"
-    ],
-    "variant_of": [
-      "the-central-room",
-      "the-garden",
-      "the-dream-world",
-      "the-i",
-      "the-real-world",
-      "the-garden-dream"
-    ],
-    "rules": [
-      "the-dream-world",
-      "the-i",
-      "the-real-world"
-    ],
-    "values": [
-      "the-dream-world"
-    ],
-    "power": [
-      "the-dream-world"
-    ],
-    "plot_type": [
-      "the-resistance"
-    ],
-    "setups": [
-      "the-resistance",
-      "the-scientists-last-stand"
-    ],
-    "crisis": [
-      "the-resistance",
-      "the-scientists-last-stand"
-    ],
-    "climax": [
-      "the-resistance",
-      "the-scientists-last-stand"
-    ],
-    "payoffs": [
-      "the-resistance",
-      "the-scientists-last-stand"
-    ],
-    "value_arc": [
-      "the-scientists-last-stand"
-    ],
-    "one_sentence": [
-      "central-room-day",
-      "central-room-night",
-      "the-core-day",
-      "the-door-closes"
-    ],
-    "value": [
-      "seq-confrontation",
-      "act-2"
-    ],
-    "value_open": [
-      "seq-confrontation",
-      "act-2"
-    ],
-    "value_close": [
-      "seq-confrontation",
-      "act-2"
-    ],
-    "climax_scene_id": [
-      "seq-confrontation",
-      "act-2"
-    ],
-    "location": [
-      "garden-day-act2",
-      "garden-dream-act2"
-    ],
-    "characters": [
-      "garden-day-act2",
-      "garden-dream-act2"
-    ],
-    "conflict_levels": [
-      "garden-day-act2",
-      "garden-dream-act2"
-    ],
-    "mood": [
-      "the-garden-dream"
-    ],
-    "dramatic_function": [
-      "the-garden-dream"
-    ]
-  },
   "memory_outline": {
     "status": "placeholder — design deferred, see §5",
     "sections": []

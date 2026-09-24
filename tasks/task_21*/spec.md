@@ -112,10 +112,6 @@ The slim structural overview. No extended fields, no arc beats, no plot scene ar
       "period": "+400y after the collapse"
     }
   ],
-  "unfilled": {
-    "goals_short": ["char-a", "char-b"],
-    "arc_type": ["char-c"]
-  },
   "memory_outline": {
     "status": "placeholder — design deferred",
     "sections": []
@@ -129,7 +125,7 @@ The slim structural overview. No extended fields, no arc beats, no plot scene ar
 - Characters: name, one_sentence, story_role, rel (no arc_type, no arc_value, no arc beats)
 - Plots: name, one_sentence, status, plot_scope, characters (no setups/crisis/climax/payoffs arrays)
 - Locations/Worlds: name, one_sentence
-- Unfilled: inverted field→entity list, ~180 tokens
+- Unfilled: not in base view — opt-in via `view="unfilled"` (§3.5)
 - Memory: headers-only outline
 
 ---
@@ -395,6 +391,32 @@ Returns all relationship entities with full perspective data. This is the only v
 - `scenes` list is populated from relationship entity frontmatter (optional)
 - For network graph rendering: each relationship → one or two directed edges; color by `type`, thickness by `strength`, dashed if `secret`
 
+### 3.5 `view="unfilled"` — What To Work On Next
+
+Returns the inverted unfilled map: which optional fields are still at default, per entity. Answers "what could we work on next" / "what remains to be done" — a data-quality signal, not a domain concern.
+
+**Parameters:**
+- `project` (required)
+- `view="unfilled"` (required)
+
+```json
+{
+  "view": "unfilled",
+  "unfilled": {
+    "goals_short": ["char-a", "char-b"],
+    "arc_type": ["char-c"],
+    "value_arc": ["the-scientists-last-stand"]
+  }
+}
+```
+
+**Field notes:**
+- Inverted map: field name → entity ids still at default
+- Stub entities skipped (planned scenes, unlabeled arc beats) — maximally unfilled by definition
+- Same logic as `story_retrieve`'s per-entity `unfilled_fields`, aggregated project-wide
+
+**Convention:** `get_unfilled_map` in `core/db.py` is the existing backend for this view — same pattern as `get_character_arcs` (§3.1): backend ready, wired to the tool when task_21 lands.
+
 ---
 
 ## 4. `story_retrieve` — Entity Drill-Down
@@ -491,7 +513,7 @@ The agent requests exactly what it needs.
 
 ## 6. Unfilled Fields
 
-**In load:** included as a small `unfilled` key in base view (~180 tokens). Inverted field→entity list.
+**In load:** not in the base view. Opt-in via `view="unfilled"` (§3.5) — the "what to work on next" overview. Inverted field→entity list.
 
 **In retrieve:** included when `fields` is requested. Shows which FM fields are still at default for this entity.
 
@@ -501,7 +523,7 @@ The agent requests exactly what it needs.
 
 ## 7. Open Questions
 
-1. **Batch retrieve** — skip for now. Agent drills one entity at a time. Add `slugs=[...]` when a real need surfaces.
+1. **Batch retrieve** — skip for now. Agent drills one entity at a time. Add `ids=[...]` when a real need surfaces.
 2. **Memory retrieval** — deferred. No clean path yet.
 3. **World rules retrieval** — stored as frontmatter, not section. Future expansion.
 4. **Plot beat descriptions** — stored as relation notes, not sections. Future expansion.
@@ -510,10 +532,9 @@ The agent requests exactly what it needs.
 
 ## 8. Migration Notes
 
-- Current `story_load` base view already close — remove plot scene arrays, remove arc beats from characters, remove climax/dramatic_role from scenes
+- Current `story_load` base view already close — remove plot scene arrays, remove arc beats from characters, remove climax/dramatic_role from scenes, remove `unfilled` (moved to `view="unfilled"`, backend `get_unfilled_map` ready in `core/db.py`)
 - Current `story_retrieve` needs FM field support added (currently sections-only)
-- Extended views (`arc`, `story_value`, `dramatic_elements`) are new — no migration needed
-- Unfilled fields stay in load but may move to a separate `story_status` tool later
+- Extended views (`arc`, `story_value`, `dramatic_elements`, `unfilled`) are new — no migration needed
 - Agent requests `fields=["all"]` → returns all groups
 - Agent can request specific fields by name if it wants to ignore grouping
 - Grouping is a return-shape concern, not a request concern

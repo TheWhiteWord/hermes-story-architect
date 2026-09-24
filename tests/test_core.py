@@ -612,7 +612,7 @@ class TestProjectCreation:
         assert "plots" in result
         assert "worlds" in result
         assert "orphaned_locations" not in result or isinstance(result["orphaned_locations"], list)
-        assert "unfilled" in result
+        assert "unfilled" not in result  # moved to view="unfilled" (task_21 spec §3.5)
         assert "memory_outline" in result
         # Old keys gone
         assert "entities" not in result
@@ -1025,6 +1025,31 @@ class TestUnfilledFields:
         result = unfilled_fields("plot", extra_main)
         assert "plot_scope" not in result
 
+    def test_unfilled_fields_subfields_perspectives(self):
+        """perspectives: bare → parent name; partial → parent.key per missing char."""
+        from core.entity import unfilled_fields
+        bare = {"name": "Kael & Mira", "characters": ["kael", "mira"]}
+        assert "perspectives" in unfilled_fields("relationship", bare)
+        partial = {**bare, "perspectives": {"kael": {"label": "Friend"}}}
+        result = unfilled_fields("relationship", partial)
+        assert "perspectives" not in result
+        assert "perspectives.mira" in result
+        assert "perspectives.kael" not in result
+        full = {**bare, "perspectives": {"kael": {"label": "Friend"}, "mira": {"label": "Anchor"}}}
+        assert "perspectives.mira" not in unfilled_fields("relationship", full)
+
+    def test_unfilled_fields_subfields_plot_beats(self):
+        """Plot beat lists: present → filled (no per-entry tracking); absent → flagged."""
+        from core.entity import unfilled_fields
+        with_beats = {"name": "X", "status": "active", "setups": ["s1"], "climax": ["s2"]}
+        result = unfilled_fields("plot", with_beats)
+        assert "setups" not in result
+        assert "climax" not in result
+        assert "crisis" in result
+        assert "payoffs" in result
+        bare = {"name": "X", "status": "active"}
+        assert "setups" in unfilled_fields("plot", bare)
+
     def test_unfilled_fields_sequence(self):
         from core.entity import unfilled_fields
         extra = {"value": "Value not set", "purpose": "Purpose not set", "primary_plot": ""}
@@ -1041,9 +1066,9 @@ class TestUnfilledFields:
         assert "act_objective" in result
         assert "climax_scene_id" in result
 
-    def test_get_project_summary_includes_unfilled(self, tmp_path):
+    def test_get_unfilled_map(self, tmp_path):
         from tools.story_create import handler as create_handler
-        from core.db import get_project_summary
+        from core.db import get_unfilled_map
 
         project_path = _make_minimal_project(tmp_path)
 
@@ -1056,14 +1081,13 @@ class TestUnfilledFields:
         result = json.loads(create_handler(args))
         assert result["success"]
 
-        summary = get_project_summary(project_path)
-        assert "unfilled" in summary
-        # New: inverted shape — field name → [entity slugs]
-        assert "goals_short" in summary["unfilled"]
-        assert "test-char" in summary["unfilled"]["goals_short"]
-        assert "goals_long" in summary["unfilled"]
+        unfilled = get_unfilled_map(project_path)
+        # Inverted shape — field name → [entity slugs]
+        assert "goals_short" in unfilled
+        assert "test-char" in unfilled["goals_short"]
+        assert "goals_long" in unfilled
 
-    def test_created_character_has_unfilled_fields(self, tmp_path):
+    def test_get_project_summary_excludes_unfilled(self, tmp_path):
         from tools.story_create import handler as create_handler
         from core.db import get_project_summary
 
@@ -1078,10 +1102,7 @@ class TestUnfilledFields:
         json.loads(create_handler(char_args))
 
         summary = get_project_summary(project_path)
-        # New: inverted — field → [entities]
-        assert "goals_short" in summary["unfilled"]
-        assert "goals_long" in summary["unfilled"]
-        assert "test-char" in summary["unfilled"]["goals_short"]
-        assert "test-char" in summary["unfilled"]["goals_long"]
+        # Unfilled moved to view="unfilled" (task_21 spec §3.5) — backend get_unfilled_map
+        assert "unfilled" not in summary
 
 

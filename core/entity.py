@@ -165,7 +165,16 @@ _RELATION_FIELDS = {
 
 
 def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
-    """Return list of optional field names whose value matches the schema default."""
+    """Return list of optional field names whose value matches the schema default.
+
+    Sub-field rule (generalized, driven by `sub_fields` in ENTITY_SCHEMAS):
+    - Parent at default → report parent name (e.g. `perspectives`, `setups`)
+    - Parent present, object type → report missing expected keys as
+      `parent.key` (e.g. `perspectives.kael`). Expected keys come from
+      `characters` — the only object-sub_fields field today.
+    - Parent present, list type → no per-entry tracking (an entry existing
+      = filled; entry notes are optional prose)
+    """
     from .constants import ENTITY_SCHEMAS
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     unfilled = []
@@ -175,10 +184,21 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
             continue
         # status: workflow state, always emitted, never "unfilled"
         # boolean/number: binary or scalar values, not "unfilled"
-        if (field != "status"
-            and meta.get("optional", True)
-            and meta["type"] not in ("boolean", "number")
-            and extra.get(field, meta["default"]) == meta["default"]):
+        if (field == "status"
+                or not meta.get("optional", True)
+                or meta["type"] in ("boolean", "number")):
+            continue
+        value = extra.get(field, meta["default"])
+        if "sub_fields" in meta and value != meta["default"]:
+            if meta["type"] == "object":
+                # Report missing expected entries as parent.key
+                expected = extra.get("characters", [])
+                for key in expected:
+                    if key not in value:
+                        unfilled.append(f"{field}.{key}")
+            # list type: parent present → filled, no per-entry tracking
+            continue
+        if value == meta["default"]:
             unfilled.append(field)
     return unfilled
 

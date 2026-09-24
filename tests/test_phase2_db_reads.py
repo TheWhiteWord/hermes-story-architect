@@ -230,13 +230,13 @@ class TestSectionsPerEntity:
 
 
 class TestUnfilledInverted:
-    """Unfilled is inverted: {field: [entity_ids]}, stubs excluded."""
+    """Unfilled map is inverted: {field: [entity_ids]}, stubs excluded. Backend: get_unfilled_map (view="unfilled", task_21 spec §3.5)."""
 
     def test_unfilled_inverted_shape(self, db_project):
         """unfilled maps field names to lists of entity slugs."""
+        from core.db import get_unfilled_map
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        unfilled = result["unfilled"]
+        unfilled = get_unfilled_map(proj)
         assert isinstance(unfilled, dict)
         # Each value should be a list
         for field, entities in unfilled.items():
@@ -244,14 +244,15 @@ class TestUnfilledInverted:
 
     def test_unfilled_excludes_stubs(self, db_project):
         """Stub entities do not appear in unfilled lists."""
+        from core.db import get_unfilled_map
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        unfilled = result["unfilled"]
+        unfilled = get_unfilled_map(proj)
         # Collect all entity slugs mentioned in unfilled
         all_unfilled = set()
         for entities in unfilled.values():
             all_unfilled.update(entities)
         # No stub scene slug should appear
+        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
@@ -260,6 +261,7 @@ class TestUnfilledInverted:
 
     def test_character_goals_unfilled(self, db_project):
         """New character has goals_short/goals_long unfilled."""
+        from core.db import get_unfilled_map
         proj, vault = db_project
         # Create a new character
         create_handler({
@@ -268,17 +270,16 @@ class TestUnfilledInverted:
             "frontmatter": {"name": "Unfilled", "story_role": "Minor"},
             "vault_path": vault
         })
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        unfilled = result["unfilled"]
+        unfilled = get_unfilled_map(proj)
         # goals_short should list the new character
         assert "goals_short" in unfilled
         assert "unfilled-test" in unfilled["goals_short"]
 
     def test_unfilled_excludes_status_booleans_numbers(self, db_project):
         """unfilled must not contain status, booleans, or numbers — only string/placeholder fields."""
+        from core.db import get_unfilled_map
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        unfilled = result["unfilled"]
+        unfilled = get_unfilled_map(proj)
         # No boolean fields
         assert "is_crisis" not in unfilled
         assert "is_climax" not in unfilled
