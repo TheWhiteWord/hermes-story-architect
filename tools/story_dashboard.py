@@ -27,7 +27,7 @@ SCHEMA = {
 }
 
 
-def _compute_screenplay_stats(screenplay_text):
+def _compute_screenplay_stats(screenplay_text, scene_ids=None):
     """Compute screenplay statistics from fountain text using fountain_lexer.
 
     Returns a dict suitable for JSON injection as window.__SCREENPLAY_STATS__.
@@ -195,6 +195,7 @@ def _compute_screenplay_stats(screenplay_text):
         'sceneStats': scene_stats,
         'titlePage': title_page,
         'scriptHtml': script_html,
+        'sceneIds': scene_ids or [],
     }
 
 
@@ -350,9 +351,10 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
 
     # Inject screenplay stats from DB scene content
     scene_text = data.get("screenplay_text", "")
+    scene_ids = data.get("screenplay_scene_ids", [])
     if scene_text:
         try:
-            stats = _compute_screenplay_stats(scene_text)
+            stats = _compute_screenplay_stats(scene_text, scene_ids=scene_ids)
             if stats:
                 stats["titlePage"] = _build_title_page(project_frontmatter)
                 injections += f"\nwindow.__SCREENPLAY_STATS__ = {json.dumps(stats)};"

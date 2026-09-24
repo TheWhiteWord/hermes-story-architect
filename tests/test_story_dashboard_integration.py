@@ -72,9 +72,9 @@ class TestDashboardIntegration:
         assert 'DASH._origSwitchView = DASH.switchView;' in js_content
 
     def test_scene_click_matching(self, dashboard_html):
-        """Scene heading click matching logic present."""
+        """Scene heading click matching uses positional sceneIds (not text matching)."""
         js_content = Path("src/dashboard/js/script-view.js").read_text()
-        assert 'DASH.showScenePanel(matched.id)' in js_content or 'showScenePanel(matched.id)' in js_content
+        assert 'stats.sceneIds' in js_content
 
     def test_no_new_inline_fountain_css(self, dashboard_html):
         """New CSS (after narrow layout) does not redefine standalone .fountain-* classes."""

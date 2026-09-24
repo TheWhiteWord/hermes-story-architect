@@ -1035,14 +1035,15 @@ def get_dashboard_data(project_path: Path) -> dict:
 
         # 3. screenplay_text — scene ## Content concatenated in order
         scene_content_rows = conn.execute(
-            """SELECT s.body, e.order_key, p.order_key as parent_order
+            """SELECT s.body, e.id, e.order_key, p.order_key as parent_order
                FROM sections s
                JOIN entities e ON s.entity_id = e.id
                LEFT JOIN entities p ON e.parent_id = p.id
-               WHERE e.type='scene' AND s.heading='Content'
+               WHERE e.type='scene' AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
         screenplay_text = "\n\n".join(r[0] for r in scene_content_rows)
+        screenplay_scene_ids = [r[1] for r in scene_content_rows]
 
         # 4. structural_stats
         status_rows = conn.execute(
@@ -1139,6 +1140,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             "story_data": story_data,
             "sections": sections,
             "screenplay_text": screenplay_text,
+            "screenplay_scene_ids": screenplay_scene_ids,
             "structural_stats": structural_stats,
             "title_page": title_page_data,
         }
@@ -1155,7 +1157,7 @@ def get_screenplay_text(project_path: Path) -> str:
                JOIN entities e ON s.entity_id = e.id
                LEFT JOIN entities p ON e.parent_id = p.id
                LEFT JOIN entities pp ON p.parent_id = pp.id
-               WHERE e.type='scene' AND s.heading='Content'
+               WHERE e.type='scene' AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(pp.order_key, 0), COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
         return "\n\n".join(r[0] for r in rows)

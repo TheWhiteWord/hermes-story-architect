@@ -72,17 +72,12 @@ DASH.buildScriptView = function() {
   doc.appendChild(body);
 
   // ── Wire scene heading clicks ──
-  doc.querySelectorAll('.fountain-scene_heading').forEach(el => {
-    const rawHeading = el.textContent.replace(/^\d+\.\s*/, '').toUpperCase().trim()
-                                     .replace(/\s*\(.*\)\s*$/, '');
-    const matched = (DASH.story && DASH.story.scenes || []).find(s => {
-      const h = (s.heading || '').toUpperCase().trim().replace(/\s*\(.*\)\s*$/, '');
-      return h === rawHeading;
-    });
-    if (matched) {
+  doc.querySelectorAll('.fountain-scene_heading').forEach((el, i) => {
+    const sceneId = stats.sceneIds && stats.sceneIds[i];
+    if (sceneId) {
       el.style.cursor = 'pointer';
       el.addEventListener('click', () => {
-        DASH.showScenePanel(matched.id);
+        DASH.showScenePanel(sceneId);
       });
     }
   });
