@@ -416,7 +416,7 @@ def test_dashboard_renders_with_entity(entity_type, project):
     dash_result = json.loads(dashboard_handler({"project": str(project)}))
     assert dash_result.get("success"), f"Dashboard failed: {dash_result}"
 
-    html_path = dash_result["dashboard_url"].replace("file://", "")
+    html_path = dash_result["dashboard_url"].replace("file://", "").split("?")[0]
     html = Path(html_path).read_text()
     assert "__STORY_DATA__" in html
     assert "__SECTIONS__" in html

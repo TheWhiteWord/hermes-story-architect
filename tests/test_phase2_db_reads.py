@@ -467,7 +467,7 @@ class TestStoryDashboardDB:
             "vault_path": vault
         }))
         assert result["success"] is True
-        html = Path(result["dashboard_url"].replace("file://", "")).read_text()
+        html = Path(result["dashboard_url"].replace("file://", "").split("?")[0]).read_text()
         assert "__STORY_DATA__" in html
         assert "__SECTIONS__" in html
         assert "__SCREENPLAY_STATS__" in html
@@ -481,7 +481,7 @@ class TestStoryDashboardDB:
             "vault_path": vault
         }))
         assert result["success"] is True
-        html = Path(result["dashboard_url"].replace("file://", "")).read_text()
+        html = Path(result["dashboard_url"].replace("file://", "").split("?")[0]).read_text()
         assert "relationships" in html
 
 
