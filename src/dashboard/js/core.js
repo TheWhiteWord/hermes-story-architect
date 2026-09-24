@@ -121,4 +121,5 @@ DASH.initStory = function(data) {
   DASH.buildRelationshipsView();
   DASH.buildWorldsView();
   DASH.buildStoryView();
+  DASH.buildScriptView();
 }

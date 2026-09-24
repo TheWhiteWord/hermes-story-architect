@@ -23,7 +23,7 @@ DASH.toggleSidebar = function() {
 DASH.refreshIndex = function() {
   document.getElementById('loading-screen').style.display = 'flex';
   if (DASH.network) { DASH.network.destroy(); DASH.network = null; }
-  setTimeout(boot, 50);
+  setTimeout(DASH.boot, 50);
 }
 
 DASH.switchGraphTab = function(tab) {
@@ -36,7 +36,7 @@ DASH.switchGraphTab = function(tab) {
     content.style.display = '';
   }
   const netLegend = document.getElementById('graph-legend');
-  if (netLegend) netLegend.style.display = (tab === 'DASH.network') ? '' : 'none';
+  if (netLegend) netLegend.style.display = (tab === 'network') ? '' : 'none';
   if (tab === 'arcgraph') { DASH.buildCharsGrid(); DASH.buildArcGraph(); DASH.updateLegend(); }
 }
 
