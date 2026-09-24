@@ -338,3 +338,98 @@ def test_assembled_dashboard_preserves_screenplay_css(dashboard_html):
 - Do not remove error handling, empty states, or edge cases
 - Do not allow core.js to become a dumping ground
 - Do not combine unrelated code merely to hit a line-count target
+| `test_build_script_view_function` | Read from `js/script-view.js` |
+| `test_open_stats_panel_function` | Read from `js/statistics/statistics.js` |
+| `test_d3_charts_functions` | Read from `js/statistics/charts.js` |
+| `test_sort_table_function` | Read from `js/statistics/statistics.js` |
+| `test_switch_view_wrapper` | Read from `js/navigation.js` |
+| `test_scene_click_matching` | Read from `js/script-view.js` |
+| `test_no_new_inline_fountain_css` | Read assembled CSS — check no standalone `.fountain-scene_heading` |
+| `test_d3_cdn_loaded` | Read from `index.html` ✓ |
+| `test_fountain_parse_imported` | Unchanged (tests `story_dashboard.py`) |
+| `test_screenplay_stats_computation` | Unchanged |
+| `test_stats_injected_before_boot` | Read assembled HTML, check injection before `// ─── Boot` |
+| `test_hsl_from_name_deterministic` | Unchanged |
+
+---
+
+## Execution Stages
+
+### Stage 0: Baseline Capture
+- Record the existing assembled artifact (the monolith) as baseline
+- Capture: all DOM IDs, script tags, CSS blocks, injection points, Hermes attributes
+- Use this baseline for comparison in every subsequent stage
+
+### Stage 1: Establish Shell (no behavior change)
+- Create directory structure: `src/dashboard/css/`, `src/dashboard/js/`
+- Split `index.html` from monolith (extract HTML shell, keep all CSS/JS inline as-is for now)
+- Verify: assembled artifact matches baseline (structurally equivalent)
+
+### Stage 2: Extract CSS
+- Move CSS sections from inline `<style>` into `css/base.css`, `css/components.css`, `css/views.css`, `css/statistics.css`, `css/graph.css`
+- Replace inline `<style>` with `<!-- CSS_PLACEHOLDER -->`
+- Update `story_dashboard.py` to assemble CSS from files
+- Update tests to read assembled CSS
+- Verify: tests pass, visual appearance unchanged
+
+### Stage 3: Extract JS — Foundation
+- Move state/boot/normalize → `js/core.js`
+- Move color maps → `js/colors.js`
+- Move pure helpers → `js/utils.js`
+- Move navigation → `js/navigation.js`
+- Move data loading → `js/data-load.js`
+- Attach each to `window.DASH = window.DASH || {}`
+- Update HTML inline `<script>` → `<!-- JS_PLACEHOLDER -->`
+- Update `story_dashboard.py` to assemble JS from files in order
+- Verify: tests pass, dashboard renders, navigation works
+
+### Stage 4: Extract JS — Views
+- Move view builders into `js/views/scenes.js`, `js/views/locations.js`, `js/views/plots.js`, `js/views/relationships.js`, `js/views/worlds.js`, `js/views/story.js`
+- Verify: all views render
+
+### Stage 5: Extract JS — Panels
+- Move panel lifecycle → `js/panels/panel-manager.js`
+- Move entity panels → `js/panels/entity-panels.js`
+- Verify: all panels open/close/content
+
+### Stage 6: Extract JS — Graph
+- Move vis-network → `js/graph/network.js`
+- Move arc graph → `js/graph/arc-graph.js`
+- Verify: graph renders, arc graph works
+
+### Stage 7: Extract JS — Statistics
+- Move stats panel + population → `js/statistics/statistics.js`
+- Move D3 charts → `js/statistics/charts.js`
+- Verify: stats panel works, charts draw, sorting works
+
+### Stage 8: Extract Script View
+- Move script view → `js/script-view.js`
+- Verify: script view renders, scene clicks work
+
+### Stage 9: Cleanup & Validation
+- Run full test suite
+- Verify no console errors, all views/panels/graphs work
+- Final structural comparison against baseline
+
+---
+
+## Key Decisions
+
+| Decision | Choice | Why |
+|----------|--------|-----|
+| Loading | Classic `<script>` tags, ordered | file:// compatible, no MIME/module issues |
+| Namespace | `window.DASH` | Avoids globals pollution, explicit ownership |
+| CSS | Source files, inlined at assembly | file:// compatible, source modularity |
+| Backend | New `assemble_dashboard()` function | Minimal change to existing runtime model |
+| Tests | Fixture calls assembler + reads source JS | Tests the actual artifact, not a phantom |
+
+## What We Do NOT Do
+
+- Do not introduce a build tool, bundler, or npm
+- Do not change the data contract (`window.__*__` globals)
+- Do not rename CSS classes
+- Do not change visual appearance
+- Do not refactor algorithms (graph math, arc calculations, D3 charts)
+- Do not remove error handling, empty states, or edge cases
+- Do not allow core.js to become a dumping ground
+- Do not combine unrelated code merely to hit a line-count target
