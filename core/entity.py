@@ -186,16 +186,16 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
 def standard_sections(entity_type: str) -> list[str]:
     """Standard body sections for an entity type."""
     sections = {
-        "project": ["Synopsis", "Themes", "Structure", "Notes"],
-        "character": ["Personality", "Background", "Voice", "Greatest Fear", "Secrets", "Arc", "Relationships", "Goals"],
-        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function"],
-        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict"],
-        "plot": ["Summary", "Obstacles", "Stakes"],
-        "scene": ["Description", "Dramatic Function", "Notes", "Content"],
-        "sequence": ["Summary", "Scene Order", "Notes"],
-        "act": ["Summary", "Thematic Function", "Notes"],
-        "arc_beat": ["Action", "Gap", "Choice", "Shift", "Development Log"],
-        "relationship": ["Description", "History", "Dynamics", "Scenes", "Notes"],
+        "project": ["Premise", "Spine", "Controlling Idea", "Value Arc", "Structure", "Genre", "Notes"],
+        "character": ["Identity", "Desires", "Background", "Contradictions", "Psychology", "Arc", "Relationships", "Voice", "Notes"],
+        "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function", "Notes"],
+        "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict", "Notes"],
+        "plot": ["Summary", "Role", "Threads", "Value", "Characters", "Notes"],
+        "scene": ["Content", "Objective", "Conflict", "Beats", "Value Turn", "Dramatic Function", "Production", "Notes"],
+        "sequence": ["Summary", "Purpose", "Value Arc", "Progression", "Sequence Climax", "Plots", "Notes"],
+        "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],
+        "arc_beat": ["Action", "The Gap", "Choice", "Value Shift", "Notes"],
+        "relationship": ["Nature", "Perspectives", "Tension", "History", "Scenes to Write", "Notes"],
     }
     return sections.get(entity_type, [])
 
