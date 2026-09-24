@@ -523,7 +523,8 @@ def get_project_summary(project_path: Path) -> dict:
 def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
     """Return arc beats for a character, ordered by order_key then id.
 
-    Used by story_retrieve to fetch arc details on demand.
+    Backend for the planned story_load view="arc" (tasks/task_21*/spec.md §3.1)
+    — one character's arc beats, on demand. Not yet wired to any tool.
     """
     import sqlite3
     db_path = project_path / ".story" / "story.db"

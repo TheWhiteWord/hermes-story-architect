@@ -187,6 +187,13 @@ Returns one character's arc: character FM + all beat FM, hierarchical.
 - Beats ordered by array position (order_key)
 - Stub beats (no label) included as bare strings
 
+**Convention:** Arc beats follow the computed-fields convention
+(`tasks/task_23/CONVENTION_computed_fields.md`): `character.arc_beats_list` is
+`"computed": True` in `ENTITY_SCHEMAS` — read-only, derived at read time, never
+persisted, lean `{id, label, scene, shift, y, order, is_crisis, is_climax}`
+objects (same shape as dashboard). `get_character_arcs` in `core/db.py` is the
+existing backend for this view.
+
 ### 3.2 `view="story_value"` — Value Tracking Across Structure
 
 Returns the value arc across acts/sequences/scenes.
