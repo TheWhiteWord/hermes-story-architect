@@ -1,6 +1,6 @@
 window.DASH = window.DASH || {};
 
-const ROLE_COLORS = {
+DASH.ROLE_COLORS = {
   'protagonist': '#7b9cf0',
   'antagonist':  '#e07070',
   'mentor':      '#b07be0',
@@ -9,7 +9,7 @@ const ROLE_COLORS = {
   'entity':      '#e06b9b',
 };
 
-const REL_TYPE_COLORS = {
+DASH.REL_TYPE_COLORS = {
   'ally':         '#6bbfb0',
   'enemy':        '#e07070',
   'family':       '#7b9cf0',
@@ -21,7 +21,7 @@ const REL_TYPE_COLORS = {
   'neutral':      '#7a8a9a',
 };
 
-const PLOT_TYPE_COLORS = {
+DASH.PLOT_TYPE_COLORS = {
   Contradictory: '#e07070',
   Resonant: '#7b9cf0',
   Complicating: '#e0a86b',

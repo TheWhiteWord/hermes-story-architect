@@ -109,7 +109,7 @@ DASH.buildGraphView = function() {
   });
 
   const edgeDataSet = new vis.DataSet(edges);
-  const container = document.getElementById('DASH.network-canvas');
+  const container = document.getElementById('network-canvas');
 
   const options = {
     nodes: { borderWidthSelected: 2 },

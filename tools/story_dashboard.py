@@ -388,6 +388,6 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
     return json.dumps({
         "success": True,
         "message": f"Dashboard opened for {project}",
-        "dashboard_url": f"file://{tmp_path}",
+        "dashboard_url": f"file://{tmp_path}?t={int(__import__('time').time())}",
         "project": project,
     })

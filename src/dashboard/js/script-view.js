@@ -96,3 +96,5 @@ DASH.buildScriptView = function() {
   container.appendChild(doc);
   DASH._scriptBuilt = true;
 };
+
+DASH.boot();

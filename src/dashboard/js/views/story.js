@@ -4,10 +4,10 @@ DASH.buildStoryView = function() {
   const p = DASH.story.project || {};
   const mem = DASH.story.story_memory || {};
 
-  document.getElementById('DASH.story-project-name').textContent = p.name || 'Story';
-  document.getElementById('DASH.story-subtitle').textContent = [p.genre, p.setting].filter(Boolean).join(' · ');
+  document.getElementById('story-project-name').textContent = p.name || 'Story';
+  document.getElementById('story-subtitle').textContent = [p.genre, p.setting].filter(Boolean).join(' · ');
 
-  const body = document.getElementById('DASH.story-body');
+  const body = document.getElementById('story-body');
 
   // Project stats
   const statsGrid = [
