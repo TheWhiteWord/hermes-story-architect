@@ -5,7 +5,6 @@ DASH.buildGraphView = function() {
   document.getElementById('graph-subtitle').textContent = chars.length + ' characters';
 
   const fgColor = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#e8e8e8';
-  const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim() || '#8a8a8a';
 
   const nodes = new vis.DataSet(chars.map(c => {
     const role = c.role || c.story_role || '';
@@ -53,7 +52,6 @@ DASH.buildGraphView = function() {
     const [a, b] = rel.characters;
     const pa = (rel.perspectives || {})[a] || {};
     const pb = (rel.perspectives || {})[b] || {};
-    const fontCfg = { color: mutedColor, size: 9, align: 'middle', strokeWidth: 2, strokeColor: '#1a1a1a' };
     const key = [a, b].sort().join('::');
     const TYPE_PROXIMITY = { family: 0, romantic: 10, ally: 40, neutral: 50, professional: 60, mentor: 70, rival: 80, enemy: 100, custom: 50 };
     const typeOffset = Math.max(
@@ -64,9 +62,8 @@ DASH.buildGraphView = function() {
 
     edges.push({
       from: a, to: b,
-      label: pa.label || '',
+      edgeLabel: pa.label || '',
       color: { color: DASH.relTypeColor(pa.type) + 'aa', highlight: DASH.relTypeColor(pa.type) },
-      font: fontCfg,
       width: 1.5,
       dashes: pa.secret || false,
       length: spring,
@@ -76,9 +73,8 @@ DASH.buildGraphView = function() {
 
     edges.push({
       from: b, to: a,
-      label: pb.label || '',
+      edgeLabel: pb.label || '',
       color: { color: DASH.relTypeColor(pb.type) + 'aa', highlight: DASH.relTypeColor(pb.type) },
-      font: fontCfg,
       width: 1.5,
       dashes: pb.secret || false,
       length: spring,
@@ -96,9 +92,8 @@ DASH.buildGraphView = function() {
       if (p.id === c.id) return;
       edges.push({
         from: c.id, to: p.id,
-        label: '',
+        edgeLabel: '',
         color: { color: '#7a8a9a11', highlight: '#7a8a9a' },
-        font: { color: mutedColor, size: 9, align: 'middle', strokeWidth: 2, strokeColor: '#1a1a1a' },
         width: 0.5,
         dashes: true,
         length: 80 + 50 * 1.5,
@@ -154,6 +149,20 @@ DASH.buildGraphView = function() {
     DASH.positionArcTooltip({ clientX: params.event.clientX, clientY: params.event.clientY });
   });
   DASH.network.on('blurNode', () => DASH.hideArcTooltip());
+
+  const edgeTooltip = document.createElement('div');
+  edgeTooltip.className = 'edge-tooltip';
+  document.body.appendChild(edgeTooltip);
+
+  DASH.network.on('hoverEdge', params => {
+    const label = edgeDataSet.get(params.edge)?.edgeLabel;
+    if (!label) return;
+    edgeTooltip.textContent = label;
+    edgeTooltip.style.left = Math.min(params.event.clientX + 14, window.innerWidth - 220) + 'px';
+    edgeTooltip.style.top = Math.max(params.event.clientY - 40, 8) + 'px';
+    edgeTooltip.classList.add('visible');
+  });
+  DASH.network.on('blurEdge', () => edgeTooltip.classList.remove('visible'));
 
   DASH.network.on('click', params => {
     if (params.nodes.length > 0) {
