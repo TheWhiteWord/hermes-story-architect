@@ -25,7 +25,33 @@ story_load / story_dashboard / story_memory
 .story/memory.md via story_export
 ```
 
-## Confirmed existing issue
+## Explicit memory import boundary
+
+`story_import` is the one intentional Markdown import exception to the DB-only runtime rule:
+
+- `.story/memory.md` may be read as an explicit import/rebuild source.
+- A valid memory file is validated and written to `project.extra.memory`.
+- If the file is absent, existing DB memory is preserved.
+- If the file is invalid, import fails before the DB is changed.
+- Runtime tools (`story_load`, `story_memory`, `story_dashboard`) read DB memory only.
+
+This is an import boundary, not a compatibility fallback. Memory is already DB-first for runtime reads and mutations; the Markdown file remains the human-facing projection/import surface.
+
+## Future target: `structure.md`
+
+`structure.md` is the future realignment target for project structure, not a current runtime file path in this repository. The later DB-first audit should use it as the canonical Markdown/import target once the broader structure architecture is defined.
+
+The intended separation is:
+
+```text
+structure.md  → explicit import source for project structure
+project.md    → project metadata
+memory.md     → explicit import source for project memory
+DB            → operational source for load, edit, memory, and dashboard
+```
+
+Do not conflate the memory exception with the broader structure migration. The memory path is settled; the later audit must determine how `structure.md` maps to the existing project, act, sequence, scene, and arc data without creating a second operational authority.
+
 
 `tools/story_dashboard.py:338-343` reads `project.md` directly to obtain project frontmatter for title-page fields:
 
@@ -47,7 +73,7 @@ Do not assume this is the only occurrence. Search before changing anything.
 - `tools/story_create.py` — memory/other file creation may happen even where the DB should be populated first;
 - `tools/story_edit.py` — older file-oriented edit paths may bypass DB writes;
 - `tools/story_dashboard.py` — direct `project.md`/Markdown reads;
-- `core/db.py` — `get_memory_outline()` currently reads `.story/memory.md` directly and must be replaced by the DB-first memory design;
+- `core/db.py` — the legacy `get_memory_outline()` reader was removed during task_25; future audit should verify no runtime path reintroduces it;
 - `tools/story_export.py` — should be the deliberate Markdown projection boundary;
 - dashboard/data loading — should consume DB-generated injected data, not fetch Markdown files;
 - any remaining `frontmatter.load()` / `frontmatter.dump()` calls whose data is authoritative project state.
@@ -63,6 +89,6 @@ Do not assume this is the only occurrence. Search before changing anything.
 
 ## Relationship to task_25
 
-The memory implementation must not introduce a new file-first dependency. `.story/memory.md` is generated/exported from `project.extra.memory`; the dashboard popup also reads DB-derived injected data.
+The memory implementation must not introduce a new runtime file-first dependency. `.story/memory.md` is generated from `project.extra.memory`; `story_import` may read it only as the explicit import/rebuild boundary described above. The dashboard popup reads DB-derived injected data.
 
 This note is a reminder to audit the older architecture later, not a request to start that refactor now.

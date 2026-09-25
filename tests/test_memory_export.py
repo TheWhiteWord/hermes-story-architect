@@ -51,3 +51,34 @@ def test_memory_file_is_projection_not_source(project):
     assert "DB value" in text
     assert "File value" not in text
     assert "Question?" in text
+
+
+def test_import_uses_valid_memory_file(project):
+    from core.db import get_project_memory
+
+    path, vault = project
+    (path / ".story" / "memory.md").write_text(
+        "---\n"
+        "decisions:\n  - Imported decision\n"
+        "directions: []\n"
+        "open_questions:\n  - Imported question?\n"
+        "continuity_warnings: []\n"
+        "---\n"
+    )
+    result = json.loads(import_handler({"project": str(path)}, vault_path=vault))
+    assert result["success"] is True
+    assert get_project_memory(path)["decisions"] == ["Imported decision"]
+    assert get_project_memory(path)["open_questions"] == ["Imported question?"]
+
+
+def test_import_rejects_invalid_memory_file_without_mutating_db(project):
+    from core.db import get_project_memory
+
+    path, vault = project
+    memory_handler({
+        "project": str(path), "action": "add", "category": "decisions", "entry": "DB value",
+    }, vault_path=vault)
+    (path / ".story" / "memory.md").write_text("---\ndecisions:\n  - one\n  - one\n---\n")
+    result = json.loads(import_handler({"project": str(path)}, vault_path=vault))
+    assert result["error"]
+    assert get_project_memory(path)["decisions"] == ["DB value"]

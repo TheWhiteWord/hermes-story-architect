@@ -28,10 +28,22 @@ def handler(args, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    from core.db import get_db, create_schema, has_schema, get_project_memory, set_project_memory
+    from core.db import (
+        get_db, create_schema, has_schema, get_project_memory,
+        empty_memory, validate_memory,
+    )
     from core.section_parser import list_sections, get_section
 
     existing_memory = get_project_memory(project_path) if (project_path / ".story" / "story.db").exists() else None
+    memory_path = project_path / ".story" / "memory.md"
+    imported_memory = None
+    if memory_path.exists():
+        import frontmatter
+        try:
+            memory_fm = dict(frontmatter.load(memory_path).metadata)
+            imported_memory = validate_memory(memory_fm)
+        except Exception as e:
+            return json.dumps({"error": f"Invalid story memory: {e}"})
     conn = get_db(project_path)
     try:
         if not has_schema(conn):
@@ -40,7 +52,13 @@ def handler(args, **kwargs) -> str:
         conn.execute("BEGIN")
         _clear_all(conn)
         _import_all(conn, project_path)
-        if existing_memory is not None:
+        if imported_memory is not None:
+            row = conn.execute("SELECT id, extra FROM entities WHERE type='project' LIMIT 1").fetchone()
+            if row:
+                extra = json.loads(row[1]) if row[1] else {}
+                extra["memory"] = imported_memory
+                conn.execute("UPDATE entities SET extra=? WHERE id=?", (json.dumps(extra, ensure_ascii=False), row[0]))
+        elif existing_memory is not None:
             row = conn.execute("SELECT id, extra FROM entities WHERE type='project' LIMIT 1").fetchone()
             if row:
                 extra = json.loads(row[1]) if row[1] else {}
@@ -82,6 +100,7 @@ def _import_all(conn, project_path: Path) -> None:
 def _import_project(conn, project_path: Path) -> None:
     """Import project.md."""
     import frontmatter
+    from core.db import empty_memory
     from core.section_parser import list_sections, get_section
 
     fm_file = project_path / "project.md"
@@ -91,10 +110,8 @@ def _import_project(conn, project_path: Path) -> None:
     fm = dict(post.metadata)
     body = post.content
 
-    extra = {}
-    from core.db import empty_memory
-    extra["memory"] = empty_memory()
-    skip = {"name", "logline"}
+    extra = {"memory": empty_memory()}
+    skip = {"name", "logline", "memory"}
     for k, v in fm.items():
         if k not in skip:
             extra[k] = v
