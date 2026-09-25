@@ -16,6 +16,10 @@ VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionm
 ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
 
+MEMORY_CATEGORIES = ("decisions", "directions", "open_questions", "continuity_warnings")
+MEMORY_CHAR_LIMIT = 3000
+MEMORY_ENTRY_LIMIT = 300
+
 REQUIRED_FIELDS = {
     "character": ["name", "story_role", "one_sentence"],
     "location": ["name", "one_sentence"],

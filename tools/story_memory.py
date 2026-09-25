@@ -2,10 +2,8 @@
 import json
 from pathlib import Path
 
+from core.constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT
 from core.db import (
-    MEMORY_CATEGORIES,
-    MEMORY_CHAR_LIMIT,
-    MEMORY_ENTRY_LIMIT,
     empty_memory,
     get_project_memory,
     memory_serialized_length,

@@ -5,6 +5,8 @@ import sqlite3
 import yaml
 from pathlib import Path
 
+from .constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS entities (
     id TEXT PRIMARY KEY,
@@ -97,11 +99,6 @@ _PROJECT_DEFAULTS = {
     "inciting_incident_scene_id": "Inciting Incident Scene not set",
     "story_climax_scene_id": "Story Climax Scene not set",
 }
-
-MEMORY_CATEGORIES = ("decisions", "directions", "open_questions", "continuity_warnings")
-MEMORY_CHAR_LIMIT = 3000
-MEMORY_ENTRY_LIMIT = 300
-
 
 def empty_memory() -> dict:
     """Return the canonical project memory shape."""
