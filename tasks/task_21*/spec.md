@@ -2,6 +2,31 @@
 
 Target: define the boundary between load (structural map) and retrieve (entity drill-down), and specify the extended structural views for load.
 
+## Runtime storage invariant (mandatory)
+
+**Resolve the project path, require `.story/story.db`, and query only DB readers. Markdown is not a fallback and is not used to enrich or repair responses.**
+
+This is the canonical rule for these tools and a reusable rule for future runtime tools:
+
+- `story_load` and `story_retrieve` resolve the project path first, then require `.story/story.db`.
+- All entity fields, computed values, relations, sections, and memory come from the DB readers in `core.db`.
+- Do not read, parse, compare, or fall back to `project.md`, entity `.md` files, `memory.md`, `index.yaml`, or any other Markdown/YAML projection.
+- A missing database is an explicit error. Do not reconstruct a response from Markdown.
+- Markdown is used only by the explicit import/export boundary.
+- This rule applies to extended views and field selection as well as the base views.
+
+### DB source map
+
+The implementation must not use “frontmatter” as a runtime storage assumption. The corresponding data is read from the DB as follows:
+
+- `entities` columns: canonical entity identity and common fields.
+- `entities.extra`: entity-specific structured fields.
+- `relations` and `relations.note`: cross-entity references, plot beats, relationship perspectives, and relation metadata.
+- `sections`: prose section bodies only.
+- `core.db` readers: the only supported runtime read API for these tools.
+
+If a value is not available from a DB reader, omit it or return the documented DB error. Never recover it from Markdown.
+
 ---
 
 ## 1. Tool Boundary
@@ -119,6 +144,8 @@ The slim structural overview. No extended fields, no arc beats, no plot scene ar
 }
 ```
 
+**Memory rule:** if the base response includes a memory outline, it must come from `core.db.get_project_memory()` or another DB reader. It must not read `.story/memory.md`. The outline shape is deferred; the source and DB-only rule are not deferred.
+
 **Base view field rules:**
 - Project: core identity + value fields + structure metadata (no title-page fields)
 - Acts/Sequences/Scenes: id, title, status, chars, loc (no climax, no dramatic_role, no value fields, no one_sentence on stubs)
@@ -136,7 +163,7 @@ Opt-in structural overviews. Activated via `view` parameter. All views return on
 
 ### 3.1 `view="arc"` — Character Arc Shape
 
-Returns one character's arc: character FM + all beat FM, hierarchical.
+Returns one character's arc: character DB fields + all beat DB fields, hierarchical.
 
 **Parameters:**
 - `project` (required)
@@ -177,11 +204,11 @@ Returns one character's arc: character FM + all beat FM, hierarchical.
 ```
 
 **Field notes:**
-- Character FM: arc_type, arc_value, arc_value_at_open/close, arc_complete (grouped — always returned together)
-- Beat FM: label, scene ref, shift, y, is_crisis, is_climax (no action/gap/choice prose)
+- Character DB fields: arc_type, arc_value, arc_value_at_open/close, arc_complete (grouped — always returned together)
+- Beat DB fields: label, scene ref, shift, y, is_crisis, is_climax (no action/gap/choice prose)
 - Beat markers (is_crisis, is_climax): omit when FALSE — only TRUE values emitted
 - Beats ordered by array position (order_key)
-- Stub beats (no label) included as bare strings
+- Arc beats are returned as lean DB objects (`id`, `label`, `scene`, `shift`, `y`, `order`, `is_crisis`, `is_climax`). Unlabeled stub beats remain objects with an empty `label`; they are not serialized as bare strings.
 
 **Convention:** Arc beats follow the computed-fields convention
 (`tasks/task_23/CONVENTION_computed_fields.md`): `character.arc_beats_list` is
@@ -388,7 +415,7 @@ Returns all relationship entities with full perspective data. This is the only v
 - Each relationship contains both character perspectives (direction-dependent qualities)
 - `secret` omitted when FALSE — only TRUE values emitted
 - `strength` range: -1.0 (antagonistic) to 1.0 (bonded); 0.0 = neutral/unknown
-- `scenes` list is populated from relationship entity frontmatter (optional)
+- `scenes` list is populated from DB relationship data (optional)
 - For network graph rendering: each relationship → one or two directed edges; color by `type`, thickness by `strength`, dashed if `secret`
 
 ### 3.5 `view="unfilled"` — What To Work On Next
@@ -421,22 +448,22 @@ Returns the inverted unfilled map: which optional fields are still at default, p
 
 ## 4. `story_retrieve` — Entity Drill-Down
 
-Single or multiple entity focus. Returns sections (prose) and/or frontmatter fields.
+Returns the DB-backed entity fields and section prose requested for one or more entities. Fields come from `entities`/`entities.extra`; relation-backed fields come from `relations`; prose comes from `sections`.
 
 **Parameters:**
 - `project` (required)
-- `entity_type` (required) — character|location|world|plot|project|scene|sequence|act|arc_beat
+- `entity_type` (required) — character|location|world|plot|project|scene|sequence|act|arc_beat|relationship
 - `id` (required) — list of entity slugs/ids (from story_load output `id` field)
 - `sections` (optional) — section names to retrieve. `["all"]` for all sections.
-- `fields` (optional) — FM field names to retrieve. No grouping — agent names exactly what it wants.
+- `fields` (optional) — DB-backed field names to retrieve. No grouping — agent names exactly what it wants.
 
 **Call patterns (from brainstorm):**
 
 | Pattern | Call | Returns |
 |---|---|---|
-| (a) Full entity | `id=["kael"], sections=["all"]` | All sections + all FM |
-| (b) Partial sections | `id=["kael"], sections=["Action", "Gap"]` | Selected sections + all FM |
-| (c) Structured only | `id=["kael"], fields=["all"]` | All FM (no sections) |
+| (a) Full entity | `id=["kael"], sections=["all"]` | All DB sections + all DB-backed fields |
+| (b) Partial sections | `id=["kael"], sections=["Action", "Gap"]` | Selected DB sections + all DB-backed fields |
+| (c) Structured only | `id=["kael"], fields=["all"]` | All DB-backed fields (no sections) |
 | (d) Partial fields | `id=["kael", "mira"], fields=["knowledge", "goals_short"]` | Selected fields for multiple entities |
 
 **Return shape (single entity):**
@@ -491,13 +518,14 @@ Single or multiple entity focus. Returns sections (prose) and/or frontmatter fie
 
 **Notes:**
 - `fields` and `sections` are composable — both can be requested in one call
-- `fields=["all"]` returns all FM for the entity type
-- `sections=["all"]` returns all sections with content
-- Unfilled fields included when `fields` is requested (shows what's still at default)
-- Empty/default FM fields are included (they signal "not set")
-- Sections not found return available list
-- No field grouping — agent names exactly what it wants
-- `id` accepts entity slugs from story_load output (the `id` field on each entity object)
+- `fields=["all"]` returns all available DB-backed fields for the entity type
+- `fields=["arc_value", "arc_type"]` returns only those DB-backed fields
+- Relation-backed fields (for example plot beats and relationship perspectives) are resolved from `relations`, not from Markdown or sections
+- `sections=["all"]` returns all DB-stored sections with content
+- Unfilled fields are calculated from DB state and included when `fields` is requested
+- Empty/default DB fields are included (they signal "not set")
+- Sections not found return the available DB-stored section names
+- `id` accepts entity slugs from `story_load` output (the `id` field on each entity object)
 
 ---
 
@@ -505,7 +533,7 @@ Single or multiple entity focus. Returns sections (prose) and/or frontmatter fie
 
 The agent requests exactly what it needs.
 
-- `fields=["all"]` → returns all FM fields for the entity
+- `fields=["all"]` → returns all DB-backed fields for the entity
 - `fields=["arc_value", "arc_type"]` → returns only those fields
 - Agent discovers available fields via `story_describe` or by reading a full entity
 
@@ -515,7 +543,7 @@ The agent requests exactly what it needs.
 
 **In load:** not in the base view. Opt-in via `view="unfilled"` (§3.5) — the "what to work on next" overview. Inverted field→entity list.
 
-**In retrieve:** included when `fields` is requested. Shows which FM fields are still at default for this entity.
+**In retrieve:** included when `fields` is requested. Shows which DB-backed fields are still at default for this entity.
 
 **Not a separate tool.** Unfilled is a data-quality signal, not a domain concern.
 
@@ -525,18 +553,19 @@ The agent requests exactly what it needs.
 
 1. **Batch retrieve** — skip for now. Agent drills one entity at a time. Add `ids=[...]` when a real need surfaces.
 2. **Memory retrieval** — deferred. No clean path yet.
-3. **World rules retrieval** — stored as frontmatter, not section. Future expansion.
+3. **World rules retrieval** — stored in DB entity data, not a section. Future expansion.
 4. **Plot beat descriptions** — stored as relation notes, not sections. Future expansion.
 
 ---
 
 ## 8. Migration Notes
 
-- Current `story_load` base view already close — remove plot scene arrays, remove arc beats from characters, remove climax/dramatic_role from scenes, remove `unfilled` (moved to `view="unfilled"`, backend `get_unfilled_map` ready in `core/db.py`)
-- Current `story_retrieve` needs FM field support added (currently sections-only)
-- Extended views (`arc`, `story_value`, `dramatic_elements`, `unfilled`) are new — no migration needed
-- Agent requests `fields=["all"]` → returns all groups
-- Agent can request specific fields by name if it wants to ignore grouping
-- Grouping is a return-shape concern, not a request concern
+- **DB-only runtime:** both handlers resolve the project path, require `.story/story.db`, and query only the `core.db` readers. Markdown is not a fallback, enrichment source, repair source, or comparison source.
+- **Storage map:** `entities` columns + `entities.extra` for entity fields; `relations`/`relations.note` for relation-backed fields; `sections` for prose; `core.db.get_project_memory()` for memory.
+- **Focused views:** `arc` uses `get_character_arcs`; `unfilled` uses `get_unfilled_map`; base load uses `get_project_summary`; story-value and dramatic-elements views use focused DB projections, not the dashboard payload and not Markdown.
+- **Missing data:** omit unavailable values or return a documented DB error; never recover a value from Markdown.
+- `get_character_arcs`, `get_unfilled_map`, `get_project_summary`, and the new focused readers must be the only runtime inputs for the corresponding views.
+- `story_load` and `story_retrieve` must not import or call `story_export`/`story_import` logic.
+- Import/export remain independent file boundaries and are not runtime fallbacks.
 
 ---
