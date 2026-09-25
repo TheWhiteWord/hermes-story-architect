@@ -67,7 +67,7 @@ DASH.buildGraphView = function() {
       width: 1.5,
       dashes: pa.secret || false,
       length: spring,
-      smooth: { enabled: false },
+      smooth: { enabled: true, type: 'curvedCW', roundness: 0.08 },
       relId: rel.id
     });
 
@@ -78,6 +78,7 @@ DASH.buildGraphView = function() {
       width: 1.5,
       dashes: pb.secret || false,
       length: spring,
+      smooth: { enabled: true, type: 'curvedCW', roundness: 0.08 },
       relId: rel.id
     });
   });
