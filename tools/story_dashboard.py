@@ -208,7 +208,7 @@ def _hsl_from_name(name):
 
 
 def _build_title_page(project_frontmatter: dict) -> dict:
-    """Build a title page dict from project.md frontmatter.
+    """Build a title page dict from DB-backed project data.
 
     Returns the {tl, tc, tr, cc, bl, br, hidden} structure expected by
     buildScriptView() in the dashboard. Fields are output-only — never indexed.
@@ -327,7 +327,6 @@ def handler(args: dict, **kwargs) -> str:
 def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
     """Render dashboard HTML from get_dashboard_data() output."""
     import tempfile
-    import frontmatter as fm
 
     dashboard_dir = Path(__file__).parent.parent / "src" / "dashboard"
     if not (dashboard_dir / "index.html").exists():
@@ -335,12 +334,7 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
 
     html = assemble_dashboard(dashboard_dir)
 
-    # Read project.md directly for title page fields (output-only, not in DB title_page)
-    try:
-        project_fm = fm.load(project_path / "project.md")
-        project_frontmatter = dict(project_fm.metadata)
-    except Exception:
-        project_frontmatter = {}
+    project_frontmatter = data.get("title_page", {})
 
     # Build all injections from get_dashboard_data output
     injections = f"window.__STORY_DATA__ = {json.dumps(data['story_data'])};"

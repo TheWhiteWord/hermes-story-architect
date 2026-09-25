@@ -1,4 +1,5 @@
 """Integration tests for Script View + Statistics Panel."""
+import json
 import pytest
 from pathlib import Path
 from unittest.mock import patch, mock_open
@@ -98,9 +99,36 @@ class TestDashboardIntegration:
         assert '_compute_screenplay_stats' in src
         assert '__SCREENPLAY_STATS__' in src
 
-    def test_stats_injected_before_boot(self, dashboard_html):
-        """Boot comment is present in assembled HTML for injection."""
-        assert "// ─── Boot" in dashboard_html
+    def test_dashboard_boot_has_no_legacy_file_fallback(self):
+        """Dashboard boot uses injected data and has no YAML/file fallback."""
+        source = Path("src/dashboard/js/core.js").read_text(encoding="utf-8")
+        assert "window.__STORY_DATA__" in source
+        assert ".DASH.story" not in source
+        assert "fetch(" not in source
+        assert "jsyaml.load" not in source
+    def test_title_page_uses_db_payload_not_project_markdown(self, tmp_path):
+        """Dashboard title-page fields come from DB data, not project.md."""
+        from tools.story_dashboard import _render_dashboard
+
+        project_path = tmp_path / "project"
+        project_path.mkdir()
+        (project_path / "project.md").write_text(
+            "---\nscreenplay_title: STALE MARKDOWN TITLE\n---\n",
+            encoding="utf-8",
+        )
+        data = {
+            "story_data": {"project": {"name": "DB Project"}},
+            "title_page": {"screenplay_title": "DB SCREENPLAY TITLE"},
+            "screenplay_text": "INT. ROOM - DAY\nA person enters.\n",
+        }
+
+        with patch("tools.story_dashboard._compute_screenplay_stats", return_value={"titlePage": {}}):
+            result = _render_dashboard(data, project_path, "db-project")
+
+        html_path = Path(json.loads(result)["dashboard_url"].replace("file://", "").split("?")[0])
+        html = html_path.read_text(encoding="utf-8")
+        assert "DB SCREENPLAY TITLE" in html
+        assert "STALE MARKDOWN TITLE" not in html
 
     def test_no_bare_inline_handlers_in_index_html(self):
         """All inline event handlers must use DASH.* prefix (not bare globals)."""

@@ -223,13 +223,8 @@ def _get_next_order_db(conn, entity_type: str, parent_id: str) -> int:
 
 
 def _create_project(slug, frontmatter_data, vault_path):
-    """Create a new project with full scaffolding in DB."""
-    import frontmatter
-
+    """Create a new project with DB-only initialization."""
     project_path = vault_path / "projects" / slug
-
-    if (project_path / "project.md").exists():
-        return json.dumps({"error": f"Project already exists: {slug}"})
 
     # Validate required fields
     schema = ENTITY_SCHEMAS.get("project", {})
@@ -242,31 +237,19 @@ def _create_project(slug, frontmatter_data, vault_path):
 
     # Merge frontmatter over schema defaults
     merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
-    from core.db import empty_memory
-    memory = empty_memory()
+    from core.db import empty_memory, get_db, create_schema
+    from core.entity import columns_for_insert, standard_sections
 
-    from core.entity import standard_sections
-
-    # Create project.md (project resolution still needs it); memory stays DB-only.
-    project_path.mkdir(parents=True, exist_ok=True)
-    post = frontmatter.Post("", **merged)
-    sections = standard_sections("project")
-    post.content = "\n".join(f"## {s}\n" for s in sections)
-    with open(project_path / "project.md", 'w') as f:
-        frontmatter.dump(post, f)
-
-    # Create entity folders (for import/export round-trip)
-    for folder in ["characters", "locations", "worlds", "plots", "scenes", "sequences", "acts", "arcs"]:
-        (project_path / folder).mkdir(exist_ok=True)
-
-    # Create story.db with schema
-    from core.db import get_db, create_schema
     conn = get_db(project_path)
     try:
         create_schema(conn)
+        conn.execute("BEGIN")
+        if conn.execute("SELECT id FROM entities WHERE type='project' LIMIT 1").fetchone():
+            conn.execute("ROLLBACK")
+            return json.dumps({"error": f"Project already exists: {slug}"})
 
-        # Insert project entity
-        from core.entity import columns_for_insert
+        memory = empty_memory()
+        sections = standard_sections("project")
         columns = columns_for_insert("project", slug, {**merged, "memory": memory})
         conn.execute(
             "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) "
@@ -275,23 +258,25 @@ def _create_project(slug, frontmatter_data, vault_path):
              columns["order_key"], columns["status"], columns["parent_id"],
              columns["location_id"], columns["extra"]),
         )
-
-        # Insert standard sections
         if sections:
-            section_rows = [(slug, heading, "") for heading in sections]
             conn.executemany(
                 "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
-                section_rows,
+                [(slug, heading, "") for heading in sections],
             )
-
-        conn.commit()
+        conn.execute("COMMIT")
+    except Exception as e:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        return json.dumps({"error": str(e)})
     finally:
         conn.close()
 
     return json.dumps({
         "success": True,
         "message": f"Created project: {slug}",
-        "file": str(project_path / "project.md"),
+        "file": str(project_path / ".story" / "story.db"),
     })
 
 

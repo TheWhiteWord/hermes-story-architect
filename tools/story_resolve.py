@@ -34,13 +34,23 @@ def resolve_project(user_input: str, vault_path: Path) -> Path:
             continue
         candidates.append((project_dir.name, project_dir))
         
-        # Also match on project name
-        project_md = project_dir / "project.md"
-        if project_md.exists():
-            import frontmatter
-            post = frontmatter.load(project_md)
-            if "name" in post.metadata:
-                candidates.append((post.metadata["name"], project_dir))
+        # Also match on the DB project name
+        db_path = project_dir / ".story" / "story.db"
+        if db_path.exists():
+            import sqlite3
+            conn = None
+            try:
+                conn = sqlite3.connect(str(db_path))
+                row = conn.execute(
+                    "SELECT name FROM entities WHERE type='project' LIMIT 1"
+                ).fetchone()
+                if row and row[0]:
+                    candidates.append((row[0], project_dir))
+            except sqlite3.Error:
+                pass
+            finally:
+                if conn is not None:
+                    conn.close()
     
     if not candidates:
         raise ValueError(f"No projects found in {projects_dir}")

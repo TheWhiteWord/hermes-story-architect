@@ -8,28 +8,11 @@ let network = null;
 
 DASH.boot = async function() {
   try {
-    // Injected data takes precedence (avoids fetch('file://') which Electron blocks)
     if (window.__STORY_DATA__) {
       DASH.initStory(window.__STORY_DATA__);
       return;
     }
-
-    // Check for project path in URL query param first
-    const params = new URLSearchParams(window.location.search);
-    const projectPath = params.get('project');
-    let indexPath;
-
-    if (projectPath) {
-      indexPath = projectPath.replace(/\/$/, '') + '/.DASH.story/index.yaml';
-    } else {
-      indexPath = '.DASH.story/index.yaml';
-    }
-
-    const res = await fetch('file://' + indexPath);
-    if (!res.ok) throw new Error('not found');
-    const text = await res.text();
-    const data = jsyaml.load(text);
-    DASH.initStory(data);
+    DASH.showError();
   } catch (e) {
     DASH.showError();
   }

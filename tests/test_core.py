@@ -512,7 +512,7 @@ class TestNoteCreation:
 class TestProjectCreation:
     """Tests for story_create(entity_type='project', ...)."""
 
-    def test_create_project_creates_all_folders(self, tmp_path):
+    def test_create_project_is_db_only(self, tmp_path):
         args = {
             "entity_type": "project",
             "slug": "test-proj",
@@ -521,10 +521,12 @@ class TestProjectCreation:
         }
         create_handler(args, vault_path=str(tmp_path))
         proj = tmp_path / "projects" / "test-proj"
+        assert (proj / ".story" / "story.db").exists()
+        assert not (proj / "project.md").exists()
         for folder in ["characters", "locations", "worlds", "plots", "scenes", "sequences", "acts", "arcs"]:
-            assert (proj / folder).is_dir(), f"Missing folder: {folder}"
+            assert not (proj / folder).exists(), f"Unexpected folder: {folder}"
 
-    def test_create_project_creates_project_md(self, tmp_path):
+    def test_create_project_does_not_create_project_markdown(self, tmp_path):
         args = {
             "entity_type": "project",
             "slug": "test-proj",
@@ -532,13 +534,7 @@ class TestProjectCreation:
             "frontmatter": {"name": "Test Project"},
         }
         create_handler(args, vault_path=str(tmp_path))
-        import frontmatter
-        post = frontmatter.load(tmp_path / "projects" / "test-proj" / "project.md")
-        for field in ENTITY_SCHEMAS["project"]:
-            assert field in post.metadata, f"Missing field: {field}"
-        assert "## Premise" in post.content
-        assert "## Notes" in post.content
-        assert "memory" not in post.metadata
+        assert not (tmp_path / "projects" / "test-proj" / "project.md").exists()
 
     def test_create_project_does_not_require_memory_file(self, tmp_path):
         args = {

@@ -13,6 +13,7 @@ from tools.story_search import handler as search_handler
 from tools.story_dashboard import handler as dashboard_handler
 from tools.story_create import handler as create_handler
 from tools.story_edit import handler as edit_handler
+from tools.story_resolve import resolve_project
 
 
 @pytest.fixture
@@ -29,6 +30,11 @@ def db_project(fixture_path):
 
 class TestStoryLoadDB:
     """story_load reads from DB when story.db exists."""
+
+    def test_resolve_project_uses_db_name_without_project_markdown(self, db_project):
+        proj, vault = db_project
+        (proj / "project.md").unlink()
+        assert resolve_project("Save the Children", vault) == proj
 
     def test_load_project_metadata(self, db_project):
         proj, vault = db_project

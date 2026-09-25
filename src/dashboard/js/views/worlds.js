@@ -5,7 +5,7 @@ DASH.buildWorldsView = function() {
   document.getElementById('worlds-subtitle').textContent = worlds.length + ' world' + (worlds.length !== 1 ? 's' : '');
   const list = document.getElementById('world-list');
   if (!worlds.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No worlds defined</div><div class="empty-state-sub">Add worlds to index.yaml to see them here.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No worlds defined</div><div class="empty-state-sub">Add worlds to the project database to see them here.</div></div>';
     return;
   }
   list.innerHTML = worlds.map(w => {

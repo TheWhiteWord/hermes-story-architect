@@ -49,6 +49,23 @@ def handler(args, **kwargs) -> str:
         if not has_schema(conn):
             create_schema(conn)
 
+        project_exists = conn.execute(
+            "SELECT id, extra FROM entities WHERE type='project' LIMIT 1"
+        ).fetchone()
+        if not (project_path / "project.md").exists():
+            if not project_exists:
+                conn.close()
+                return json.dumps({"error": "Project markdown not found and no project DB exists"})
+            if imported_memory is not None:
+                extra = json.loads(project_exists[1]) if project_exists[1] else {}
+                extra["memory"] = imported_memory
+                conn.execute(
+                    "UPDATE entities SET extra=? WHERE id=?",
+                    (json.dumps(extra, ensure_ascii=False), project_exists[0]),
+                )
+            conn.close()
+            return json.dumps({"success": True, "message": f"Imported memory for {project_path.name}"})
+
         conn.execute("BEGIN")
         _clear_all(conn)
         _import_all(conn, project_path)
