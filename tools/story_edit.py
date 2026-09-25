@@ -2,19 +2,18 @@
 import json
 from pathlib import Path
 from core.constants import ENTITY_SCHEMAS
-from core.section_parser import replace_section
 
 SCHEMA = {
     "type": "object",
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["edit_note", "delete_entity", "update_story_memory", "reorder"],
-            "description": "Action type: edit_note (edit entity frontmatter/body sections), delete_entity (hard delete, blocked if has children), update_story_memory, reorder (batch renumber order fields for scenes/sequences)"
+            "enum": ["edit_note", "delete_entity", "reorder"],
+            "description": "Action type: edit_note (edit entity frontmatter/body sections), delete_entity (hard delete, blocked if has children), reorder (batch renumber order fields for scenes/sequences)"
         },
         "target": {
             "type": "object",
-            "description": "Target entity (omit for update_story_memory)",
+            "description": "Target entity (entity_type, slug, project)",
             "properties": {
                 "entity_type": {"type": "string", "enum": ["character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat", "relationship"]},
                 "slug": {"type": "string"}
@@ -85,8 +84,6 @@ def handler(args: dict, **kwargs) -> str:
         result = _edit_note_db(project_path, target, data, summary)
     elif action == "delete_entity":
         result = _delete_entity(project_path, target, summary)
-    elif action == "update_story_memory":
-        result = _update_story_memory(project_path, data, summary)
     elif action == "reorder":
         order_context = args.get("order_context", {})
         result = _reorder(project_path, target, order_context, summary)
@@ -346,29 +343,6 @@ def _delete_entity(project_path: Path, target: dict, summary: str) -> str:
         "success": True,
         "message": f"Deleted: {summary}",
         "entity_id": entity_id
-    })
-
-
-def _update_story_memory(project_path: Path, data: dict, summary: str) -> str:
-    """Update the story memory file using data bag. All keys are body sections (memory.md has no frontmatter schema)."""
-    import frontmatter
-    memory_path = project_path / ".story" / "memory.md"
-
-    if not memory_path.exists():
-        return json.dumps({"error": "memory.md not found"})
-
-    post = frontmatter.load(memory_path)
-
-    for key, value in data.items():
-        post.content = replace_section(post.content, key, value)
-
-    with open(memory_path, 'w') as f:
-        frontmatter.dump(post, f)
-
-    return json.dumps({
-        "success": True,
-        "message": f"Updated story memory: {summary}",
-        "file": str(memory_path)
     })
 
 

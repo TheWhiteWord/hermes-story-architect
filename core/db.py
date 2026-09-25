@@ -1,6 +1,8 @@
 """Database connection, schema creation, and table existence checks."""
 import json
 import sqlite3
+
+import yaml
 from pathlib import Path
 
 SCHEMA_SQL = """
@@ -96,39 +98,121 @@ _PROJECT_DEFAULTS = {
     "story_climax_scene_id": "Story Climax Scene not set",
 }
 
+MEMORY_CATEGORIES = ("decisions", "directions", "open_questions", "continuity_warnings")
+MEMORY_CHAR_LIMIT = 3000
+MEMORY_ENTRY_LIMIT = 300
 
-def get_memory_outline(project_path: Path) -> dict:
-    """Parse ## headings from .story/memory.md, return outline with preview lines."""
-    memory_path = project_path / ".story" / "memory.md"
-    if not memory_path.exists():
-        return {"status": "placeholder — design deferred, see §5", "sections": []}
 
-    content = memory_path.read_text()
-    sections = []
-    lines = content.split("\n")
-    current_heading = None
-    preview = ""
+def empty_memory() -> dict:
+    """Return the canonical project memory shape."""
+    return {category: [] for category in MEMORY_CATEGORIES}
 
-    for line in lines:
-        if line.startswith("## "):
-            if current_heading is not None:
-                sections.append({"heading": current_heading, "preview": preview})
-            current_heading = line[3:].strip()
-            preview = ""
-        elif current_heading is not None and not preview and line.strip():
-            preview = line.strip()[:120]
 
-    if current_heading is not None:
-        sections.append({"heading": current_heading, "preview": preview})
+def validate_memory(memory: dict) -> dict:
+    """Validate and return a copy of the canonical memory shape."""
+    if not isinstance(memory, dict):
+        raise ValueError("Memory must be an object")
 
-    return {"status": "placeholder — design deferred, see §5", "sections": sections}
+    unknown = set(memory) - set(MEMORY_CATEGORIES)
+    if unknown:
+        raise ValueError(f"Unknown memory category: {sorted(unknown)[0]}")
+
+    result = empty_memory()
+    for category in MEMORY_CATEGORIES:
+        entries = memory.get(category, [])
+        if not isinstance(entries, list):
+            raise ValueError(f"Memory category must be a list: {category}")
+        seen = set()
+        for entry in entries:
+            if not isinstance(entry, str) or not entry.strip():
+                raise ValueError(f"Memory entries must be non-empty strings: {category}")
+            if len(entry) > MEMORY_ENTRY_LIMIT:
+                raise ValueError(f"Memory entry exceeds {MEMORY_ENTRY_LIMIT} characters")
+            if entry in seen:
+                raise ValueError(f"Duplicate memory entry in {category}")
+            seen.add(entry)
+            result[category].append(entry)
+
+    if memory_serialized_length(result) > MEMORY_CHAR_LIMIT:
+        raise ValueError(f"Memory exceeds {MEMORY_CHAR_LIMIT} serialized characters")
+    return result
+
+
+def memory_serialized_length(memory: dict) -> int:
+    """Return the deterministic serialized-frontmatter character count."""
+    import yaml
+
+    normalized = {category: memory.get(category, []) for category in MEMORY_CATEGORIES}
+    return len(yaml.safe_dump(normalized, sort_keys=False, allow_unicode=True).strip())
+
+
+def memory_usage(memory: dict) -> dict:
+    """Return memory counts and serialized-frontmatter usage."""
+    normalized = {category: memory.get(category, []) for category in MEMORY_CATEGORIES}
+    return {
+        "counts": {category: len(entries) for category, entries in normalized.items()},
+        "usage": memory_serialized_length(normalized),
+    }
+
+
+def get_memory_block(project_path: Path) -> dict:
+    """Return the bounded memory contract used by load and dashboard."""
+    memory = get_project_memory(project_path)
+    usage = memory_usage(memory)
+    return {
+        "status": "ready",
+        "content": yaml.safe_dump(memory, sort_keys=False, allow_unicode=True).strip(),
+        "usage": f"{usage['usage']}/{MEMORY_CHAR_LIMIT}",
+        "counts": usage["counts"],
+        "categories": memory,
+    }
+
+
+def get_project_memory(project_path: Path) -> dict:
+    """Read project.extra.memory from the DB; missing memory is empty."""
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return empty_memory()
+    conn = get_db(project_path)
+    try:
+        row = conn.execute(
+            "SELECT extra FROM entities WHERE type='project' ORDER BY rowid LIMIT 1"
+        ).fetchone()
+        if not row or not row[0]:
+            return empty_memory()
+        extra = json.loads(row[0])
+        return validate_memory(extra.get("memory", {}))
+    finally:
+        conn.close()
+
+
+def set_project_memory(project_path: Path, memory: dict) -> dict:
+    """Validate and write project.extra.memory in the DB."""
+    normalized = validate_memory(memory)
+    conn = get_db(project_path)
+    try:
+        row = conn.execute(
+            "SELECT id, extra FROM entities WHERE type='project' ORDER BY rowid LIMIT 1"
+        ).fetchone()
+        if not row:
+            raise ValueError("Project not found")
+        project_id, extra_json = row
+        extra = json.loads(extra_json) if extra_json else {}
+        extra["memory"] = normalized
+        conn.execute(
+            "UPDATE entities SET extra=? WHERE id=? AND type='project'",
+            (json.dumps(extra, ensure_ascii=False), project_id),
+        )
+        return normalized
+    finally:
+        conn.close()
 
 
 def get_project_summary(project_path: Path) -> dict:
     """Return nested project summary for story_load (spec §2).
 
     Shape: {loaded, confirmation, project, acts, characters, plots,
-            locations, worlds, memory_outline}
+            locations, worlds, memory}
     """
     conn = get_db(project_path)
     try:
@@ -463,8 +547,8 @@ def get_project_summary(project_path: Path) -> dict:
             f"{len(worlds)} worlds."
         )
 
-        # ── Memory outline ──
-        memory_outline = get_memory_outline(project_path)
+        # ── Memory ──
+        memory_block = get_memory_block(project_path)
 
         result = {
             "loaded": True,
@@ -474,7 +558,7 @@ def get_project_summary(project_path: Path) -> dict:
             "characters": characters_list,
             "plots": plots_list,
             "worlds": worlds_list,
-            "memory_outline": memory_outline,
+            "memory": memory_block,
         }
         if orphaned_locations:
             result["orphaned_locations"] = orphaned_locations
@@ -1007,28 +1091,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                     elif beat == "payoff": act_plots[pid]["has_payoff"] = True
             act["plots"] = sorted(act_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
-        # Project entity (for story_memory)
-        proj_row = conn.execute(
-            "SELECT name, one_sentence, extra FROM entities WHERE type='project'"
-        ).fetchone()
-        story_memory = {}
-        if proj_row:
-            story_memory = {
-                "name": proj_row[0],
-                "logline": proj_row[1],
-                "title_page": {
-                    "name": proj_row[0],
-                    "logline": proj_row[1],
-                    "screenplay_title": json.loads(proj_row[2]).get("screenplay_title", "") if proj_row[2] else "",
-                    "credit": json.loads(proj_row[2]).get("credit", "") if proj_row[2] else "",
-                    "author": json.loads(proj_row[2]).get("author", "") if proj_row[2] else "",
-                    "contact": json.loads(proj_row[2]).get("contact", "") if proj_row[2] else "",
-                    "draft_date": json.loads(proj_row[2]).get("draft_date", "") if proj_row[2] else "",
-                    "draft": json.loads(proj_row[2]).get("draft", "") if proj_row[2] else "",
-                },
-            }
-
-        # Project: dashboard reads p.logline (not one_sentence) and top-level extra fields
+        story_memory = get_memory_block(project_path)
         proj_dict = entity_by_id.get(conn.execute("SELECT id FROM entities WHERE type='project' LIMIT 1").fetchone()[0], {})
         if proj_dict:
             if not proj_dict.get("logline") and proj_dict.get("one_sentence"):

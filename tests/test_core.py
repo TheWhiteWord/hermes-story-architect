@@ -538,8 +538,9 @@ class TestProjectCreation:
             assert field in post.metadata, f"Missing field: {field}"
         assert "## Premise" in post.content
         assert "## Notes" in post.content
+        assert "memory" not in post.metadata
 
-    def test_create_project_creates_memory_md(self, tmp_path):
+    def test_create_project_does_not_require_memory_file(self, tmp_path):
         args = {
             "entity_type": "project",
             "slug": "test-proj",
@@ -547,10 +548,16 @@ class TestProjectCreation:
             "frontmatter": {"name": "Test Project"},
         }
         create_handler(args, vault_path=str(tmp_path))
-        memory = tmp_path / "projects" / "test-proj" / ".story" / "memory.md"
-        assert memory.exists()
-        assert "# Story Memory" in memory.read_text()
-        assert "## Continuity notes" in memory.read_text()
+        project = tmp_path / "projects" / "test-proj"
+        assert not (project / ".story" / "memory.md").exists()
+        from core.db import get_db, get_project_memory, empty_memory
+        conn = get_db(project)
+        try:
+            extra = json.loads(conn.execute("SELECT extra FROM entities WHERE type='project'").fetchone()[0])
+        finally:
+            conn.close()
+        assert extra["memory"] == empty_memory()
+        assert get_project_memory(project) == empty_memory()
 
     def test_create_project_creates_db(self, tmp_path):
         args = {
@@ -613,11 +620,13 @@ class TestProjectCreation:
         assert "worlds" in result
         assert "orphaned_locations" not in result or isinstance(result["orphaned_locations"], list)
         assert "unfilled" not in result  # moved to view="unfilled" (task_21 spec §3.5)
-        assert "memory_outline" in result
+        assert "memory" in result
+        assert "memory_outline" not in result
+        assert set(result["memory"]["categories"]) == {
+            "decisions", "directions", "open_questions", "continuity_warnings"
+        }
         # Old keys gone
         assert "entities" not in result
-        assert "relations" not in result
-        assert "memory" not in result
 
 
 def _make_project_with_structure(tmp):

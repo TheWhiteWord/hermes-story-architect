@@ -97,7 +97,8 @@ DASH.normalise = function(data) {
   });
 
   d.worlds = d.worlds || [];
-  d.story_memory = d.story_memory || {};
+  d.story_memory = d.story_memory || { status: "ready", usage: "0/3000", counts: {}, categories: {} };
+  d.story_memory.categories = d.story_memory.categories || {};
 
   return d;
 }

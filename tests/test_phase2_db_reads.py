@@ -105,12 +105,16 @@ class TestNestedStructure:
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
         assert "relations" not in result
 
-    def test_no_memory_key(self, db_project):
-        """Old full-memory key is gone (replaced by memory_outline)."""
+    def test_memory_contract(self, db_project):
+        """story_load returns the full DB-backed memory block."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        assert "memory" not in result
-        assert "memory_outline" in result
+        assert "memory" in result
+        assert "memory_outline" not in result
+        assert result["memory"]["status"] == "ready"
+        assert list(result["memory"]["categories"]) == [
+            "decisions", "directions", "open_questions", "continuity_warnings"
+        ]
 
 
 class TestStubClassification:

@@ -120,15 +120,31 @@ def _build_tool_schema(name: str) -> dict:
                 "required": ["query", "project"],
             },
         },
+        "story_memory": {
+            "name": "story_memory",
+            "description": "Add, remove, or replace explicit project story-memory entries.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["add", "remove", "replace"]},
+                    "project": {"type": "string", "description": "Project slug or path"},
+                    "category": {"type": "string", "enum": ["decisions", "directions", "open_questions", "continuity_warnings"]},
+                    "entry": {"type": "string", "description": "Entry for add"},
+                    "old_entry": {"type": "string", "description": "Complete existing entry for remove or replace"},
+                    "new_entry": {"type": "string", "description": "Replacement entry for replace"},
+                },
+                "required": ["action", "project", "category"],
+            },
+        },
         "story_edit": {
             "name": "story_edit",
-            "description": "Edit story entities and memory.",
+            "description": "Edit authoritative story entities and structure.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["edit_note", "delete_entity", "update_story_memory", "reorder"],
+                        "enum": ["edit_note", "delete_entity", "reorder"],
                         "description": "Edit action",
                     },
                     "target": {
@@ -178,7 +194,7 @@ SCHEMA = {
             "type": "array",
             "items": {
                 "type": "string",
-                "enum": ["story_create", "story_load", "story_retrieve", "story_search", "story_edit", "story_dashboard"],
+                "enum": ["story_create", "story_load", "story_retrieve", "story_search", "story_edit", "story_memory", "story_dashboard"],
             },
             "description": "Tool names to describe. Omit for all tools.",
         },
@@ -206,7 +222,7 @@ def handler(args: dict, **kwargs) -> str:
     else:
         tools = {name: _build_tool_schema(name) for name in
                  ["story_create", "story_load", "story_retrieve",
-                  "story_search", "story_edit", "story_dashboard"]
+                  "story_search", "story_edit", "story_memory", "story_dashboard"]
                  if _build_tool_schema(name)}
 
     # Build entity schemas

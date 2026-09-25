@@ -96,6 +96,8 @@ def _export_all(conn, project_path: Path) -> None:
 
         if entity_type == "project":
             _write_note(project_path / "project.md", fm, body)
+            from core.db import get_project_memory
+            _write_note(project_path / ".story" / "memory.md", get_project_memory(project_path), "")
         elif entity_type == "arc_beat":
             # Derive beat_id from composite entity_id + parent_id
             beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
@@ -113,7 +115,7 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
     """Build frontmatter dict for export."""
     if entity_type == "project":
         fm = {"name": name, "logline": one_sentence}
-        fm.update(extra)
+        fm.update({k: v for k, v in extra.items() if k != "memory"})
         return fm
 
     fm = {}

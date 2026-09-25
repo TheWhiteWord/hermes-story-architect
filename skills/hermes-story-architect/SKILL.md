@@ -7,7 +7,14 @@ author: TWW
 
 # Story Architect
 
-## Tool Boundary
+## Project Entry and Story Memory
+
+- Always call `story_load` before working on a story project. It contains the project structure and current story memory.
+- Memory is explicit, bounded, project-level creative guidance stored in the project DB. `.story/memory.md` is only an export projection.
+- Use `story_memory` to add, remove, or replace complete entries. Do not silently infer canon from scenes or implications.
+- Keep one entry to one rule, fact, direction, question, or warning. Preserve unresolved questions and continuity warnings until the user resolves them.
+- Memory is advisory. Authoritative entity data and explicit user decisions take precedence; report conflicts instead of rewriting memory automatically.
+
 
 - **story_load** = structural map of the whole project. Called once per session or on-demand for views. Returns nested tree.
 - **story_retrieve** = entity drill-down. Called many times. Returns flat entity + requested fields/sections.

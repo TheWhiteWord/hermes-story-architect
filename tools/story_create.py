@@ -242,28 +242,18 @@ def _create_project(slug, frontmatter_data, vault_path):
 
     # Merge frontmatter over schema defaults
     merged = {field: frontmatter_data.get(field, meta["default"]) for field, meta in schema.items()}
+    from core.db import empty_memory
+    memory = empty_memory()
 
     from core.entity import standard_sections
 
-    # Create project.md + memory.md (project.md still needed for story_resolve)
+    # Create project.md (project resolution still needs it); memory stays DB-only.
     project_path.mkdir(parents=True, exist_ok=True)
     post = frontmatter.Post("", **merged)
     sections = standard_sections("project")
     post.content = "\n".join(f"## {s}\n" for s in sections)
     with open(project_path / "project.md", 'w') as f:
         frontmatter.dump(post, f)
-
-    # Create .story/memory.md with standard sections
-    memory_dir = project_path / ".story"
-    memory_dir.mkdir(parents=True, exist_ok=True)
-    memory_content = "\n\n".join([
-        "# Story Memory",
-        "## Continuity notes\n",
-        "## Character knowledge\n",
-        "## World events\n",
-        "## Open questions\n",
-    ])
-    (memory_dir / "memory.md").write_text(memory_content)
 
     # Create entity folders (for import/export round-trip)
     for folder in ["characters", "locations", "worlds", "plots", "scenes", "sequences", "acts", "arcs"]:
@@ -277,7 +267,7 @@ def _create_project(slug, frontmatter_data, vault_path):
 
         # Insert project entity
         from core.entity import columns_for_insert
-        columns = columns_for_insert("project", slug, merged)
+        columns = columns_for_insert("project", slug, {**merged, "memory": memory})
         conn.execute(
             "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
