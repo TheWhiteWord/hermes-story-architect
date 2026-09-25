@@ -158,7 +158,6 @@ def get_memory_block(project_path: Path) -> dict:
     usage = memory_usage(memory)
     return {
         "status": "ready",
-        "content": yaml.safe_dump(memory, sort_keys=False, allow_unicode=True).strip(),
         "usage": f"{usage['usage']}/{MEMORY_CHAR_LIMIT}",
         "counts": usage["counts"],
         "categories": memory,

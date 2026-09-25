@@ -319,8 +319,31 @@
       "period": "+400y after the collapse"
     }
   ],
-  "memory_outline": {
-    "status": "placeholder — design deferred, see §5",
-    "sections": []
+  "memory": {
+    "status": "ready",
+    "usage": "662/3000",
+    "counts": {
+      "decisions": 1,
+      "directions": 2,
+      "open_questions": 2,
+      "continuity_warnings": 2
+    },
+    "categories": {
+      "decisions": [
+        "The Institute is both a refuge and a prison; do not resolve that contradiction as a simple good-versus-evil choice."
+      ],
+      "directions": [
+        "Keep Kael's escape motivated by earned trust, not sudden certainty.",
+        "Preserve ambiguity about whether the inherited memories are a rescue plan or another form of control."
+      ],
+      "open_questions": [
+        "Who originally authorized the door to remain unlocked?",
+        "Which memories belong to Kael, and which belong to the last scientists?"
+      ],
+      "continuity_warnings": [
+        "The door is unlocked from Kael's first discovery; do not later describe it as physically locked.",
+        "The Administrator knows the system is unstable before the climax reveal."
+      ]
+    }
   }
 }
