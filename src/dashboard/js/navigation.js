@@ -10,6 +10,10 @@ DASH.switchView = function(view, btn) {
   document.getElementById(view + '-view').classList.add('active');
   btn.classList.add('active');
   DASH.currentView = view;
+  if (view === 'graph' && DASH.network) {
+    DASH.network.redraw();
+    DASH.network.fit();
+  }
   DASH.closePanel();
 }
 
