@@ -242,9 +242,8 @@ to trigger:
    ago than that are eligible, so **anything deleted in this session stays
    restorable** and tidying up can never destroy a fresh mistake.
 
-A `story_backup` (`core.db.backup_database`) is taken **before** the wipe, and
-the response lists every destroyed id plus the backup path — so even a purge is
-recoverable by hand from `.story/`. To undo a recent delete, use `restore` — that is exact.
+A `story_backup` is taken before the wipe, and the response lists every
+destroyed id. To undo a recent delete, use `restore` — that is exact.
 
 ### Deleted notes are swept on the next export
 
