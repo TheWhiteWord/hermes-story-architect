@@ -79,13 +79,11 @@ def _match_confidence(user_input: str, resolved: Path) -> dict | None:
 def handler(args: dict, **kwargs) -> str:
     """Apply one exact-entry mutation to project.extra.memory."""
     from .story_resolve import resolve_project
-    from core.config import load_plugin_config
+    from core.config import resolve_root
 
-    vault_path = Path(kwargs["vault_path"]) if kwargs.get("vault_path") else Path(
-        load_plugin_config().get("vault_path", "~/story-vault")
-    ).expanduser()
+    root_path = resolve_root(kwargs)
     try:
-        project_path = resolve_project(args["project"], vault_path)
+        project_path = resolve_project(args["project"], root_path)
     except ValueError as exc:
         return json.dumps({"error": str(exc)})
     uncertain = _match_confidence(args["project"], project_path)

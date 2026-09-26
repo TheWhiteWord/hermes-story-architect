@@ -85,15 +85,10 @@ _FIELDS_TO_SKIP = {"id", "type"}
 
 def handler(args: dict, **kwargs) -> str:
     """Apply edit to project note."""
-    from core.config import load_plugin_config
+    from core.config import resolve_root
     from .story_resolve import resolve_project
 
-    _vault = kwargs.get("vault_path")
-    if _vault:
-        vault_path = Path(_vault)
-    else:
-        config = load_plugin_config()
-        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
 
     action = args["action"]
     target = args["target"]
@@ -102,7 +97,7 @@ def handler(args: dict, **kwargs) -> str:
 
     # Resolve project
     try:
-        project_path = resolve_project(target.get("project", ""), vault_path)
+        project_path = resolve_project(target.get("project", ""), root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 

@@ -45,20 +45,15 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Load project nested index into context."""
+    from core.config import resolve_root
     from .story_resolve import resolve_project
 
-    _vault = kwargs.get("vault_path")
-    if _vault:
-        vault_path = Path(_vault)
-    else:
-        from core.config import load_plugin_config
-        config = load_plugin_config()
-        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
     project = args["project"]
 
     # Resolve project
     try:
-        project_path = resolve_project(project, vault_path)
+        project_path = resolve_project(project, root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
@@ -143,21 +138,59 @@ def _view_arc(conn, args: dict) -> dict:
 
 
 def _view_story_value(conn, args: dict) -> dict:
-    """Opening and closing value per act, and where the story's beats sit."""
+    """The value's journey: project, then act → sequence → scene.
+
+    This view owns the value at every level — the base structural map carries
+    only the project's own value, so nothing is lost by not repeating it there.
+    Each container develops the value independently, so a scene's shift is not
+    derivable from its sequence's and must be read here. Scenes matter most:
+    they are where the value actually turns, and in a real project they carry
+    values the containers do not (a subplot's Hope against the mainline Trust).
+    """
     act_filter = args.get("act")
+
+    scene_sql = ("SELECT id, parent_id, order_key, name, extra FROM entities "
+                 "WHERE type='scene' AND is_deleted=0 ORDER BY order_key, id")
+    scenes_by_seq: dict[str, list] = {}
+    for scene_id, parent_id, _ok, name, extra_json in conn.execute(scene_sql).fetchall():
+        extra = json.loads(extra_json or "{}")
+        scenes_by_seq.setdefault(parent_id, []).append({
+            "id": scene_id,
+            "title": name,
+            "value": extra.get("value", ""),
+            "value_at_open": extra.get("value_at_open", ""),
+            "value_at_close": extra.get("value_at_close", ""),
+        })
+
+    seq_sql = ("SELECT id, parent_id, name, order_key, extra FROM entities "
+               "WHERE type='sequence' AND is_deleted=0 ORDER BY order_key, id")
+    seq_by_act: dict[str, list] = {}
+    for seq_id, parent_id, name, _ok, extra_json in conn.execute(seq_sql).fetchall():
+        extra = json.loads(extra_json or "{}")
+        seq_by_act.setdefault(parent_id, []).append({
+            "id": seq_id,
+            "title": name,
+            "value": extra.get("value", ""),
+            "value_at_open": extra.get("value_at_open", ""),
+            "value_at_close": extra.get("value_at_close", ""),
+            "scenes": scenes_by_seq.get(seq_id, []),
+        })
+
     sql = ("SELECT id, name, order_key, extra FROM entities "
            "WHERE type='act' AND is_deleted=0 "
            "ORDER BY order_key, id")
     acts = []
-    for act_id, title, order_key, extra_json in conn.execute(sql).fetchall():
+    for act_id, title, _order_key, extra_json in conn.execute(sql).fetchall():
         if act_filter and act_id != act_filter:
             continue
         extra = json.loads(extra_json or "{}")
         acts.append({
             "id": act_id,
             "title": title,
+            "value": extra.get("value", ""),
             "value_at_open": extra.get("value_at_open", ""),
             "value_at_close": extra.get("value_at_close", ""),
+            "sequences": seq_by_act.get(act_id, []),
         })
 
     project = conn.execute(
@@ -288,8 +321,14 @@ def _view_unfilled(project_path, args: dict) -> dict:
     if len(items) > UNFILLED_LIMIT:
         out["truncated"] = True
         out["shown_types"] = UNFILLED_LIMIT
+        # Name the fields that did not fit. Without this an omitted field is
+        # indistinguishable from a resolved one: `characters` fell off the end
+        # at count 2, and dropping one entity pushed it further off, so fixing
+        # a scene made the remaining gap look like it had been handled.
+        out["other_fields"] = [i["field"] for i in items[UNFILLED_LIMIT:]]
         out["hint"] = (f"{len(items)} field types are incomplete; the "
-                       f"{UNFILLED_LIMIT} most common are shown.")
+                       f"{UNFILLED_LIMIT} most common are shown. "
+                       f"other_fields lists the rest — still gaps.")
     if not items:
         out["message"] = "Nothing is at default — every optional field is filled."
     return out

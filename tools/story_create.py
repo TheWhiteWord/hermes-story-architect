@@ -89,23 +89,24 @@ SCHEMA = _build_schema()
 
 def handler(args: dict, **kwargs) -> str:
     """Create new entity in DB."""
-    from core.config import load_plugin_config
+    from core.config import resolve_root
     from .story_resolve import resolve_project
 
-    _vault = kwargs.get("vault_path")
-    if _vault:
-        vault_path = Path(_vault)
-    else:
-        config = load_plugin_config()
-        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
 
     entity_type = args["entity_type"]
     slug = args["slug"]
     frontmatter_data = args["frontmatter"]
 
+    # Validate slug. Checked before the project branch too: a project slug IS a
+    # directory name (projects/<slug>), so an unvalidated one is a path
+    # traversal, not just a malformed id.
+    if not slug or not slug.replace("-", "").replace("_", "").isalnum():
+        return json.dumps({"error": "Slug must be alphanumeric with hyphens/underscores only"})
+
     # Project creation is special — initializes the full project structure
     if entity_type == "project":
-        return _create_project(slug, frontmatter_data, vault_path)
+        return _create_project(slug, frontmatter_data, root_path)
 
     # The schema enum is advisory — an LLM can still pass anything. Reject it here,
     # or an unknown type lands in the database and surfaces much later as a mystery.
@@ -115,10 +116,6 @@ def handler(args: dict, **kwargs) -> str:
             "valid_types": sorted(ENTITY_SCHEMAS),
         })
 
-    # Validate slug
-    if not slug.replace("-", "").replace("_", "").isalnum():
-        return json.dumps({"error": "Slug must be alphanumeric with hyphens/underscores only"})
-
     # Validated here, not mid-insert, so a bad value cannot leave a half-made entity.
     supplied_sections = args.get("sections") or {}
     if not isinstance(supplied_sections, dict):
@@ -127,7 +124,7 @@ def handler(args: dict, **kwargs) -> str:
 
     # Resolve project
     try:
-        project_path = resolve_project(args.get("project", ""), vault_path)
+        project_path = resolve_project(args.get("project", ""), root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
@@ -274,9 +271,9 @@ def _get_next_order_db(conn, entity_type: str, parent_id: str) -> int:
     return int(row[0]) if row else 1
 
 
-def _create_project(slug, frontmatter_data, vault_path):
+def _create_project(slug, frontmatter_data, root_path):
     """Create a new project with DB-only initialization."""
-    project_path = vault_path / "projects" / slug
+    project_path = root_path / "projects" / slug
 
     # Validate required fields
     schema = ENTITY_SCHEMAS.get("project", {})

@@ -18,7 +18,7 @@ from core.constants import FUZZY_THRESHOLD
 PROJECT_THRESHOLD = 75
 
 
-def resolve_project(user_input: str, vault_path: Path) -> Path:
+def resolve_project(user_input: str, root_path: Path) -> Path:
     """Resolve user input to a project folder path.
     
     1. Direct path (if user_input is an existing directory)
@@ -31,7 +31,7 @@ def resolve_project(user_input: str, vault_path: Path) -> Path:
     if direct.is_dir():
         return direct
     
-    projects_dir = vault_path / "projects"
+    projects_dir = root_path / "projects"
     
     if not projects_dir.exists():
         raise ValueError(f"No projects directory found at {projects_dir}")

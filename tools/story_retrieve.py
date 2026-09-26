@@ -153,18 +153,14 @@ def _sections(conn, entity_id: str, wanted) -> dict:
 
 def handler(args: dict, **kwargs) -> str:
     """Return the requested fields and sections for one or more entities."""
-    from core.config import load_plugin_config
+    from core.config import resolve_root
     from core.db import get_db, has_schema
     from .story_resolve import resolve_project
 
-    _vault = kwargs.get("vault_path")
-    if _vault:
-        vault_path = Path(_vault)
-    else:
-        vault_path = Path(load_plugin_config().get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
 
     try:
-        project_path = resolve_project(args["project"], vault_path)
+        project_path = resolve_project(args["project"], root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 

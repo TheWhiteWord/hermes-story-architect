@@ -285,16 +285,15 @@ def handler(args: dict, **kwargs) -> str:
     import tempfile
     import frontmatter as fm
 
-    from core.config import load_plugin_config
+    from core.config import resolve_root
     from core.db import get_dashboard_data, has_schema
     from .story_resolve import resolve_project
 
-    config = load_plugin_config()
-    vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
     project = args["project"]
 
     try:
-        project_path = resolve_project(project, vault_path)
+        project_path = resolve_project(project, root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 

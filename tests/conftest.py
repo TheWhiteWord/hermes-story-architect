@@ -11,13 +11,14 @@ sys.path.insert(0, str(repo_root))
 
 
 @pytest.fixture(autouse=True)
-def _isolate_vault(monkeypatch, tmp_path):
-    """Patch load_plugin_config so tests never write to the live Hermes vault.
+def _isolate_root(monkeypatch, tmp_path):
+    """Patch load_plugin_config so tests never write to the live story root.
 
-    Handlers that don't pass vault_path fall back to load_plugin_config().
-    Without this, they'd read ~/.hermes/config.yaml and write to the real vault.
+    Handlers without an explicit root_path kwarg fall back to
+    load_plugin_config(). Without this, they'd read ~/.hermes/config.yaml and
+    write to the real projects directory.
     """
-    monkeypatch.setattr("core.config.load_plugin_config", lambda: {"vault_path": str(tmp_path)})
+    monkeypatch.setattr("core.config.load_plugin_config", lambda: {"root_path": str(tmp_path)})
 
 
 @pytest.fixture

@@ -8,7 +8,8 @@ STARC is a GPLv3 C++/Qt desktop screenwriting app with a rich data model: charac
 
 This project takes STARC's **architecture** — the taxonomy, the entity schemas, the action protocol, the continuity model — and re-implements it as a **Hermes-native writing environment**:
 
-- Story projects live as **Markdown + YAML frontmatter** notes in the Obsidian vault
+- Story projects live as a **SQLite database** (`.story/story.db`) under the configured
+  story root; `story_export` writes Markdown for use with an md system such as Obsidian
 - Hermes provides the **intelligence layer** (story loading, editing, continuity checking)
 - The **preview pane** provides interactive navigation (characters, scenes, timeline)
 - All edits require **human review** before being applied
@@ -35,13 +36,13 @@ hermes-story-architect/
 ├── src/
 │   └── dashboard/               # Preview pane interactive dashboard
 │       └── story-dashboard.html
-├── vault-conventions.md         # Vault structure + frontmatter schemas
+├── vault-conventions.md         # Export structure + frontmatter schemas
 └── README.md
 ```
 
 ## Stages
 
-1. **Schema & Conventions** — Define entity types, fields, vault structure
+1. **Schema & Conventions** — Define entity types, fields, project structure
 2. **Story Loader Skill** — Load full project context into Hermes
 3. **Story Editor Skill** — Propose + apply structured edits (Action Protocol)
 4. **Preview Pane Dashboard** — Interactive character/scene/world navigation

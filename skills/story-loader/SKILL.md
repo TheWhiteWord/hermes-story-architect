@@ -14,7 +14,7 @@ metadata:
 # Story Loader Skill
 
 Loads a story project's index and memory into the LLM context. Read-only — does
-not edit anything. Works with any story project in the configured vault.
+not edit anything. Works with any story project in the configured story root.
 
 ## When to Use
 
@@ -28,8 +28,8 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 
 ## Prerequisites
 
-- Story vault configured (Hermes plugin config: `story_architect.vault_path`)
-- Project exists at `<vault>/projects/<slug>/`
+- Story root configured (Hermes plugin config: `story_architect.root_path`)
+- Project exists at `<root>/projects/<slug>/`
 - Project created via `story_create(entity_type='project', ...)` (creates all files)
 
 ## Tools Available
@@ -69,7 +69,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 ## Procedure
 
 1. **Resolve project** — match user input to a project folder
-   - Try exact slug match first: `<vault>/projects/<input>/`
+   - Try exact slug match first: `<root>/projects/<input>/`
    - Try fuzzy match on slug + project name (rapidfuzz, threshold 40)
    - If multiple matches: list them, ask user to pick
    - If no match: suggest similar, then list all available projects
@@ -87,7 +87,7 @@ Don't use for: editing (use story-editor), searching across projects (use story_
 
 ## Quick Reference
 
-- Vault: `<vault>/projects/<slug>/`
+- Root: `<root>/projects/<slug>/`
 - Index: `.story/index.yaml` (always-loaded graph)
 - Memory: `.story/memory.md` (continuity map)
 - Match: fuzzy on slug + name, threshold 40

@@ -81,17 +81,12 @@ def _diff(project_path: Path) -> dict:
 def handler(args, **kwargs) -> str:
     """Import markdown vault into SQLite."""
     from .story_resolve import resolve_project
-    from core.config import load_plugin_config
+    from core.config import resolve_root
 
-    vault = kwargs.get("vault_path")
-    if vault:
-        vault_path = Path(vault)
-    else:
-        config = load_plugin_config()
-        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
 
     try:
-        project_path = resolve_project(args["project"], vault_path)
+        project_path = resolve_project(args["project"], root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 

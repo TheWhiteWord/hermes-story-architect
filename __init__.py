@@ -1,5 +1,6 @@
 """Hermes Story Architect — plugin entry point."""
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -8,15 +9,62 @@ _REPO_ROOT = Path(__file__).parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from core.config import load_plugin_config
+from core.config import DEFAULT_ROOT_PATH, load_plugin_config
 
 _SKILL_DIR = _REPO_ROOT / "skills"
 
 
 def _requirements_met() -> bool:
-    """Check if vault_path is configured."""
-    config = load_plugin_config()
-    return bool(config.get("vault_path"))
+    """Check if root_path is configured."""
+    return bool(load_plugin_config().get("root_path"))
+
+
+def _ensure_root_path() -> None:
+    """Make ``story_architect.root_path`` visible in config.yaml.
+
+    The key used to be ``vault_path``, back when markdown was the source of
+    truth. The DB is authoritative now, so the directory is a plain root —
+    and nothing reads the old name any more. Inject the key when it is absent
+    so the user can see and change it instead of guessing which directory the
+    tools are pointed at.
+
+    Text-level YAML edit, not safe_load/safe_dump — a dump would rewrite the
+    whole file and drop every comment in the user's config.
+    """
+    try:
+        import yaml
+        from hermes_constants import get_hermes_home
+    except ImportError:
+        return
+
+    path = get_hermes_home() / "config.yaml"
+    if not path.exists():
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+        data = yaml.safe_load(text) or {}
+    except Exception:
+        return
+
+    block = data.get("story_architect")
+    if isinstance(block, dict) and "root_path" in block:
+        return  # already configured — nothing to do
+
+    if re.search(r"^story_architect\s*:", text, re.M):
+        new_text = re.sub(
+            r"^(story_architect\s*:)[ \t]*$",
+            rf"\1\n  root_path: {DEFAULT_ROOT_PATH}",
+            text,
+            count=1,
+            flags=re.M,
+        )
+    else:
+        new_text = text.rstrip("\n") + f"\n\nstory_architect:\n  root_path: {DEFAULT_ROOT_PATH}\n"
+
+    try:
+        path.write_text(new_text, encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _tool_schema(schema: dict) -> dict:
@@ -39,6 +87,8 @@ def _tool_schema(schema: dict) -> dict:
 
 def register(ctx) -> None:
     """Register all Story Architect tools and skills."""
+    _ensure_root_path()
+
     from .tools import story_load
     from .tools import story_retrieve
     from .tools import story_search

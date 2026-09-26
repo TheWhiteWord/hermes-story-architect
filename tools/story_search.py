@@ -29,19 +29,14 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Search across project section prose."""
-    from core.config import load_plugin_config
+    from core.config import resolve_root
     from core.db import get_db, has_schema, search_sections
     from .story_resolve import resolve_project
 
-    _vault = kwargs.get("vault_path")
-    if _vault:
-        vault_path = Path(_vault)
-    else:
-        config = load_plugin_config()
-        vault_path = Path(config.get("vault_path", "~/story-vault")).expanduser()
+    root_path = resolve_root(kwargs)
 
     try:
-        project_path = resolve_project(args["project"], vault_path)
+        project_path = resolve_project(args["project"], root_path)
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
