@@ -1,7 +1,7 @@
 {
   "view": "unfilled",
-  "total_gaps": 80,
-  "gap_types": 23,
+  "total_gaps": 74,
+  "gap_types": 22,
   "unfilled": [
     {
       "field": "character_value_at_close",
@@ -68,18 +68,6 @@
         "kael-the-administrator",
         "marcus-chen-kael",
         "mira-the-administrator"
-      ],
-      "count": 6
-    },
-    {
-      "field": "variant_of",
-      "entities": [
-        "the-central-room",
-        "the-garden-dream",
-        "the-garden",
-        "the-dream-world",
-        "the-i",
-        "the-real-world"
       ],
       "count": 6
     },
@@ -163,6 +151,14 @@
         "act-2"
       ],
       "count": 2
+    },
+    {
+      "field": "value_at_open",
+      "entities": [
+        "seq-confrontation",
+        "act-2"
+      ],
+      "count": 2
     }
   ],
   "value_drift": [
@@ -175,7 +171,6 @@
   "truncated": true,
   "shown_types": 15,
   "other_fields": [
-    "value_at_open",
     "dramatic_function",
     "mood",
     "plot_type",
@@ -184,5 +179,5 @@
     "value_arc",
     "values"
   ],
-  "hint": "23 field types are incomplete; the 15 most common are shown. other_fields lists the rest — still gaps."
+  "hint": "22 field types are incomplete; the 15 most common are shown. other_fields lists the rest — still gaps. Pass field=<name> for one, or entity=<id> for one entity."
 }

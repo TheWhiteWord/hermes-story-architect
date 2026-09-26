@@ -38,7 +38,18 @@ SCHEMA = {
         "add_plot": {
             "type": "boolean",
             "description": "For view='dramatic_elements': include which plots reference each "
-                           "scene, and in which role. Off by default — it roughly doubles the view."
+                           "scene, and in what role. Off by default — it roughly doubles the view."
+        },
+        "field": {
+            "type": "string",
+            "description": "For view='unfilled': one field name (e.g. 'character_value_at_close'). "
+                           "Answers 'who else is missing this?' — the unfiltered list is grouped by "
+                           "field, so asking for one is a lookup, not a filter over the output."
+        },
+        "entity": {
+            "type": "string",
+            "description": "For view='unfilled': one entity id. Answers 'what did I skip on this?'. "
+                           "Pair with `field` to ask both ways at once."
         }
     },
     "required": ["project"]
@@ -337,10 +348,30 @@ UNFILLED_LIMIT = 15
 
 
 def _view_unfilled(project_path, args: dict) -> dict:
+    """What is still at its default, and — with a filter — one answer at a time.
+
+    The two questions worth asking are both lookups against the same inverted
+    map:
+
+      field=X   "who else is missing X?" — the other entities that skipped it
+      entity=Y  "what did I skip on Y?"  — the fields that entity is missing
+
+    Unfiltered, the list is grouped by field and sorted by how many entities
+    share each gap. That ordering is not a priority ranking: `goals_long` is
+    high because nothing writes it, not because it matters more. To ask about
+    a specific one, filter — a filtered answer is never truncated.
+    """
     from core.db import get_unfilled_map, get_value_drift
 
-    items = [{"field": field, "entities": ids, "count": len(ids)}
-             for field, ids in get_unfilled_map(project_path).items()]
+    unfilled = get_unfilled_map(project_path)
+    field = args.get("field")
+    entity = args.get("entity")
+
+    if field or entity:
+        return _unfilled_focused(unfilled, field, entity)
+
+    items = [{"field": f, "entities": ids, "count": len(ids)}
+             for f, ids in unfilled.items()]
     items.sort(key=lambda i: (-i["count"], i["field"]))
 
     total = sum(i["count"] for i in items)
@@ -367,9 +398,38 @@ def _view_unfilled(project_path, args: dict) -> dict:
         out["other_fields"] = [i["field"] for i in items[UNFILLED_LIMIT:]]
         out["hint"] = (f"{len(items)} field types are incomplete; the "
                        f"{UNFILLED_LIMIT} most common are shown. "
-                       f"other_fields lists the rest — still gaps.")
+                       f"other_fields lists the rest — still gaps. "
+                       f"Pass field=<name> for one, or entity=<id> for one entity.")
     if not items:
         out["message"] = "Nothing is at default — every optional field is filled."
+    return out
+
+
+def _unfilled_focused(unfilled: dict, field: str | None, entity: str | None) -> dict:
+    """One field's entities, or one entity's fields. Never truncated.
+
+    A filtered answer is complete by construction: you asked about one field or
+    one entity, so there is nothing to cut off and no `other_fields` to warn
+    about. That is the whole reason to filter rather than read the long list.
+
+    No counts. The lists are the answer, and a count beside a list is a second
+    thing to keep in step with it. No "is this entity in that list" flag
+    either — the caller is holding both.
+    """
+    out: dict = {"view": "unfilled"}
+    if field:
+        out["field"] = field
+        out["entities"] = unfilled.get(field, [])
+        if not out["entities"]:
+            out["message"] = (
+                f"'{field}' is missing on no entity — either it is filled "
+                f"everywhere, or it is not a field. story_describe lists the "
+                f"fields that exist.")
+    if entity:
+        out["entity"] = entity
+        out["fields"] = sorted(f for f, ids in unfilled.items() if entity in ids)
+        if not out["fields"]:
+            out["message"] = f"'{entity}' has every optional field filled."
     return out
 
 

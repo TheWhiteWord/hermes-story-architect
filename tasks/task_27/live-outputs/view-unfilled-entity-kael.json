@@ -1,0 +1,8 @@
+{
+  "view": "unfilled",
+  "entity": "kael",
+  "fields": [
+    "goals_long",
+    "goals_short"
+  ]
+}

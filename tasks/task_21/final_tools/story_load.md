@@ -47,7 +47,7 @@ thing to argue with first.
 | `story_value` | "how does value move through the structure?" | `act` | 52 tok |
 | `dramatic_elements` | "which scene is the crisis / climax?" | `act`, `add_plot` | 122–127 tok |
 | `relationship` | "how do these people see each other?" | — | 314 tok |
-| `unfilled` | **"what shall we work on next?"** | — | 479 tok |
+| `unfilled` | "what is still at default — and where?" | `field`, `entity` | 583 tok unfiltered, ~50 filtered |
 
 ### `view="arc"` — Character Arc Shape
 
@@ -81,26 +81,51 @@ storage-friendly, but awkward to read at a glance:
                   "feeling": "…", "strength": 0.7, "secret": false}]
 ```
 
-### `view="unfilled"` — What To Work On Next
+### `view="unfilled"` — What Is Still At Default
 
-The inverted map: which optional fields are still at default, per entity. This is
-the one view that answers a *meta* question — "what could we work on next".
+The inverted map: which optional fields are still at default, per entity.
 
-**Ranked and capped at 15 field types.** A 90-scene project produces hundreds of
-unfilled entries, and an unbounded list is a wall the LLM cannot act on. So it
-reports `total_gaps` and `gap_types` alongside the top 15, and says plainly that
-it truncated:
+**Two filters, and they are the point.** Unfiltered, this is a long list
+grouped by field; the two questions worth asking are both lookups against it,
+and each returns a complete answer that is never truncated:
+
+| call | Answers | Size on the live project |
+|---|---|---|
+| `field="character_value_at_close"` | who else is missing this? | 200 chars |
+| `entity="kael"` | what did I skip on this one? | 79 chars |
+| both | both questions at once | 287 chars |
+| unfiltered | the whole picture | 2,330 chars |
+
+`entities` is *who has the gap*; `fields` is *what one entity lacks*. They point
+opposite ways and are different lengths, so neither carries a count — the list
+is the answer.
+
+Unfiltered it reports `total_gaps` and `gap_types` alongside the top 15, and
+says plainly that it truncated:
 
 ```json
-{"view": "unfilled", "total_gaps": 63, "gap_types": 19,
+{"view": "unfilled", "total_gaps": 74, "gap_types": 22,
  "unfilled": [{"field": "goals_long", "count": 6, "entities": [...]}],
- "truncated": true, "shown_types": 15,
- "hint": "19 field types are incomplete; the 15 most common are shown."}
+ "truncated": true, "shown_types": 15, "other_fields": ["mood", "power", …],
+ "hint": "22 field types are incomplete; the 15 most common are shown. … Pass field=<name> for one, or entity=<id> for one entity."}
 ```
 
-Ranking is **structural** (count descending, then field name) — deliberately, per
-decision. A severity model would need a priority order per entity type, and the
-structural signal was judged sufficient.
+A filter that matches nothing returns an **empty list plus a `message`**, not
+silence — an empty list with no explanation reads as "complete" when it usually
+means "you typed the field wrong".
+
+**The ordering is not a priority ranking.** Rows are sorted by count descending
+(structural, per decision), so `goals_long` outranks a real gap on a character
+arc — it is high because nothing writes it, not because it matters more. There
+is no score and no "top N to work on" for the same reason: a count of
+fields-at-default is a fact about the schema, not about the story. To ask about
+a specific field, filter for it.
+
+**Fields empty by design are not gaps.** `variant_of` on a base location or
+world is empty *because it is a base one* — filling it would mean inventing a
+parent that does not exist. It is skipped in `unfilled_fields`, so it reaches
+neither this view nor `story_retrieve`'s per-entity list. Same class as
+`status` and the boolean/number fields.
 
 **Note the gap this view does not cover:** `unfilled_fields` skips *required*
 fields by design, so a required field emptied by a `story_edit` cascade is
@@ -111,6 +136,10 @@ Together the two cover everything.
 
 ## Verification
 
-`tests/test_story_load_views.py` — 24 tests: the base view's shape and growth
-rate, each view's contract, `add_plot` role derivation, the `unfilled` ranking
-and cap, and the unknown-view error listing every valid name.
+`tests/test_story_load_views.py` — the base view's shape and growth rate, each
+view's contract, `add_plot` role derivation, and the unknown-view error listing
+every valid name.
+
+`tests/test_unfilled_truncation.py` — the unfilled view: a filtered answer is
+never truncated, the two filters compose, an empty result says why, and
+`variant_of` is not reported as a gap on either entity type.

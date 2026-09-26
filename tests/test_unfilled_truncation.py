@@ -35,6 +35,76 @@ def unfilled(project):
                 root_path=str(project.parent.parent)))
 
 
+def unfilled_by(project, **kw):
+    from tools.story_load import handler
+    return json.loads(
+        handler({"project": "save-the-children", "view": "unfilled", **kw},
+                root_path=str(project.parent.parent)))
+
+
+def test_a_filtered_answer_is_complete_and_points_both_ways(project):
+    """Asking about one field or entity is what makes the long list readable.
+
+    The cap exists because ~20 field types do not fit. A filtered answer has
+    no such problem, so it must not inherit the truncation machinery — no
+    `other_fields`, no `truncated`, and no list that could have been cut.
+
+    The two filters are the two directions of one question and compose:
+    `entities` is who has the gap, `fields` is what one entity lacks.
+    """
+    from core.db import get_unfilled_map
+    known = get_unfilled_map(project)
+    dropped = unfilled(project)["other_fields"][0]
+    assert dropped in known, "the omitted field must still be a real gap"
+
+    by_field = unfilled_by(project, field=dropped)
+    assert "truncated" not in by_field and "other_fields" not in by_field
+    assert by_field["entities"] == known[dropped], "field= must be a lookup, not a sample"
+
+    entity = by_field["entities"][0]
+    by_entity = unfilled_by(project, entity=entity)
+    assert "truncated" not in by_entity and "other_fields" not in by_entity
+    assert by_entity["fields"] == sorted(
+        f for f, ids in known.items() if entity in ids)
+
+    both = unfilled_by(project, field=dropped, entity=entity)
+    assert both["entities"] == known[dropped]
+    assert dropped in both["fields"], "the two filters answer opposite questions"
+
+
+def test_a_filter_that_matches_nothing_says_so(project):
+    """An empty list with no explanation reads as "complete", not "you typo'd"."""
+    for kw in ({"field": "no_cast"}, {"field": "not_a_real_field"}):
+        empty = unfilled_by(project, **kw)
+        key = "entities" if "field" in kw else "fields"
+        assert empty[key] == [], empty
+        assert "message" in empty, f"{kw} returned an empty list with no explanation"
+
+    complete = unfilled_by(project, entity="no-such-entity")
+    assert complete["fields"] == [] and "message" in complete
+
+
+def test_a_field_that_is_empty_by_design_is_not_a_gap():
+    """`variant_of` is empty ON a base location or world — that is what a base
+    one is. Reported as unfilled, every project carries the gap forever and
+    "fixing" it means inventing a parent that does not exist.
+    """
+    from core.constants import ENTITY_SCHEMAS
+    from core.entity import unfilled_fields
+    for entity_type in ("location", "world"):
+        assert "variant_of" in ENTITY_SCHEMAS[entity_type], \
+            f"{entity_type} lost variant_of — this guard is about the field, not the type"
+        assert "variant_of" not in unfilled_fields(entity_type, {}), \
+            f"{entity_type}.variant_of is reported as a gap on a base entity"
+
+
+def test_a_field_that_is_filled_by_hand_is_still_not_a_gap():
+    """The skip is unconditional — a real variant relationship is not a gap
+    either, and neither state should reach the view."""
+    from core.entity import unfilled_fields
+    assert "variant_of" not in unfilled_fields("location", {"variant_of": "the-i"})
+
+
 def test_omitted_fields_are_named(project):
     """When the view truncates, it must say which fields it dropped."""
     data = unfilled(project)
@@ -45,6 +115,9 @@ def test_omitted_fields_are_named(project):
     assert shown and dropped
     assert not (shown & dropped), "a field cannot be both shown and omitted"
     assert len(data["unfilled"]) + len(data["other_fields"]) == data["gap_types"]
+    # The hint must point at how to ask about one, or the caller is left with a
+    # list it cannot act on and no way to get past the cap.
+    assert "field=" in data["hint"] and "entity=" in data["hint"], data["hint"]
 
 
 def test_a_gap_is_never_silently_absent(project):

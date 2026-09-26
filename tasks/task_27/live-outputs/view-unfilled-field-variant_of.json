@@ -1,0 +1,6 @@
+{
+  "view": "unfilled",
+  "field": "variant_of",
+  "entities": [],
+  "message": "'variant_of' is missing on no entity — either it is filled everywhere, or it is not a field. story_describe lists the fields that exist."
+}

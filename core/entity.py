@@ -211,6 +211,11 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
         # Skip computed fields — derived at read time, not persisted
         if meta.get("computed"):
             continue
+        # variant_of is empty ON a base location or world — that is what a base
+        # one is. Reporting it is noise: every project would carry the gap
+        # forever and filling it means inventing a parent that does not exist.
+        if field == "variant_of":
+            continue
         # status: workflow state, always emitted, never "unfilled"
         # boolean/number: binary or scalar values, not "unfilled"
         if (field == "status"
