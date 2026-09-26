@@ -1,0 +1,49 @@
+{
+  "view": "story_value",
+  "act": "act-1",
+  "story_value": "Trust",
+  "story_value_at_open": "positive",
+  "story_value_at_close": "ironic",
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "value_at_open": "positive",
+      "value_at_close": "negative",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "value_at_open": "positive",
+          "value_at_close": "negative",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "value_at_open": "positive",
+              "value_at_close": "negative",
+              "shift": "trust → suspicion",
+              "y": -0.4
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "value_at_open": "negative",
+              "value_at_close": "positive",
+              "shift": "suspicion → self-trust",
+              "y": 0.3
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "value_at_open": "positive",
+              "value_at_close": "positive",
+              "shift": "self-trust → earned trust in each other",
+              "y": 0.7
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

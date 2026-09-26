@@ -11,9 +11,9 @@ project:
   status: active
   spine: A young person discovers the truth about their world and chooses to escape
   controlling_idea: Freedom requires sacrifice
-  value: Trust
-  value_at_open: positive
-  value_at_close: negative
+  story_value: Trust
+  story_value_at_open: positive
+  story_value_at_close: negative
   inciting_incident_scene_id: central-room-day
   story_climax_scene_id: central-room-night
   structure_type: Classical
@@ -33,9 +33,9 @@ characters:
     minds even knowing the bodies would never come.
   story_role: Supporting
   arc_type: negative
-  arc_value: Redemption
-  arc_value_at_open: positive
-  arc_value_at_close: negative
+  character_value: Redemption
+  character_value_at_open: positive
+  character_value_at_close: negative
   arc_complete: true
   sections:
   - Personality
@@ -315,7 +315,6 @@ acts:
   title: Act One
   order: 1
   status: in-progress
-  value: Trust
   value_at_open: positive
   value_at_close: negative
   climax_scene_id: central-room-night
@@ -348,7 +347,6 @@ sequences:
   order: 1
   status: in-progress
   act_id: act-1
-  value: Trust
   value_at_open: positive
   value_at_close: negative
   climax_scene_id: central-room-night
@@ -389,7 +387,6 @@ scenes:
   plots:
   - id: the-resistance
     beat: setup
-  value: Trust
   value_at_open: positive
   value_at_close: negative
   conflict_levels:
@@ -445,7 +442,6 @@ scenes:
   plots:
   - id: the-resistance
     beat: setup
-  value: Trust
   value_at_open: negative
   value_at_close: positive
   conflict_levels:
@@ -501,7 +497,6 @@ scenes:
   plots:
   - id: the-resistance
     beat: payoff
-  value: Trust
   value_at_open: positive
   value_at_close: positive
   conflict_levels:

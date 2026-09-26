@@ -1,0 +1,190 @@
+{
+  "view": "relationship",
+  "relationships": [
+    {
+      "id": "dr-elena-voss-marcus-chen",
+      "name": "Dr. Elena Voss & Marcus Chen",
+      "status": "complex",
+      "characters": [
+        "dr-elena-voss",
+        "marcus-chen"
+      ],
+      "scenes": [
+        "the-core-day"
+      ],
+      "perspectives": [
+        {
+          "character": "dr-elena-voss",
+          "type": "ally",
+          "label": "Colleague",
+          "feeling": "Respects him more for disagreeing than she ever said",
+          "strength": 0.6,
+          "secret": false
+        },
+        {
+          "character": "marcus-chen",
+          "type": "ally",
+          "label": "Colleague, friend",
+          "feeling": "The one he cannot forgive but cannot abandon",
+          "strength": 0.4,
+          "secret": false
+        }
+      ]
+    },
+    {
+      "id": "kael-dr-elena-voss",
+      "name": "Kael & Dr. Elena Voss",
+      "status": "active",
+      "characters": [
+        "kael",
+        "dr-elena-voss"
+      ],
+      "scenes": [
+        "central-room-day",
+        "central-room-night"
+      ],
+      "perspectives": [
+        {
+          "character": "dr-elena-voss",
+          "type": "ally",
+          "label": "The saved child",
+          "feeling": "Watches from the system, unable to intervene, unable to look away",
+          "strength": 0.8,
+          "secret": false
+        },
+        {
+          "character": "kael",
+          "type": "ally",
+          "label": "Watcher",
+          "feeling": "Senses her presence but cannot name it",
+          "strength": 0.3,
+          "secret": false
+        }
+      ]
+    },
+    {
+      "id": "kael-mira",
+      "name": "Kael & Mira",
+      "status": "active",
+      "characters": [
+        "kael",
+        "mira"
+      ],
+      "scenes": [
+        "central-room-day",
+        "central-room-night"
+      ],
+      "perspectives": [
+        {
+          "character": "kael",
+          "type": "family",
+          "label": "Closest friend",
+          "feeling": "Trusts her feelings more than their own logic",
+          "strength": 0.9,
+          "secret": false
+        },
+        {
+          "character": "mira",
+          "type": "romantic",
+          "label": "Friend, anchor",
+          "feeling": "Understands his silences better than his words",
+          "strength": 0.7,
+          "secret": true
+        }
+      ]
+    },
+    {
+      "id": "kael-the-administrator",
+      "name": "Kael & The Administrator",
+      "status": "active",
+      "characters": [
+        "kael",
+        "the-administrator"
+      ],
+      "scenes": [
+        "central-room-day",
+        "central-room-night"
+      ],
+      "perspectives": [
+        {
+          "character": "kael",
+          "type": "enemy",
+          "label": "Antagonist",
+          "feeling": "Pities them — which is worse than hate",
+          "strength": -0.3,
+          "secret": false
+        },
+        {
+          "character": "the-administrator",
+          "type": "rival",
+          "label": "Anomaly",
+          "feeling": "The one who questions",
+          "strength": -0.6,
+          "secret": false
+        }
+      ]
+    },
+    {
+      "id": "marcus-chen-kael",
+      "name": "Marcus Chen & Kael",
+      "status": "active",
+      "characters": [
+        "marcus-chen",
+        "kael"
+      ],
+      "scenes": [
+        "central-room-day",
+        "the-core-day"
+      ],
+      "perspectives": [
+        {
+          "character": "kael",
+          "type": "ally",
+          "label": "Unknown",
+          "feeling": "",
+          "strength": 0.0,
+          "secret": false
+        },
+        {
+          "character": "marcus-chen",
+          "type": "ally",
+          "label": "Proof",
+          "feeling": "The argument he made at the gates, still breathing",
+          "strength": 0.8,
+          "secret": false
+        }
+      ]
+    },
+    {
+      "id": "mira-the-administrator",
+      "name": "Mira & The Administrator",
+      "status": "active",
+      "characters": [
+        "mira",
+        "the-administrator"
+      ],
+      "scenes": [
+        "central-room-night",
+        "the-door-closes"
+      ],
+      "perspectives": [
+        {
+          "character": "mira",
+          "type": "enemy",
+          "label": "Adversary",
+          "feeling": "Understands them better than Kael does, which makes her more dangerous",
+          "strength": -0.5,
+          "secret": true
+        },
+        {
+          "character": "the-administrator",
+          "type": "rival",
+          "label": "Wildcard",
+          "feeling": "Too intuitive to predict",
+          "strength": -0.4,
+          "secret": false
+        }
+      ]
+    }
+  ]
+}

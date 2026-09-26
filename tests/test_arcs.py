@@ -52,12 +52,17 @@ class TestArcValidation:
         })
         assert any("Invalid arc_type" in w for w in warnings)
 
-    def test_validate_character_arc_value_enums(self):
+    def test_validate_character_value_enums(self):
         warnings = validate_entity("character", {
             "name": "T", "story_role": "Protagonist", "one_sentence": "X",
-            "arc_value_at_open": "positive", "arc_value_at_close": "negative"
+            "character_value_at_open": "positive", "character_value_at_close": "negative"
         })
         assert not any("Invalid" in w for w in warnings)
+        bad = validate_entity("character", {
+            "name": "T", "story_role": "Protagonist", "one_sentence": "X",
+            "character_value_at_open": "sideways"
+        })
+        assert any("Invalid character_value_at_open: sideways" in w for w in bad)
 
     def test_arc_schema_has_all_fields(self):
         arc_schema = ENTITY_SCHEMAS["arc_beat"]
@@ -69,7 +74,7 @@ class TestArcValidation:
     def test_character_schema_has_arc_fields(self):
         char_schema = ENTITY_SCHEMAS["character"]
         assert "arc_type" in char_schema
-        assert "arc_value" in char_schema
+        assert "character_value" in char_schema
         assert "arc_complete" in char_schema
 
 

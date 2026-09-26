@@ -132,7 +132,7 @@ DASH.buildGraphView = function() {
     if (!char) return;
     const role = char.role || char.story_role || '';
     const arcType = char.arc_type || 'absent';
-    const arcValue = char.arc_value || '';
+    const arcValue = char.character_value || '';
     const arcBeatCount = char.arc_beats_list ? char.arc_beats_list.length : 0;
     const tt = document.getElementById('arc-beat-tooltip');
     if (!tt) return;

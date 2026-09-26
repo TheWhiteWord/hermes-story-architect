@@ -67,17 +67,23 @@ McKee defines the structural hierarchy by **scale of value change**, not by diff
 
 ### What this means for our system
 
-Mckean theory does NOT require:
+McKeean theory does NOT require:
 - Each level to use the same value word
 - Act values to be "children" of story values
 - Scene values to map 1:1 to act values
 
-Mckean theory DOES require:
+McKeean theory DOES require:
 - Each level creates **progressively larger** value reversals
 - The story climax delivers the **largest, irreversible** value change
 - Values are **thematically related** across levels (not random)
 
-**Conclusion for Q4 (hierarchy):** Values should be **independent at each level** but **thematically coherent** across levels. The LLM should be able to see the thematic link without enforcing a rigid parent-child relationship.
+**Conclusion:** the hierarchy is about the *size* of the reversal, and that is
+what our charge fields record — the story's value word is stated once and every
+level charges it with a progressively larger swing. The thematic "rhyme" between
+a scene's turn and a larger reversal is real, and it is where a second value
+word legitimately appears: on a **character**, as their own track (see §8). It is
+not recorded as a second value on a story container, and it is not derived by a
+rule — it is a judgement made while writing.
 
 ---
 
@@ -116,7 +122,7 @@ Two forces in tension:
 - **Structure's job:** Create progressively increasing pressures (value turns)
 - **Character's job:** Make credible choices under that pressure
 
-The character arc is NOT a separate thing from structural values — it's **how the character's internal value changes as external structure turns the screws**.
+The character arc is how a character's *own* value changes as the external structure turns the screws. The two tracks are recorded separately — the story's charges on story containers, the character's on the character and their beats — and neither is computed from the other. The pressure is real even when the value word is not shared.
 
 ### McKee's arc types (implied, not named)
 - **Positive arc:** Character moves from negative to positive value (disillusionment → hope)
@@ -143,11 +149,13 @@ This means arc beats encode:
 
 > **Controlling Idea:** Expressed in a single sentence describing *how and why life changes* from beginning to end.
 
-The controlling idea is the **story-level value statement**. It's built from the value charge at open and close:
+The controlling idea is the **story-level value statement** — the story track, read from `story_value_at_open` and `story_value_at_close`:
 
 - **Idealistic (up-ending):** "Value moves from negative to positive" → hope, optimism
 - **Pessimistic (down-ending):** "Value moves from positive to negative" → loss, cynicism
 - **Ironic (up/down):** "Value appears to move one way but actually moves the other" → complexity
+
+It is a statement about the *story's* value. A character's arc is a separate track and does not have to agree with it.
 
 The controlling idea emerges FROM the arc — it's not imposed before writing. The LLM can propose one after analyzing the climaxes, but it should be treated as a hypothesis, not a constraint.
 
@@ -163,33 +171,89 @@ When reasoning about values in features:
 
 3. **Values escalate through the P/C/CD/NN schema.** Don't jump from [P] to [CD] — move through [C] first. Save [NN] for crisis/climax.
 
-4. **Character arc = structural value turned inward.** When designing an arc beat, ask: what value is at stake for THIS character, how is it charged, and how does this beat change that charge?
+4. **Character arc = structural value turned inward.** When designing an arc beat, ask: what value is at stake for THIS character, how is it charged, and how does this beat change that charge? Answer the last two on the character's own value, which need not be the story's.
 
-5. **Independence with thematic coherence.** Act values don't need to match project values word-for-word, but they must rhyme. "Trust → Betrayal" at project level can play out as "Certainty → Doubt" in Act 1, "Loyalty → Treason" in Act 2, "Justice → Corruption" in Act 3.
+5. **Progressive size, one word per track.** The story's value word is stated once on the project and inherited downward — a scene does not get to name a different one. What grows down the hierarchy is the *size* of the reversal. A character, by contrast, states their own value word once, and it may differ from the story's: that is the second track, recorded independently, not a mismatch.
 
 6. **The controlling idea is the arc's thesis.** After arc beats are designed, the controlling idea should be derivable from the value journey — not the other way around.
 
 ---
 
-## 8. Value Fields in Our System
+## 8. Two Tracks — Story Value and Character Value
 
-Current state across entity types:
+There are **two** value tracks, and they are not the same thing.
 
-| Entity | Fields | Status |
-|--------|--------|--------|
-| Project | `value`, `value_at_open`, `value_at_close`, `structure_type`, `spine`, `controlling_idea` | ✅ Present |
-| Act | `value`, `value_open`, `value_close` | ✅ Present |
-| Sequence | `value`, `value_open`, `value_close` | ✅ Present |
-| Scene | `value`, `value_open`, `value_close`, `conflict_levels`, `dramatic_role` | ✅ Present |
-| Character | None | ❌ Missing |
+| Track | Whose value it is | Stated once, on | Inherited by |
+|-------|-------------------|-----------------|-------------|
+| **Story value** | the thematic exploration the whole work is about | `project` | act, sequence, scene |
+| **Character value** | what one person's arc explores | `character` | their arc beats |
 
-What character arc needs (derived from theory):
-- `arc_value` — the value that changes for this character
-- `arc_value_at_open` / `arc_value_at_close` — starting/ending charge
-- `arc_type` — positive/negative/flat/ironic
-- Arc beats that encode: action → gap → choice → value shift
+Kael's `Freedom` inside a story about `Trust` is not a contradiction and not a
+sub-theme. It is the second track: a protagonist's arc may run on a different
+value from the story's, and that is often the point. The two are recorded
+independently, and how they relate is a judgement made while writing, not a
+fact stored in the data.
 
-These are **not structural values** — they're the character's personal value journey that plays out within the structural pressure.
+**The vocabulary is shared.** Same value words, same charge words
+(`positive`, `negative`, `mixed`, `ironic`) on both tracks. The field name says
+whose arc it is. There is no separate naming scheme for character values, and
+nothing in either name implies one track is derived from the other.
+
+### The field table
+
+| scope | value word | charge | reading | curve |
+|---|---|---|---|---|
+| `project` | `story_value` | `story_value_at_open` / `_close` | — | — |
+| `act` / `sequence` | *inherited* | `value_at_open` / `_close` | — | — |
+| `scene` | *inherited* | `value_at_open` / `_close` | `shift` | `y` |
+| `character` | `character_value` | `character_value_at_open` / `_close` | — | — |
+| `arc_beat` | *inherited* | `character_value_at_open` / `_close` | `shift` | `y` |
+
+Two rules hold this together:
+
+1. **The value word is stated once per track and inherited downward.** There is
+   no value word field on act, sequence, scene or arc beat. Every one of them
+   charges the word its track already declared.
+2. **The charge is per-entity, everywhere, on both tracks.** `value_at_open` /
+   `_close`, `shift` and `y` are never inherited. A charge is a property of
+   *this* scene, *this* beat — that is where the story turns, so it is recorded
+   where the turn happens.
+
+`shift` and `y` are unprefixed on both tracks on purpose: the prefix is only
+needed where the ambiguity lives, which is the *identity* of the value. Each
+entity carries exactly one track, so its shift and charge have one possible
+owner.
+
+The character carries no `shift` / `y` — it is the promise (where the arc must
+start and end), not a sampled point. The beats are the path.
+
+### A scene cannot introduce a second theme
+
+If a scene seems to turn on a value word that is not the story's, that word
+belongs somewhere else:
+
+- it is a **character value** — record it on that character and their beats, and
+  charge the story value in the scene
+- it is a **plot concern** — a genuine subplot with its own theme belongs to
+  `plot`, not to a value field
+
+Do not open a new value in a scene. There is no field for it, by design: a
+second theme in a story-container field is almost always a character's value
+recorded in the wrong place.
+
+### What `shift` and `y` add on top of the charge pair
+
+Three different kinds of data, all kept:
+
+| | what it is | example |
+|---|---|---|
+| `value_at_open` / `_close` | a measurement on the charge scale | `positive → negative` |
+| `y` | the ending charge — the point a curve passes through | `-0.3` |
+| `shift` | the dramaturgical reading, in the story's language | `suspicious doubt → active defiance` |
+
+The charge pair is instrumentation; `shift` is the finding, and the one a
+writer actually uses. `y` is the only one of the three that can be interpolated,
+which is why the graph plots it.
 
 ---
 
@@ -216,12 +280,12 @@ Each arc beat should encode **four elements** without becoming verbose:
 
 ### The Four Elements
 
-| Element | What it captures | Example (Trust → Betrayal) |
+| Element | What it captures | Example (this character's own value: Trust → Betrayal) |
 |---------|------------------|----------------------------|
 | **Action** | What the character tries (their move in the argument) | "Mara asks Oak directly about the discrepancy" |
 | **Gap** | Unexpected reaction that disconfirms their expectation | "He lies smoothly — and she realizes he's been lying for months" |
 | **Choice** | What they do next (reveals true character under pressure) | "She nods, says nothing, files the report herself" |
-| **Value shift** | How the value charge changes as a result | Trust → Doubt (positive → contrary) |
+| **Value shift** | How *this character's* value charge changes as a result | Trust → Doubt (positive → mixed) |
 
 ### The Gap is the Core
 
@@ -253,7 +317,7 @@ The four elements should fit in **3-5 short lines**:
 - Action: Mara asks Oak directly about the discrepancy.
   Gap: He lies smoothly — she realizes he's been lying for months.
   Choice: She nods, says nothing, files the report herself.
-  Shift: Trust → Doubt (positive → contrary)
+  Shift: Trust → Doubt (positive → mixed)
 ```
 
 Not:
@@ -283,7 +347,9 @@ Each beat file (`arcs/{character}/{beat_id}.md`) uses these fields:
 | `gap` | Expectation vs reality | One sentence, the surprise |
 | `choice` | True character revealed | One sentence, what they do next |
 | `shift` | Value charge change | Format: `"positive → mixed"` or `"negative → ironic"` |
-| `y` | Numeric value of the shift | -1.0 to +1.0, derived from Shift |
+| `character_value_at_open` | Charge entering this beat | `positive`, `negative`, `mixed`, `ironic` |
+| `character_value_at_close` | Charge leaving this beat | `positive`, `negative`, `mixed`, `ironic` |
+| `y` | **Ending** charge after the shift, −1.0 to +1.0 | Derived from `shift`; see below |
 | `order` | Position in arc sequence | 1, 2, 3... (explicit, not derived) |
 | `is_crisis` | Major reversal marker | `true` only for sequence/act climax beats |
 | `is_climax` | Arc completion marker | `true` only for the final beat of the arc |
@@ -295,10 +361,14 @@ On the character file, these fields describe the overall arc:
 | Field | Theory Source | What to Write |
 |-------|---------------|---------------|
 | `arc_type` | Arc trajectory type | `positive`, `negative`, `flat`, `ironic`, or `absent` |
-| `arc_value` | The value that changes for this character | Same value word as the story's value, or a thematic variant |
-| `arc_value_at_open` | Starting charge | `positive`, `negative`, `mixed`, `ironic` |
-| `arc_value_at_close` | Ending charge | `positive`, `negative`, `mixed`, `ironic` |
+| `character_value` | The value this character's arc explores | Same vocabulary as the story's value, or a different one. **May differ from the story's** — that is the second track, not an error |
+| `character_value_at_open` | Starting charge — the promise | `positive`, `negative`, `mixed`, `ironic` |
+| `character_value_at_close` | Ending charge — the promise | `positive`, `negative`, `mixed`, `ironic` |
 | `arc_complete` | Whether arc is finished | `true` when all beats are designed |
+
+The character's open/close are the **promise** — where this journey must start
+and end. The beats are the **path**, and the path is allowed to wobble, because
+the wobble is the drama.
 
 ### Arc Type Decision Logic
 
@@ -340,7 +410,9 @@ action: "Elena makes the call — save the minds, abandon the bodies."
 gap: "She expects relief. She gets silence."
 choice: "She does not explain herself. She signs the order."
 shift: "positive → negative"
-y: 0.8
+character_value_at_open: positive
+character_value_at_close: negative
+y: -0.8
 order: 1
 is_crisis: false
 is_climax: false
@@ -375,11 +447,26 @@ The `shift` line is linguistic. The `y` field is numeric. The LLM derives `y` fr
 |---------------|------------|----------|---------------|
 | `positive → mixed` | +1.0 | +0.3 to 0.0 | Start high, move slightly negative |
 | `mixed → negative` | +0.3 | -0.5 to -0.8 | Cross zero into negative |
-| `positive → negative` | +1.0 | -1.0 | Full reversal — only for crisis/climax |
+| `positive → negative` | +1.0 | -0.8, or -1.0 at crisis/climax | Full reversal — reserve the bottom of the scale for the crisis |
 | `negative → ironic` | -0.5 | *true* -0.5, surface +0.5 | Ironic: store true charge, mark shift as ironic |
 | `flat arc` | +0.8 | +0.7 | Small movement, character holds [P] |
 
-**Practical rule:** The `y` value is the ENDING charge after this beat's shift. If the shift is "positive → mixed" and the character started at +1.0, the `y` is where they land (e.g., +0.3).
+**The `y` value is the ENDING charge after this shift.** If the shift is
+`positive → mixed` and the character started at +1.0, the `y` is where they land
+(e.g. `+0.3`) — not the start.
+
+**Sign convention:** `y` is signed like the charge word. `positive` is above
+zero, `negative` below, `mixed` and `ironic` in between. A `shift` of
+`positive → negative` with `y: +0.3` is a contradiction, not a nuance.
+
+**The same rule holds on a scene.** A scene's `y` is its ending charge after the
+scene's own turn, signed the same way, and it is the point the story-value curve
+passes through. The story side of a scene and the character side of a beat are
+read the same way.
+
+**A missing `y` is not `0.0`.** `0.0` is a charge a writer can choose; a scene
+or beat with no recorded turn has no `y`, and the graph draws no point for it.
+Never write `y: 0.0` to fill the gap.
 
 ### Arc Design Checklist
 
@@ -387,18 +474,27 @@ Before writing beat files, the LLM should:
 
 1. **Choose which characters get arcs** — protagonist always, antagonist usually, supporting if they change, minor/cameo = `absent`
 2. **Determine arc_type** — look at the character's journey across all scenes
-3. **Identify arc_value** — what value is at stake for THIS character (may differ from story value)
+3. **Identify `character_value`** — what value is at stake for THIS character. It may be a different word from the story's; that is the second track, not a problem to solve
 4. **Map beats to scenes** — which scenes show this character changing?
 5. **Check P/C/CD/NN escalation** — beats should escalate through the schema, not jump
 6. **Verify crisis/climax placement** — crisis should be a major reversal, climax should resolve the arc
 
 After writing beats, verify:
 - [ ] Beat count matches `arc_beat_count` on character
-- [ ] `arc_value_at_open` matches first beat's starting charge
-- [ ] `arc_value_at_close` matches last beat's ending charge
+- [ ] Every beat records its own `character_value_at_open` / `_close` — the charge pair is per-beat, never inherited
+- [ ] Every beat's `y` is the **ending** charge, and its sign matches its `shift`
 - [ ] Crisis beats have `is_crisis: true`
 - [ ] Climax beat has `is_climax: true`
 - [ ] Y values follow a gradual trend (not too jagged, not too flat)
+
+**Do not add a continuity check the beats did not earn.** Do not require
+`character_value_at_open` to equal the first beat's opening charge, or
+`character_value_at_close` to equal the last beat's ending `y`. A value can move
+*consequentially*, with no turn on screen — a scene the character is absent from
+can shift what they believe. When the beats and the promise disagree, that is
+information: it means the design needs adjusting, sometimes by rewriting scenes,
+sometimes by reshaping the arc itself. It is a judgement made while writing, not
+a mismatch a tool reports.
 
 ---
 
@@ -420,15 +516,19 @@ After writing beats, verify:
 | `negative` | `-1.0` | [CD] |
 | `ironic` (surface) | *opposite of true* | [NN] — use true charge + irony flag |
 
-For irony: store the **true** charge numerically, mark `ironic: true`. The dashboard can render irony as a dashed line or different color. This keeps the graph honest to the character's real journey.
+For irony: store the **true** charge numerically, and say so in the `shift` line
+(`"negative → ironic"`). There is no `ironic: true` field — irony is carried by
+the charge word and the shift line, and `y` holds the true charge. This keeps the
+graph honest to the character's real journey.
 
 ### Why This Works
 
 Each beat becomes a point `(x, y)` where:
 - `x` = narrative position (0.0 to 1.0, by scene order)
-- `y` = that beat's value charge (-1.0 to +1.0)
+- `y` = that beat's **ending** value charge (-1.0 to +1.0)
 
-Connecting the points gives you the **arc wave**.
+Connecting the points gives you the **arc wave**. Scenes plot the same way on the
+same scale, in story order — one engine, two sources.
 
 ### Decoding Math Back to Language
 
@@ -460,18 +560,22 @@ The beat stores both the linguistic description **and** the numeric encoding:
 - Action: Mara asks Oak directly about the discrepancy.
   Gap: He lies smoothly — she realizes he's been lying for months.
   Choice: She nods, says nothing, files the report herself.
-  Shift: Trust → Doubt (positive → contrary)
+  Shift: Trust → Doubt (positive → mixed)
   Y: +0.3
 ```
 
-The LLM populates `Y` at authoring time, derived from the Shift line. The dashboard reads `Y` directly to plot the curve. No separate derivation pipeline — the LLM does the translation once, the number is stored alongside the language.
+The LLM populates `y` at authoring time, derived from the shift line. The dashboard reads `y` directly to plot the curve. No separate derivation pipeline — the LLM does the translation once, the number is stored alongside the language.
 
 ### The Verification Loop
 
-1. LLM designs the beat linguistically (Action/Gap/Choice/Shift)
-2. LLM derives `Y` from the Shift (positive→contrary leaning negative = +0.3)
-3. Dashboard plots the curve from all beats' `Y` values
+1. LLM designs the beat linguistically (action/gap/choice/shift)
+2. LLM derives `y` from the shift — the **ending** charge, signed like the charge word (`positive → mixed` leaning positive = `+0.3`)
+3. Dashboard plots the curve from all beats' `y` values
 4. Human/LLM checks the curve shape: too jagged? too flat? adjust beats
 5. The curve doesn't replace judgment — it **surfaces** problems the language hides
 
 This is the encoding as **lens**, not replacement.
+
+The story track plots through the same loop, from scene `y` values in story
+order. Two tracks, two lines, one engine — and they are read separately, because
+a character turning on `Freedom` is not the story turning on `Trust`.

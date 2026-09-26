@@ -1,0 +1,84 @@
+{
+  "view": "arc",
+  "arcs": [
+    {
+      "character": "kael",
+      "beat_count": 4,
+      "beats": [
+        {
+          "id": "kael-1",
+          "label": "The Unlocked Door",
+          "scene": "central-room-day",
+          "character_value_at_open": "",
+          "character_value_at_close": "",
+          "shift": "entrapment → the first taste of choosing",
+          "y": 0.2,
+          "is_crisis": false,
+          "is_climax": false
+        },
+        {
+          "id": "kael-2",
+          "label": "The Administrator's Offer",
+          "scene": "central-room-night",
+          "character_value_at_open": "",
+          "character_value_at_close": "",
+          "shift": "temptation → chosen discomfort",
+          "y": 0.4,
+          "is_crisis": true,
+          "is_climax": false
+        },
+        {
+          "id": "kael-3",
+          "label": "Into the Real",
+          "scene": "the-core-day",
+          "character_value_at_open": "",
+          "character_value_at_close": "",
+          "shift": "choosing → standing in the real",
+          "y": 0.8,
+          "is_crisis": false,
+          "is_climax": true
+        },
+        {
+          "id": "kael-4",
+          "label": "The Point of No Return",
+          "scene": "the-door-closes",
+          "character_value_at_open": "",
+          "character_value_at_close": "",
+          "shift": "openness → hard-won freedom",
+          "y": 0.6,
+          "is_crisis": false,
+          "is_climax": false
+        }
+      ]
+    },
+    {
+      "character": "mira",
+      "beat_count": 2,
+      "beats": [
+        {
+          "id": "mira-1",
+          "label": "Shared Dreams",
+          "scene": "central-room-night",
+          "character_value_at_open": "",
+          "character_value_at_close": "",
+          "shift": "fear → tentative trust",
+          "y": 0.2,
+          "is_crisis": false,
+          "is_climax": false
+        },
+        {
+          "id": "mira-2",
+          "label": "The Leap",
+          "scene": "the-core-day",
+          "character_value_at_open": "",
+          "character_value_at_close": "",
+          "shift": "tentative trust → grounded faith",
+          "y": 0.6,
+          "is_crisis": false,
+          "is_climax": true
+        }
+      ]
+    }
+  ],
+  "hint": "Pass character=<id> for one arc in full."
+}

@@ -42,8 +42,8 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         if "story_role" in frontmatter and frontmatter["story_role"] not in VALID_ROLES:
             warnings.append(f"Invalid story_role: {frontmatter['story_role']}")
         _validate_enum(frontmatter, "arc_type", ARC_TYPES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "arc_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "arc_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "character_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "character_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
 
     if entity_type == "plot" and "status" in frontmatter:
         if frontmatter["status"] not in VALID_STATUSES:
@@ -53,8 +53,8 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "value_arc", VALUE_ARCS, warnings, empty_ok=True)
 
     if entity_type == "project":
-        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "story_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "story_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
 
     if entity_type == "scene":
@@ -64,6 +64,7 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
+        _validate_y(frontmatter, warnings)
 
     if entity_type == "sequence":
         _validate_enum(frontmatter, "status", SEQUENCE_STATUSES, warnings)
@@ -79,12 +80,10 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_numeric(frontmatter, "order", warnings)
 
     if entity_type == "arc_beat":
-        _validate_numeric(frontmatter, "y", warnings)
         _validate_numeric(frontmatter, "order", warnings)
-        if "y" in frontmatter:
-            y_val = frontmatter["y"]
-            if isinstance(y_val, (int, float)) and not (-1.0 <= float(y_val) <= 1.0):
-                warnings.append(f"y out of range: {y_val} (must be -1.0 to +1.0)")
+        _validate_enum(frontmatter, "character_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "character_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_y(frontmatter, warnings)
 
     if entity_type == "relationship":
         chars = frontmatter.get("characters", [])
@@ -111,6 +110,20 @@ def _validate_enum(frontmatter: dict, field: str, valid: list[str], warnings: li
         return
     if val not in valid:
         warnings.append(f"Invalid {field}: {val}")
+
+
+def _validate_y(frontmatter: dict, warnings: list[str]) -> None:
+    """Append warnings if `y` is present, non-numeric, or outside -1.0…+1.0.
+
+    Every entity carrying a charge curve has a `y`, so the range check lives
+    here rather than being repeated per entity type.
+    """
+    if "y" not in frontmatter:
+        return
+    _validate_numeric(frontmatter, "y", warnings)
+    y_val = frontmatter["y"]
+    if isinstance(y_val, (int, float)) and not (-1.0 <= float(y_val) <= 1.0):
+        warnings.append(f"y out of range: {y_val} (must be -1.0 to +1.0)")
 
 
 def _validate_numeric(frontmatter: dict, field: str, warnings: list[str]) -> None:

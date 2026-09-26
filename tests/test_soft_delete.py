@@ -180,7 +180,7 @@ class TestRestore:
         def snap():
             r = json.loads(handler({
                 "project": "stc", "entity_type": "character", "id": ["kael"],
-                "fields": ["goals_short", "arc_value", "one_sentence"],
+                "fields": ["goals_short", "character_value", "one_sentence"],
                 "sections": ["all"]}, root_path=str(vault)))
             return r["entities"][0]
 

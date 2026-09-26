@@ -5,7 +5,7 @@ import sqlite3
 import yaml
 from pathlib import Path
 
-from .constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT
+from .constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT, ENTITY_SCHEMAS
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS entities (
@@ -151,19 +151,21 @@ def has_schema(conn: sqlite3.Connection) -> bool:
     return {"entities", "relations", "sections", "sections_fts"}.issubset(tables)
 
 
+# Project fields eligible for omission from the base map, i.e. those whose
+# schema default is meaningful noise in a payload. Derived from the schema so
+# a renamed field can never keep its old key here, minus the title-page block:
+# those are screenplay-form fields, not working state, so they never appear in
+# a payload in the first place. `name`/`status` are excluded because the base
+# map emits them unconditionally (see the always_keep in get_project_summary).
+_PROJECT_TITLE_PAGE_FIELDS = {
+    "name", "status",
+    "screenplay_title", "credit", "author", "contact", "draft_date", "draft",
+}
+
 _PROJECT_DEFAULTS = {
-    "logline": "logline not set",
-    "genre": "genre not set",
-    "setting": "not set",
-    "spine": "Spine not set",
-    "controlling_idea": "Controlling Idea not set",
-    "value": "Value not set",
-    "value_at_open": "Opening Value not set",
-    "value_at_close": "Closing Value not set",
-    "structure_type": "Structure Type not set",
-    "act_count": 3,
-    "inciting_incident_scene_id": "Inciting Incident Scene not set",
-    "story_climax_scene_id": "Story Climax Scene not set",
+    k: v["default"]
+    for k, v in ENTITY_SCHEMAS["project"].items()
+    if k not in _PROJECT_TITLE_PAGE_FIELDS
 }
 
 def empty_memory() -> dict:
@@ -285,24 +287,12 @@ def get_project_summary(project_path: Path) -> dict:
         if row:
             proj_name, proj_one_sentence, proj_extra_json = row
             proj_extra = json.loads(proj_extra_json) if proj_extra_json else {}
-            project = {
-                "name": proj_name,
-                "logline": proj_one_sentence,
-                "status": proj_extra.get("status", ""),
-                "genre": proj_extra.get("genre", ""),
-                "setting": proj_extra.get("setting", ""),
-                "spine": proj_extra.get("spine", ""),
-                "controlling_idea": proj_extra.get("controlling_idea", ""),
-                "value": proj_extra.get("value", ""),
-                "value_at_open": proj_extra.get("value_at_open", ""),
-                "value_at_close": proj_extra.get("value_at_close", ""),
-                "structure_type": proj_extra.get("structure_type", ""),
-                "act_count": proj_extra.get("act_count", 3),
-                "inciting_incident_scene_id": proj_extra.get("inciting_incident_scene_id", ""),
-                "story_climax_scene_id": proj_extra.get("story_climax_scene_id", ""),
-            }
+            project = {"name": proj_name, "logline": proj_one_sentence, "status": proj_extra.get("status", "")}
+            # name/logline/status are set above; the rest come from extra.
+            project.update({k: proj_extra.get(k, "") for k in _PROJECT_DEFAULTS if k not in project})
+            project["act_count"] = proj_extra.get("act_count", 3)
             project = {k: v for k, v in project.items()
-                       if k in ("status", "act_count") or (v and v != _PROJECT_DEFAULTS.get(k))}
+                       if k in ("name", "status", "act_count") or (v and v != _PROJECT_DEFAULTS.get(k))}
         else:
             project = {"name": "Unknown", "logline": "", "status": ""}
 
@@ -373,9 +363,9 @@ def get_project_summary(project_path: Path) -> dict:
                     "id": eid, "name": name, "one_sentence": one_sentence,
                     "story_role": extra.get("story_role", ""),
                     "arc_type": extra.get("arc_type", "Arc type not set"),
-                    "arc_value": extra.get("arc_value", "Arc value not set"),
-                    "arc_value_at_open": extra.get("arc_value_at_open", "Not set"),
-                    "arc_value_at_close": extra.get("arc_value_at_close", "Not set"),
+                    "character_value": extra.get("character_value", "Arc value not set"),
+                    "character_value_at_open": extra.get("character_value_at_open", "Not set"),
+                    "character_value_at_close": extra.get("character_value_at_close", "Not set"),
                 }
             elif etype == "plot":
                 plots[eid] = {
@@ -516,13 +506,14 @@ def get_project_summary(project_path: Path) -> dict:
                 "one_sentence": char["one_sentence"],
                 "story_role": char["story_role"],
                 "arc_type": char["arc_type"],
-                "arc_value": char["arc_value"],
-                "arc_value_at_open": char["arc_value_at_open"],
-                "arc_value_at_close": char["arc_value_at_close"],
+                "character_value": char["character_value"],
+                "character_value_at_open": char["character_value_at_open"],
+                "character_value_at_close": char["character_value_at_close"],
                 "relationships": char_rel_summary.get(char_id, []),
             }
-            return _omit(result, {"arc_type": "Arc type not set", "arc_value": "Arc value not set",
-                                  "arc_value_at_open": "Not set", "arc_value_at_close": "Not set", "relationships": []})
+            return _omit(result, {"arc_type": "Arc type not set", "character_value": "Arc value not set",
+                                  "character_value_at_open": "Not set", "character_value_at_close": "Not set",
+                                  "relationships": []})
 
         # ── Build plot output ──
         def _build_plot(plot_id):
@@ -725,6 +716,8 @@ def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
                 "id": row[0],
                 "label": row[1],
                 "scene": json.loads(row[2]).get("scene", "") if row[2] else "",
+                "character_value_at_open": json.loads(row[2]).get("character_value_at_open", "") if row[2] else "",
+                "character_value_at_close": json.loads(row[2]).get("character_value_at_close", "") if row[2] else "",
                 "shift": json.loads(row[2]).get("shift", "") if row[2] else "",
                 "y": json.loads(row[2]).get("y", 0.0) if row[2] else 0.0,
                 "is_crisis": json.loads(row[2]).get("is_crisis", False) if row[2] else False,
@@ -732,6 +725,65 @@ def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
             }
             for row in rows
         ]
+    except Exception:
+        return []
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def _has_charge(extra: dict) -> bool:
+    return bool(extra.get("value_at_open") or extra.get("value_at_close"))
+
+
+def get_value_drift(project_path: Path) -> list[dict]:
+    """Return story containers with no charge whose children carry one.
+
+    A missing charge is already a gap row in `get_unfilled_map` — this reports
+    the fact that row cannot: that the container is empty *while its children
+    are not*. Filling the container is then a judgement call about scope, not a
+    mechanical copy, and this deliberately stops short of proposing a value.
+
+    Not a continuity check: it never compares a child's charge to its
+    container's, only whether one was recorded. See the Continuity section of
+    tasks/task_27/implementation-plan.md for why no such check ships.
+    """
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return []
+    conn = None
+    try:
+        conn = sqlite3.connect(str(db_path))
+        # child_id -> number of its own children that carry a charge
+        charged_children = {}
+        for cid, _ok, extra_json in conn.execute(
+            "SELECT id, order_key, extra FROM entities "
+            "WHERE type IN ('sequence','scene') AND is_deleted=0"
+        ):
+            if _has_charge(json.loads(extra_json or "{}")):
+                charged_children[cid] = 1
+        containers = conn.execute(
+            "SELECT id, type, extra FROM entities "
+            "WHERE type IN ('act','sequence') AND is_deleted=0"
+        ).fetchall()
+        drift = []
+        for cid, ctype, extra_json in containers:
+            if _has_charge(json.loads(extra_json or "{}")):
+                continue
+            # An act is charged by its sequences, a sequence by its scenes.
+            child_type = "sequence" if ctype == "act" else "scene"
+            n = 0
+            for (kid,) in conn.execute(
+                "SELECT id FROM entities WHERE type=? AND parent_id=? AND is_deleted=0",
+                (child_type, cid),
+            ):
+                n += charged_children.get(kid, 0)
+            if n:
+                drift.append({"id": cid, "type": ctype, "descendants_with_charges": n})
+        return drift
     except Exception:
         return []
     finally:
@@ -1035,6 +1087,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["action"] = extra.get("action", "")
                 d["choice"] = extra.get("choice", "")
                 d["gap"] = extra.get("gap", "")
+                d["character_value_at_open"] = extra.get("character_value_at_open", "")
+                d["character_value_at_close"] = extra.get("character_value_at_close", "")
                 d["shift"] = extra.get("shift", "")
                 d["y"] = extra.get("y", 0.0)
                 d["is_crisis"] = extra.get("is_crisis", False)
@@ -1069,6 +1123,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                         "id": a.get("id", ""),
                         "label": a.get("label", ""),
                         "scene": a.get("scene", ""),
+                        "character_value_at_open": a.get("character_value_at_open", ""),
+                        "character_value_at_close": a.get("character_value_at_close", ""),
                         "shift": a.get("shift", ""),
                         "y": a.get("y", 0.0),
                         "order": a.get("order", 0),

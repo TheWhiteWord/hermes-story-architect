@@ -132,11 +132,9 @@
   justify-content: space-between;
   margin-bottom: 12px;
 }
-.arc-graph-title {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: var(--foreground);
-}
+/* The title borrows .panel-section-label (the "Cast" style) and only needs its
+   margin reset — the header is a flex row, not a stacked section. */
+.arc-graph-title { margin-bottom: 0; }
 .arc-controls { display: flex; gap: 6px; align-items: center; }
 .arc-graph-wrap {
   background: var(--card);
@@ -167,6 +165,8 @@
 }
 .arc-legend .legend-item:hover, .arc-legend .legend-item.active { color: var(--foreground); }
 .arc-legend .legend-item.muted { opacity: 0.35; }
+.arc-legend .legend-item.static { cursor: default; }
+.arc-legend .legend-item.static:hover { color: var(--muted-foreground); }
 .arc-legend .legend-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
@@ -210,6 +210,11 @@
 .arc-act-band.odd { fill: rgba(255,255,255,0.04); }
 .arc-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: opacity 200ms; }
 .arc-line.muted { opacity: 0.15; }
+/* The story value's curve: solid and slightly heavier so the spine reads
+   under the character arcs it is drawn behind. */
+.arc-line.story-line { stroke-width: 2.5; }
+.story-point { cursor: pointer; transition: r 150ms; }
+.story-point:hover { r: 7; }
 .arc-beat-dot { cursor: pointer; transition: r 150ms, opacity 200ms; }
 .arc-beat-dot:hover { r: 7; }
 .arc-beat-dot.muted { opacity: 0.15; }

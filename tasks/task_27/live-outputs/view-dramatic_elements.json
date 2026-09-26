@@ -1,0 +1,66 @@
+{
+  "view": "dramatic_elements",
+  "act": "all",
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "status": "drafted",
+              "dramatic_role": "setup"
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "status": "drafted",
+              "dramatic_role": "climax"
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "status": "written",
+              "dramatic_role": "resolution"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-2",
+      "title": "Act II",
+      "sequences": [
+        {
+          "id": "seq-confrontation",
+          "title": "The Confrontation",
+          "scenes": [
+            {
+              "id": "garden-day",
+              "title": "Garden - Day",
+              "status": "drafted",
+              "dramatic_role": "setup"
+            },
+            {
+              "id": "garden-dream",
+              "title": "Garden Dream",
+              "status": "drafted",
+              "dramatic_role": "setup"
+            },
+            {
+              "id": "the-door-closes",
+              "title": "The Door Closes",
+              "status": "written",
+              "dramatic_role": "resolution"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

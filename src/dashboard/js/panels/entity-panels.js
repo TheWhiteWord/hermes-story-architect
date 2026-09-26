@@ -456,7 +456,7 @@ DASH.showScenePanel = function(sceneId) {
   if (scene.is_act_climax) dramaTags.push({ l: 'act-climax', v: 'Act Climax' });
   if (scene.is_story_climax) dramaTags.push({ l: 'DASH.story-climax', v: 'Story Climax' });
 
-  const valueArc = [scene.value, scene.value_open, scene.value_close].filter(Boolean);
+  const valueArc = [scene.value_at_open, scene.value_at_close].filter(Boolean);
   const conflicts = (scene.conflict_levels || []).filter(Boolean);
 
   const dramaHtml = (dramaTags.length || valueArc.length || conflicts.length) ? `

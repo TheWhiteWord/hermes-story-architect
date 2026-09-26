@@ -44,11 +44,42 @@ def test_base_map_carries_no_container_values(project):
             assert not {"value", "value_at_open", "value_at_close"} & seq.keys()
 
 
+def test_base_view_top_level_keys_are_pinned(project):
+    """The base view's shape, asserted rather than measured and forgotten.
+
+    Every phase of this task moved keys between the base map and the value
+    view, and each move was invisible to the suite — the payload stayed
+    well-shaped, just carrying the wrong thing. A key set is the cheapest
+    assertion that catches a container field creeping back in, or a view
+    key disappearing in a rename.
+    """
+    assert sorted(load(project)) == [
+        "acts", "characters", "confirmation", "loaded",
+        "memory", "plots", "project", "worlds",
+    ]
+
+
 def test_base_map_still_carries_the_project_value(project):
     """Stripping the containers must not strip the project's own value."""
     p = load(project)["project"]
-    for k in ("value", "value_at_open", "value_at_close"):
+    for k in ("story_value", "story_value_at_open", "story_value_at_close"):
         assert k in p
+
+
+def test_base_map_character_carries_the_character_value(project):
+    """The character value is the character's, named as such in the base map.
+
+    Regression: the base map read `arc_value` from a DB that no longer stores
+    it, fell through to the schema default, and `_omit` dropped the key — the
+    only character with a designed arc had no value in the base map at all.
+    """
+    chars = {c["id"]: c for c in load(project)["characters"]}
+    voss = chars["dr-elena-voss"]
+    assert voss["character_value"] == "Redemption"
+    assert voss["character_value_at_open"] == "positive"
+    assert voss["character_value_at_close"] == "negative"
+    # A character with nothing recorded must not grow the keys at defaults.
+    assert "character_value" not in chars["kael"]
 
 
 def test_story_value_view_carries_act_and_sequence_values(project):
@@ -61,6 +92,113 @@ def test_story_value_view_carries_act_and_sequence_values(project):
             assert "value_at_open" in seq and "value_at_close" in seq
             with_seq += 1
     assert with_seq, "fixture should have sequences to prove they survive"
+
+
+def test_no_container_payload_carries_a_value_key(project):
+    """The value word is stated once, on the project, and inherited downward.
+
+    A `value` key on a container means the story track and a character track
+    have been merged back together in the payload — the exact conflation this
+    schema exists to separate.
+    """
+    def containers(data):
+        for act in data["acts"]:
+            yield act
+            for seq in act["sequences"]:
+                yield seq
+                for sc in seq.get("scenes", []):
+                    yield sc
+
+    for c in containers(load(project, view="story_value")):
+        assert "value" not in c, f"{c['id']} carries a value word: {c}"
+
+
+def test_view_story_value_key_is_the_schema_field(project):
+    """The key the view returns is the key the schema writes.
+
+    These disagreed until the rename: the view returned `story_value` while the
+    field was called `value`. Asserted because the agreement is the point — a
+    well-shaped payload naming a field nothing writes is a silent lie.
+    """
+    from core.constants import ENTITY_SCHEMAS
+    data = load(project, view="story_value")
+    for key in ("story_value", "story_value_at_open", "story_value_at_close"):
+        assert key in ENTITY_SCHEMAS["project"], f"{key} is not a project field"
+        assert key in data, f"{key} missing from the story_value view"
+    # The containers inherit the word, so they must not claim one.
+    for field in ("value_at_open", "value_at_close", "shift", "y"):
+        assert field in ENTITY_SCHEMAS["scene"]
+
+
+def test_story_value_view_carries_a_real_shift_and_curve(project):
+    """Scenes must carry a real `shift` and a real `y` — and nothing else may.
+
+    The bug this guards: keys present but always empty reads as "no value data",
+    which is a different lie. A well-shaped all-empty payload must not pass —
+    `value_open` vs `value_at_open` recurred exactly that way.
+
+    Scenes are the assertion, and the only place it can live: a turn is only
+    observable once the scene exists. Act and sequence state an expectation, so
+    `shift`/`y` there could only be the model predicting unwritten scenes — the
+    old container-level half of this test passed only because phase 4
+    hand-filled the fixture, and failed against the live project.
+    """
+    from core.constants import ENTITY_SCHEMAS
+    data = load(project, view="story_value")
+    scenes = [sc for act in data["acts"] for seq in act["sequences"]
+              for sc in seq.get("scenes", [])]
+    assert any(sc.get("shift") for sc in scenes), "scenes carry no shift — they are where it turns"
+    assert any(sc.get("y") for sc in scenes), "every scene y is 0.0 — the curve is not plottable"
+
+    # The fields exist on scenes and beats only. A container carrying them again
+    # means the shape has crept back to a guess with no observation behind it.
+    for entity_type in ("scene", "arc_beat"):
+        for field in ("shift", "y"):
+            assert field in ENTITY_SCHEMAS[entity_type], f"{entity_type} lost {field}"
+    for entity_type in ("project", "act", "sequence"):
+        for field in ("shift", "y"):
+            assert field not in ENTITY_SCHEMAS[entity_type], f"{entity_type} re-gained {field}"
+    for c in [d for act in data["acts"] for d in [act] + act["sequences"]]:
+        assert "shift" not in c, f"{c['id']} carries a shift: {c}"
+        assert "y" not in c, f"{c['id']} carries a y: {c}"
+
+
+def test_an_unrecorded_y_is_not_reported_as_zero(project):
+    """An unrecorded curve point must read as absent, not as `y: 0.0`.
+
+    0.0 is a charge a writer can legitimately choose; "not observed" is a
+    different statement, and the graph already treats it as one —
+    `get_dashboard_data` omits the key so `storySeries` skips the point. The
+    view used to disagree with the plot it feeds, reporting the schema default
+    as a real measurement.
+
+    The fixture has all three scenes filled, so the unfilled case is built here:
+    a test that only ever sees a full project would pass against the bug.
+    """
+    from core.db import get_db
+    conn = get_db(project)
+    try:
+        row = conn.execute(
+            "SELECT id, extra FROM entities WHERE type='scene' AND is_deleted=0"
+        ).fetchone()
+        scene_id, extra_json = row
+        extra = json.loads(extra_json or "{}")
+        extra.pop("y", None)
+        extra.pop("shift", None)
+        conn.execute("UPDATE entities SET extra=? WHERE id=?", (json.dumps(extra), scene_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    scenes = [sc for act in load(project, view="story_value")["acts"]
+              for seq in act["sequences"] for sc in seq.get("scenes", [])]
+    blanked = next(sc for sc in scenes if sc["id"] == scene_id)
+    assert blanked["y"] == "", f"an unrecorded y reads as {blanked['y']!r}, not as absent"
+    assert blanked["shift"] == "", "an unrecorded shift must not read as recorded"
+
+    # The filled scenes are untouched — the rule is about defaults, not zeroes.
+    filled = [sc for sc in scenes if sc["id"] != scene_id]
+    assert any(isinstance(sc["y"], float) for sc in filled), "no scene kept a real y"
 
 
 def test_sequences_are_titled(project):
@@ -121,6 +259,42 @@ def test_value_view_is_not_silently_empty(project):
         for side in ("value_at_open", "value_at_close")
     ]
     assert any(charges), f"every value field empty — key mismatch again: {data}"
+
+
+def test_story_value_view_growth_is_measured_not_assumed(project):
+    """Re-measured after shift/y were added, per the plan's phase-4 note.
+
+    The view's cost per scene is the number that decides whether it can stay a
+    view at all. Two fields per container is a real cost, so it is pinned here
+    rather than left to be discovered as a slow context leak.
+    """
+    from tools.story_create import handler as create_handler
+
+    vault = str(project.parent.parent)
+
+    def size():
+        return len(json.dumps(load(project, view="story_value")))
+
+    small = size()
+    for i in range(40):
+        create_handler({"entity_type": "scene", "slug": f"drift-{i:02d}",
+                        "project": "save-the-children",
+                        "frontmatter": {"title": f"Drift {i}",
+                                        "sequence_id": "seq-discovery",
+                                        "value_at_open": "positive",
+                                        "value_at_close": "negative",
+                                        "shift": "blind trust → first doubt",
+                                        "y": -0.3}},
+                       root_path=vault)
+    per_scene = (size() - small) / 40
+    # MEASURED at 153.75, not guessed: a fully recorded scene costs that much
+    # because the view's whole job is to carry four value fields per scene
+    # ({"id", "title", "value_at_open", "value_at_close", "shift", "y"} is 151
+    # chars, plus the list separator).
+    # The ceiling is deliberately loose — this is a leak alarm, not a budget.
+    # What it catches is a field added twice, or a placeholder string
+    # reintroduced into the payload (that one cost 125 → 107 when fixed).
+    assert per_scene < 200, f"{per_scene:.1f} chars per scene in the value view"
 
 
 def test_act_filter_still_works_in_the_value_view(project):

@@ -24,7 +24,7 @@ DASH.handleFileLoad = function(input) {
 DASH.loadSampleData = function() {
   // Sample data in the REAL backend schema (as per brief) — exercises the normaliser
   const sample = {
-    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", spine: "", controlling_idea: "", value: "", value_at_open: "", value_at_close: "", inciting_incident_scene_id: "", story_climax_scene_id: "", structure_type: "", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", spine: "", controlling_idea: "", story_value: "", story_value_at_open: "", story_value_at_close: "", inciting_incident_scene_id: "", story_climax_scene_id: "", structure_type: "", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
     characters: [
       {
         id: "detective-oak", name: "Detective Oak", story_role: "Supporting",

@@ -59,8 +59,6 @@ def _sample_value(field, meta):
             return _make_beats()
         if field in ("conflict_levels",):
             return ["inner", "personal"]
-        if field == "value":
-            return "Freedom"
         return [f"item-{i}" for i in range(1, 3)]
     return f"sample-{field}"
 
@@ -295,7 +293,7 @@ def test_edit_all_field_types(entity_type, project):
     extra_fields = {
         "character": {"arc_type": "negative", "arc_complete": True},
         "plot": {"plot_type": "Resonant", "value_arc": "Maturation"},
-        "scene": {"dramatic_role": "crisis", "value": "Betrayal"},
+        "scene": {"dramatic_role": "crisis", "shift": "trust → suspicion"},
         "arc_beat": {"action": "Updated action", "y": -0.7, "is_crisis": True},
     }
     edit_data.update(extra_fields.get(entity_type, {}))

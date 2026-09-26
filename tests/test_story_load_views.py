@@ -145,7 +145,7 @@ class TestStoryValueView:
     def test_returns_value_at_project_and_act_level(self, project):
         r = load(project, view="story_value")
         assert r["story_value"] == "Trust"
-        assert r["value_at_open"] and r["value_at_close"]
+        assert r["story_value_at_open"] and r["story_value_at_close"]
         assert [a["id"] for a in r["acts"]] == ["act-1"]
 
     def test_act_filter_narrows(self, project):
@@ -203,9 +203,18 @@ class TestRelationshipView:
 
 class TestUnfilledView:
     def test_answers_what_next(self, project):
+        """The top gap must be the field most entities share.
+
+        Not a fixed field name: 16 of the fixture's 17 characters have no arc
+        designed, so `character_value_at_close` legitimately outranks everything
+        else. Pinning a name here would make the test fail every time the
+        fixture's data changes, and pass for the wrong reason if it did not.
+        """
         r = load(project, view="unfilled")
         assert r["total_gaps"] > 0
-        assert r["unfilled"][0]["field"] == "goals_long"
+        top = r["unfilled"][0]
+        assert top["count"] == max(i["count"] for i in r["unfilled"])
+        assert top["count"] > 1, "a top gap shared by one entity is not 'what next?'"
 
     def test_ranks_by_how_many_entities_share_the_gap(self, project):
         counts = [i["count"] for i in load(project, view="unfilled")["unfilled"]]

@@ -110,12 +110,24 @@ class TestEntityExtraction:
         assert not any("Invalid dramatic_role" in w for w in warnings)
 
     def test_non_event_with_empty_values_is_valid(self):
-        """non-event scenes should leave value_open/value_close empty (no fake value turn)."""
+        """non-event scenes should leave value_at_open/value_at_close empty.
+
+        Was passing `value_open`/`value_close` — names the schema dropped in an
+        earlier rename, so the validator ignored them and the test asserted
+        "no warnings" on input nothing read.
+        """
         warnings = validate_entity("scene", {
             "title": "Test", "sequence_id": "seq-1", "act_id": "act-1",
-            "dramatic_role": "non-event", "value_open": "", "value_close": ""
+            "dramatic_role": "non-event", "value_at_open": "", "value_at_close": ""
         })
         assert not any("Invalid" in w for w in warnings)
+        # A real charge on a non-event scene is still legal — the role is a
+        # description, not a constraint on the fields.
+        assert not any("Invalid" in w for w in validate_entity("scene", {
+            "title": "Test", "sequence_id": "seq-1", "act_id": "act-1",
+            "dramatic_role": "non-event", "value_at_open": "positive",
+            "value_at_close": "mixed", "shift": "trust → mild doubt", "y": -0.1
+        }))
 
     def test_validate_sequence_invalid_status(self):
         """validate_entity('sequence', {status: 'invalid'}) returns warning."""
@@ -972,10 +984,10 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_scene_location(self):
         from core.entity import unfilled_fields
-        extra = {"location": "Location not set", "value": "Value not set", "dramatic_role": ""}
+        extra = {"location": "Location not set", "value_at_open": "", "dramatic_role": ""}
         result = unfilled_fields("scene", extra)
         assert "location" in result
-        assert "value" in result
+        assert "value_at_open" in result
         # dramatic_role is at default "" but also optional — should appear
         assert "dramatic_role" in result
 
@@ -997,10 +1009,10 @@ class TestUnfilledFields:
     def test_unfilled_fields_skips_status(self):
         """status is a workflow state, never reported as unfilled."""
         from core.entity import unfilled_fields
-        extra = {"status": "planned", "value": "Value not set", "dramatic_role": ""}
+        extra = {"status": "planned", "value_at_open": "", "dramatic_role": ""}
         result = unfilled_fields("scene", extra)
         assert "status" not in result
-        assert "value" in result
+        assert "value_at_open" in result
         assert "dramatic_role" in result
 
     def test_unfilled_fields_skips_booleans(self):
@@ -1067,19 +1079,35 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_sequence(self):
         from core.entity import unfilled_fields
-        extra = {"value": "Value not set", "purpose": "Purpose not set", "primary_plot": ""}
+        extra = {"value_at_open": "", "purpose": "Purpose not set", "primary_plot": ""}
         result = unfilled_fields("sequence", extra)
-        assert "value" in result
+        assert "value_at_open" in result
         assert "purpose" in result
         assert "primary_plot" in result
 
     def test_unfilled_fields_act(self):
         from core.entity import unfilled_fields
-        extra = {"value": "Value not set", "act_objective": "Objective not set", "climax_scene_id": ""}
+        extra = {"value_at_open": "", "act_objective": "Objective not set", "climax_scene_id": ""}
         result = unfilled_fields("act", extra)
-        assert "value" in result
+        assert "value_at_open" in result
         assert "act_objective" in result
         assert "climax_scene_id" in result
+
+    def test_unfilled_fields_curve_fields(self):
+        """`y` is a number, so it is never a gap row; `shift` is a
+        placeholder-default string, so an unfilled one is — same as `action`.
+
+        On a scene or a beat, a missing shift is a real gap in the value track.
+        Act and sequence state an expectation, not an observed turn, so they
+        carry no `shift`/`y` to be unfilled.
+        """
+        from core.entity import unfilled_fields
+        for entity_type in ("scene", "arc_beat"):
+            result = unfilled_fields(entity_type, {})
+            assert "y" not in result, entity_type
+            assert "shift" in result, entity_type
+            filled = unfilled_fields(entity_type, {"shift": "trust → suspicion"})
+            assert "shift" not in filled, entity_type
 
     def test_get_unfilled_map(self, tmp_path):
         from tools.story_create import handler as create_handler
@@ -1119,5 +1147,122 @@ class TestUnfilledFields:
         summary = get_project_summary(project_path)
         # Unfilled moved to view="unfilled" (task_21 spec §3.5) — backend get_unfilled_map
         assert "unfilled" not in summary
+
+
+# ---- Value Schema Tests (task_27 phase 1) ----
+
+# Field → the value it charges. A description must name it, or the model is
+# left guessing which value the charge belongs to — the conflation the two
+# tracks exist to remove.
+_VALUE_FIELDS = {
+    "project": ["story_value_at_open", "story_value_at_close"],
+    "character": ["character_value_at_open", "character_value_at_close"],
+    "arc_beat": ["character_value_at_open", "character_value_at_close", "y"],
+    "act": ["value_at_open", "value_at_close"],
+    "sequence": ["value_at_open", "value_at_close"],
+    "scene": ["value_at_open", "value_at_close", "y"],
+}
+
+_STORY_SIDE = {"project", "act", "sequence", "scene"}
+# The curve fields live on scene and arc_beat only: they describe a turn, and a
+# turn is only observable once the scene or the beat exists. Act and sequence
+# state an expectation, so there is nothing there to describe.
+_CURVE_ENTITIES = ("scene", "arc_beat")
+
+
+class TestValueSchema:
+    """The schema descriptions are the model's only instruction — pin their meaning."""
+
+    @pytest.mark.parametrize("entity_type,field", [
+        (et, f) for et, fields in _VALUE_FIELDS.items() for f in fields
+    ])
+    def test_value_description_names_the_value_it_charges(self, entity_type, field):
+        desc = ENTITY_SCHEMAS[entity_type][field]["description"]
+        expected = "story value" if entity_type in _STORY_SIDE else "this character's value"
+        assert expected in desc, f"{entity_type}.{field} does not say which value it charges: {desc!r}"
+
+    @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
+    def test_y_description_states_the_ending_charge(self, entity_type):
+        """`y` is the ENDING charge — the point a curve passes through.
+
+        The rule lived only in a skill document while the field the model reads
+        said only "Value charge (-1.0 to +1.0)", so the graph's x-axis meaning
+        was documented nowhere it was reachable.
+        """
+        desc = ENTITY_SCHEMAS[entity_type]["y"]["description"]
+        assert "Ending" in desc
+        assert "curve" in desc
+
+    @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
+    def test_shift_description_names_the_value_that_turns(self, entity_type):
+        desc = ENTITY_SCHEMAS[entity_type]["shift"]["description"]
+        expected = "story value" if entity_type in _STORY_SIDE else "this character's value"
+        assert expected in desc
+
+    def test_containers_have_no_value_word_field(self):
+        """The value word is stated once, on the project, and inherited downward."""
+        for entity_type in ("act", "sequence", "scene", "arc_beat"):
+            assert "value" not in ENTITY_SCHEMAS[entity_type]
+
+    def test_arc_beat_carries_the_character_charge(self):
+        for field in ("character_value_at_open", "character_value_at_close"):
+            meta = ENTITY_SCHEMAS["arc_beat"][field]
+            assert meta["optional"] is True
+            assert meta["default"] == "Not set"
+
+    @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
+    def test_y_description_states_the_sign_convention(self, entity_type):
+        """`y` is signed like the charge word — the rule the graph depends on.
+
+        "The ending charge" is not enough on its own: `positive` and `negative`
+        are words, `-0.3` is a number, and nothing told the model which way
+        round. A beat reading `positive → mixed` with `y: -0.3` satisfies every
+        other rule in the schema and still plots on the wrong side of the line.
+
+        Asserted on the description because that is what `story_describe`
+        returns to the model. There is deliberately no runtime check: the
+        rejected continuity rules in the plan exist because a machine cannot
+        judge whether a charge and a number agree — it can only be told.
+        """
+        desc = ENTITY_SCHEMAS[entity_type]["y"]["description"]
+        assert "positive is above zero" in desc, desc
+        assert "negative below" in desc, desc
+
+    def test_y_range_is_validated_on_every_curve_entity(self):
+        for entity_type in _CURVE_ENTITIES:
+            warnings = validate_entity(entity_type, {"title": "T", "y": 2.0})
+            assert any("y out of range" in w for w in warnings), entity_type
+            assert not any("y out of range" in w for w in
+                           validate_entity(entity_type, {"title": "T", "y": 0.3}))
+
+    def test_only_scenes_and_beats_carry_the_curve_fields(self):
+        """`shift` and `y` describe a turn, and only a scene or a beat has one.
+
+        On an act or a sequence they could only be the model predicting scenes
+        that do not exist yet — a guess with no observation behind it, which is
+        the one thing this redesign exists to remove.
+        """
+        for entity_type in _CURVE_ENTITIES:
+            for field in ("shift", "y"):
+                assert field in ENTITY_SCHEMAS[entity_type], f"{entity_type} lost {field}"
+        for entity_type in ("project", "act", "sequence"):
+            for field in ("shift", "y"):
+                assert field not in ENTITY_SCHEMAS[entity_type], f"{entity_type} re-gained {field}"
+
+    def test_project_defaults_cover_the_whole_project_schema(self):
+        """A project key missing from _PROJECT_DEFAULTS is always emitted,
+        unfilled or not — `.get()` returns None and `v != None` is always true."""
+        from core.db import _PROJECT_DEFAULTS, _PROJECT_TITLE_PAGE_FIELDS
+
+        assert set(_PROJECT_DEFAULTS) | _PROJECT_TITLE_PAGE_FIELDS == set(ENTITY_SCHEMAS["project"])
+        assert set(_PROJECT_DEFAULTS) & _PROJECT_TITLE_PAGE_FIELDS == set()
+        for key, default in _PROJECT_DEFAULTS.items():
+            assert default == ENTITY_SCHEMAS["project"][key]["default"], key
+
+    def test_project_defaults_exclude_the_title_page_block(self):
+        from core.db import _PROJECT_DEFAULTS
+
+        for key in ("screenplay_title", "credit", "author", "contact", "draft_date", "draft"):
+            assert key not in _PROJECT_DEFAULTS
 
 

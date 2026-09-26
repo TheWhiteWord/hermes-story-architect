@@ -11,8 +11,8 @@ setting: The Institute — a decaying research facility, 400 years apart
 spine: A young person discovers the truth about their world and chooses to escape
 status: active
 story_climax_scene_id: central-room-night
+story_value: Trust
+story_value_at_close: negative
+story_value_at_open: positive
 structure_type: Classical
-value: Trust
-value_at_close: negative
-value_at_open: positive
 ---

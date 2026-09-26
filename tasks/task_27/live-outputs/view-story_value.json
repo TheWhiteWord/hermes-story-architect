@@ -1,0 +1,89 @@
+{
+  "view": "story_value",
+  "act": "all",
+  "story_value": "Trust",
+  "story_value_at_open": "positive",
+  "story_value_at_close": "ironic",
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "value_at_open": "positive",
+      "value_at_close": "negative",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "value_at_open": "positive",
+          "value_at_close": "negative",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "value_at_open": "positive",
+              "value_at_close": "negative",
+              "shift": "trust → suspicion",
+              "y": -0.4
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "value_at_open": "negative",
+              "value_at_close": "positive",
+              "shift": "suspicion → self-trust",
+              "y": 0.3
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "value_at_open": "positive",
+              "value_at_close": "positive",
+              "shift": "self-trust → earned trust in each other",
+              "y": 0.7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-2",
+      "title": "Act II",
+      "value_at_open": "",
+      "value_at_close": "",
+      "sequences": [
+        {
+          "id": "seq-confrontation",
+          "title": "The Confrontation",
+          "value_at_open": "",
+          "value_at_close": "",
+          "scenes": [
+            {
+              "id": "garden-day",
+              "title": "Garden - Day",
+              "value_at_open": "positive",
+              "value_at_close": "mixed",
+              "shift": "earned trust → trust with visible seams",
+              "y": -0.1
+            },
+            {
+              "id": "garden-dream",
+              "title": "Garden Dream",
+              "value_at_open": "positive",
+              "value_at_close": "negative",
+              "shift": "",
+              "y": ""
+            },
+            {
+              "id": "the-door-closes",
+              "title": "The Door Closes",
+              "value_at_open": "negative",
+              "value_at_close": "positive",
+              "shift": "trust in the world → trust in what we chose",
+              "y": 0.4
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

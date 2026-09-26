@@ -25,7 +25,7 @@ DASH.renderSectionsHtml = function(entityType, slug, skip = []) {
 DASH.arcSectionHtml = function(char) {
   const arcBeats = char.arc_beats_list || [];
   const arcType = char.arc_type || 'absent';
-  const arcValue = char.arc_value || '';
+  const arcValue = char.character_value || '';
   if (arcBeats.length > 0) {
     return `
       <div class="panel-muted" style="font-size:var(--font-size-sm);margin-bottom:8px">

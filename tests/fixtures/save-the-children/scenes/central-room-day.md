@@ -20,9 +20,10 @@ status: drafted
 time_of_day: DAY
 title: Central Room - Day
 type: scene
-value: Trust
 value_at_close: negative
 value_at_open: positive
+shift: blind trust → first doubt
+y: -0.3
 ---
 
 ## Description

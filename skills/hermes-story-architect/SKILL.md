@@ -26,6 +26,13 @@ author: TWW
 - `view="story_value"` + optional `act` param — value tracking across act→seq→scene
 - `view="dramatic_elements"` + optional `act` + `add_plot` (default false) — dramatic_role + milestone per scene, with optional plot cross-refs
 
+## Two value tracks
+
+- The story's value is `story_value` on the project; the character's is `character_value` on the character. Same vocabulary, no derivation between them — a protagonist may arc on a different value from the story's.
+- Act, sequence and scene **inherit** the story's value word and charge it per-entity (`value_at_open` / `value_at_close`). Beats inherit the character's and charge theirs (`character_value_at_open` / `_close`).
+- A scene does not get a value word of its own. A second theme there is a character value, or a `plot` concern.
+- `references/story-value-vs-character-value.md` — the field table, and why there is no continuity check.
+
 ## story_retrieve
 
 - Uses `refs` (list of entity keys from load output), not single `slug`. Batch by default.
