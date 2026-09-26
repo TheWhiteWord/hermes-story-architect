@@ -25,20 +25,20 @@ def vault(tmp_path):
     (v / "projects").mkdir(parents=True)
     r = json.loads(create_handler(
         {"entity_type": "project", "slug": "stc", "frontmatter": {"name": "STC", "logline": "L"}},
-        vault_path=str(v)))
+        root_path=str(v)))
     assert r["success"] is True
     return v
 
 
 def _create(vault, **args):
     args.setdefault("project", "stc")
-    return json.loads(create_handler(args, vault_path=str(vault)))
+    return json.loads(create_handler(args, root_path=str(vault)))
 
 
 def _sections(vault, entity_type, entity_id):
     r = json.loads(retrieve_handler(
         {"project": "stc", "entity_type": entity_type, "id": [entity_id],
-         "sections": ["all"]}, vault_path=str(vault)))
+         "sections": ["all"]}, root_path=str(vault)))
     return r["entities"][0]["sections"]
 
 

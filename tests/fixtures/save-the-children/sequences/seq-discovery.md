@@ -9,8 +9,8 @@ status: in-progress
 title: The Discovery
 type: sequence
 value: Trust
-value_close: negative
-value_open: positive
+value_at_close: negative
+value_at_open: positive
 ---
 
 ## Summary

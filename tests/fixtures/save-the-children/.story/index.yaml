@@ -316,8 +316,8 @@ acts:
   order: 1
   status: in-progress
   value: Trust
-  value_open: positive
-  value_close: negative
+  value_at_open: positive
+  value_at_close: negative
   climax_scene_id: central-room-night
   act_objective: Kael discovers the truth about the door.
   sections:
@@ -349,8 +349,8 @@ sequences:
   status: in-progress
   act_id: act-1
   value: Trust
-  value_open: positive
-  value_close: negative
+  value_at_open: positive
+  value_at_close: negative
   climax_scene_id: central-room-night
   primary_plot: the-resistance
   purpose: Kael discovers the truth about the door and chooses to act.
@@ -390,8 +390,8 @@ scenes:
   - id: the-resistance
     beat: setup
   value: Trust
-  value_open: positive
-  value_close: negative
+  value_at_open: positive
+  value_at_close: negative
   conflict_levels:
   - inner
   - personal
@@ -446,8 +446,8 @@ scenes:
   - id: the-resistance
     beat: setup
   value: Trust
-  value_open: negative
-  value_close: positive
+  value_at_open: negative
+  value_at_close: positive
   conflict_levels:
   - personal
   dramatic_role: climax
@@ -502,8 +502,8 @@ scenes:
   - id: the-resistance
     beat: payoff
   value: Trust
-  value_open: positive
-  value_close: positive
+  value_at_open: positive
+  value_at_close: positive
   conflict_levels:
   - extra-personal
   dramatic_role: resolution

@@ -34,15 +34,15 @@ def vault(tmp_path, monkeypatch):
     shutil.copytree(str(FIXTURE), str(dest))
     import core.config
     monkeypatch.setattr(core.config, "load_plugin_config",
-                        lambda: {"vault_path": str(v)})
+                        lambda: {"root_path": str(v)})
     from tools.story_import import handler
-    handler({"project": "stc", "confirm": True}, vault_path=str(v))
+    handler({"project": "stc", "confirm": True}, root_path=str(v))
     return v
 
 
 def _backup(vault):
     from tools.story_backup import handler
-    return json.loads(handler({"project": "stc"}, vault_path=str(vault)))
+    return json.loads(handler({"project": "stc"}, root_path=str(vault)))
 
 
 def _backups(project):
@@ -131,7 +131,7 @@ class TestContract:
     def test_missing_database_is_an_error(self, vault):
         (vault / "projects" / "empty").mkdir()
         from tools.story_backup import handler
-        r = json.loads(handler({"project": "empty"}, vault_path=str(vault)))
+        r = json.loads(handler({"project": "empty"}, root_path=str(vault)))
         assert "error" in r
 
     def test_the_live_database_is_untouched(self, vault):

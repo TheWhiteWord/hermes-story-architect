@@ -61,20 +61,20 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "status", SCENE_STATUSES, warnings)
         _validate_enum(frontmatter, "time_of_day", SCENE_TIMES_OF_DAY, warnings, empty_ok=True)
         _validate_enum(frontmatter, "dramatic_role", SCENE_DRAMATIC_ROLES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 
     if entity_type == "sequence":
         _validate_enum(frontmatter, "status", SEQUENCE_STATUSES, warnings)
-        _validate_enum(frontmatter, "value_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 
     if entity_type == "act":
         _validate_enum(frontmatter, "status", ACT_STATUSES, warnings)
-        _validate_enum(frontmatter, "value_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_close", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 

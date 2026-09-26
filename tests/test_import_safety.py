@@ -28,7 +28,7 @@ def _ids(project_path):
 
 
 def _run(args, vault):
-    return json.loads(import_handler(args, vault_path=vault))
+    return json.loads(import_handler(args, root_path=vault))
 
 
 @pytest.fixture

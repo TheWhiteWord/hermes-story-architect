@@ -22,7 +22,7 @@ def db_project(fixture_path):
     proj = Path(tmp) / "projects" / "save-the-children"
     proj.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(proj))
-    import_handler({"project": str(proj), "vault_path": Path(tmp)})
+    import_handler({"project": str(proj), "root_path": Path(tmp)})
     yield proj, Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -32,14 +32,14 @@ class TestSearchQuerySafety:
         proj, vault = db_project
         for query in ["garden (part 2)", 'the "garden', "Kael & Mira", "garden ^ 2"]:
             result = json.loads(search_handler({
-                "project": str(proj), "query": query, "vault_path": vault,
+                "project": str(proj), "query": query, "root_path": vault,
             }))
             assert "error" not in result, f"{query!r} -> {result}"
 
     def test_reports_total_when_truncated(self, db_project):
         proj, vault = db_project
         result = json.loads(search_handler({
-            "project": str(proj), "query": "the", "vault_path": vault, "limit": 2,
+            "project": str(proj), "query": "the", "root_path": vault, "limit": 2,
         }))
         assert result["total"] == 2
         assert result["total_matches"] >= result["total"]
@@ -49,6 +49,6 @@ class TestSearchQuerySafety:
     def test_snippet_is_bounded(self, db_project):
         proj, vault = db_project
         result = json.loads(search_handler({
-            "project": str(proj), "query": "the", "vault_path": vault,
+            "project": str(proj), "query": "the", "root_path": vault,
         }))
         assert all(len(r["snippet"]) <= 205 for r in result["results"])

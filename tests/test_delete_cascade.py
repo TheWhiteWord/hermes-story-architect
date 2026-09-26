@@ -31,7 +31,7 @@ def _setup(fixture_path, tmp_path, name):
     p = vault / "projects" / "save-the-children"
     p.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(p))
-    import_handler({"project": "save-the-children", "confirm": True}, vault_path=str(vault))
+    import_handler({"project": "save-the-children", "confirm": True}, root_path=str(vault))
     return p, vault
 
 
@@ -39,7 +39,7 @@ def _delete(vault, entity_type, slug):
     return json.loads(edit_handler(
         {"action": "delete_entity",
          "target": {"entity_type": entity_type, "slug": slug, "project": "save-the-children"},
-         "summary": "t", "confirm": True}, vault_path=str(vault)))
+         "summary": "t", "confirm": True}, root_path=str(vault)))
 
 
 def _references_to(project, target):
@@ -200,7 +200,7 @@ class TestFieldsSurviveAsBlanks:
         _delete(vault, "scene", "central-room-day")
         r = json.loads(retrieve_handler(
             {"project": "save-the-children", "entity_type": "arc_beat", "id": ["dr-elena-voss-1"],
-             "fields": ["scene", "action"]}, vault_path=str(vault)))
+             "fields": ["scene", "action"]}, root_path=str(vault)))
         fields = r["entities"][0]["fields"]
         assert "scene" in fields and fields["scene"] == ""
         assert fields["action"]
@@ -260,7 +260,7 @@ class TestDetachedReporting:
         result = json.loads(edit_handler(
             {"action": "delete_entity",
              "target": {"entity_type": "scene", "slug": "central-room-day", "project": "save-the-children"},
-             "summary": "t", "dry_run": True}, vault_path=str(vault)))
+             "summary": "t", "dry_run": True}, root_path=str(vault)))
         assert "would_delete" in result
 
 
@@ -281,7 +281,7 @@ class TestDefaultsOnReset:
         _delete(vault, "location", "the-garden")
         r = json.loads(retrieve_handler(
             {"project": "save-the-children", "entity_type": "scene", "id": ["the-core-day"],
-             "fields": ["location"]}, vault_path=str(vault)))
+             "fields": ["location"]}, root_path=str(vault)))
         assert r["entities"][0]["fields"]["location"] == ""
         assert "location" in r["entities"][0]["unfilled_fields"]
 

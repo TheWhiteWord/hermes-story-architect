@@ -519,7 +519,7 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {"name": "Test Project", "logline": "A test"},
         }
-        create_handler(args, vault_path=str(tmp_path))
+        create_handler(args, root_path=str(tmp_path))
         proj = tmp_path / "projects" / "test-proj"
         assert (proj / ".story" / "story.db").exists()
         assert not (proj / "project.md").exists()
@@ -533,7 +533,7 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {"name": "Test Project"},
         }
-        create_handler(args, vault_path=str(tmp_path))
+        create_handler(args, root_path=str(tmp_path))
         assert not (tmp_path / "projects" / "test-proj" / "project.md").exists()
 
     def test_create_project_does_not_require_memory_file(self, tmp_path):
@@ -543,7 +543,7 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {"name": "Test Project"},
         }
-        create_handler(args, vault_path=str(tmp_path))
+        create_handler(args, root_path=str(tmp_path))
         project = tmp_path / "projects" / "test-proj"
         assert not (project / ".story" / "memory.md").exists()
         from core.db import get_db, get_project_memory, empty_memory
@@ -562,7 +562,7 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {"name": "Test Project"},
         }
-        result = create_handler(args, vault_path=str(tmp_path))
+        result = create_handler(args, root_path=str(tmp_path))
         assert json.loads(result)["success"] is True
         db_path = tmp_path / "projects" / "test-proj" / ".story" / "story.db"
         assert db_path.exists()
@@ -582,7 +582,7 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {},
         }
-        result = json.loads(create_handler(args, vault_path=str(tmp_path)))
+        result = json.loads(create_handler(args, root_path=str(tmp_path)))
         assert "error" in result
         assert "Missing required" in result["error"]
 
@@ -593,8 +593,8 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {"name": "Test Project"},
         }
-        create_handler(args, vault_path=str(tmp_path))
-        result = json.loads(create_handler(args, vault_path=str(tmp_path)))
+        create_handler(args, root_path=str(tmp_path))
+        result = json.loads(create_handler(args, root_path=str(tmp_path)))
         assert "error" in result
 
     def test_story_load_works_after_create(self, tmp_path):
@@ -604,9 +604,9 @@ class TestProjectCreation:
             "project": "",
             "frontmatter": {"name": "Test Project"},
         }
-        create_handler(args, vault_path=str(tmp_path))
+        create_handler(args, root_path=str(tmp_path))
         load_args = {"project": str(tmp_path / "projects" / "test-proj")}
-        result = json.loads(load_handler(load_args, vault_path=str(tmp_path)))
+        result = json.loads(load_handler(load_args, root_path=str(tmp_path)))
         assert result["loaded"] is True
         assert result["project"]["name"] == "Test Project"
         # Nested structure present

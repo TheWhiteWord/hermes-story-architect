@@ -380,14 +380,14 @@ class TestArcToolIntegrationFixture:
         from tools.story_retrieve import handler as retrieve_handler
 
         # Import fixture to DB (in temp)
-        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+        import_handler({"project": str(fixture_path), "root_path": fixture_path.parent})
 
         result = retrieve_handler({
             "project": str(fixture_path),
             "entity_type": "arc_beat",
             "id": ["1"],
             "sections": ["all"],
-            "vault_path": fixture_path.parent,
+            "root_path": fixture_path.parent,
         })
         data = json.loads(result)
         assert data["entity_type"] == "arc_beat"
@@ -400,14 +400,14 @@ class TestArcToolIntegrationFixture:
         from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
 
-        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+        import_handler({"project": str(fixture_path), "root_path": fixture_path.parent})
 
         result = retrieve_handler({
             "project": str(fixture_path),
             "entity_type": "arc_beat",
             "id": ["2"],
             "sections": ["Action"],
-            "vault_path": fixture_path.parent,
+            "root_path": fixture_path.parent,
         })
         data = json.loads(result)
         assert "Action" in data["entities"][0]["sections"]
@@ -417,11 +417,11 @@ class TestArcToolIntegrationFixture:
         from tools.story_import import handler as import_handler
         from tools.story_load import handler as load_handler
 
-        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+        import_handler({"project": str(fixture_path), "root_path": fixture_path.parent})
 
         result = load_handler({
             "project": str(fixture_path),
-            "vault_path": fixture_path.parent,
+            "root_path": fixture_path.parent,
         })
         data = json.loads(result)
         # New format: character count instead of arc count

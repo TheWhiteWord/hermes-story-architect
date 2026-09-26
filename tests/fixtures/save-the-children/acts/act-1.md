@@ -7,8 +7,8 @@ status: in-progress
 title: Act One
 type: act
 value: Trust
-value_close: negative
-value_open: positive
+value_at_close: negative
+value_at_open: positive
 ---
 
 ## Summary

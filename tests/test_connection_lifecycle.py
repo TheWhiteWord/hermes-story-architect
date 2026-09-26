@@ -28,7 +28,7 @@ def test_import_does_not_leak_connections(fixture_path):
             return conn
 
         with patch.object(db, 'get_db', side_effect=tracking_get_db):
-            result = import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+            result = import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         data = json.loads(result)
         assert data["success"] is True
@@ -47,7 +47,7 @@ def test_export_does_not_leak_connections(fixture_path):
         shutil.copytree(str(fixture_path), str(project_path))
 
         # First import
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         from core import db
         original_get_db = db.get_db
@@ -59,7 +59,7 @@ def test_export_does_not_leak_connections(fixture_path):
             return conn
 
         with patch.object(db, 'get_db', side_effect=tracking_get_db):
-            result = export_handler({"project": str(project_path), "vault_path": Path(tmp)})
+            result = export_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         data = json.loads(result)
         assert data["success"] is True
@@ -76,7 +76,7 @@ def test_backup_does_not_leak_connections(fixture_path):
         shutil.copytree(str(fixture_path), str(project_path))
 
         # First import
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         from core import db
         original_get_db = db.get_db
@@ -88,7 +88,7 @@ def test_backup_does_not_leak_connections(fixture_path):
             return conn
 
         with patch.object(db, 'get_db', side_effect=tracking_get_db):
-            result = backup_handler({"project": str(project_path), "vault_path": Path(tmp)})
+            result = backup_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         data = json.loads(result)
         assert data["success"] is True

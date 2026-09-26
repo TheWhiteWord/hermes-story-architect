@@ -20,7 +20,7 @@ def db_project(fixture_path):
     proj = Path(tmp) / "projects" / "save-the-children"
     proj.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(proj))
-    import_handler({"project": str(proj), "vault_path": Path(tmp)})
+    import_handler({"project": str(proj), "root_path": Path(tmp)})
     yield proj, Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -95,12 +95,12 @@ class Test3EditScenario:
             "target": {"entity_type": "character", "slug": "kael", "project": str(proj)},
             "data": {"one_sentence": "Updated description for kael."},
             "summary": "Update kael one_sentence",
-            "vault_path": vault
+            "root_path": vault
         })
         assert json.loads(result)["success"] is True
 
         # Load shows change
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert result["loaded"] is True
         kael = next(e for e in result["characters"] if e["id"] == "kael")
         assert kael["one_sentence"] == "Updated description for kael."
@@ -113,7 +113,7 @@ class Test3EditScenario:
         create_handler({
             "entity_type": "character", "slug": "temp-char", "project": str(proj),
             "frontmatter": {"name": "Temp", "story_role": "Minor", "one_sentence": "Temp"},
-            "vault_path": vault
+            "root_path": vault
         })
         create_handler({
             "entity_type": "arc_beat", "slug": "1", "project": str(proj),
@@ -122,7 +122,7 @@ class Test3EditScenario:
                 "label": "Beat", "action": "a", "gap": "g",
                 "choice": "c", "shift": "s", "y": 0.0, "order": 1,
             },
-            "vault_path": vault
+            "root_path": vault
         })
 
         # Delete character
@@ -131,12 +131,12 @@ class Test3EditScenario:
             "target": {"entity_type": "character", "slug": "temp-char", "project": str(proj)},
             "summary": "Delete temp-char",
             "confirm": True,
-            "vault_path": vault
+            "root_path": vault
         })
         assert json.loads(result)["success"] is True
 
         # Load excludes deleted entity AND its arcs
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         ids = _all_entity_ids(result)
         assert "temp-char" not in ids
         assert "temp-char-1" not in ids, f"Arc beat not cascade-deleted: {ids}"
@@ -148,13 +148,13 @@ class Test3EditScenario:
         create_handler({
             "entity_type": "sequence", "slug": "seq-with-scenes", "project": str(proj),
             "frontmatter": {"title": "Seq", "act_id": "act-1"},  # act-1 from fixture import
-            "vault_path": vault
+            "root_path": vault
         })
         # Create a scene in this sequence
         create_handler({
             "entity_type": "scene", "slug": "scene-in-seq", "project": str(proj),
             "frontmatter": {"title": "Scene", "sequence_id": "seq-with-scenes", "act_id": "act-1"},
-            "vault_path": vault
+            "root_path": vault
         })
 
         result = edit_handler({
@@ -162,7 +162,7 @@ class Test3EditScenario:
             "target": {"entity_type": "sequence", "slug": "seq-with-scenes", "project": str(proj)},
             "summary": "Delete seq",
             "confirm": True,
-            "vault_path": vault
+            "root_path": vault
         })
         data = json.loads(result)
         assert "error" in data
@@ -175,7 +175,7 @@ class Test3EditScenario:
         create_handler({
             "entity_type": "character", "slug": "cascade-char", "project": str(proj),
             "frontmatter": {"name": "Cascade", "story_role": "Minor", "one_sentence": "Test"},
-            "vault_path": vault
+            "root_path": vault
         })
         for i in range(1, 4):
             create_handler({
@@ -185,7 +185,7 @@ class Test3EditScenario:
                     "label": f"Beat {i}", "action": "a", "gap": "g",
                     "choice": "c", "shift": "s", "y": 0.0, "order": i,
                 },
-                "vault_path": vault
+                "root_path": vault
             })
 
         # Delete character
@@ -194,12 +194,12 @@ class Test3EditScenario:
             "target": {"entity_type": "character", "slug": "cascade-char", "project": str(proj)},
             "summary": "Delete cascade-char",
             "confirm": True,
-            "vault_path": vault
+            "root_path": vault
         })
         assert json.loads(result)["success"] is True
 
         # All arcs gone
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         ids = _all_entity_ids(result)
         assert "cascade-char" not in ids
         for i in range(1, 4):
@@ -212,17 +212,17 @@ class Test3EditScenario:
         # Create a sequence with scenes
         create_handler({
             "entity_type": "act", "slug": "act-test", "project": str(proj),
-            "frontmatter": {"title": "Test Act"}, "vault_path": vault
+            "frontmatter": {"title": "Test Act"}, "root_path": vault
         })
         create_handler({
             "entity_type": "sequence", "slug": "seq-test", "project": str(proj),
-            "frontmatter": {"title": "Test Seq", "act_id": "act-test"}, "vault_path": vault
+            "frontmatter": {"title": "Test Seq", "act_id": "act-test"}, "root_path": vault
         })
         for slug in ["scene-x", "scene-y", "scene-z"]:
             create_handler({
                 "entity_type": "scene", "slug": slug, "project": str(proj),
                 "frontmatter": {"title": f"Scene {slug[-1]}", "sequence_id": "seq-test", "act_id": "act-test"},
-                "vault_path": vault
+                "root_path": vault
             })
 
         # Reorder: scene-z first
@@ -231,12 +231,12 @@ class Test3EditScenario:
             "target": {"entity_type": "scene", "project": str(proj)},
             "order_context": {"ordered_ids": ["scene-z", "scene-x", "scene-y"]},
             "summary": "Reorder scenes",
-            "vault_path": vault
+            "root_path": vault
         })
         assert json.loads(result)["success"] is True
 
         # Load shows new order
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         # Find scenes in nested structure
         scenes_found = {}
         for act in result["acts"]:

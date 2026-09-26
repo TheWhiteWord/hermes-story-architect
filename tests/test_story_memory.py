@@ -14,12 +14,12 @@ def project(tmp_path):
         "slug": "memory-tool",
         "project": "",
         "frontmatter": {"name": "Memory Tool"},
-    }, vault_path=tmp_path)
+    }, root_path=tmp_path)
     return tmp_path / "projects" / "memory-tool", tmp_path
 
 
 def call(project, vault, **args):
-    return json.loads(handler({"project": str(project), **args}, vault_path=vault))
+    return json.loads(handler({"project": str(project), **args}, root_path=vault))
 
 
 def test_add_remove_and_replace_round_trip(project):

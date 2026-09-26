@@ -40,18 +40,18 @@ def vault(tmp_path, monkeypatch):
     v = tmp_path / "v"
     import core.config
     monkeypatch.setattr(core.config, "load_plugin_config",
-                        lambda: {"vault_path": str(v)})
+                        lambda: {"root_path": str(v)})
     return v
 
 
 def _import(vault, slug):
     from tools.story_import import handler
-    handler({"project": slug, "confirm": True}, vault_path=str(vault))
+    handler({"project": slug, "confirm": True}, root_path=str(vault))
 
 
 def _dash(vault, slug):
     from tools.story_dashboard import handler
-    return json.loads(handler({"project": slug}, vault_path=str(vault)))
+    return json.loads(handler({"project": slug}, root_path=str(vault)))
 
 
 class TestAssemblesAndInjects:

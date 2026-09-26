@@ -21,8 +21,8 @@ time_of_day: DAY
 title: Central Room - Day
 type: scene
 value: Trust
-value_close: negative
-value_open: positive
+value_at_close: negative
+value_at_open: positive
 ---
 
 ## Description

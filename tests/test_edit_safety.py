@@ -27,7 +27,7 @@ def proj(fixture_path, tmp_path):
     p = vault / "projects" / "save-the-children"
     p.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(p))
-    import_handler({"project": "save-the-children", "confirm": True}, vault_path=str(vault))
+    import_handler({"project": "save-the-children", "confirm": True}, root_path=str(vault))
     return p, vault
 
 
@@ -35,7 +35,7 @@ def _edit(vault, action, entity_type, slug, **args):
     target = {"entity_type": entity_type, "slug": slug, "project": "save-the-children"}
     return json.loads(edit_handler(
         {"action": action, "target": target, "summary": "test", **args},
-        vault_path=str(vault)))
+        root_path=str(vault)))
 
 
 def _col(project, entity_id, column):
@@ -91,7 +91,7 @@ class TestColumnMap:
               data={"logline": "A NEW logline."})
         r = json.loads(retrieve_handler(
             {"project": "save-the-children", "entity_type": "project", "id": ["stc"],
-             "fields": ["logline"]}, vault_path=str(vault)))
+             "fields": ["logline"]}, root_path=str(vault)))
         assert r["entities"][0]["fields"]["logline"] == "A NEW logline."
 
     def test_no_local_map_remains(self):

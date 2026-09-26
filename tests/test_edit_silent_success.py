@@ -32,9 +32,9 @@ def vault(tmp_path, monkeypatch):
     shutil.copytree(str(FIXTURE), str(dest))
     import core.config
     monkeypatch.setattr(core.config, "load_plugin_config",
-                        lambda: {"vault_path": str(v)})
+                        lambda: {"root_path": str(v)})
     from tools.story_import import handler
-    handler({"project": "save-the-children", "confirm": True}, vault_path=str(v))
+    handler({"project": "save-the-children", "confirm": True}, root_path=str(v))
     return v
 
 
@@ -44,14 +44,14 @@ def _edit(vault, data, entity_type="character", slug="kael"):
         "action": "edit_note",
         "target": {"entity_type": entity_type, "slug": slug,
                    "project": "save-the-children"},
-        "data": data, "summary": "t"}, vault_path=str(vault)))
+        "data": data, "summary": "t"}, root_path=str(vault)))
 
 
 def _field(vault, name, entity_type="character", entity_id="kael"):
     from tools.story_retrieve import handler
     r = json.loads(handler({
         "project": "save-the-children", "entity_type": entity_type,
-        "id": [entity_id], "fields": [name]}, vault_path=str(vault)))
+        "id": [entity_id], "fields": [name]}, root_path=str(vault)))
     return r["entities"][0]["fields"][name]
 
 
@@ -143,7 +143,7 @@ class TestValidKeysStillWork:
         _edit(vault, {"Background": "PROSE MARKER."})
         r = json.loads(handler({
             "project": "save-the-children", "entity_type": "character",
-            "id": ["kael"], "sections": ["all"]}, vault_path=str(vault)))
+            "id": ["kael"], "sections": ["all"]}, root_path=str(vault)))
         assert r["entities"][0]["sections"]["Background"] == "PROSE MARKER."
 
     def test_every_valid_key_of_every_entity_type_is_accepted(self, vault):

@@ -29,16 +29,52 @@ def project(tmp_path, monkeypatch):
     shutil.copytree(FIXTURE, vault / "projects" / "save-the-children")
     import core.config
     monkeypatch.setattr(core.config, "load_plugin_config",
-                        lambda: {"vault_path": str(vault)})
+                        lambda: {"root_path": str(vault)})
     from tools.story_import import handler as import_handler
-    import_handler({"project": "save-the-children", "confirm": True}, vault_path=str(vault))
+    import_handler({"project": "save-the-children", "confirm": True}, root_path=str(vault))
     return vault / "projects" / "save-the-children"
 
 
 def load(project, **args):
     from tools.story_load import handler
     vault = str(project.parent.parent)
-    return json.loads(handler({"project": "save-the-children", **args}, vault_path=vault))
+    return json.loads(handler({"project": "save-the-children", **args}, root_path=vault))
+
+
+class TestPlotBeatsLiveInTheirOwnView:
+    """The base map names plots; it does not enumerate their beats.
+
+    setups/crisis/climax/payoffs are per-scene in
+    view='dramatic_elements' with add_plot, and story_retrieve returns the plot
+    whole. Repeating bare scene ids in the map cost tokens and told you nothing
+    the other two surfaces don't say better.
+    """
+
+    def test_base_map_has_no_plot_beats(self, project):
+        result = load(project)
+        assert result["plots"], "fixture should have plots"
+        for plot in result["plots"]:
+            assert not {"setups", "crisis", "climax", "payoffs"} & plot.keys()
+
+    def test_dramatic_elements_with_add_plot_still_has_every_beat_kind(self, project):
+        result = load(project, view="dramatic_elements", add_plot=True)
+        roles = {p["role"]
+                 for act in result["acts"] for seq in act.get("sequences", [])
+                 for scene in seq.get("scenes", []) for p in scene.get("plots", [])}
+        assert roles, "add_plot returned no plot references at all"
+        assert roles <= {"setup", "crisis", "climax", "payoff"}
+
+    def test_retrieve_returns_the_plot_beats(self, project):
+        from tools.story_retrieve import handler as retrieve_handler
+        import json as _json
+        plot_id = load(project)["plots"][0]["id"]
+        got = _json.loads(retrieve_handler({
+            "project": "save-the-children", "entity_type": "plot",
+            "id": [plot_id], "fields": ["all"], "root_path": str(project.parent.parent),
+        }))["entities"][0]["fields"]
+        beats = got.get("setups", []) + got.get("crisis", []) \
+            + got.get("climax", []) + got.get("payoffs", [])
+        assert beats, f"{plot_id} lost its beats — they are readable nowhere"
 
 
 class TestBaseViewIsUnchanged:
@@ -77,7 +113,7 @@ class TestBaseViewIsUnchanged:
                             "project": "save-the-children",
                             "frontmatter": {"title": f"Extra {i}",
                                             "sequence_id": "seq-discovery"}},
-                           vault_path=vault)
+                           root_path=vault)
         grown = len(json.dumps(load(project)))
         # 40 scenes must not cost more than a trivial slice of the budget.
         assert (grown - small) / 40 < 40, f"{grown - small} chars for 40 scenes"

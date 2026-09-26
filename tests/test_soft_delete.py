@@ -34,9 +34,9 @@ def vault(tmp_path, monkeypatch):
     shutil.copytree(str(FIXTURE), str(dest))
     import core.config
     monkeypatch.setattr(core.config, "load_plugin_config",
-                        lambda: {"vault_path": str(v)})
+                        lambda: {"root_path": str(v)})
     from tools.story_import import handler
-    handler({"project": "stc", "confirm": True}, vault_path=str(v))
+    handler({"project": "stc", "confirm": True}, root_path=str(v))
     return v
 
 
@@ -49,7 +49,7 @@ def _edit(vault, action, entity_type="character", slug="kael", **extra):
     return json.loads(handler({
         "action": action,
         "target": {"entity_type": entity_type, "slug": slug, "project": "stc"},
-        "summary": "test", **extra}, vault_path=str(vault)))
+        "summary": "test", **extra}, root_path=str(vault)))
 
 
 def _q(vault, sql, args=()):
@@ -105,7 +105,7 @@ class TestDeletedEntitiesAreInvisible:
         _delete(vault)
         r = json.loads(handler({
             "project": "stc", "entity_type": "character", "id": ["kael"],
-            "fields": ["one_sentence"]}, vault_path=str(vault)))
+            "fields": ["one_sentence"]}, root_path=str(vault)))
         assert r.get("entities", []) == []
         assert r.get("not_found"), "a deleted id must not read as found"
 
@@ -113,7 +113,7 @@ class TestDeletedEntitiesAreInvisible:
         from tools.story_load import handler
         _delete(vault)
         assert "kael" not in json.dumps(
-            json.loads(handler({"project": "stc"}, vault_path=str(vault))))
+            json.loads(handler({"project": "stc"}, root_path=str(vault))))
 
     def test_search_cannot_reach_its_prose(self, vault):
         from tools.story_search import handler
@@ -160,14 +160,14 @@ class TestDeletedEntitiesAreInvisible:
         from tools.story_load import handler
         _delete(vault)
         r = json.loads(handler({"project": "stc", "view": "arc"},
-                               vault_path=str(vault)))
+                               root_path=str(vault)))
         assert "kael" not in {a["character"] for a in r.get("arcs", [])}
 
     def test_unfilled_view_omits_it(self, vault):
         from tools.story_load import handler
         _delete(vault)
         r = json.loads(handler({"project": "stc", "view": "unfilled"},
-                               vault_path=str(vault)))
+                               root_path=str(vault)))
         listed = {e for item in r["unfilled"] for e in item["entities"]}
         assert "kael" not in listed
 
@@ -181,7 +181,7 @@ class TestRestore:
             r = json.loads(handler({
                 "project": "stc", "entity_type": "character", "id": ["kael"],
                 "fields": ["goals_short", "arc_value", "one_sentence"],
-                "sections": ["all"]}, vault_path=str(vault)))
+                "sections": ["all"]}, root_path=str(vault)))
             return r["entities"][0]
 
         before = snap()

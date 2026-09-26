@@ -23,7 +23,7 @@ def db_project(fixture_path):
     proj = Path(tmp) / "projects" / "save-the-children"
     proj.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(proj))
-    import_handler({"project": str(proj), "vault_path": Path(tmp)})
+    import_handler({"project": str(proj), "root_path": Path(tmp)})
     yield proj, Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -38,7 +38,7 @@ class TestStoryLoadDB:
 
     def test_load_project_metadata(self, db_project):
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert result["project"]["name"] == "Save the Children"
 
 
@@ -48,7 +48,7 @@ class TestNestedStructure:
     def test_load_returns_nested_acts(self, db_project):
         """acts[] contains sequences[] contains scenes[]."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "acts" in result
         assert isinstance(result["acts"], list)
         assert len(result["acts"]) > 0
@@ -63,7 +63,7 @@ class TestNestedStructure:
     def test_load_characters_keyed_by_slug(self, db_project):
         """characters is a list with explicit id field."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "characters" in result
         assert isinstance(result["characters"], list)
         assert any(e["id"] == "kael" for e in result["characters"])
@@ -71,14 +71,14 @@ class TestNestedStructure:
     def test_load_plots_keyed_by_slug(self, db_project):
         """plots is a list with explicit id field."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "plots" in result
         assert isinstance(result["plots"], list)
 
     def test_load_locations_keyed_by_slug(self, db_project):
         """locations nested inside worlds, each with explicit id field."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "worlds" in result
         assert isinstance(result["worlds"], list)
         # Locations are nested inside worlds
@@ -89,32 +89,38 @@ class TestNestedStructure:
         assert all("id" in loc for loc in all_locs)
 
     def test_load_worlds_keyed_by_slug(self, db_project):
-        """worlds is a list with explicit id field, contains locations."""
+        """worlds is a list with explicit id field; a populated world lists locations.
+
+        An empty `locations` key is omitted like every other empty collection —
+        an unwritten world prints "locations": [] and reads as "done, has none".
+        """
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "worlds" in result
         assert isinstance(result["worlds"], list)
         assert all("id" in w for w in result["worlds"])
-        # Each world has a locations array
-        for w in result["worlds"]:
-            assert "locations" in w
+        populated = [w for w in result["worlds"] if w.get("locations")]
+        assert populated, "fixture should have a world with locations"
+        for w in populated:
+            assert all("id" in loc for loc in w["locations"])
+        assert not any(w.get("locations") == [] for w in result["worlds"])
 
     def test_no_entities_key(self, db_project):
         """Old flat entities key is gone."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "entities" not in result
 
     def test_no_relations_key(self, db_project):
         """Old flat relations key is gone."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "relations" not in result
 
     def test_memory_contract(self, db_project):
         """story_load returns the full DB-backed memory block."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         assert "memory" in result
         assert "memory_outline" not in result
         assert result["memory"]["status"] == "ready"
@@ -129,7 +135,7 @@ class TestStubClassification:
     def test_scene_stub_has_only_id(self, db_project):
         """A planned scene with no dramatic_role is a stub: {id} only."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         # Verify stub mechanism: if a stub exists, it should be a compact object
         for act in result["acts"]:
             for seq in act.get("sequences", []):
@@ -143,7 +149,7 @@ class TestStubClassification:
     def test_scene_full_has_dramatic_role(self, db_project):
         """A non-stub scene has dramatic_role."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         found_full = False
         for act in result["acts"]:
             for seq in act.get("sequences", []):
@@ -155,7 +161,7 @@ class TestStubClassification:
     def test_character_has_no_arc_array(self, db_project):
         """Character in load output has no arc array (retrieved via story_retrieve)."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for char in result["characters"]:
             assert "arc" not in char
 
@@ -166,7 +172,7 @@ class TestEmbeddedCrossReferences:
     def test_scene_has_chars(self, db_project):
         """scene.chars populated from character_scene relations."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
@@ -179,7 +185,7 @@ class TestEmbeddedCrossReferences:
     def test_scene_has_loc(self, db_project):
         """scene.loc populated from location_scene relation."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
@@ -191,7 +197,7 @@ class TestEmbeddedCrossReferences:
     def test_character_has_rel(self, db_project):
         """character.relationships populated from relationship entities."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for char in result["characters"]:
             if "relationships" in char:
                 for rel in char["relationships"]:
@@ -202,7 +208,7 @@ class TestEmbeddedCrossReferences:
     def test_plot_has_setups(self, db_project):
         """plot.setups populated from plot_setup relations."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for plot in result["plots"]:
             if "setups" in plot:
                 assert isinstance(plot["setups"], list)
@@ -214,14 +220,14 @@ class TestSectionsPerEntity:
     def test_character_has_no_sections_key(self, db_project):
         """Character in load output has no sections key."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         kael = next(e for e in result["characters"] if e["id"] == "kael")
         assert "sections" not in kael
 
     def test_all_entities_have_no_sections_key(self, db_project):
         """No entity type in load output has a sections key."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for char in result["characters"]:
             assert "sections" not in char
         for plot in result["plots"]:
@@ -262,7 +268,7 @@ class TestUnfilledInverted:
         for entities in unfilled.values():
             all_unfilled.update(entities)
         # No stub scene slug should appear
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
@@ -278,7 +284,7 @@ class TestUnfilledInverted:
             "entity_type": "character", "slug": "unfilled-test",
             "project": str(proj),
             "frontmatter": {"name": "Unfilled", "story_role": "Minor"},
-            "vault_path": vault
+            "root_path": vault
         })
         unfilled = get_unfilled_map(proj)
         # goals_short should list the new character
@@ -309,7 +315,7 @@ class TestConfirmationFormat:
     def test_confirmation_format(self, db_project):
         """Confirmation: 'Loaded <name> — N scenes (M developed), ...'"""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         conf = result["confirmation"]
         assert conf.startswith("Loaded Save the Children — ")
         assert "scenes" in conf
@@ -325,7 +331,7 @@ class TestConfirmationFormat:
 class TestTokenBudget:
     def test_load_under_8_5k_tokens(self, db_project):
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         data = json.dumps(result)
         est_tokens = len(data) // 4
         assert est_tokens < 8500, f"Estimated tokens: {est_tokens}"
@@ -335,10 +341,17 @@ class TestNavigationalQueries:
     """5 navigational queries answerable from nested structure alone."""
 
     def test_plot_to_scenes(self, db_project):
-        """Which scenes does 'the-resistance' plot touch?"""
+        """Which scenes does 'the-resistance' plot touch?
+
+        Verified through story_retrieve, which returns the plot whole — the
+        base map no longer carries beats.
+        """
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        plot = next(p for p in result["plots"] if p["id"] == "the-resistance")
+        from tools.story_retrieve import handler as retrieve_handler
+        result = json.loads(retrieve_handler({
+            "project": str(proj), "entity_type": "plot",
+            "id": ["the-resistance"], "fields": ["all"]}))
+        plot = result["entities"][0]["fields"]  # field values are nested under "fields"
         scenes = (
             plot.get("setups", [])
             + plot.get("crisis", [])
@@ -350,7 +363,7 @@ class TestNavigationalQueries:
     def test_character_to_scenes(self, db_project):
         """What scenes has Kael been in?"""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         kael = next(e for e in result["characters"] if e["id"] == "kael")
         # Navigate: find scenes where kael is in chars
         kael_scenes = []
@@ -362,25 +375,27 @@ class TestNavigationalQueries:
         assert "central-room-day" in kael_scenes
 
     def test_scene_to_plots(self, db_project):
-        """Which plots touch central-room-day?"""
+        """Which plots touch central-room-day?
+
+        Plot beats are not in the base map any more — they are per-scene in
+        view='dramatic_elements' with add_plot, which is the surface that
+        answers "what touches this scene" without inverting the index.
+        """
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
-        touching = []
-        for plot in result["plots"]:
-            all_scenes = (
-                plot.get("setups", [])
-                + plot.get("crisis", [])
-                + plot.get("climax", [])
-                + plot.get("payoffs", [])
-            )
-            if "central-room-day" in all_scenes:
-                touching.append(plot["id"])
-        assert len(touching) > 0
+        result = json.loads(load_handler({
+            "project": str(proj), "root_path": vault, "view": "dramatic_elements", "add_plot": True}))
+        touching = set()
+        for act in result["acts"]:
+            for seq in act.get("sequences", []):
+                for scene in seq.get("scenes", []):
+                    if scene.get("id") == "central-room-day":
+                        touching = {p["plot"] for p in scene.get("plots", [])}
+        assert touching, "no plot references central-room-day"
 
     def test_structure_hierarchy(self, db_project):
         """act→sequence→scene hierarchy is directly visible in nesting."""
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "vault_path": vault}))
+        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         acts = result["acts"]
         assert len(acts) > 0
         for act in acts:
@@ -400,7 +415,7 @@ class TestStoryRetrieveDB:
             "entity_type": "character",
             "id": ["kael"],
             "sections": ["Identity", "Background"],
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["entity_type"] == "character"
         entity = result["entities"][0]
@@ -415,7 +430,7 @@ class TestStoryRetrieveDB:
             "entity_type": "character",
             "id": ["kael"],
             "sections": ["all"],
-            "vault_path": vault
+            "root_path": vault
         }))
         entity = result["entities"][0]
         assert "sections" in entity
@@ -428,7 +443,7 @@ class TestStoryRetrieveDB:
             "entity_type": "arc_beat",
             "id": ["kael-1"],
             "sections": ["Action"],
-            "vault_path": vault
+            "root_path": vault
         }))
         entity = result["entities"][0]
         assert entity["id"] == "kael-1"
@@ -444,7 +459,7 @@ class TestStorySearchDB:
         result = json.loads(search_handler({
             "project": str(proj),
             "query": "First Doubt",
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["total"] > 0
         # Found in an arc beat entity
@@ -456,7 +471,7 @@ class TestStorySearchDB:
         result = json.loads(search_handler({
             "project": str(proj),
             "query": "KAEL",
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["total"] > 0
 
@@ -465,7 +480,7 @@ class TestStorySearchDB:
         result = json.loads(search_handler({
             "project": str(proj),
             "query": "xyznonexistent123",
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["total"] == 0
 
@@ -477,7 +492,7 @@ class TestStoryDashboardDB:
         proj, vault = db_project
         result = json.loads(dashboard_handler({
             "project": str(proj),
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["success"] is True
         html = Path(result["dashboard_url"].replace("file://", "").split("?")[0]).read_text()
@@ -491,7 +506,7 @@ class TestStoryDashboardDB:
         proj, vault = db_project
         result = json.loads(dashboard_handler({
             "project": str(proj),
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["success"] is True
         html = Path(result["dashboard_url"].replace("file://", "").split("?")[0]).read_text()
@@ -509,7 +524,7 @@ class TestAutoReimport:
             "slug": "test-new-char",
             "project": str(proj),
             "frontmatter": {"name": "Test New Char", "story_role": "Supporting"},
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["success"] is True
 
@@ -531,7 +546,7 @@ class TestAutoReimport:
             "target": {"entity_type": "character", "slug": "kael", "project": str(proj)},
             "data": {"one_sentence": "Updated description."},
             "summary": "Update one_sentence",
-            "vault_path": vault
+            "root_path": vault
         }))
         assert result["success"] is True
 

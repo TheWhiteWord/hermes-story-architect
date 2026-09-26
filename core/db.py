@@ -63,6 +63,10 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     Uses autocommit mode (isolation_level=None) — callers explicitly
     BEGIN/COMMIT/ROLLBACK for transactions. Avoids nested-transaction errors
     from SQLite's implicit transaction behavior.
+
+    Also migrates soft-delete columns: every reader filters on
+    ``is_deleted``, and a read-only tool never calls create_schema(), so a
+    project created by an earlier build failed with "no such column" on read.
     """
     db_path = project_path / ".story" / "story.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,6 +74,12 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=3000")
     conn.execute("PRAGMA foreign_keys=ON")
+    # No entities table yet (fresh project) — create_schema() adds it with the
+    # columns already present, so there is nothing to migrate.
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='entities'"
+    ).fetchone():
+        ensure_soft_delete_columns(conn)
     return conn
 
 
@@ -314,22 +324,17 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build cross-reference maps ──
         scene_chars = {}  # scene_id -> [char_slug, ...]
         scene_loc = {}    # scene_id -> loc_slug
-        plot_scenes = {}  # plot_slug -> {"setups": [], "crisis": [], "climax": [], "payoffs": []}
         variant_of = {}   # entity_id -> base_slug (location_variant / world_variant)
 
+        # Plot beats are deliberately NOT collected here: the base map does not
+        # carry them (view='dramatic_elements' with add_plot does, per scene,
+        # with the beat's prose). Building the map cost a dict per plot for
+        # nothing.
         for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
                 scene_chars.setdefault(to_id, []).append(from_id)
             elif kind == "location_scene":
                 scene_loc[to_id] = from_id
-            elif kind == "plot_setup":
-                plot_scenes.setdefault(from_id, {}).setdefault("setups", []).append(to_id)
-            elif kind == "plot_crisis":
-                plot_scenes.setdefault(from_id, {}).setdefault("crisis", []).append(to_id)
-            elif kind == "plot_climax":
-                plot_scenes.setdefault(from_id, {}).setdefault("climax", []).append(to_id)
-            elif kind == "plot_payoff":
-                plot_scenes.setdefault(from_id, {}).setdefault("payoffs", []).append(to_id)
             elif kind in ("location_variant", "world_variant"):
                 variant_of[from_id] = to_id
 
@@ -348,17 +353,11 @@ def get_project_summary(project_path: Path) -> dict:
             if etype == "act":
                 acts[eid] = {
                     "id": eid, "title": name, "status": status,
-                    "value": extra.get("value", "Value not set"),
-                    "value_open": extra.get("value_open", ""),
-                    "value_close": extra.get("value_close", ""),
                     "_order_key": order_key, "_parent_id": parent_id,
                 }
             elif etype == "sequence":
                 sequences[eid] = {
                     "id": eid, "title": name, "status": status,
-                    "value": extra.get("value", "Value not set"),
-                    "value_open": extra.get("value_open", ""),
-                    "value_close": extra.get("value_close", ""),
                     "_order_key": order_key, "_parent_id": parent_id,
                 }
             elif etype == "scene":
@@ -463,17 +462,15 @@ def get_project_summary(project_path: Path) -> dict:
                 [sid for sid, s in scenes.items() if s["_parent_id"] == seq_id],
                 key=lambda sid: (scenes[sid]["_order_key"], sid)
             )
-            result = {
+            # No value here: the sequence's shift is its own, and view='story_value'
+            # is where every container's value lives. Repeating it here cost tokens
+            # in the view whose job is to stay small.
+            return {
                 "id": seq["id"],
                 "title": seq["title"],
                 "status": seq["status"],
-                "value": seq["value"],
-                "value_open": seq["value_open"],
-                "value_close": seq["value_close"],
                 "scenes": [_build_scene(sid) for sid in child_scene_ids],
             }
-            return _omit(result, {"value": "Value not set", "value_open": "", "value_close": ""},
-                         always_keep={"status"})
 
         # ── Build act output ──
         def _build_act(act_id):
@@ -482,17 +479,12 @@ def get_project_summary(project_path: Path) -> dict:
                 [sid for sid, s in sequences.items() if s["_parent_id"] == act_id],
                 key=lambda sid: (sequences[sid]["_order_key"], sid)
             )
-            result = {
+            return {
                 "id": act["id"],
                 "title": act["title"],
                 "status": act["status"],
-                "value": act["value"],
-                "value_open": act["value_open"],
-                "value_close": act["value_close"],
                 "sequences": [_build_sequence(sid) for sid in child_seq_ids],
             }
-            return _omit(result, {"value": "Value not set", "value_open": "", "value_close": ""},
-                         always_keep={"status"})
 
         # Build top-level acts (those without parent_id or parent not in acts)
         top_act_ids = sorted(
@@ -535,7 +527,6 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Build plot output ──
         def _build_plot(plot_id):
             plot = plots[plot_id]
-            ps = plot_scenes.get(plot_id, {})
             result = {
                 "id": plot_id,
                 "name": plot["name"],
@@ -545,13 +536,13 @@ def get_project_summary(project_path: Path) -> dict:
                 "plot_scope": plot["plot_scope"],
                 "value_arc": plot["value_arc"],
                 "characters": plot["characters"],
-                "setups": ps.get("setups", []),
-                "crisis": ps.get("crisis", []),
-                "climax": ps.get("climax", []),
-                "payoffs": ps.get("payoffs", []),
             }
+            # No setups/crisis/climax/payoffs: view='dramatic_elements' with
+            # add_plot carries all four per scene, with the beat's own prose,
+            # and story_retrieve returns the plot whole. Repeating the bare
+            # scene ids here bought nothing in the view that must stay small.
             return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "Value arc not set",
-                                  "characters": [], "setups": [], "crisis": [], "climax": [], "payoffs": []},
+                                  "characters": []},
                          always_keep={"status"})
 
         # ── Build location/world output ──
@@ -568,13 +559,16 @@ def get_project_summary(project_path: Path) -> dict:
                 [lid for lid, loc in locations.items() if loc.get("_parent_id") == world_id],
                 key=lambda lid: (locations[lid]["_order_key"], lid),
             )
-            locations_list = [_build_location(lid) for lid in child_loc_ids]
-            result = {"id": world_id, "name": w["name"], "one_sentence": w["one_sentence"], "locations": locations_list}
+            result = {"id": world_id, "name": w["name"], "one_sentence": w["one_sentence"],
+                      "locations": [_build_location(lid) for lid in child_loc_ids]}
             if w.get("period"):
                 result["period"] = w["period"]
             if world_id in variant_of:
                 result["variant_of"] = variant_of[world_id]
-            return result
+            # Same _omit as every other builder: a world with no locations yet
+            # drops the key rather than printing "locations": []. Was the only
+            # builder that emitted an empty collection.
+            return _omit(result, {"locations": []})
 
         characters_list = [_build_character(cid) for cid in characters]
         plots_list = [_build_plot(pid) for pid in plots]
@@ -674,6 +668,11 @@ def get_unfilled_map(project_path: Path) -> dict:
                     extra = {**extra, "status": status}
                 if one_sentence:
                     extra = {**extra, "one_sentence": one_sentence}
+                # A scene that records no cast is a decision (no_cast), not a gap.
+                # Without this it is flagged forever, which trains the author to
+                # ignore the characters gap — the opposite of what it is for.
+                if extra.get("no_cast"):
+                    extra = {**extra, "characters": ["__none__"]}
                 if scene_chars.get(eid):
                     extra = {**extra, "characters": scene_chars[eid]}
                 if scene_loc.get(eid):

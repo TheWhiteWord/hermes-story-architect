@@ -32,9 +32,9 @@ def vault(tmp_path, monkeypatch):
     shutil.copytree(str(FIXTURE), str(dest))
     import core.config
     monkeypatch.setattr(core.config, "load_plugin_config",
-                        lambda: {"vault_path": str(v)})
+                        lambda: {"root_path": str(v)})
     from tools.story_import import handler
-    handler({"project": "stc", "confirm": True}, vault_path=str(v))
+    handler({"project": "stc", "confirm": True}, root_path=str(v))
     return v
 
 
@@ -45,7 +45,7 @@ def _edit(vault, action, **args):
     from tools.story_edit import handler
     return json.loads(handler({
         "action": action, "target": TARGET, "summary": "test", **args},
-        vault_path=str(vault)))
+        root_path=str(vault)))
 
 
 def _exists(vault, entity_id):
@@ -188,21 +188,21 @@ class TestPurgeLeavesNoMarkdownToResurrect:
         # The sweep only touches files a previous export wrote, so the entity
         # has to be exported once while it still exists.
         export_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         assert note.exists()
 
         _delete(vault)
         _edit(vault, "purge", purge_confirm="DELETE stc", older_than_days=0)
 
         export_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         assert not note.exists(), "purged entity's note survived"
 
         import_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         r = json.loads(retrieve_handler({
             "project": "stc", "entity_type": "character", "id": ["kael"],
-            "fields": ["one_sentence"]}, vault_path=str(vault)))
+            "fields": ["one_sentence"]}, root_path=str(vault)))
         assert not r.get("entities"), "purged entity came back"
 
 
@@ -215,24 +215,24 @@ class TestSoftDeleteSurvivesAnExportImportRoundTrip:
         from tools.story_retrieve import handler as retrieve_handler
         # Export first, so the manifest knows the file exists.
         export_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         _delete(vault)
         export_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         assert not (vault / "projects" / "stc" / "characters" / "kael.md").exists()
         import_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         r = json.loads(retrieve_handler({
             "project": "stc", "entity_type": "character", "id": ["kael"],
-            "fields": ["one_sentence"]}, vault_path=str(vault)))
+            "fields": ["one_sentence"]}, root_path=str(vault)))
         assert not r.get("entities"), "story_import resurrected a deleted entity"
 
     def test_its_arc_beats_are_swept_too(self, vault):
         from tools.story_export import handler as export_handler
         export_handler({"project": "stc", "confirm": True},
-                       vault_path=str(vault))
+                       root_path=str(vault))
         _delete(vault)
         r = json.loads(export_handler({"project": "stc", "confirm": True},
-                                      vault_path=str(vault)))
+                                      root_path=str(vault)))
         assert "characters/kael.md" in r["files_removed"]
         assert any("arcs/kael" in f for f in r["files_removed"])

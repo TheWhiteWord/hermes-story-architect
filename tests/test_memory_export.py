@@ -16,7 +16,7 @@ def project(tmp_path):
         "slug": "memory-export",
         "project": "",
         "frontmatter": {"name": "Memory Export"},
-    }, vault_path=tmp_path)
+    }, root_path=tmp_path)
     return tmp_path / "projects" / "memory-export", tmp_path
 
 
@@ -24,11 +24,11 @@ def test_export_writes_frontmatter_only_and_preserves_order(project):
     path, vault = project
     memory_handler({
         "project": str(path), "action": "add", "category": "decisions", "entry": "First",
-    }, vault_path=vault)
+    }, root_path=vault)
     memory_handler({
         "project": str(path), "action": "add", "category": "decisions", "entry": "Second",
-    }, vault_path=vault)
-    assert json.loads(export_handler({"project": str(path)}, vault_path=vault))["success"] is True
+    }, root_path=vault)
+    assert json.loads(export_handler({"project": str(path)}, root_path=vault))["success"] is True
     text = (path / ".story" / "memory.md").read_text()
     assert text.startswith("---")
     assert text.rstrip().endswith("---")
@@ -41,12 +41,12 @@ def test_memory_file_is_projection_not_source(project):
     path, vault = project
     memory_handler({
         "project": str(path), "action": "add", "category": "directions", "entry": "DB value",
-    }, vault_path=vault)
+    }, root_path=vault)
     (path / ".story" / "memory.md").write_text("---\ndirections:\n  - File value\n---\n")
     memory_handler({
         "project": str(path), "action": "add", "category": "open_questions", "entry": "Question?",
-    }, vault_path=vault)
-    export_handler({"project": str(path)}, vault_path=vault)
+    }, root_path=vault)
+    export_handler({"project": str(path)}, root_path=vault)
     text = (path / ".story" / "memory.md").read_text()
     assert "DB value" in text
     assert "File value" not in text
@@ -65,7 +65,7 @@ def test_import_uses_valid_memory_file(project):
         "continuity_warnings: []\n"
         "---\n"
     )
-    result = json.loads(import_handler({"project": str(path)}, vault_path=vault))
+    result = json.loads(import_handler({"project": str(path)}, root_path=vault))
     assert result["success"] is True
     assert get_project_memory(path)["decisions"] == ["Imported decision"]
     assert get_project_memory(path)["open_questions"] == ["Imported question?"]
@@ -77,8 +77,8 @@ def test_import_rejects_invalid_memory_file_without_mutating_db(project):
     path, vault = project
     memory_handler({
         "project": str(path), "action": "add", "category": "decisions", "entry": "DB value",
-    }, vault_path=vault)
+    }, root_path=vault)
     (path / ".story" / "memory.md").write_text("---\ndecisions:\n  - one\n  - one\n---\n")
-    result = json.loads(import_handler({"project": str(path)}, vault_path=vault))
+    result = json.loads(import_handler({"project": str(path)}, root_path=vault))
     assert result["error"]
     assert get_project_memory(path)["decisions"] == ["DB value"]

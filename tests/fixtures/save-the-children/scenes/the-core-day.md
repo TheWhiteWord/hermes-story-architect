@@ -20,8 +20,8 @@ time_of_day: DAY
 title: The Core - Day
 type: scene
 value: Trust
-value_close: positive
-value_open: positive
+value_at_close: positive
+value_at_open: positive
 ---
 
 ## Description

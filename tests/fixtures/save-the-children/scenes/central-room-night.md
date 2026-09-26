@@ -19,8 +19,8 @@ time_of_day: NIGHT
 title: Central Room - Night
 type: scene
 value: Trust
-value_close: positive
-value_open: negative
+value_at_close: positive
+value_at_open: negative
 ---
 
 ## Description

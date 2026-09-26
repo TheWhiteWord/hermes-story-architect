@@ -34,13 +34,13 @@ def vault(tmp_path):
     import pytest as _p
     _monkey = _p.MonkeyPatch()
     _monkey.setattr(core.config, "load_plugin_config",
-                    lambda: {"vault_path": str(v)})
+                    lambda: {"root_path": str(v)})
     yield v
     _monkey.undo()
 
 
 def _mem(vault, **args):
-    return json.loads(memory_handler(args, vault_path=str(vault)))
+    return json.loads(memory_handler(args, root_path=str(vault)))
 
 
 class TestThreshold:

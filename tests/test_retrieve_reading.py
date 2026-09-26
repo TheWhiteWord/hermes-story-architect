@@ -19,7 +19,7 @@ from tools.story_retrieve import handler as retrieve_handler
 
 def _get(project, vault, **args):
     args["project"] = str(project)
-    args["vault_path"] = str(vault)
+    args["root_path"] = str(vault)
     return json.loads(retrieve_handler(args))
 
 
@@ -30,7 +30,7 @@ def db(fixture_path, tmp_path):
     proj = vault / "save-the-children"
     proj.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(proj))
-    import_handler({"project": str(proj), "confirm": True, "vault_path": str(vault)})
+    import_handler({"project": str(proj), "confirm": True, "root_path": str(vault)})
     return proj, vault
 
 

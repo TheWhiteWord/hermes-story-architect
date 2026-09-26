@@ -88,7 +88,7 @@ def project(tmp_path):
         "slug": proj_slug,
         "project": str(tmp_path),
         "frontmatter": {"name": "Test Project", "logline": "Test logline"},
-        "vault_path": tmp_path,
+        "root_path": tmp_path,
     })
     data = json.loads(result)
     assert data.get("success"), f"Project creation failed: {data}"
@@ -397,9 +397,18 @@ def test_edit_all_field_types(entity_type, project):
         section_content = retrieve_after["entities"][0]["sections"].get(section_name, "")
         assert f"Updated {section_name} content via edit." in section_content
 
-    # Relation check — now embedded in plot
+    # Relation check — plot beats are no longer in the base map (they live in
+    # view='dramatic_elements' with add_plot, and story_retrieve returns the
+    # plot whole), so verify through story_retrieve.
     if entity_type == "plot":
-        all_scenes = entity_data["setups"] + entity_data["crisis"] + entity_data["climax"] + entity_data["payoffs"]
+        plot_after = json.loads(retrieve_handler({
+            "project": str(project),
+            "entity_type": "plot",
+            "id": [entity_id],
+            "fields": ["all"],
+        }))["entities"][0]["fields"]  # field values are nested under "fields"
+        all_scenes = (plot_after.get("setups", []) + plot_after.get("crisis", [])
+                      + plot_after.get("climax", []) + plot_after.get("payoffs", []))
         assert len(all_scenes) > 0, "Plot has no scene references after edit"
 
 
@@ -446,8 +455,8 @@ def test_import_export_round_trip(tmp_path):
     proj.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(str(fixture), str(proj))
 
-    import_handler({"project": str(proj), "vault_path": tmp_path})
-    export_handler({"project": str(proj), "vault_path": tmp_path})
+    import_handler({"project": str(proj), "root_path": tmp_path})
+    export_handler({"project": str(proj), "root_path": tmp_path})
 
     assert (proj / "project.md").exists()
     assert (proj / "characters").is_dir()
@@ -467,7 +476,7 @@ def test_import_preserves_all_plot_beats(tmp_path):
     proj.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(str(fixture), str(proj))
 
-    import_handler({"project": str(proj), "vault_path": tmp_path})
+    import_handler({"project": str(proj), "root_path": tmp_path})
 
     from core.db import get_db
     conn = get_db(proj)
@@ -507,7 +516,7 @@ def test_import_skips_recycle_bin(tmp_path):
     proj.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(str(fixture), str(proj))
 
-    import_handler({"project": str(proj), "vault_path": tmp_path})
+    import_handler({"project": str(proj), "root_path": tmp_path})
 
     from core.db import get_db
     conn = get_db(proj)

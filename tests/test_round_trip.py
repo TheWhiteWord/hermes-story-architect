@@ -15,7 +15,7 @@ def test_import_creates_schema_and_entities(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        result = import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        result = import_handler({"project": str(project_path), "root_path": Path(tmp)})
         data = json.loads(result)
         assert data["success"] is True
 
@@ -40,7 +40,7 @@ def test_round_trip_preserves_entities(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         export_dir = Path(tmp) / "exported"
         export_dir.mkdir()
@@ -51,7 +51,7 @@ def test_round_trip_preserves_entities(fixture_path):
         for f in export_path.rglob("*.md"):
             f.unlink()
 
-        result = export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        result = export_handler({"project": str(export_path), "root_path": str(export_dir)})
         data = json.loads(result)
         assert data["success"] is True
 
@@ -72,7 +72,7 @@ def test_round_trip_preserves_data(fixture_path):
         # First import
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         # Export
         export_dir = Path(tmp) / "exported"
@@ -81,7 +81,7 @@ def test_round_trip_preserves_data(fixture_path):
         export_path = export_dir / "proj"
         for f in export_path.rglob("*.md"):
             f.unlink()
-        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
         # Re-import from the exported files
         reimport_path = Path(tmp) / "reimported"
@@ -94,7 +94,7 @@ def test_round_trip_preserves_data(fixture_path):
         if db_path.exists():
             db_path.unlink()
 
-        import_handler({"project": str(reimport_proj), "vault_path": str(reimport_path)})
+        import_handler({"project": str(reimport_proj), "root_path": str(reimport_path)})
 
         # Compare DB state (project id will differ since it's the folder name)
         from core.db import get_db
@@ -130,7 +130,7 @@ def test_round_trip_kael_note(fixture_path):
         shutil.copytree(str(fixture_path), str(project_path))
 
         # Import
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         # Export
         export_dir = Path(tmp) / "exported"
@@ -139,7 +139,7 @@ def test_round_trip_kael_note(fixture_path):
         export_path = export_dir / "proj"
         for f in export_path.rglob("*.md"):
             f.unlink()
-        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
         orig = frontmatter.load(project_path / "characters" / "kael.md")
         exported = frontmatter.load(export_path / "characters" / "kael.md")
@@ -167,7 +167,7 @@ def test_fts5_populated_after_import(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         from core.db import get_db
         conn = get_db(project_path)
@@ -191,7 +191,7 @@ def test_recycle_bin_not_imported(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         from core.db import get_db
         conn = get_db(project_path)
@@ -210,7 +210,7 @@ def test_world_fields_round_trip(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         export_dir = Path(tmp) / "exported"
         export_dir.mkdir()
@@ -218,7 +218,7 @@ def test_world_fields_round_trip(fixture_path):
         export_path = export_dir / "proj"
         for f in export_path.rglob("*.md"):
             f.unlink()
-        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
         orig = frontmatter.load(project_path / "worlds" / "the-i.md")
         exported = frontmatter.load(export_path / "worlds" / "the-i.md")
@@ -241,7 +241,7 @@ def test_location_world_and_variant_fields_round_trip(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         export_dir = Path(tmp) / "exported"
         export_dir.mkdir()
@@ -249,7 +249,7 @@ def test_location_world_and_variant_fields_round_trip(fixture_path):
         export_path = export_dir / "proj"
         for f in export_path.rglob("*.md"):
             f.unlink()
-        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
         orig = frontmatter.load(project_path / "locations" / "the-central-room.md")
         exported = frontmatter.load(export_path / "locations" / "the-central-room.md")
@@ -271,7 +271,7 @@ def test_relationship_round_trip(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         # Export
         export_dir = Path(tmp) / "exported"
@@ -280,7 +280,7 @@ def test_relationship_round_trip(fixture_path):
         export_path = export_dir / "proj"
         for f in export_path.rglob("*.md"):
             f.unlink()
-        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
         # Verify relationships/ folder has files
         rel_dir = export_path / "relationships"
@@ -299,7 +299,7 @@ def test_relationship_round_trip(fixture_path):
         if db_path.exists():
             db_path.unlink()
 
-        import_handler({"project": str(reimport_proj), "vault_path": str(reimport_path)})
+        import_handler({"project": str(reimport_proj), "root_path": str(reimport_path)})
 
         # Verify relationship entities in DB
         from core.db import get_db
@@ -319,7 +319,7 @@ def test_world_variant_of_round_trip(fixture_path):
         project_path = Path(tmp) / "save-the-children"
         shutil.copytree(str(fixture_path), str(project_path))
 
-        import_handler({"project": str(project_path), "vault_path": Path(tmp)})
+        import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         # Verify relation row was created
         from core.db import get_db
@@ -338,7 +338,7 @@ def test_world_variant_of_round_trip(fixture_path):
         export_path = export_dir / "proj"
         for f in export_path.rglob("*.md"):
             f.unlink()
-        export_handler({"project": str(export_path), "vault_path": str(export_dir)})
+        export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
         exported = frontmatter.load(export_path / "worlds" / "the-real-world.md")
         assert exported.metadata["variant_of"] == "the-i"

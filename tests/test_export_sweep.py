@@ -22,12 +22,12 @@ from tools.story_import import handler as import_handler
 
 def _export(project, vault):
     # Resolve by name against the vault so the tool's own path resolution runs.
-    return json.loads(export_handler({"project": "save-the-children"}, vault_path=str(vault)))
+    return json.loads(export_handler({"project": "save-the-children"}, root_path=str(vault)))
 
 
 def _reimport(project, vault):
     (project / ".story" / "story.db").unlink()
-    import_handler({"project": "save-the-children", "confirm": True}, vault_path=str(vault))
+    import_handler({"project": "save-the-children", "confirm": True}, root_path=str(vault))
 
 
 def _delete(project, *ids):
@@ -54,7 +54,7 @@ def proj(fixture_path, tmp_path):
     p = vault / "projects" / "save-the-children"
     p.parent.mkdir(parents=True)
     shutil.copytree(str(fixture_path), str(p))
-    import_handler({"project": "save-the-children", "confirm": True}, vault_path=str(vault))
+    import_handler({"project": "save-the-children", "confirm": True}, root_path=str(vault))
     return p, vault
 
 

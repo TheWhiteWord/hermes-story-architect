@@ -149,7 +149,7 @@ class TestStructuralStats:
         from tools.story_import import handler as import_handler
         from core.db import get_dashboard_data
 
-        import_handler({"project": str(fixture_path), "vault_path": fixture_path.parent})
+        import_handler({"project": str(fixture_path), "root_path": fixture_path.parent})
 
         data = get_dashboard_data(fixture_path)
         stats = data["structural_stats"]
