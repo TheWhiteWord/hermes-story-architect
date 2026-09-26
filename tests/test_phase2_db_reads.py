@@ -398,39 +398,41 @@ class TestStoryRetrieveDB:
         result = json.loads(retrieve_handler({
             "project": str(proj),
             "entity_type": "character",
-            "slug": "kael",
+            "id": ["kael"],
             "sections": ["Identity", "Background"],
             "vault_path": vault
         }))
         assert result["entity_type"] == "character"
-        assert result["slug"] == "kael"
-        assert "Identity" in result["sections"]
-        assert "Background" in result["sections"]
+        entity = result["entities"][0]
+        assert entity["id"] == "kael"
+        assert "Identity" in entity["sections"]
+        assert "Background" in entity["sections"]
 
     def test_retrieve_all_sections(self, db_project):
         proj, vault = db_project
         result = json.loads(retrieve_handler({
             "project": str(proj),
             "entity_type": "character",
-            "slug": "kael",
+            "id": ["kael"],
             "sections": ["all"],
             "vault_path": vault
         }))
-        assert "content" in result
-        assert "sections" in result
-        assert "Identity" in result["sections"]
+        entity = result["entities"][0]
+        assert "sections" in entity
+        assert "Identity" in entity["sections"]
 
     def test_retrieve_arc_beat(self, db_project):
         proj, vault = db_project
         result = json.loads(retrieve_handler({
             "project": str(proj),
             "entity_type": "arc_beat",
-            "slug": "kael-1",
+            "id": ["kael-1"],
             "sections": ["Action"],
             "vault_path": vault
         }))
-        assert result["slug"] == "kael-1"
-        assert "Action" in result["sections"]
+        entity = result["entities"][0]
+        assert entity["id"] == "kael-1"
+        assert "Action" in entity["sections"]
 
 
 class TestStorySearchDB:

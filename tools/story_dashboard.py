@@ -36,7 +36,7 @@ def _compute_screenplay_stats(screenplay_text, scene_ids=None):
     try:
         from core.fountain_lexer import parse as fountain_parse, tokens_to_html
     except ImportError:
-        from core.fountain_lexer import parse as fountain_parse, tokens_to_html
+        return None
 
     parsed = fountain_parse(screenplay_text)
     tokens = parsed.get('tokens', [])
@@ -359,31 +359,38 @@ def _render_dashboard(data: dict, project_path: Path, project: str) -> str:
     if data.get("structural_stats"):
         injections += f"\nwindow.__STRUCTURAL_STATS__ = {json.dumps(data['structural_stats'])};"
 
-    html = html.replace(
-        "// ─── Boot ─────────────────────────────────────────────────────────────────────",
-        injections + "\n// ─── Boot ─────────────────────────────────────────────────────────────────────",
-    )
+    # The injection point is a comment inside core.js. If that comment is ever
+    # edited or reworded, a silent .replace() would leave __STORY_DATA__ unset
+    # and the dashboard would render empty while still reporting success — so
+    # assert the anchor actually landed.
+    boot_marker = "// ─── Boot ─────────────────────────────────────────────────────────────────────"
+    if boot_marker not in html:
+        return json.dumps({
+            "error": "Dashboard boot marker not found in the assembled HTML. "
+                     "The injection point in dashboard/js/core.js has probably "
+                     "been reworded — story_dashboard needs its marker updated.",
+        })
+    html = html.replace(boot_marker, injections + "\n" + boot_marker)
 
-    # Name temp file after the story title
-    project_name = ""
-    sd = data.get("story_data", {})
-    if isinstance(sd, dict):
-        project_name = sd.get("project", {}).get("name", "")
-    else:
-        for row in sd:
-            if row.get("type") == "project" and row.get("name"):
-                project_name = row["name"]
-                break
-    if not project_name:
-        project_name = project
-    safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in project_name).strip().replace(" ", "_")
+    # Name the file after the project SLUG, never the title: two projects can
+    # share a title, and one shared file means the second dashboard silently
+    # renders the first project's data. The title is only used for the slug
+    # when the folder name is unavailable.
+    project_name = project_path.name or project
+    safe_slug = "".join(
+        c if c.isalnum() or c in " -_" else "_" for c in project_name
+    ).strip().replace(" ", "_") or "dashboard"
+
+    # Cache-buster varies by project AND by time, so re-opening after an edit
+    # always refetches.
+    stamp = int(__import__("time").time())
     tmp_dir = Path(tempfile.gettempdir())
-    tmp_path = tmp_dir / f"{safe_name}.html"
+    tmp_path = tmp_dir / f"{safe_slug}.html"
     tmp_path.write_text(html, encoding="utf-8")
 
     return json.dumps({
         "success": True,
         "message": f"Dashboard opened for {project}",
-        "dashboard_url": f"file://{tmp_path}?t={int(__import__('time').time())}",
+        "dashboard_url": f"file://{tmp_path}?t={stamp}",
         "project": project,
     })

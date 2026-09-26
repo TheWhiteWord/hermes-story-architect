@@ -289,14 +289,16 @@ class TestArcRetrieveTool:
         result = retrieve_handler({
             "project": str(tmp_path),
             "entity_type": "arc_beat",
-            "slug": "1",
+            "id": ["1"],
             "sections": ["all"]
         })
         data = json.loads(result)
         assert data["entity_type"] == "arc_beat"
-        assert data["slug"] == "1"
-        assert "## Action" in data["content"]
-        assert "## Notes" in data["content"]
+        # "1" is the beat part of a `{character}-{beat}` key; it resolves to the real id.
+        entity = data["entities"][0]
+        assert entity["id"].endswith("-1")
+        assert "Action" in entity["sections"]
+        assert "Notes" in entity["sections"]
 
     def test_retrieve_arc_specific_section(self, tmp_path):
         """story_retrieve can load specific arc beat section."""
@@ -319,11 +321,11 @@ class TestArcRetrieveTool:
         result = retrieve_handler({
             "project": str(tmp_path),
             "entity_type": "arc_beat",
-            "slug": "1",
+            "id": ["1"],
             "sections": ["Action"]
         })
         data = json.loads(result)
-        assert "Action" in data["sections"]
+        assert "Action" in data["entities"][0]["sections"]
 
     def test_retrieve_arc_not_found(self, tmp_path):
         """story_retrieve returns error for nonexistent arc beat."""
@@ -332,7 +334,7 @@ class TestArcRetrieveTool:
         result = retrieve_handler({
             "project": str(tmp_path),
             "entity_type": "arc_beat",
-            "slug": "999",
+            "id": ["999"],
             "sections": ["all"]
         })
         data = json.loads(result)
@@ -383,14 +385,15 @@ class TestArcToolIntegrationFixture:
         result = retrieve_handler({
             "project": str(fixture_path),
             "entity_type": "arc_beat",
-            "slug": "1",
+            "id": ["1"],
             "sections": ["all"],
             "vault_path": fixture_path.parent,
         })
         data = json.loads(result)
         assert data["entity_type"] == "arc_beat"
-        assert data["slug"] == "1"
-        assert "## Action" in data["content"]
+        entity = data["entities"][0]
+        assert entity["id"].endswith("-1")
+        assert "Action" in entity["sections"]
 
     def test_retrieve_arc_action_section_from_fixture(self, fixture_path):
         """story_retrieve loads specific section from fixture arc beat."""
@@ -402,12 +405,12 @@ class TestArcToolIntegrationFixture:
         result = retrieve_handler({
             "project": str(fixture_path),
             "entity_type": "arc_beat",
-            "slug": "2",
+            "id": ["2"],
             "sections": ["Action"],
             "vault_path": fixture_path.parent,
         })
         data = json.loads(result)
-        assert "Action" in data["sections"]
+        assert "Action" in data["entities"][0]["sections"]
 
     def test_load_fixture_includes_arc_count(self, fixture_path):
         """story_load confirmation includes fixture character count."""

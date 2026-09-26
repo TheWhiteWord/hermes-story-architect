@@ -1,10 +1,13 @@
 """story_backup tool — create timestamped .db backup."""
 import json
-import shutil
-from datetime import datetime
 from pathlib import Path
 
 SCHEMA = {
+    "description": "Copy the project database to a timestamped file. The database holds every "
+                   "write — story_edit, story_create and story_memory all persist there, and the "
+                   "Markdown files are only a stale export. Take one before a delete_entity, and "
+                   "before finishing a working session. Note: a backup can be copied but NOT "
+                   "restored by any tool yet, and story_edit does not take one automatically.",
     "type": "object",
     "properties": {
         "project": {"type": "string", "description": "Project slug or path"},
@@ -34,12 +37,11 @@ def handler(args, **kwargs) -> str:
     if not db_path.exists():
         return json.dumps({"error": "No story.db found. Run story_import first."})
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = project_path / ".story" / f"story_{timestamp}.db"
-    shutil.copy2(str(db_path), str(backup_path))
+    from core.db import backup_database
+    backup_path = backup_database(project_path)
 
     return json.dumps({
         "success": True,
-        "message": f"Backed up to {backup_path.name}",
-        "backup": str(backup_path),
+        "message": f"Backed up to {Path(backup_path).name}",
+        "backup": backup_path,
     })

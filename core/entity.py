@@ -164,11 +164,27 @@ _RELATION_FIELDS = {
 }
 
 
+def _is_empty(value, default) -> bool:
+    """True when a field holds nothing worth showing.
+
+    Three cases, all of which really are "not set by the user":
+      * the schema default — which for some fields is a UI placeholder string
+        like "Summary not set" rather than an empty value;
+      * an empty string, list or dict — a field the user deliberately cleared;
+      * None.
+    """
+    if value is None:
+        return True
+    if isinstance(value, (str, list, dict)) and len(value) == 0:
+        return True
+    return value == default
+
+
 def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
-    """Return list of optional field names whose value matches the schema default.
+    """Return list of optional field names that hold no user-supplied value.
 
     Sub-field rule (generalized, driven by `sub_fields` in ENTITY_SCHEMAS):
-    - Parent at default → report parent name (e.g. `perspectives`, `setups`)
+    - Parent empty → report parent name (e.g. `perspectives`, `setups`)
     - Parent present, object type → report missing expected keys as
       `parent.key` (e.g. `perspectives.kael`). Expected keys come from
       `characters` — the only object-sub_fields field today.
@@ -189,7 +205,7 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
                 or meta["type"] in ("boolean", "number")):
             continue
         value = extra.get(field, meta["default"])
-        if "sub_fields" in meta and value != meta["default"]:
+        if "sub_fields" in meta and not _is_empty(value, meta["default"]):
             if meta["type"] == "object":
                 # Report missing expected entries as parent.key
                 expected = extra.get("characters", [])
@@ -198,7 +214,7 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
                         unfilled.append(f"{field}.{key}")
             # list type: parent present → filled, no per-entry tracking
             continue
-        if value == meta["default"]:
+        if _is_empty(value, meta["default"]):
             unfilled.append(field)
     return unfilled
 

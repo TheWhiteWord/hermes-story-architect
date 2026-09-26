@@ -743,7 +743,8 @@ class TestPhase3ToolSurface:
         result = edit_handler({
             "action": "delete_entity",
             "target": {"entity_type": "sequence", "slug": "seq-1", "project": str(project_path)},
-            "summary": "Delete seq-1"
+            "summary": "Delete seq-1",
+            "confirm": True
         })
         parsed = json.loads(result)
         assert "error" in parsed
@@ -775,7 +776,8 @@ class TestPhase3ToolSurface:
         result = edit_handler({
             "action": "delete_entity",
             "target": {"entity_type": "act", "slug": "act-1", "project": str(project_path)},
-            "summary": "Delete act-1"
+            "summary": "Delete act-1",
+            "confirm": True
         })
         parsed = json.loads(result)
         assert "error" in parsed
@@ -805,18 +807,26 @@ class TestPhase3ToolSurface:
         result = edit_handler({
             "action": "delete_entity",
             "target": {"entity_type": "character", "slug": "solo-char", "project": str(project_path)},
-            "summary": "Delete solo-char"
+            "summary": "Delete solo-char",
+            "confirm": True
         })
         parsed = json.loads(result)
         assert parsed["success"] is True
 
-        # Verify entity is completely gone (hard delete)
+        # The row survives, flagged — that is what makes restore an exact
+        # inverse (task_18 soft delete). What must be true is that no reader
+        # can see it any more.
         import sqlite3
         conn = sqlite3.connect(str(project_path / ".story" / "story.db"))
         conn.execute("PRAGMA journal_mode=WAL")
-        row = conn.execute("SELECT id FROM entities WHERE id='solo-char'").fetchone()
+        row = conn.execute(
+            "SELECT is_deleted FROM entities WHERE id='solo-char'").fetchone()
+        live = conn.execute(
+            "SELECT count(*) FROM entities WHERE id='solo-char' AND is_deleted=0"
+        ).fetchone()[0]
         conn.close()
-        assert row is None
+        assert row == (1,), "delete must flag the row, not erase it"
+        assert live == 0, "deleted entity must be invisible to readers"
 
     def test_create_scene_auto_order(self, tmp_path):
         """Create scene without order → auto-assigned next position."""

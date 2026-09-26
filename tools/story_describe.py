@@ -1,261 +1,74 @@
-"""story_describe tool — return full schemas for story tools (non-deferred)."""
+"""story_describe tool — what fields does an entity type expect?
+
+The LLM calls this before creating or completing an entity, so it knows which
+questions to ask the user and which fields are worth filling in.
+
+It deliberately does NOT describe the other tools. Tool schemas are already in
+the model's context at all times — that is how tool calling works — so repeating
+them here spends tokens telling the model something it already knows. Each tool
+carries its own `description` instead, which is where the model actually reads it.
+"""
 import json
+
 from core.constants import ENTITY_SCHEMAS
+from core.entity import _RELATION_FIELDS
+
+# Fields stored as rows in `relations` rather than in the entity's own columns/extra.
+# The most surprising thing about the model, and invisible unless we say so.
+_RELATION_FIELDS_BY_NAME = {field for fields in _RELATION_FIELDS.values() for field in fields}
 
 
-def _all_fields() -> dict:
-    """Collect all unique fields across all entity types."""
-    all_fields: dict = {}
-    for entity_type, fields in ENTITY_SCHEMAS.items():
-        for field, meta in fields.items():
-            if field not in all_fields:
-                all_fields[field] = {
-                    "type": meta["type"],
-                    "description": meta["description"],
-                    "default": meta["default"],
-                    "optional": meta.get("optional", True),
-                    "_entity_types": [entity_type],
-                }
-                if meta.get("computed"):
-                    all_fields[field]["computed"] = True
-            else:
-                all_fields[field]["_entity_types"].append(entity_type)
-    return all_fields
-
-
-def _build_tool_schema(name: str) -> dict:
-    """Build schema for a single tool."""
-    schemas = {
-        "story_create": {
-            "name": "story_create",
-            "description": "Create new entity notes (characters, locations, worlds, plots, scenes, sequences, acts, projects).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "entity_type": {
-                        "type": "string",
-                        "enum": list(ENTITY_SCHEMAS.keys()),
-                        "description": "Type of entity to create",
-                    },
-                    "slug": {
-                        "type": "string",
-                        "description": "Entity slug (unique identifier, used as filename)",
-                    },
-                    "project": {
-                        "type": "string",
-                        "description": "Project slug or path",
-                    },
-                    "frontmatter": {
-                        "type": "object",
-                        "description": "Frontmatter fields. Only include fields relevant to your entity type.",
-                        "properties": {
-                            field: {
-                                "type": meta["type"],
-                                "description": f"{meta['description']} (default: {meta['default']})",
-                            }
-                            for field, meta in _all_fields().items()
-                        },
-                    },
-                },
-                "required": ["entity_type", "slug", "project", "frontmatter"],
-            },
-        },
-        "story_load": {
-            "name": "story_load",
-            "description": "Load a story project's index and memory into context.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project": {
-                        "type": "string",
-                        "description": "Project slug or name",
-                    },
-                },
-                "required": ["project"],
-            },
-        },
-        "story_retrieve": {
-            "name": "story_retrieve",
-            "description": "Get specific sections from a note.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "entity_type": {
-                        "type": "string",
-                        "enum": list(ENTITY_SCHEMAS.keys()),
-                        "description": "Type of entity",
-                    },
-                    "slug": {
-                        "type": "string",
-                        "description": "Entity slug",
-                    },
-                    "project": {
-                        "type": "string",
-                        "description": "Project slug or path",
-                    },
-                    "sections": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Section names to retrieve",
-                    },
-                },
-                "required": ["entity_type", "slug", "project", "sections"],
-            },
-        },
-        "story_search": {
-            "name": "story_search",
-            "description": "Search across project notes.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query",
-                    },
-                    "project": {
-                        "type": "string",
-                        "description": "Project slug or path",
-                    },
-                },
-                "required": ["query", "project"],
-            },
-        },
-        "story_memory": {
-            "name": "story_memory",
-            "description": "Add, remove, or replace explicit project story-memory entries.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {"type": "string", "enum": ["add", "remove", "replace"]},
-                    "project": {"type": "string", "description": "Project slug or path"},
-                    "category": {"type": "string", "enum": ["decisions", "directions", "open_questions", "continuity_warnings"]},
-                    "entry": {"type": "string", "description": "Entry for add"},
-                    "old_entry": {"type": "string", "description": "Complete existing entry for remove or replace"},
-                    "new_entry": {"type": "string", "description": "Replacement entry for replace"},
-                },
-                "required": ["action", "project", "category"],
-            },
-        },
-        "story_edit": {
-            "name": "story_edit",
-            "description": "Edit authoritative story entities and structure.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["edit_note", "delete_entity", "reorder"],
-                        "description": "Edit action",
-                    },
-                    "target": {
-                        "type": "object",
-                        "description": "Target entity (entity_type, slug, project)",
-                    },
-                    "data": {
-                        "type": "object",
-                        "description": "Key-value pairs for edits (frontmatter fields or body sections)",
-                    },
-                    "order_context": {
-                        "type": "object",
-                        "description": "For reorder action: {ordered_ids: [...]}",
-                    },
-                    "summary": {
-                        "type": "string",
-                        "description": "Summary of changes",
-                    },
-                },
-                "required": ["action", "target"],
-            },
-        },
-        "story_dashboard": {
-            "name": "story_dashboard",
-            "description": "Open the story dashboard in the preview pane.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project": {
-                        "type": "string",
-                        "description": "Project slug or name",
-                    },
-                },
-                "required": ["project"],
-            },
-        },
-    }
-    return schemas.get(name)
+def _entity_schemas(entity_types: list) -> dict:
+    """Field metadata per entity type, flagging relation-backed and computed fields."""
+    out = {}
+    for entity_type in entity_types:
+        fields = {}
+        for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
+            entry = {
+                "type": meta["type"],
+                "default": meta["default"],
+                "optional": meta.get("optional", True),
+                "description": meta["description"],
+            }
+            if meta.get("computed"):
+                entry["computed"] = True
+                entry["description"] += " (read-only, computed — do not set)"
+            if field in _RELATION_FIELDS_BY_NAME:
+                entry["stored_as"] = "relation"
+            fields[field] = entry
+        out[entity_type] = fields
+    return out
 
 
 SCHEMA = {
     "name": "story_describe",
-    "description": "Return full schemas for story tools and entity types. Use this to discover available tools and their parameters before calling them.",
+    "description": "List the fields an entity type expects, with types, defaults and descriptions. "
+                   "Call this before creating an entity or asking the user about one, so you know "
+                   "which questions are worth asking and which fields are still empty.",
     "type": "object",
     "properties": {
-        "tools": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "enum": ["story_create", "story_load", "story_retrieve", "story_search", "story_edit", "story_memory", "story_dashboard"],
-            },
-            "description": "Tool names to describe. Omit for all tools.",
-        },
         "entity_type": {
             "type": "string",
-            "enum": list(ENTITY_SCHEMAS.keys()),
-            "description": "Describe fields for a specific entity type. Omit for all entities.",
-        },
+            "enum": list(ENTITY_SCHEMAS),
+            "description": "Entity type to describe. Omit for all types.",
+        }
     },
 }
 
 
 def handler(args: dict, **kwargs) -> str:
-    """Return full schemas for story tools, optionally filtered."""
-    tool_names = args.get("tools")
-    entity_type_filter = args.get("entity_type")
+    """Return field metadata for the requested entity type(s)."""
+    entity_type = args.get("entity_type")
 
-    # Build tool schemas
-    if tool_names:
-        tools = {}
-        for name in tool_names:
-            schema = _build_tool_schema(name)
-            if schema:
-                tools[name] = schema
-    else:
-        tools = {name: _build_tool_schema(name) for name in
-                 ["story_create", "story_load", "story_retrieve",
-                  "story_search", "story_edit", "story_memory", "story_dashboard"]
-                 if _build_tool_schema(name)}
+    if entity_type and entity_type not in ENTITY_SCHEMAS:
+        return json.dumps({
+            "success": False,
+            "error": f"Unknown entity_type: {entity_type}. "
+                     f"Available: {', '.join(ENTITY_SCHEMAS)}",
+        })
 
-    # Build entity schemas
-    if entity_type_filter:
-        entity_schemas = {
-            entity_type_filter: {
-                field: {
-                    "type": meta["type"],
-                    "default": meta["default"],
-                    "optional": meta.get("optional", True),
-                    "description": meta["description"] + (" (read-only, computed)" if meta.get("computed") else ""),
-                    **({"computed": True} if meta.get("computed") else {}),
-                }
-                for field, meta in ENTITY_SCHEMAS[entity_type_filter].items()
-            }
-        } if entity_type_filter in ENTITY_SCHEMAS else {}
-    else:
-        entity_schemas = {
-            entity_type: {
-                field: {
-                    "type": meta["type"],
-                    "default": meta["default"],
-                    "optional": meta.get("optional", True),
-                    "description": meta["description"] + (" (read-only, computed)" if meta.get("computed") else ""),
-                    **({"computed": True} if meta.get("computed") else {}),
-                }
-                for field, meta in fields.items()
-            }
-            for entity_type, fields in ENTITY_SCHEMAS.items()
-        }
-
+    types = [entity_type] if entity_type else list(ENTITY_SCHEMAS)
     return json.dumps({
         "success": True,
-        "tools": tools,
-        "entity_schemas": entity_schemas,
+        "entity_schemas": _entity_schemas(types),
     })

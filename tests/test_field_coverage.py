@@ -225,20 +225,20 @@ def test_create_load_retrieve(entity_type, project):
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "arc_beat",
-            "slug": f"parent-char-{slug}",
+            "id": [f"parent-char-{slug}"],
             "sections": ["all"],
         }))
-        found = retrieve_result.get("content") or retrieve_result.get("sections")
+        found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
     elif entity_type == "relationship":
         # Full relationship graph removed from base view (view="relationship",
         # task_21 spec §3.4) — verify the entity via retrieve, like arc_beat
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "relationship",
-            "slug": slug,
+            "id": [slug],
             "sections": ["all"],
         }))
-        found = retrieve_result.get("content") or retrieve_result.get("sections")
+        found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
 
     assert found, f"Entity {slug} not in load result"
 
@@ -249,10 +249,10 @@ def test_create_load_retrieve(entity_type, project):
     retrieve_result = json.loads(retrieve_handler({
         "project": str(project),
         "entity_type": entity_type,
-        "slug": expected_id,
+        "id": [expected_id],
         "sections": ["all"],
     }))
-    assert retrieve_result.get("content") or retrieve_result.get("sections"), \
+    assert retrieve_result["entities"] and retrieve_result["entities"][0].get("sections"), \
         f"Retrieve failed for {entity_type}/{slug}: {retrieve_result}"
 
     # Search doesn't crash
@@ -348,10 +348,12 @@ def test_edit_all_field_types(entity_type, project):
         retrieve_after = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "arc_beat",
-            "slug": entity_id,
+            "id": [entity_id],
             "sections": ["all"],
         }))
-        entity_data = {"label": "Updated Label"} if "Updated" in retrieve_after.get("content", "") else None
+        entity_data = ({"label": "Updated Label"}
+                       if "Updated" in retrieve_after["entities"][0]["sections"].get("Action", "")
+                       else None)
 
     assert entity_data is not None, f"Entity {entity_id} missing after edit"
 
@@ -389,10 +391,10 @@ def test_edit_all_field_types(entity_type, project):
         retrieve_after = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": entity_type,
-            "slug": entity_id,
+            "id": [entity_id],
             "sections": [section_name],
         }))
-        section_content = retrieve_after.get("sections", {}).get(section_name, "")
+        section_content = retrieve_after["entities"][0]["sections"].get(section_name, "")
         assert f"Updated {section_name} content via edit." in section_content
 
     # Relation check — now embedded in plot

@@ -19,6 +19,24 @@ def _requirements_met() -> bool:
     return bool(config.get("vault_path"))
 
 
+def _tool_schema(schema: dict) -> dict:
+    """Wrap a tool module's SCHEMA into the shape Hermes registers.
+
+    Tool modules declare a plain JSON Schema (``properties``/``required`` at the
+    top level). Hermes reads ``schema["parameters"]`` — so passing that
+    straight through registered every tool with ZERO parameters and an empty
+    description, and the model had to guess what to pass. One place to fix it.
+    """
+    return {
+        "description": schema.get("description", ""),
+        "parameters": {
+            "type": "object",
+            "properties": schema.get("properties", {}),
+            "required": schema.get("required", []),
+        },
+    }
+
+
 def register(ctx) -> None:
     """Register all Story Architect tools and skills."""
     from .tools import story_load
@@ -35,7 +53,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_describe",
         toolset="story_architect",
-        schema=story_describe.SCHEMA,
+        schema=_tool_schema(story_describe.SCHEMA),
         handler=story_describe.handler,
         check_fn=_requirements_met,
         emoji="📋",
@@ -44,7 +62,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_load",
         toolset="story_architect",
-        schema=story_load.SCHEMA,
+        schema=_tool_schema(story_load.SCHEMA),
         handler=story_load.handler,
         check_fn=_requirements_met,
         emoji="📖",
@@ -52,7 +70,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_retrieve",
         toolset="story_architect",
-        schema=story_retrieve.SCHEMA,
+        schema=_tool_schema(story_retrieve.SCHEMA),
         handler=story_retrieve.handler,
         check_fn=_requirements_met,
         emoji="🔍",
@@ -60,7 +78,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_search",
         toolset="story_architect",
-        schema=story_search.SCHEMA,
+        schema=_tool_schema(story_search.SCHEMA),
         handler=story_search.handler,
         check_fn=_requirements_met,
         emoji="🔎",
@@ -68,7 +86,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_edit",
         toolset="story_architect",
-        schema=story_edit.SCHEMA,
+        schema=_tool_schema(story_edit.SCHEMA),
         handler=story_edit.handler,
         check_fn=_requirements_met,
         emoji="✏️",
@@ -76,7 +94,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_memory",
         toolset="story_architect",
-        schema=story_memory.SCHEMA,
+        schema=_tool_schema(story_memory.SCHEMA),
         handler=story_memory.handler,
         check_fn=_requirements_met,
         emoji="🧠",
@@ -85,7 +103,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_create",
         toolset="story_architect",
-        schema=story_create.SCHEMA,
+        schema=_tool_schema(story_create.SCHEMA),
         handler=story_create.handler,
         check_fn=_requirements_met,
         emoji="➕",
@@ -97,7 +115,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_import",
         toolset="story_architect",
-        schema=story_import.SCHEMA,
+        schema=_tool_schema(story_import.SCHEMA),
         handler=story_import.handler,
         check_fn=_requirements_met,
         emoji="📥",
@@ -105,7 +123,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_export",
         toolset="story_architect",
-        schema=story_export.SCHEMA,
+        schema=_tool_schema(story_export.SCHEMA),
         handler=story_export.handler,
         check_fn=_requirements_met,
         emoji="📤",
@@ -113,7 +131,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_backup",
         toolset="story_architect",
-        schema=story_backup.SCHEMA,
+        schema=_tool_schema(story_backup.SCHEMA),
         handler=story_backup.handler,
         check_fn=_requirements_met,
         emoji="💾",
@@ -124,7 +142,7 @@ def register(ctx) -> None:
     ctx.register_tool(
         name="story_dashboard",
         toolset="story_architect",
-        schema=story_dashboard.SCHEMA,
+        schema=_tool_schema(story_dashboard.SCHEMA),
         handler=story_dashboard.handler,
         check_fn=_requirements_met,
         emoji="📊",

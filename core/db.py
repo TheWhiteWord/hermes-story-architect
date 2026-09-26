@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS entities (
     status TEXT NOT NULL DEFAULT '',
     parent_id TEXT,
     location_id TEXT,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at TEXT,
     extra JSON NOT NULL DEFAULT '{}'
 );
 
@@ -71,9 +73,63 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def backup_database(project_path: Path) -> str:
+    """Copy story.db to a timestamped file. Returns the backup path.
+
+    Two things this must get right, both of which a plain file copy got wrong:
+
+    * **WAL safety.** The database runs in WAL mode, so recent writes can sit in
+      `story.db-wal` and not yet be in the main file. `shutil.copy2` copies only
+      the main file, silently producing a *stale* backup. `Connection.backup()`
+      goes through SQLite and includes everything committed.
+    * **No collisions.** The stamp has one-second granularity, so two backups in
+      the same second overwrote each other — the second destroying the first
+      while both reported success. A counter suffix keeps every snapshot.
+
+    Shared by story_backup and story_import so the two cannot drift apart.
+    """
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dest = project_path / ".story" / f"story_{stamp}.db"
+    n = 1
+    while dest.exists():
+        dest = project_path / ".story" / f"story_{stamp}_{n}.db"
+        n += 1
+
+    src = get_db(project_path)
+    try:
+        out = sqlite3.connect(str(dest))
+        try:
+            src.backup(out)
+        finally:
+            out.close()
+    finally:
+        src.close()
+    return str(dest)
+
+
+def ensure_soft_delete_columns(conn: sqlite3.Connection) -> None:
+    """Add is_deleted / deleted_at to databases created before the soft delete.
+
+    `CREATE TABLE IF NOT EXISTS` silently leaves an existing table alone, so any
+    project created by an earlier build has no such column — and every reader
+    that filters on it would fail with "no such column". Idempotent.
+    """
+    have = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
+    if "is_deleted" not in have:
+        conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
+    if "deleted_at" not in have:
+        conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
+
+
 def create_schema(conn: sqlite3.Connection) -> None:
-    """Create all tables, indexes, triggers."""
+    """Create all tables, indexes, triggers. Also migrates an existing db."""
     conn.executescript(SCHEMA_SQL)
+    # CREATE TABLE IF NOT EXISTS leaves an existing table untouched, so a
+    # project created by an earlier build would be missing the soft-delete
+    # columns that every reader now filters on.
+    ensure_soft_delete_columns(conn)
 
 
 def has_schema(conn: sqlite3.Connection) -> bool:
@@ -243,12 +299,16 @@ def get_project_summary(project_path: Path) -> dict:
         # ── All entities (excluding project) ──
         ent_rows = conn.execute(
             "SELECT id, type, name, one_sentence, status, order_key, parent_id, extra "
-            "FROM entities WHERE type != 'project'"
+            "FROM entities WHERE type != 'project' AND is_deleted=0"
         ).fetchall()
 
         # ── All relations ──
         rel_rows = conn.execute(
             "SELECT from_id, to_id, kind, note FROM relations"
+            # A soft-deleted endpoint means the relation is invisible: the
+            # entity it points at is gone from every other reader.
+            " WHERE from_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
+            " AND to_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
         ).fetchall()
 
         # ── Build cross-reference maps ──
@@ -578,7 +638,7 @@ def get_unfilled_map(project_path: Path) -> dict:
     try:
         conn = sqlite3.connect(str(db_path))
         ent_rows = conn.execute(
-            "SELECT id, type, name, one_sentence, status, extra FROM entities WHERE type != 'project'"
+            "SELECT id, type, name, one_sentence, status, extra FROM entities WHERE type != 'project' AND is_deleted=0"
         ).fetchall()
         # Relation-sourced fields (scene chars/loc, plot beats) for accurate unfilled detection
         scene_chars = {}
@@ -586,6 +646,8 @@ def get_unfilled_map(project_path: Path) -> dict:
         plot_beats = {}
         for from_id, to_id, kind in conn.execute(
             "SELECT from_id, to_id, kind FROM relations"
+            " WHERE from_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
+            " AND to_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
         ).fetchall():
             if kind == "character_scene":
                 scene_chars.setdefault(to_id, []).append(from_id)
@@ -656,7 +718,7 @@ def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
     try:
         conn = sqlite3.connect(str(db_path))
         rows = conn.execute(
-            "SELECT id, name, extra, order_key FROM entities WHERE type='arc_beat' AND parent_id=? ORDER BY order_key, id",
+            "SELECT id, name, extra, order_key FROM entities WHERE type='arc_beat' AND parent_id=? AND is_deleted=0 ORDER BY order_key, id",
             (char_id,),
         ).fetchall()
         return [
@@ -694,25 +756,67 @@ def get_entity_sections(project_path: Path, entity_id: str) -> dict:
         conn.close()
 
 
-def search_sections(project_path: Path, query: str) -> list[dict]:
-    """FTS5 search across all sections. Returns list of {entity_id, heading, snippet}."""
+def fts5_query(user_input: str) -> str:
+    """Turn free text into a safe FTS5 MATCH expression.
+
+    The query language treats ( ) " * : ^ - as operators, so a natural query
+    like "garden (part 2)" is a syntax error. Quote each whitespace-separated
+    term instead and AND them: always valid, never surprising.
+
+    ponytail: no phrase/NEAR/prefix support. Add a raw_query flag if a caller
+    ever needs FTS5 operators deliberately.
+    """
+    terms = [f'"{t.replace(chr(34), "")}"' for t in user_input.split() if t.strip()]
+    return " AND ".join(terms)
+
+
+def _snippet(body: str, query: str, limit: int = 200) -> str:
+    """Excerpt around the first matching term, for a result preview."""
+    low = body.lower()
+    words = query.split()
+    pos = min((low.find(w.lower()) for w in words if low.find(w.lower()) >= 0), default=-1)
+    if pos < 0:
+        return body[:limit] + ("…" if len(body) > limit else "")
+    start = max(0, pos - limit // 3)
+    text = body[start:start + limit]
+    return ("…" if start else "") + text + ("…" if start + limit < len(body) else "")
+
+
+def search_sections(project_path: Path, query: str, limit: int = 10) -> dict:
+    """FTS5 search across all sections.
+
+    Returns {"results": [{entity_id, heading, snippet}], "total_matches": int}.
+    `total_matches` is the full count before `limit`, so a truncated result
+    set is never mistaken for the whole story.
+    """
+    match = fts5_query(query)
     conn = get_db(project_path)
     try:
-        # FTS5 query — join back to sections for entity_id + heading
+        # A soft-deleted entity keeps its sections (so restore is exact), which
+        # means FTS would otherwise keep returning prose nobody can retrieve.
+        live = "s.entity_id IN (SELECT id FROM entities WHERE is_deleted=0)"
+        total = conn.execute(
+            f"SELECT count(*) FROM sections_fts f "
+            f"JOIN sections s ON f.rowid = s.rowid "
+            f"WHERE f.body MATCH ? AND {live}",
+            (match,)
+        ).fetchone()[0]
+        # Join back to sections for entity_id + heading
         cursor = conn.execute(
-            """SELECT s.entity_id, s.heading, s.body
+            f"""SELECT s.entity_id, s.heading, s.body
                FROM sections_fts f
                JOIN sections s ON f.rowid = s.rowid
-               WHERE f.body MATCH ?
-               ORDER BY rank""",
-            (query,)
+               WHERE f.body MATCH ? AND {live}
+               ORDER BY rank LIMIT ?""",
+            (match, limit)
         )
-        return [
-            {"entity_id": row[0], "heading": row[1], "snippet": row[2]}
-            for row in cursor.fetchall()
+        results = [
+            {"entity_id": r[0], "heading": r[1], "snippet": _snippet(r[2], query)}
+            for r in cursor.fetchall()
         ]
     finally:
         conn.close()
+    return {"results": results, "total_matches": total}
 
 
 def get_dashboard_data(project_path: Path) -> dict:
@@ -730,7 +834,7 @@ def get_dashboard_data(project_path: Path) -> dict:
         # 1. story_data — denormalized projection per entity type
         ent_rows = conn.execute(
             "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
-            "FROM entities ORDER BY type, id"
+            "FROM entities WHERE is_deleted=0 ORDER BY type, id"
         ).fetchall()
 
         # Build entity lookup for cross-references (must precede rel lookups)
@@ -745,6 +849,8 @@ def get_dashboard_data(project_path: Path) -> dict:
         # Load all relations for denormalization (include note for plot beat descriptions)
         rel_rows = conn.execute(
             "SELECT from_id, to_id, kind, note FROM relations"
+            " WHERE from_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
+            " AND to_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
         ).fetchall()
         # Build lookup: entity_id -> {kind -> [{to_id, note}]}
         rel_map = {}
@@ -1148,33 +1254,33 @@ def get_dashboard_data(project_path: Path) -> dict:
 
         # 4. structural_stats
         status_rows = conn.execute(
-            "SELECT status, COUNT(*) FROM entities WHERE type='scene' GROUP BY status"
+            "SELECT status, COUNT(*) FROM entities WHERE type='scene' AND is_deleted=0 GROUP BY status"
         ).fetchall()
         scene_status = dict(status_rows)
 
         role_rows = conn.execute(
             "SELECT json_extract(extra, '$.dramatic_role'), COUNT(*) "
-            "FROM entities WHERE type='scene' "
+            "FROM entities WHERE type='scene' AND is_deleted=0 "
             "GROUP BY json_extract(extra, '$.dramatic_role')"
         ).fetchall()
         scene_roles = {r[0] or "unset": r[1] for r in role_rows}
 
         seq_count = conn.execute(
-            "SELECT COUNT(*) FROM entities WHERE type='sequence' "
+            "SELECT COUNT(*) FROM entities WHERE type='sequence' AND is_deleted=0 "
         ).fetchone()[0]
         act_count = conn.execute(
-            "SELECT COUNT(*) FROM entities WHERE type='act' "
+            "SELECT COUNT(*) FROM entities WHERE type='act' AND is_deleted=0 "
         ).fetchone()[0]
         scene_count = sum(scene_status.values())
 
         # Act stats — count scenes/sequences per act
         act_rows = conn.execute(
-            "SELECT id, name, order_key FROM entities WHERE type='act'  ORDER BY order_key"
+            "SELECT id, name, order_key FROM entities WHERE type='act' AND is_deleted=0 ORDER BY order_key"
         ).fetchall()
         acts_stats = []
         for act_id, act_name, act_order in act_rows:
             seq_c = conn.execute(
-                "SELECT COUNT(*) FROM entities WHERE type='sequence' AND parent_id=? ",
+                "SELECT COUNT(*) FROM entities WHERE type='sequence' AND parent_id=? AND is_deleted=0 ",
                 (act_id,)
             ).fetchone()[0]
             scene_c = conn.execute(

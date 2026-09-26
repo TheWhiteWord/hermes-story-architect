@@ -3,12 +3,79 @@ import json
 from pathlib import Path
 
 SCHEMA = {
+    "description": "DESTRUCTIVE. Rebuilds the database from the Markdown vault: deletes every row "
+                   "and re-imports, discarding all work done since the last story_export. The "
+                   "database is the source of truth, not Markdown. Only for an intentional re-sync "
+                   "from Markdown files. Never use this to repair a problem — take a "
+                   "story_backup first, and prefer story_edit or story_create to change things.",
     "type": "object",
     "properties": {
         "project": {"type": "string", "description": "Project slug or path"},
+        "dry_run": {"type": "boolean",
+                    "description": "Report what would be deleted and re-imported without "
+                                   "changing anything. Use this first."},
+        "confirm": {"type": "boolean",
+                    "description": "Required to actually import when the database holds work that "
+                                   "exists only in the database. Set after reading the dry_run report."},
     },
     "required": ["project"],
 }
+
+
+def _backup(project_path: Path) -> str:
+    """Timestamped copy of story.db, so a destructive import is always recoverable.
+
+    Delegates to core.db.backup_database — the WAL-safe, collision-free copy that
+    story_backup also uses.
+    """
+    from core.db import backup_database
+    return backup_database(project_path)
+
+
+def _diff(project_path: Path) -> dict:
+    """Which database entities have no Markdown note behind them.
+
+    Those are the ones an import destroys. An entity created at runtime with
+    story_create has no .md file — that is exactly the set the wipe deletes.
+
+    Deliberately one-directional: an entity with a note file is never reported as
+    at risk, even when the importer keys it differently (the project row uses the
+    folder name, arc beats a `{char}-{beat}` composite). A missed warning only
+    means the guard stays quiet; a false "you will lose data" would block every
+    legitimate re-import.
+    """
+    from core.db import get_db
+
+    conn = get_db(project_path)
+    try:
+        rows = conn.execute("SELECT id, type FROM entities").fetchall()
+    finally:
+        conn.close()
+
+    markdown_ids = set()
+    for folder in ("characters", "locations", "worlds", "plots", "scenes",
+                   "sequences", "acts", "relationships"):
+        d = project_path / folder
+        if d.exists():
+            markdown_ids |= {f.stem for f in d.glob("*.md") if not f.name.startswith("_")}
+
+    # Arc beats live in arcs/{character}/{beat}.md and are keyed `{char}-{beat}`.
+    # They do not appear in the flat folders above, and a database may hold them
+    # typed as 'character', so match them by the note tree as well.
+    arc_beat_ids = set()
+    arcs = project_path / "arcs"
+    if arcs.exists():
+        for char_dir in arcs.iterdir():
+            if char_dir.is_dir() and not char_dir.name.startswith(("_", ".")):
+                arc_beat_ids |= {f"{char_dir.name}-{f.stem}" for f in char_dir.glob("*.md")}
+
+    at_risk = sorted(
+        entity_id for entity_id, entity_type in rows
+        if entity_type not in ("project", "arc_beat")
+        and entity_id not in markdown_ids
+        and entity_id not in arc_beat_ids
+    )
+    return {"entities_in_db": len(rows), "would_be_destroyed": at_risk}
 
 
 def handler(args, **kwargs) -> str:
@@ -32,9 +99,54 @@ def handler(args, **kwargs) -> str:
         get_db, create_schema, has_schema, get_project_memory,
         empty_memory, validate_memory,
     )
-    from core.section_parser import list_sections, get_section
 
-    existing_memory = get_project_memory(project_path) if (project_path / ".story" / "story.db").exists() else None
+    db_file = project_path / ".story" / "story.db"
+
+    # ── Safety gate ────────────────────────────────────────────────────────────
+    # An import DELETEs every row and rebuilds from Markdown. The database is the
+    # source of truth, so anything that exists only in the database is lost — the
+    # character a user created five minutes ago, every story_edit since the last
+    # export. This is the one tool that can silently destroy work, so it reports
+    # first and refuses without explicit consent.
+    if db_file.exists() and args.get("dry_run"):
+        report = _diff(project_path)
+        report["dry_run"] = True
+        report["message"] = (
+            f"Nothing was changed. An import would rebuild {project_path.name} from Markdown: "
+            f"{report['entities_in_db']} entities are in the database. The database is the "
+            f"source of truth, so anything without a Markdown note behind it would be lost."
+        )
+        if report["would_be_destroyed"]:
+            report["warning"] = (
+                f"{len(report['would_be_destroyed'])} entities exist ONLY in the database and "
+                f"would be DESTROYED: {', '.join(report['would_be_destroyed'][:10])}"
+                + ("..." if len(report["would_be_destroyed"]) > 10 else "")
+            )
+            report["next_step"] = (
+                "Run story_export first to keep them, or story_backup to save a restorable copy. "
+                "Then re-run with confirm=true to import anyway."
+            )
+        else:
+            report["next_step"] = "Nothing would be lost. Re-run with confirm=true to import."
+        return json.dumps(report)
+
+    if db_file.exists() and not args.get("confirm"):
+        report = _diff(project_path)
+        if report["would_be_destroyed"]:
+            backup = _backup(project_path)
+            return json.dumps({
+                "success": False,
+                "error": f"Refusing to import: {len(report['would_be_destroyed'])} entities exist "
+                         f"only in the database and would be destroyed.",
+                "would_be_destroyed": report["would_be_destroyed"],
+                "backup_created": backup,
+                "action_required": "A backup was saved. Run story_export to keep these entities in "
+                                   "Markdown, then re-run with confirm=true to import anyway.",
+                "hint": "Run with dry_run=true first to see this report before doing anything.",
+            })
+        # Nothing would be lost — a clean re-sync. Allow it, but still back up.
+
+    existing_memory = get_project_memory(project_path) if db_file.exists() else None
     memory_path = project_path / ".story" / "memory.md"
     imported_memory = None
     if memory_path.exists():
@@ -66,6 +178,9 @@ def handler(args, **kwargs) -> str:
             conn.close()
             return json.dumps({"success": True, "message": f"Imported memory for {project_path.name}"})
 
+        # Last line of defence: the wipe below is irreversible from here.
+        backup_path = _backup(project_path)
+
         conn.execute("BEGIN")
         _clear_all(conn)
         _import_all(conn, project_path)
@@ -88,7 +203,11 @@ def handler(args, **kwargs) -> str:
         return json.dumps({"error": str(e)})
 
     conn.close()
-    return json.dumps({"success": True, "message": f"Imported {project_path.name}"})
+    return json.dumps({
+        "success": True,
+        "message": f"Imported {project_path.name}",
+        "backup_created": backup_path,
+    })
 
 
 def _clear_all(conn) -> None:
@@ -100,8 +219,6 @@ def _clear_all(conn) -> None:
 
 def _import_all(conn, project_path: Path) -> None:
     """Walk all entity folders and import."""
-    import frontmatter
-
     _import_project(conn, project_path)
     _import_folder(conn, project_path, "characters", "character")
     _import_folder(conn, project_path, "locations", "location")
@@ -117,7 +234,6 @@ def _import_all(conn, project_path: Path) -> None:
 def _import_project(conn, project_path: Path) -> None:
     """Import project.md."""
     import frontmatter
-    from core.db import empty_memory
     from core.section_parser import list_sections, get_section
 
     fm_file = project_path / "project.md"
@@ -127,6 +243,7 @@ def _import_project(conn, project_path: Path) -> None:
     fm = dict(post.metadata)
     body = post.content
 
+    from core.db import empty_memory
     extra = {"memory": empty_memory()}
     skip = {"name", "logline", "memory"}
     for k, v in fm.items():
@@ -172,7 +289,6 @@ def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str)
 def _import_arcs(conn, project_path: Path) -> None:
     """Import arc beats from nested arcs/{character}/{beat}.md structure."""
     import frontmatter
-    from core.section_parser import list_sections, get_section
 
     arcs_folder = project_path / "arcs"
     if not arcs_folder.exists():

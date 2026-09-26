@@ -44,16 +44,22 @@ def _build_schema() -> dict:
         frontmatter_props[field] = field_schema
 
     return {
+        "description": "Create a new entity, or a new project. Validates parent references and "
+                       "auto-orders new scenes and sequences. Fails if the entity already exists "
+                       "— use story_edit to change something that is already there. Call "
+                       "story_describe first to see which fields this entity type expects.",
         "type": "object",
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["project", "character", "location", "world", "plot", "scene", "sequence", "act", "arc_beat", "relationship"],
+                "enum": list(ENTITY_SCHEMAS),
                 "description": "Type of entity to create",
             },
             "slug": {
                 "type": "string",
-                "description": "Entity slug (unique identifier, used as filename)",
+                "description": "Unique id for the entity, as it will appear in story_load "
+                               "output. Lowercase, hyphen-separated. For entity_type='project' "
+                               "this is the new project's folder name.",
             },
             "project": {
                 "type": "string",
@@ -63,6 +69,15 @@ def _build_schema() -> dict:
                 "type": "object",
                 "description": "Frontmatter fields. Only include fields relevant to your entity type.",
                 "properties": frontmatter_props,
+            },
+            "sections": {
+                "type": "object",
+                "description": "Prose to write into the entity's body sections, keyed by heading "
+                               "({heading: text}). Every standard section is created regardless; "
+                               "this fills the ones you supply. A heading that is not standard for "
+                               "this entity type is added as written. Use story_describe to see the "
+                               "standard sections.",
+                "additionalProperties": {"type": "string"},
             },
         },
         "required": ["entity_type", "slug", "project", "frontmatter"],
@@ -92,9 +107,23 @@ def handler(args: dict, **kwargs) -> str:
     if entity_type == "project":
         return _create_project(slug, frontmatter_data, vault_path)
 
+    # The schema enum is advisory — an LLM can still pass anything. Reject it here,
+    # or an unknown type lands in the database and surfaces much later as a mystery.
+    if entity_type not in ENTITY_SCHEMAS:
+        return json.dumps({
+            "error": f"Unknown entity_type: {entity_type}",
+            "valid_types": sorted(ENTITY_SCHEMAS),
+        })
+
     # Validate slug
     if not slug.replace("-", "").replace("_", "").isalnum():
         return json.dumps({"error": "Slug must be alphanumeric with hyphens/underscores only"})
+
+    # Validated here, not mid-insert, so a bad value cannot leave a half-made entity.
+    supplied_sections = args.get("sections") or {}
+    if not isinstance(supplied_sections, dict):
+        return json.dumps({"error": "'sections' must be an object of {heading: text}"})
+    supplied_sections = {str(k): str(v) for k, v in supplied_sections.items()}
 
     # Resolve project
     try:
@@ -118,12 +147,23 @@ def handler(args: dict, **kwargs) -> str:
         columns = columns_for_insert(entity_type, slug, merged)
         entity_id = columns["id"]
 
-        # Check uniqueness (PK will enforce, but give friendly error)
+        # Check uniqueness (PK will enforce, but give friendly error). Ids are
+        # global across types, so the name the caller gave may belong to something
+        # else entirely — say which, or they will retry with a different slug.
         existing = conn.execute(
-            "SELECT id FROM entities WHERE id=?", (entity_id,)
+            "SELECT type FROM entities WHERE id=?", (entity_id,)
         ).fetchone()
         if existing:
-            return json.dumps({"error": f"Entity already exists: {entity_type}/{slug}"})
+            if existing[0] == entity_type:
+                return json.dumps({
+                    "error": f"Entity already exists: {entity_type}/{slug}",
+                    "hint": "Use story_edit to change something that is already there.",
+                })
+            return json.dumps({
+                "error": f"Id '{slug}' is already used by a {existing[0]}.",
+                "hint": f"Entity ids are unique across all types. "
+                        f"Choose a different slug for this {entity_type}.",
+            })
 
         # Parent validation for arc type
         if entity_type == "arc_beat":
@@ -177,9 +217,15 @@ def handler(args: dict, **kwargs) -> str:
              columns["location_id"], columns["extra"]),
         )
 
-        # Insert standard sections
-        if sections:
-            section_rows = [(entity_id, heading, "") for heading in sections]
+        # Every standard section is created; the caller's prose fills the ones given.
+        # A heading that is not standard is added as written — a scene may need a
+        # heading this schema has never heard of.
+        supplied = supplied_sections
+        section_rows = [(entity_id, heading, str(supplied.get(heading, "")))
+                        for heading in sections]
+        section_rows += [(entity_id, heading, str(body))
+                         for heading, body in supplied.items() if heading not in sections]
+        if section_rows:
             conn.executemany(
                 "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
                 section_rows,
@@ -192,7 +238,13 @@ def handler(args: dict, **kwargs) -> str:
                 (rel["from_id"], rel["to_id"], rel["kind"], rel["note"], rel["order"]),
             )
     except Exception as e:
-        conn.execute("ROLLBACK")
+        # Autocommit mode: there is no open transaction, so ROLLBACK itself raises
+        # and would replace the real error with "cannot rollback - no transaction
+        # is active". Never let cleanup hide the cause.
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
         return json.dumps({"error": str(e)})
     finally:
         conn.close()

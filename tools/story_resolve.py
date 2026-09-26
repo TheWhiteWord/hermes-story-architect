@@ -1,7 +1,21 @@
-"""Project resolution — fuzzy match user input to project folder."""
+"""Project resolution — fuzzy match user input to project folder.
+
+Resolving to the WRONG project is worse than failing, because a write to the
+wrong story looks like it succeeded. FUZZY_THRESHOLD (40, shared with
+screenplay title matching) is far too permissive here: at 40 an unrelated name
+like "ghost" scores 72 against a short slug and is accepted. PROJECT_THRESHOLD
+is tuned for this job — see the table in tasks/task_21*/final_tools.
+"""
 from pathlib import Path
 from rapidfuzz import fuzz, process
 from core.constants import FUZZY_THRESHOLD
+
+# Stricter than FUZZY_THRESHOLD on purpose, and local to this module: a miss
+# here silently writes to the wrong project, whereas a screenplay title miss
+# just fails to find a candidate. 75 keeps every plausible near-match
+# ("the children" -> save-the-children, 75) while rejecting unrelated input
+# ("ghost", 72; "a totally unrelated phrase", 45).
+PROJECT_THRESHOLD = 75
 
 
 def resolve_project(user_input: str, vault_path: Path) -> Path:
@@ -58,7 +72,7 @@ def resolve_project(user_input: str, vault_path: Path) -> Path:
     names = [c[0] for c in candidates]
     result = process.extractOne(user_input, names, scorer=fuzz.WRatio)
     
-    if result and result[1] >= FUZZY_THRESHOLD:
+    if result and result[1] >= PROJECT_THRESHOLD:
         matched_name = result[0]
         for name, path in candidates:
             if name == matched_name:

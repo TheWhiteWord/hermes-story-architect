@@ -130,6 +130,7 @@ class Test3EditScenario:
             "action": "delete_entity",
             "target": {"entity_type": "character", "slug": "temp-char", "project": str(proj)},
             "summary": "Delete temp-char",
+            "confirm": True,
             "vault_path": vault
         })
         assert json.loads(result)["success"] is True
@@ -160,6 +161,7 @@ class Test3EditScenario:
             "action": "delete_entity",
             "target": {"entity_type": "sequence", "slug": "seq-with-scenes", "project": str(proj)},
             "summary": "Delete seq",
+            "confirm": True,
             "vault_path": vault
         })
         data = json.loads(result)
@@ -191,6 +193,7 @@ class Test3EditScenario:
             "action": "delete_entity",
             "target": {"entity_type": "character", "slug": "cascade-char", "project": str(proj)},
             "summary": "Delete cascade-char",
+            "confirm": True,
             "vault_path": vault
         })
         assert json.loads(result)["success"] is True
