@@ -1,0 +1,169 @@
+{
+  "view": "unfilled",
+  "total_gaps": 68,
+  "gap_types": 23,
+  "unfilled": [
+    {
+      "field": "goals_long",
+      "entities": [
+        "dr-elena-voss",
+        "kael",
+        "marcus-chen",
+        "mira",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 6
+    },
+    {
+      "field": "goals_short",
+      "entities": [
+        "dr-elena-voss",
+        "kael",
+        "marcus-chen",
+        "mira",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 6
+    },
+    {
+      "field": "history",
+      "entities": [
+        "dr-elena-voss-marcus-chen",
+        "kael-dr-elena-voss",
+        "kael-mira",
+        "kael-the-administrator",
+        "marcus-chen-kael",
+        "mira-the-administrator"
+      ],
+      "count": 6
+    },
+    {
+      "field": "variant_of",
+      "entities": [
+        "the-central-room",
+        "the-garden-dream",
+        "the-garden",
+        "the-dream-world",
+        "the-i",
+        "the-real-world"
+      ],
+      "count": 6
+    },
+    {
+      "field": "arc_type",
+      "entities": [
+        "dr-elena-voss",
+        "marcus-chen",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 4
+    },
+    {
+      "field": "arc_value",
+      "entities": [
+        "dr-elena-voss",
+        "marcus-chen",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 4
+    },
+    {
+      "field": "arc_value_at_close",
+      "entities": [
+        "dr-elena-voss",
+        "marcus-chen",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 4
+    },
+    {
+      "field": "arc_value_at_open",
+      "entities": [
+        "dr-elena-voss",
+        "marcus-chen",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 4
+    },
+    {
+      "field": "knowledge",
+      "entities": [
+        "marcus-chen",
+        "mira",
+        "the-administrator",
+        "the-outsider"
+      ],
+      "count": 4
+    },
+    {
+      "field": "one_sentence",
+      "entities": [
+        "central-room-day",
+        "central-room-night",
+        "the-core-day",
+        "the-door-closes"
+      ],
+      "count": 4
+    },
+    {
+      "field": "world",
+      "entities": [
+        "the-central-room",
+        "the-garden-dream",
+        "the-garden"
+      ],
+      "count": 3
+    },
+    {
+      "field": "climax_scene_id",
+      "entities": [
+        "seq-confrontation",
+        "act-2"
+      ],
+      "count": 2
+    },
+    {
+      "field": "rules",
+      "entities": [
+        "the-dream-world",
+        "the-real-world"
+      ],
+      "count": 2
+    },
+    {
+      "field": "value",
+      "entities": [
+        "seq-confrontation",
+        "act-2"
+      ],
+      "count": 2
+    },
+    {
+      "field": "value_at_close",
+      "entities": [
+        "seq-confrontation",
+        "act-2"
+      ],
+      "count": 2
+    }
+  ],
+  "truncated": true,
+  "shown_types": 15,
+  "other_fields": [
+    "value_at_open",
+    "characters",
+    "dramatic_function",
+    "mood",
+    "plot_type",
+    "power",
+    "value_arc",
+    "values"
+  ],
+  "hint": "23 field types are incomplete; the 15 most common are shown. other_fields lists the rest \u2014 still gaps."
+}

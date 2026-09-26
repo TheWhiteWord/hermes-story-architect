@@ -1,0 +1,87 @@
+{
+  "view": "story_value",
+  "act": "all",
+  "story_value": "Trust",
+  "value_at_open": "positive",
+  "value_at_close": "ironic",
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "value": "Trust",
+      "value_at_open": "positive",
+      "value_at_close": "negative",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "value": "Trust",
+          "value_at_open": "positive",
+          "value_at_close": "negative",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "value": "Trust",
+              "value_at_open": "positive",
+              "value_at_close": "negative"
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "value": "Trust",
+              "value_at_open": "negative",
+              "value_at_close": "positive"
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "value": "Trust",
+              "value_at_open": "positive",
+              "value_at_close": "positive"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-2",
+      "title": "Act II",
+      "value": "",
+      "value_at_open": "",
+      "value_at_close": "",
+      "sequences": [
+        {
+          "id": "seq-confrontation",
+          "title": "The Confrontation",
+          "value": "",
+          "value_at_open": "",
+          "value_at_close": "",
+          "scenes": [
+            {
+              "id": "garden-day",
+              "title": "Garden - Day",
+              "value": "Hope",
+              "value_at_open": "positive",
+              "value_at_close": "mixed"
+            },
+            {
+              "id": "garden-dream",
+              "title": "Garden Dream",
+              "value": "Hope",
+              "value_at_open": "positive",
+              "value_at_close": "negative"
+            },
+            {
+              "id": "the-door-closes",
+              "title": "The Door Closes",
+              "value": "Freedom",
+              "value_at_open": "negative",
+              "value_at_close": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

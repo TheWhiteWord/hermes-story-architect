@@ -1,0 +1,318 @@
+{
+  "loaded": true,
+  "confirmation": "Loaded Save the Children \u2014 6 scenes (6 developed), 2 sequences, 2 acts, 6 characters, 3 locations, 2 plots, 3 worlds.",
+  "project": {
+    "name": "Save the Children",
+    "logline": "In a world where humanity survives only as consciousness inside a machine, a young person fights to escape an oppressive system \u2014 unaware that the rebellion itself, the system, and every feeling of purpose they have ever known are the inherited memories of the last scientists who built the world that imprisoned them.",
+    "status": "active",
+    "genre": "Sci-fi drama",
+    "setting": "The Institute \u2014 a decaying research facility, 400 years apart",
+    "spine": "A young person fights to escape an oppressive system \u2014 unaware that the rebellion itself is inherited from the last scientists who built it",
+    "controlling_idea": "Freedom requires the courage to leave what you know",
+    "value": "Trust",
+    "value_at_open": "positive",
+    "value_at_close": "ironic",
+    "structure_type": "Classical",
+    "act_count": 3,
+    "inciting_incident_scene_id": "central-room-day",
+    "story_climax_scene_id": "central-room-night"
+  },
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "status": "in-progress",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "status": "in-progress",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "status": "drafted",
+              "dramatic_role": "setup",
+              "chars": [
+                "kael",
+                "mira"
+              ],
+              "loc": "the-central-room",
+              "milestone": "inciting incident"
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "status": "drafted",
+              "dramatic_role": "climax",
+              "chars": [
+                "kael"
+              ],
+              "loc": "the-central-room",
+              "milestone": "sequence climax"
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "status": "written",
+              "dramatic_role": "resolution",
+              "chars": [
+                "kael",
+                "mira"
+              ],
+              "loc": "the-garden"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-2",
+      "title": "Act II",
+      "status": "planned",
+      "sequences": [
+        {
+          "id": "seq-confrontation",
+          "title": "The Confrontation",
+          "status": "planned",
+          "scenes": [
+            {
+              "id": "garden-day",
+              "title": "Garden - Day",
+              "status": "drafted",
+              "dramatic_role": "setup",
+              "loc": "the-garden"
+            },
+            {
+              "id": "garden-dream",
+              "title": "Garden Dream",
+              "status": "drafted",
+              "dramatic_role": "setup",
+              "loc": "the-garden-dream"
+            },
+            {
+              "id": "the-door-closes",
+              "title": "The Door Closes",
+              "status": "written",
+              "dramatic_role": "resolution",
+              "chars": [
+                "kael"
+              ],
+              "loc": "the-central-room",
+              "milestone": "sequence climax"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "id": "dr-elena-voss",
+      "name": "Dr. Elena Voss",
+      "one_sentence": "Lead scientist on Project Save the Children \u2014 chose to preserve the minds even knowing the bodies would never come.",
+      "story_role": "Supporting",
+      "relationships": [
+        {
+          "with": "marcus-chen",
+          "label": "Colleague",
+          "type": "ally"
+        },
+        {
+          "with": "kael",
+          "label": "The saved child",
+          "type": "ally"
+        }
+      ]
+    },
+    {
+      "id": "kael",
+      "name": "Kael",
+      "one_sentence": "A young person inside The I who begins to feel the system is wrong.",
+      "story_role": "Protagonist",
+      "arc_type": "positive",
+      "arc_value": "Freedom",
+      "arc_value_at_open": "negative",
+      "arc_value_at_close": "positive",
+      "relationships": [
+        {
+          "with": "dr-elena-voss",
+          "label": "Watcher",
+          "type": "ally"
+        },
+        {
+          "with": "mira",
+          "label": "Closest friend",
+          "type": "family"
+        },
+        {
+          "with": "the-administrator",
+          "label": "Antagonist",
+          "type": "enemy"
+        },
+        {
+          "with": "marcus-chen",
+          "label": "Unknown",
+          "type": "ally"
+        }
+      ]
+    },
+    {
+      "id": "marcus-chen",
+      "name": "Marcus Chen",
+      "one_sentence": "Elena's colleague \u2014 believes the outsiders should be included, even at the cost of the project.",
+      "story_role": "Supporting",
+      "relationships": [
+        {
+          "with": "dr-elena-voss",
+          "label": "Colleague, friend",
+          "type": "ally"
+        },
+        {
+          "with": "kael",
+          "label": "Proof",
+          "type": "ally"
+        }
+      ]
+    },
+    {
+      "id": "mira",
+      "name": "Mira",
+      "one_sentence": "Kael's closest friend \u2014 believes in the feeling before believing in the cause.",
+      "story_role": "Supporting",
+      "arc_type": "positive",
+      "arc_value": "Trust",
+      "arc_value_at_open": "negative",
+      "arc_value_at_close": "positive",
+      "relationships": [
+        {
+          "with": "kael",
+          "label": "Friend, anchor",
+          "type": "romantic"
+        },
+        {
+          "with": "the-administrator",
+          "label": "Adversary",
+          "type": "enemy"
+        }
+      ]
+    },
+    {
+      "id": "the-administrator",
+      "name": "The Administrator",
+      "one_sentence": "The face of the Institute's control \u2014 theatrical, precise, almost too perfect an opponent.",
+      "story_role": "Antagonist",
+      "relationships": [
+        {
+          "with": "kael",
+          "label": "Anomaly",
+          "type": "rival"
+        },
+        {
+          "with": "mira",
+          "label": "Wildcard",
+          "type": "rival"
+        }
+      ]
+    },
+    {
+      "id": "the-outsider",
+      "name": "The Outsider",
+      "one_sentence": "A dying human outside the Institute walls \u2014 represents what the children could become if they breach the door.",
+      "story_role": "Supporting"
+    }
+  ],
+  "plots": [
+    {
+      "id": "the-resistance",
+      "name": "The Resistance",
+      "one_sentence": "Kael and Mira organize the children to breach the Central Room.",
+      "status": "active",
+      "plot_scope": "main",
+      "value_arc": "Maturation",
+      "characters": [
+        "kael",
+        "mira"
+      ]
+    },
+    {
+      "id": "the-scientists-last-stand",
+      "name": "The Scientists' Last Stand",
+      "one_sentence": "400 years earlier, the scientists race to complete Project Save the Children as the outsiders gather.",
+      "status": "active",
+      "plot_type": "Contradictory",
+      "plot_scope": "sub",
+      "characters": [
+        "dr-elena-voss",
+        "marcus-chen",
+        "the-outsider"
+      ]
+    }
+  ],
+  "worlds": [
+    {
+      "id": "the-dream-world",
+      "name": "The Dream World",
+      "one_sentence": "A failing echo of The I \u2014 generated by the system's decay, shaped by the children's collective unconscious.",
+      "locations": [
+        {
+          "id": "the-garden-dream",
+          "name": "The Garden (dream)",
+          "one_sentence": "A dreamlike echo of the Garden \u2014 where Kael's subconscious reshapes memory into landscape."
+        }
+      ],
+      "period": "+400y after the collapse (overlapping)"
+    },
+    {
+      "id": "the-i",
+      "name": "The I",
+      "one_sentence": "A simulation environment where developing consciousness forms.",
+      "locations": [
+        {
+          "id": "the-central-room",
+          "name": "The Central Room",
+          "one_sentence": "The heart of the Institute \u2014 where children believe freedom waits beyond the door."
+        },
+        {
+          "id": "the-garden",
+          "name": "The Garden",
+          "one_sentence": "A simulated outdoor space where Kael dreams \u2014 the only place that feels real."
+        }
+      ],
+      "period": "+400y after the collapse"
+    },
+    {
+      "id": "the-real-world",
+      "name": "The Real World",
+      "one_sentence": "400 years after the Institute went silent \u2014 green, vast, indifferent.",
+      "period": "+400y after the collapse"
+    }
+  ],
+  "memory": {
+    "status": "ready",
+    "usage": "662/3000",
+    "counts": {
+      "decisions": 1,
+      "directions": 2,
+      "open_questions": 2,
+      "continuity_warnings": 2
+    },
+    "categories": {
+      "decisions": [
+        "The Institute is both a refuge and a prison; do not resolve that contradiction as a simple good-versus-evil choice."
+      ],
+      "directions": [
+        "Keep Kael's escape motivated by earned trust, not sudden certainty.",
+        "Preserve ambiguity about whether the inherited memories are a rescue plan or another form of control."
+      ],
+      "open_questions": [
+        "Who originally authorized the door to remain unlocked?",
+        "Which memories belong to Kael, and which belong to the last scientists?"
+      ],
+      "continuity_warnings": [
+        "The door is unlocked from Kael's first discovery; do not later describe it as physically locked.",
+        "The Administrator knows the system is unstable before the climax reveal."
+      ]
+    }
+  }
+}
