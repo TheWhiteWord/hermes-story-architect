@@ -11,8 +11,7 @@ from tools.story_load import handler as load_handler
 from tools.story_retrieve import handler as retrieve_handler
 from tools.story_search import handler as search_handler
 from tools.story_dashboard import handler as dashboard_handler
-from tools.story_create import handler as create_handler
-from tools.story_edit import handler as edit_handler
+from core.writes import create_entity, edit_entity
 from tools.story_resolve import resolve_project
 
 
@@ -280,12 +279,8 @@ class TestUnfilledInverted:
         from core.db import get_unfilled_map
         proj, vault = db_project
         # Create a new character
-        create_handler({
-            "entity_type": "character", "slug": "unfilled-test",
-            "project": str(proj),
-            "frontmatter": {"name": "Unfilled", "story_role": "Minor"},
-            "root_path": vault
-        })
+        create_entity(proj, "character", "unfilled-test",
+                      {"name": "Unfilled", "story_role": "Minor"})
         unfilled = get_unfilled_map(proj)
         # goals_short should list the new character
         assert "goals_short" in unfilled
@@ -519,13 +514,8 @@ class TestAutoReimport:
     def test_create_entity_syncs_to_db(self, db_project):
         proj, vault = db_project
         # Create a new character
-        result = json.loads(create_handler({
-            "entity_type": "character",
-            "slug": "test-new-char",
-            "project": str(proj),
-            "frontmatter": {"name": "Test New Char", "story_role": "Supporting"},
-            "root_path": vault
-        }))
+        result = create_entity(proj, "character", "test-new-char",
+                               {"name": "Test New Char", "story_role": "Supporting"})
         assert result["success"] is True
 
         # DB should now have the new entity
@@ -541,13 +531,9 @@ class TestAutoReimport:
     def test_edit_entity_syncs_to_db(self, db_project):
         proj, vault = db_project
         # Edit kael's one_sentence
-        result = json.loads(edit_handler({
-            "action": "edit_note",
-            "target": {"entity_type": "character", "slug": "kael", "project": str(proj)},
-            "data": {"one_sentence": "Updated description."},
-            "summary": "Update one_sentence",
-            "root_path": vault
-        }))
+        result = edit_entity(proj, "character", "kael",
+                             {"one_sentence": "Updated description."},
+                             "Update one_sentence")
         assert result["success"] is True
 
         # DB should reflect the change

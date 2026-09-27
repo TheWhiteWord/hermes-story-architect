@@ -3,6 +3,23 @@ import pytest
 from pathlib import Path
 from core.entity import validate_entity
 from core.constants import ARC_TYPES, ENTITY_SCHEMAS
+from core.db import get_db
+from core.writes import create_entity, edit_entity
+
+
+def _kael(project):
+    """The parent every arc beat needs. Six tests set up the same one."""
+    create_entity(project, "character", "kael",
+                  {"name": "Kael", "story_role": "Protagonist",
+                   "one_sentence": "Test"})
+
+
+def _beat(project, **overrides):
+    """Kael's first beat, as five tests set it up."""
+    create_entity(project, "arc_beat", "1", {
+        "id": "1", "character": "kael",
+        "label": "First Doubt", "action": "a", "gap": "g",
+        "choice": "c", "shift": "s", "y": 0.5, "order": 1, **overrides})
 
 
 class TestArcValidation:
@@ -85,26 +102,16 @@ import json
 
 class TestArcCreateTool:
     def test_create_arc_beat(self, tmp_path):
-        """story_create with entity_type='arc_beat' creates DB entity."""
-        from tools.story_create import handler as create_handler
-        from core.db import get_db
+        """An arc beat is created in the DB with a composite ID."""
+        _kael(tmp_path)
 
-
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-
-        result = create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "First Doubt", "action": "Kael questions",
-                "gap": "Expected answers", "choice": "Pushes harder",
-                "shift": "positive → mixed", "y": 0.5, "order": 1,
-            }
-        })
-        data = json.loads(result)
+        data = create_entity(tmp_path, "arc_beat", "1",
+                             {
+                                 "id": "1", "character": "kael",
+                                 "label": "First Doubt", "action": "Kael questions",
+                                 "gap": "Expected answers", "choice": "Pushes harder",
+                                 "shift": "positive → mixed", "y": 0.5, "order": 1,
+                             })
         assert data["success"] is True
 
         # Verify DB state — arc entity with composite ID
@@ -123,22 +130,11 @@ class TestArcCreateTool:
 
     def test_create_arc_standard_sections(self, tmp_path):
         """Arc beat in DB includes Action/Gap/Choice/Shift/Development Log sections."""
-        from tools.story_create import handler as create_handler
-        from core.db import get_db
-
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-
-        create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "First Doubt", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.5, "order": 1,
-            }
-        })
+        _kael(tmp_path)
+        create_entity(tmp_path, "arc_beat", "1",
+                      {"id": "1", "character": "kael",
+                       "label": "First Doubt", "action": "a", "gap": "g",
+                       "choice": "c", "shift": "s", "y": 0.5, "order": 1})
 
         # Verify sections in DB
         conn = get_db(tmp_path)
@@ -157,69 +153,31 @@ class TestArcCreateTool:
 
     def test_create_arc_character_not_found(self, tmp_path):
         """Arc creation fails if character doesn't exist."""
-        from tools.story_create import handler as create_handler
-
-        result = create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "nonexistent",
-                "label": "Test", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.0, "order": 1,
-            }
-        })
-        data = json.loads(result)
-        assert "error" in data
-        assert "Character not found" in data["error"]
+        with pytest.raises(ValueError, match="Character not found"):
+            create_entity(tmp_path, "arc_beat", "1",
+                          {"id": "1", "character": "nonexistent",
+                           "label": "Test", "action": "a", "gap": "g",
+                           "choice": "c", "shift": "s", "y": 0.0, "order": 1})
 
     def test_create_arc_scene_not_found(self, tmp_path):
         """Arc creation fails if scene doesn't exist."""
-        from tools.story_create import handler as create_handler
-
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-
-        result = create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael", "scene": "nonexistent-scene",
-                "label": "Test", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.0, "order": 1,
-            }
-        })
-        data = json.loads(result)
-        assert "error" in data
-        assert "Scene not found" in data["error"]
+        _kael(tmp_path)
+        with pytest.raises(ValueError, match="Scene not found"):
+            create_entity(tmp_path, "arc_beat", "1",
+                          {"id": "1", "character": "kael", "scene": "nonexistent-scene",
+                           "label": "Test", "action": "a", "gap": "g",
+                           "choice": "c", "shift": "s", "y": 0.0, "order": 1})
 
 
 class TestArcEditTool:
     def test_edit_arc_frontmatter(self, tmp_path):
-        """story_edit can modify arc beat frontmatter in DB."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-        from core.db import get_db
+        """An edit can modify arc beat frontmatter in DB."""
+        _kael(tmp_path)
+        _beat(tmp_path)
 
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-        create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "First Doubt", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.5, "order": 1,
-            }
-        })
-
-        result = edit_handler({
-            "action": "edit_note",
-            "target": {"entity_type": "arc_beat", "slug": "1", "project": str(tmp_path)},
-            "data": {"label": "Updated Label", "y": -0.3},
-            "summary": "Update label and y"
-        })
-        assert json.loads(result)["success"] is True
+        assert edit_entity(tmp_path, "arc_beat", "1",
+                           {"label": "Updated Label", "y": -0.3},
+                           "Update label and y")["success"] is True
 
         # Assert on DB state (label → name column, y → extra JSON)
         conn = get_db(tmp_path)
@@ -234,31 +192,13 @@ class TestArcEditTool:
             conn.close()
 
     def test_edit_arc_body_section(self, tmp_path):
-        """story_edit can update arc body sections in DB."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-        from core.db import get_db
+        """An edit can update arc body sections in DB."""
+        _kael(tmp_path)
+        _beat(tmp_path)
 
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-        create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "First Doubt", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.5, "order": 1,
-            }
-        })
-
-        result = edit_handler({
-            "action": "edit_note",
-            "target": {"entity_type": "arc_beat", "slug": "1", "project": str(tmp_path)},
-            "data": {"Action": "New action content here."},
-            "summary": "Update action section"
-        })
-        assert json.loads(result)["success"] is True
+        assert edit_entity(tmp_path, "arc_beat", "1",
+                           {"Action": "New action content here."},
+                           "Update action section")["success"] is True
 
         # Assert on DB state
         conn = get_db(tmp_path)
@@ -274,22 +214,12 @@ class TestArcEditTool:
 class TestArcRetrieveTool:
     def test_retrieve_arc_full(self, tmp_path):
         """story_retrieve can load full arc beat note."""
-        from tools.story_create import handler as create_handler
         from tools.story_retrieve import handler as retrieve_handler
 
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-        create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "First Doubt", "action": "Kael questions the system",
-                "gap": "Expected answers", "choice": "Pushes harder",
-                "shift": "positive → mixed", "y": 0.5, "order": 1,
-            }
-        })
+        _kael(tmp_path)
+        _beat(tmp_path, action="Kael questions the system",
+              gap="Expected answers", choice="Pushes harder",
+              shift="positive → mixed")
 
         result = retrieve_handler({
             "project": str(tmp_path),
@@ -307,21 +237,10 @@ class TestArcRetrieveTool:
 
     def test_retrieve_arc_specific_section(self, tmp_path):
         """story_retrieve can load specific arc beat section."""
-        from tools.story_create import handler as create_handler
         from tools.story_retrieve import handler as retrieve_handler
 
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-        create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "First Doubt", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.5, "order": 1,
-            }
-        })
+        _kael(tmp_path)
+        _beat(tmp_path)
 
         result = retrieve_handler({
             "project": str(tmp_path),
@@ -349,21 +268,10 @@ class TestArcRetrieveTool:
 class TestArcLoadTool:
     def test_load_includes_arc_count(self, tmp_path):
         """story_load confirmation includes character count."""
-        from tools.story_create import handler as create_handler
         from tools.story_load import handler as load_handler
 
-        create_handler({
-            "entity_type": "character", "slug": "kael", "project": str(tmp_path),
-            "frontmatter": {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"}
-        })
-        create_handler({
-            "entity_type": "arc_beat", "slug": "1", "project": str(tmp_path),
-            "frontmatter": {
-                "id": "1", "character": "kael",
-                "label": "Beat", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.0, "order": 1,
-            }
-        })
+        _kael(tmp_path)
+        _beat(tmp_path, label="Beat", y=0.0)
 
         result = load_handler({
             "project": str(tmp_path)
