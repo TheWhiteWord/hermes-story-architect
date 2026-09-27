@@ -1,4 +1,4 @@
-"""story_edit must never report success for an edit it did not make.
+"""An edit must never report success for an edit it did not make.
 
 `data` is flat: {"<field>": value} or {"<Section name>": body}. Before this was
 pinned, any unrecognised key — including a nested call like
@@ -38,13 +38,13 @@ def vault(tmp_path, monkeypatch):
     return v
 
 
+def _project(vault):
+    return vault / "projects" / "save-the-children"
+
+
 def _edit(vault, data, entity_type="character", slug="kael"):
-    from tools.story_edit import handler
-    return json.loads(handler({
-        "action": "edit_note",
-        "target": {"entity_type": entity_type, "slug": slug,
-                   "project": "save-the-children"},
-        "data": data, "summary": "t"}, root_path=str(vault)))
+    from core.writes import edit_entity
+    return edit_entity(_project(vault), entity_type, slug, data, "t")
 
 
 def _field(vault, name, entity_type="character", entity_id="kael"):
@@ -59,44 +59,56 @@ class TestUnrecognisedKeysAreRejected:
     """The original defect: a nested call reported success and changed nothing."""
 
     def test_nested_frontmatter_is_rejected(self, vault):
-        r = _edit(vault, {"frontmatter": {"goals_short": "NESTED"}})
-        assert "error" in r
-        assert "frontmatter" in r["error"]
+        with pytest.raises(ValueError, match="frontmatter"):
+            _edit(vault, {"frontmatter": {"goals_short": "NESTED"}})
 
     def test_nested_sections_is_rejected(self, vault):
-        assert "error" in _edit(vault, {"sections": {"Background": "x"}})
+        with pytest.raises(ValueError):
+            _edit(vault, {"sections": {"Background": "x"}})
 
     def test_rejected_edit_changes_nothing(self, vault):
         before = _field(vault, "goals_short")
-        _edit(vault, {"frontmatter": {"goals_short": "NESTED"}})
+        with pytest.raises(ValueError):
+            _edit(vault, {"frontmatter": {"goals_short": "NESTED"}})
         assert _field(vault, "goals_short") == before
 
     def test_error_explains_the_flat_shape(self, vault):
-        """The caller must be able to correct itself without guessing."""
-        r = _edit(vault, {"frontmatter": {}})
-        assert "flat" in r["error"]
-        assert "unrecognised_keys" in r
+        """The caller must be able to correct itself without guessing — so the
+        shape rule travels with the failure, not just the key that broke."""
+        with pytest.raises(ValueError) as exc:
+            _edit(vault, {"frontmatter": {}})
+        assert "flat" in str(exc.value)
 
     def test_error_offers_the_valid_names(self, vault):
-        r = _edit(vault, {"nonsense_key": 1})
-        assert r["valid_field_examples"]
-        assert "story_describe" in r["hint"]
+        """Same reason: an error naming nothing actionable just gets retried
+        the same wrong way."""
+        from core.constants import ENTITY_SCHEMAS
+        with pytest.raises(ValueError) as exc:
+            _edit(vault, {"nonsense_key": 1})
+        message = str(exc.value)
+        # A real field name and a real section name, so the caller can copy one.
+        fields = [f for f, m in ENTITY_SCHEMAS["character"].items()
+                  if not m.get("computed")]
+        assert fields[0] in message
+        assert "Background" in message
 
     def test_one_bad_key_rejects_the_whole_call(self, vault):
         """Partial application is worse than none: the agent would think the
         valid half landed and not retry."""
         before = _field(vault, "goals_short")
-        r = _edit(vault, {"goals_short": "SHOULD NOT APPLY", "sectons": {"x": 1}})
-        assert "error" in r
+        with pytest.raises(ValueError):
+            _edit(vault, {"goals_short": "SHOULD NOT APPLY", "sectons": {"x": 1}})
         assert _field(vault, "goals_short") == before
 
     def test_nothing_is_leaked_into_extra(self, vault):
-        _edit(vault, {"frontmatter": {"goals_short": "NESTED"}})
-        db = vault / "projects" / "save-the-children" / ".story" / "story.db"
-        conn = sqlite3.connect(str(db))
-        extra = conn.execute(
-            "SELECT extra FROM entities WHERE id='kael'").fetchone()[0]
-        conn.close()
+        with pytest.raises(ValueError):
+            _edit(vault, {"frontmatter": {"goals_short": "NESTED"}})
+        conn = sqlite3.connect(str(_project(vault) / ".story" / "story.db"))
+        try:
+            extra = conn.execute(
+                "SELECT extra FROM entities WHERE id='kael'").fetchone()[0]
+        finally:
+            conn.close()
         assert "frontmatter" not in extra
         assert "NESTED" not in extra
 
@@ -151,14 +163,15 @@ class TestValidKeysStillWork:
         from core.constants import ENTITY_SCHEMAS
         from core.entity import (_RELATION_FIELDS, ENTITY_COLUMN_MAP,
                                  standard_sections)
-        from tools.story_edit import _FIELDS_TO_SKIP
+        from core.writes import _FIELDS_TO_SKIP
 
-        db = vault / "projects" / "save-the-children" / ".story" / "story.db"
-        conn = sqlite3.connect(str(db))
-        samples = {}
-        for etype, eid in conn.execute("SELECT type, id FROM entities"):
-            samples.setdefault(etype, eid)
-        conn.close()
+        conn = sqlite3.connect(str(_project(vault) / ".story" / "story.db"))
+        try:
+            samples = {}
+            for etype, eid in conn.execute("SELECT type, id FROM entities"):
+                samples.setdefault(etype, eid)
+        finally:
+            conn.close()
 
         rejected = []
         for etype, sample in samples.items():
@@ -170,6 +183,8 @@ class TestValidKeysStillWork:
             for key in keys:
                 if key in _FIELDS_TO_SKIP:
                     continue
-                if "error" in _edit(vault, {key: "PROBE"}, etype, sample):
+                try:
+                    _edit(vault, {key: "PROBE"}, etype, sample)
+                except ValueError:
                     rejected.append(f"{etype}.{key}")
         assert not rejected, f"valid keys wrongly rejected: {rejected}"

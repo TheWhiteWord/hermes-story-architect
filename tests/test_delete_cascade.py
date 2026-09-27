@@ -22,7 +22,7 @@ import sqlite3
 
 import pytest
 
-from tools.story_edit import handler as edit_handler
+from core.writes import delete_entity
 from tools.story_import import handler as import_handler
 
 
@@ -35,11 +35,10 @@ def _setup(fixture_path, tmp_path, name):
     return p, vault
 
 
-def _delete(vault, entity_type, slug):
-    return json.loads(edit_handler(
-        {"action": "delete_entity",
-         "target": {"entity_type": entity_type, "slug": slug, "project": "save-the-children"},
-         "summary": "t", "confirm": True}, root_path=str(vault)))
+def _delete(p, entity_type, slug, confirm=True):
+    """confirm defaults to True here so cascade tests read as intent; the
+    unconfirmed path is exercised explicitly where it is the subject."""
+    return delete_entity(p, entity_type, slug, "t", confirm)
 
 
 def _references_to(project, target):
@@ -100,7 +99,7 @@ def _extra(project, entity_id):
 class TestNothingDangles:
     def test_no_reference_of_any_kind_survives(self, fixture_path, tmp_path, entity_type, slug):
         p, vault = _setup(fixture_path, tmp_path, f"v-{entity_type}-{slug}")
-        result = _delete(vault, entity_type, slug)
+        result = _delete(p, entity_type, slug)
         assert result.get("success") is True
         assert _references_to(p, slug) == []
 
@@ -110,14 +109,14 @@ class TestRelationshipEntities:
 
     def test_deleting_a_character_strips_it_from_relationships(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "rel")
-        _delete(vault, "character", "kael")
+        _delete(p, "character", "kael")
         extra = _extra(p, "kael-mira")
         assert "kael" not in extra["characters"]
         assert "mira" in extra["characters"], "the surviving character must remain"
 
     def test_perspectives_of_the_dead_character_are_removed(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "persp")
-        _delete(vault, "character", "kael")
+        _delete(p, "character", "kael")
         perspectives = _extra(p, "kael-mira")["perspectives"]
         assert "kael" not in perspectives
         assert "mira" in perspectives, "the other perspective must be untouched"
@@ -125,7 +124,7 @@ class TestRelationshipEntities:
     def test_the_relationship_entity_itself_survives(self, fixture_path, tmp_path):
         """Kael and Mira still have a relationship; only Kael's half is gone."""
         p, vault = _setup(fixture_path, tmp_path, "survive")
-        _delete(vault, "character", "kael")
+        _delete(p, "character", "kael")
         conn = sqlite3.connect(str(p / ".story" / "story.db"))
         try:
             assert conn.execute(
@@ -136,12 +135,12 @@ class TestRelationshipEntities:
     def test_unrelated_relationships_are_untouched(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "unrelated")
         before = _extra(p, "mira-the-administrator")
-        _delete(vault, "character", "kael")
+        _delete(p, "character", "kael")
         assert _extra(p, "mira-the-administrator") == before
 
     def test_scene_removal_strips_relationship_scene_lists(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "scenes")
-        _delete(vault, "scene", "central-room-day")
+        _delete(p, "scene", "central-room-day")
         assert "central-room-day" not in _extra(p, "kael-mira")["scenes"]
 
 
@@ -149,7 +148,7 @@ class TestColumnReferences:
     def test_location_id_is_emptied(self, fixture_path, tmp_path):
         """Emptied to "", not NULL: the field still exists and reads as a gap."""
         p, vault = _setup(fixture_path, tmp_path, "loc")
-        _delete(vault, "location", "the-garden")
+        _delete(p, "location", "the-garden")
         conn = sqlite3.connect(str(p / ".story" / "story.db"))
         try:
             row = conn.execute(
@@ -160,7 +159,7 @@ class TestColumnReferences:
 
     def test_the_scene_itself_survives_the_location_removal(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "loc2")
-        _delete(vault, "location", "the-garden")
+        _delete(p, "location", "the-garden")
         conn = sqlite3.connect(str(p / ".story" / "story.db"))
         try:
             assert conn.execute("SELECT 1 FROM entities WHERE id='the-core-day'").fetchone()
@@ -179,7 +178,7 @@ class TestFieldsSurviveAsBlanks:
 
     def test_arc_beat_keeps_an_empty_scene_key(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "blank-beat")
-        _delete(vault, "scene", "central-room-day")
+        _delete(p, "scene", "central-room-day")
         extra = _extra(p, "dr-elena-voss-1")
         assert "scene" in extra
         assert extra["scene"] == ""
@@ -187,7 +186,7 @@ class TestFieldsSurviveAsBlanks:
     def test_beat_prose_is_untouched(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "blank-prose")
         before = _extra(p, "dr-elena-voss-1")
-        _delete(vault, "scene", "central-room-day")
+        _delete(p, "scene", "central-room-day")
         after = _extra(p, "dr-elena-voss-1")
         assert after["action"] == before["action"]
         assert after["gap"] == before["gap"]
@@ -197,7 +196,7 @@ class TestFieldsSurviveAsBlanks:
     def test_retrieve_shows_the_field_as_empty(self, fixture_path, tmp_path):
         from tools.story_retrieve import handler as retrieve_handler
         p, vault = _setup(fixture_path, tmp_path, "blank-read")
-        _delete(vault, "scene", "central-room-day")
+        _delete(p, "scene", "central-room-day")
         r = json.loads(retrieve_handler(
             {"project": "save-the-children", "entity_type": "arc_beat", "id": ["dr-elena-voss-1"],
              "fields": ["scene", "action"]}, root_path=str(vault)))
@@ -207,18 +206,18 @@ class TestFieldsSurviveAsBlanks:
 
     def test_relationship_keeps_an_empty_scenes_list(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "blank-scenes")
-        _delete(vault, "scene", "central-room-day")
+        _delete(p, "scene", "central-room-day")
         assert _extra(p, "kael-mira")["scenes"] == ["central-room-night"]
 
     def test_character_keeps_an_empty_characters_list(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "blank-chars")
-        _delete(vault, "character", "kael")
+        _delete(p, "character", "kael")
         assert _extra(p, "kael-mira")["characters"] == ["mira"]
 
     def test_perspectives_key_is_removed_not_emptied(self, fixture_path, tmp_path):
         """The one genuine removal: a dead viewpoint has no blank form."""
         p, vault = _setup(fixture_path, tmp_path, "blank-persp")
-        _delete(vault, "character", "kael")
+        _delete(p, "character", "kael")
         perspectives = _extra(p, "kael-mira")["perspectives"]
         assert "kael" not in perspectives
         assert "mira" in perspectives
@@ -234,34 +233,34 @@ class TestDetachedReporting:
 
     def test_delete_reports_detached_beats(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "det-1")
-        result = _delete(vault, "scene", "central-room-day")
+        result = _delete(p, "scene", "central-room-day")
         beats = {d["entity_id"] for d in result["detached"] if d["field"] == "scene"}
         assert beats == {"dr-elena-voss-1", "kael-1", "marcus-chen-1",
                          "the-administrator-1"}
 
     def test_detached_names_what_it_pointed_at(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "det-2")
-        result = _delete(vault, "scene", "central-room-day")
+        result = _delete(p, "scene", "central-room-day")
         assert all(d["was_pointing_at"] == "central-room-day" for d in result["detached"])
 
     def test_detached_carries_the_entity_type(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "det-3")
-        result = _delete(vault, "location", "the-garden")
+        result = _delete(p, "location", "the-garden")
         assert result["detached"] == [{"entity_id": "the-core-day",
                                        "entity_type": "scene", "field": "location",
                                        "was_pointing_at": "the-garden"}]
 
     def test_nothing_detached_when_nothing_pointed(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "det-4")
-        assert _delete(vault, "plot", "the-resistance")["detached"] == []
+        assert _delete(p, "plot", "the-resistance")["detached"] == []
 
-    def test_detach_is_reported_on_the_dry_run_too(self, fixture_path, tmp_path):
+    def test_detach_is_reported_on_the_refusal_too(self, fixture_path, tmp_path):
+        """The consent gate IS the preview, so a delete the caller has not
+        confirmed must already name the cascade."""
         p, vault = _setup(fixture_path, tmp_path, "det-5")
-        result = json.loads(edit_handler(
-            {"action": "delete_entity",
-             "target": {"entity_type": "scene", "slug": "central-room-day", "project": "save-the-children"},
-             "summary": "t", "dry_run": True}, root_path=str(vault)))
+        result = _delete(p, "scene", "central-room-day", confirm=None)
         assert "would_delete" in result
+        assert "central-room-day" in result["would_delete"]
 
 
 class TestDefaultsOnReset:
@@ -270,7 +269,7 @@ class TestDefaultsOnReset:
     def test_arc_beat_scene_resets_to_its_default(self, fixture_path, tmp_path):
         from core.constants import ENTITY_SCHEMAS
         p, vault = _setup(fixture_path, tmp_path, "def-1")
-        _delete(vault, "scene", "central-room-day")
+        _delete(p, "scene", "central-room-day")
         assert _extra(p, "dr-elena-voss-1")["scene"] == ENTITY_SCHEMAS["arc_beat"]["scene"]["default"]
 
     def test_optional_location_still_lands_in_unfilled_fields(self, fixture_path, tmp_path):
@@ -278,7 +277,7 @@ class TestDefaultsOnReset:
         so unfilled_fields reports it and the UI has its signal."""
         from tools.story_retrieve import handler as retrieve_handler
         p, vault = _setup(fixture_path, tmp_path, "def-2")
-        _delete(vault, "location", "the-garden")
+        _delete(p, "location", "the-garden")
         r = json.loads(retrieve_handler(
             {"project": "save-the-children", "entity_type": "scene", "id": ["the-core-day"],
              "fields": ["location"]}, root_path=str(vault)))
@@ -289,15 +288,15 @@ class TestDefaultsOnReset:
 class TestReporting:
     def test_reports_what_it_purged(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "report")
-        result = _delete(vault, "character", "kael")
+        result = _delete(p, "character", "kael")
         assert "kael-mira" in result["references_purged"]
 
     def test_reports_the_cascade(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "cascade")
-        result = _delete(vault, "character", "kael")
+        result = _delete(p, "character", "kael")
         assert set(result["cascade_deleted"]) == {"kael-1", "kael-2", "kael-3"}
 
     def test_nothing_purged_when_nothing_referenced(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "nopurge")
-        result = _delete(vault, "plot", "the-resistance")
+        result = _delete(p, "plot", "the-resistance")
         assert result["references_purged"] == []
