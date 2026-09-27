@@ -7,10 +7,9 @@ from pathlib import Path
 import pytest
 
 from core.constants import ENTITY_SCHEMAS
-from tools.story_create import handler as create_handler
+from core.writes import create_entity, create_project, edit_entity
 from tools.story_load import handler as load_handler
 from tools.story_retrieve import handler as retrieve_handler
-from tools.story_edit import handler as edit_handler
 from tools.story_search import handler as search_handler
 from tools.story_dashboard import handler as dashboard_handler
 from tools.story_import import handler as import_handler
@@ -81,14 +80,9 @@ def project(tmp_path):
     Each test gets a unique project slug to avoid cross-test collisions.
     """
     proj_slug = f"proj-{uuid.uuid4().hex[:8]}"
-    result = create_handler({
-        "entity_type": "project",
-        "slug": proj_slug,
-        "project": str(tmp_path),
-        "frontmatter": {"name": "Test Project", "logline": "Test logline"},
-        "root_path": tmp_path,
-    })
-    data = json.loads(result)
+    data = create_project(proj_slug,
+                          {"name": "Test Project", "logline": "Test logline"},
+                          tmp_path)
     assert data.get("success"), f"Project creation failed: {data}"
     return tmp_path / "projects" / proj_slug
 
@@ -96,52 +90,26 @@ def project(tmp_path):
 def _create_parents(project, entity_type):
     """Create required parent entities for structural types."""
     if entity_type == "arc_beat":
-        create_handler({
-            "entity_type": "character", "slug": "parent-char",
-            "project": str(project),
-            "frontmatter": {"name": "Parent", "story_role": "Protagonist", "one_sentence": "Parent char"},
-        })
+        create_entity(project, "character", "parent-char",
+                      {"name": "Parent", "story_role": "Protagonist",
+                       "one_sentence": "Parent char"})
         # Arc needs a real scene to reference (validate_arc_parents checks existence)
-        create_handler({
-            "entity_type": "act", "slug": "act-1",
-            "project": str(project),
-            "frontmatter": {"title": "Act I"},
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1",
-            "project": str(project),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"},
-        })
-        create_handler({
-            "entity_type": "scene", "slug": "beat-scene",
-            "project": str(project),
-            "frontmatter": {"title": "Beat Scene", "sequence_id": "seq-1", "act_id": "act-1"},
-        })
+        create_entity(project, "act", "act-1", {"title": "Act I"})
+        create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project, "scene", "beat-scene", {"title": "Beat Scene", "sequence_id": "seq-1", "act_id": "act-1"})
     if entity_type in ("scene", "sequence", "plot"):
-        create_handler({
-            "entity_type": "act", "slug": "act-1",
-            "project": str(project),
-            "frontmatter": {"title": "Act I"},
-        })
+        create_entity(project, "act", "act-1", {"title": "Act I"})
     if entity_type in ("scene", "plot"):
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1",
-            "project": str(project),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"},
-        })
+        create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
     if entity_type == "plot":
         for slug in ("kael", "mira"):
-            create_handler({
-                "entity_type": "character", "slug": slug,
-                "project": str(project),
-                "frontmatter": {"name": slug.capitalize(), "story_role": "Supporting", "one_sentence": slug},
-            })
+            create_entity(project, "character", slug,
+                          {"name": slug.capitalize(), "story_role": "Supporting",
+                           "one_sentence": slug})
         for i in range(1, 4):
-            create_handler({
-                "entity_type": "scene", "slug": f"scene-{i}",
-                "project": str(project),
-                "frontmatter": {"title": f"Scene {i}", "sequence_id": "seq-1", "act_id": "act-1"},
-            })
+            create_entity(project, "scene", f"scene-{i}",
+                          {"title": f"Scene {i}", "sequence_id": "seq-1",
+                           "act_id": "act-1"})
 
 
 def _prepare_frontmatter(entity_type, slug, fm):
@@ -172,13 +140,7 @@ def test_create_load_retrieve(entity_type, project):
     _create_parents(project, entity_type)
     fm = _prepare_frontmatter(entity_type, slug, fm)
 
-    result = create_handler({
-        "entity_type": entity_type,
-        "slug": slug,
-        "project": str(project),
-        "frontmatter": fm,
-    })
-    data = json.loads(result)
+    data = create_entity(project, entity_type, slug, fm)
     assert data.get("success"), f"Create failed for {entity_type}/{slug}: {data}"
 
     # Load → entity appears in nested structure
@@ -269,13 +231,8 @@ def test_edit_all_field_types(entity_type, project):
     _create_parents(project, entity_type)
     fm = _prepare_frontmatter(entity_type, slug, fm)
 
-    result = create_handler({
-        "entity_type": entity_type,
-        "slug": slug,
-        "project": str(project),
-        "frontmatter": fm,
-    })
-    assert json.loads(result).get("success"), f"Create failed: {result}"
+    assert create_entity(project, entity_type, slug, fm).get("success"), \
+        f"Create failed for {entity_type}/{slug}"
 
     entity_id = f"parent-char-{slug}" if entity_type == "arc_beat" else slug
 
@@ -317,13 +274,9 @@ def test_edit_all_field_types(entity_type, project):
         edit_data["climax"] = [{"scene_id": "scene-2", "description": "Climax beat"}]
         edit_data["payoffs"] = [{"scene_id": "scene-3", "description": "New payoff"}]
 
-    edit_result = edit_handler({
-        "action": "edit_note",
-        "target": {"entity_type": entity_type, "slug": slug, "project": str(project)},
-        "data": edit_data,
-        "summary": f"Test edit for {entity_type}",
-    })
-    assert json.loads(edit_result).get("success"), f"Edit failed: {edit_result}"
+    assert edit_entity(project, entity_type, slug, edit_data,
+                       f"Test edit for {entity_type}").get("success"), \
+        f"Edit failed for {entity_type}"
 
     # Verify edit persisted
     load_after = json.loads(load_handler({"project": str(project)}))
@@ -422,13 +375,8 @@ def test_dashboard_renders_with_entity(entity_type, project):
     _create_parents(project, entity_type)
     fm = _prepare_frontmatter(entity_type, slug, fm)
 
-    result = create_handler({
-        "entity_type": entity_type,
-        "slug": slug,
-        "project": str(project),
-        "frontmatter": fm,
-    })
-    assert json.loads(result).get("success"), f"Create failed: {result}"
+    assert create_entity(project, entity_type, slug, fm).get("success"), \
+        f"Create failed for {entity_type}/{slug}"
 
     dash_result = json.loads(dashboard_handler({"project": str(project)}))
     assert dash_result.get("success"), f"Dashboard failed: {dash_result}"

@@ -151,21 +151,13 @@ def test_drift_row_names_a_container_whose_children_carry_charges(project):
     invisible — the container was a gap, the scenes were filled, and nothing
     connected the two facts.
     """
-    from tools.story_create import handler as create_handler
-    from tools.story_edit import handler as edit_handler
-
-    vault = project.parent.parent
+    from core.writes import create_entity, edit_entity
 
     def create(entity_type, slug, frontmatter):
-        create_handler({"entity_type": entity_type, "slug": slug,
-                        "project": "save-the-children", "frontmatter": frontmatter},
-                       root_path=str(vault))
+        create_entity(project, entity_type, slug, frontmatter)
 
     def edit(entity_type, slug, **fields):
-        edit_handler({"action": "edit_note", "summary": "test",
-                      "target": {"entity_type": entity_type, "slug": slug,
-                                 "project": "save-the-children"},
-                      "data": fields}, root_path=str(vault))
+        edit_entity(project, entity_type, slug, fields, "test")
 
     # A charged act holding a charged sequence holding charged scenes, then
     # strip the act's own charge: exactly the drift, built in the open.
