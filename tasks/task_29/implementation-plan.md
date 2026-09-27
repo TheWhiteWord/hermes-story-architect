@@ -223,6 +223,40 @@ nothing changed, commit, confirm it did, and confirm a project creation and a
 purge still work through `story_admin`. Then confirm the model-facing tool
 list is 11 and contains no authoring path.
 
+**Result — both assumptions hold, verified by execution rather than by eye.**
+
+*Assumption 1* was true but **unenforced**: nothing in the suite asserted it,
+so a future change could have reopened the path silently. `TestNoDirectAuthoringPath`
+now asserts both names are absent from `register()`'s output, from
+`plugin.yaml`, and from disk. It was checked against an injected
+`tools/story_create.py` and failed as it should — a guard that cannot fail is
+decoration.
+
+*Assumption 2* was already satisfied by Phase 4. `core/drafts.py:92` and `:538`
+and `story_draft`'s SCHEMA all name `story_admin`, which exists. The pointer
+cannot dangle: `set(registered) == set(TOOLS)` already pins the tool set.
+
+**End-to-end: 21/21 against the real handlers on a real project on disk.**
+
+| Step | Result |
+|---|---|
+| `create_project` | project folder + database created |
+| stage a 2-entity batch | **no entity rows written (1 → 1), no prose written**, 452-char preview returned for the user to read |
+| commit | both entities and their prose landed |
+| delete via draft, then `restore` | flagged, not removed; restore brought it back |
+| `list_projects` | finds the project without opening a database |
+| `delete_project` | refused without `delete_confirm`, removed with it, project survived the refusal |
+| `purge` | refused without `purge_confirm`; **a confirmed purge still spared a fresh delete** — the 30-day age floor held — and removed it at `older_than_days=0` |
+
+Model-facing list: **11 tools**, no authoring path. `story_draft` is the only
+route to a create, edit, delete or reorder.
+
+**One finding worth keeping.** The age floor is invisible unless you test for
+it: a confirmed `purge` on a just-deleted entity returns `success: True` with
+`purged: []`. That is correct — the entity is still restorable — but a caller
+checking only the success flag would read it as "purged". The empty `purged`
+list is the signal, and it is the right one.
+
 ---
 
 ## Deferred
@@ -244,9 +278,9 @@ list is 11 and contains no authoring path.
 
 ---
 
-# Final brief — Phases 1, 3, 4
+# Final brief — Phases 1, 3, 4, 5
 
-**Status: complete.** 811 passing, down from 819 at the start of Phase 4.
+**Status: complete.** 814 passing (811 after Phase 4, +3 for the Phase 5 canary).
 
 ## The test number, and why it moved
 
@@ -257,6 +291,7 @@ list is 11 and contains no authoring path.
 | −2 | `test_story_describe`'s enum parametrize: the `story_create` and `story_edit` params died with the modules. The guard still runs for `story_retrieve` / `story_describe`. |
 | −4 | `test_plugin_registration`'s `TOOLS` 13 → 11, across two parametrized tests. |
 | −2 | `preview_reorder` and its two tests — see below. |
+| +3 | `TestNoDirectAuthoringPath`, the Phase 5 canary. |
 
 ## What Phase 4 actually removed
 
