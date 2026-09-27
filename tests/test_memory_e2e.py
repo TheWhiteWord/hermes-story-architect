@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from tools.story_create import handler as create_handler
+from core.writes import create_project
 from tools.story_dashboard import handler as dashboard_handler
 from tools.story_export import handler as export_handler
 from tools.story_load import handler as load_handler
@@ -13,10 +13,7 @@ from tools.story_memory import handler as memory_handler
 def test_memory_loop_is_db_authoritative(tmp_path):
     project = tmp_path / "projects" / "memory-e2e"
     vault = tmp_path
-    assert json.loads(create_handler({
-        "entity_type": "project", "slug": "memory-e2e", "project": "",
-        "frontmatter": {"name": "Memory E2E"},
-    }, root_path=vault))["success"] is True
+    assert create_project("memory-e2e", {"name": "Memory E2E"}, vault)["success"] is True
 
     entries = {
         "decisions": "Decision",

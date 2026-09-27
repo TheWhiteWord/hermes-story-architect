@@ -105,15 +105,11 @@ class TestBaseViewIsUnchanged:
     def test_base_view_stays_small_as_the_project_grows(self, project):
         """The cost that justifies the views: a scene must be near-free."""
         from tools.story_load import handler
-        vault = str(project.parent.parent)
         small = len(json.dumps(load(project)))
-        from tools.story_create import handler as create_handler
+        from core.writes import create_entity
         for i in range(40):
-            create_handler({"entity_type": "scene", "slug": f"extra-{i:02d}",
-                            "project": "save-the-children",
-                            "frontmatter": {"title": f"Extra {i}",
-                                            "sequence_id": "seq-discovery"}},
-                           root_path=vault)
+            create_entity(project, "scene", f"extra-{i:02d}",
+                          {"title": f"Extra {i}", "sequence_id": "seq-discovery"})
         grown = len(json.dumps(load(project)))
         # 40 scenes must not cost more than a trivial slice of the budget.
         assert (grown - small) / 40 < 40, f"{grown - small} chars for 40 scenes"

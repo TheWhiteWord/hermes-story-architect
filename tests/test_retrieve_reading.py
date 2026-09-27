@@ -12,7 +12,6 @@ import shutil
 
 import pytest
 
-from tools.story_create import handler as create_handler
 from tools.story_import import handler as import_handler
 from tools.story_retrieve import handler as retrieve_handler
 

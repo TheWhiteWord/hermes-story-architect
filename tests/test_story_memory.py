@@ -3,18 +3,13 @@ import json
 
 import pytest
 
+from core.writes import create_project
 from tools.story_memory import handler
 
 
 @pytest.fixture
 def project(tmp_path):
-    from tools.story_create import handler as create_handler
-    create_handler({
-        "entity_type": "project",
-        "slug": "memory-tool",
-        "project": "",
-        "frontmatter": {"name": "Memory Tool"},
-    }, root_path=tmp_path)
+    create_project("memory-tool", {"name": "Memory Tool"}, tmp_path)
     return tmp_path / "projects" / "memory-tool", tmp_path
 
 

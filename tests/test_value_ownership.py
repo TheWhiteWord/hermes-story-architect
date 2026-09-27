@@ -268,24 +268,20 @@ def test_story_value_view_growth_is_measured_not_assumed(project):
     view at all. Two fields per container is a real cost, so it is pinned here
     rather than left to be discovered as a slow context leak.
     """
-    from tools.story_create import handler as create_handler
-
-    vault = str(project.parent.parent)
+    from core.writes import create_entity
 
     def size():
         return len(json.dumps(load(project, view="story_value")))
 
     small = size()
     for i in range(40):
-        create_handler({"entity_type": "scene", "slug": f"drift-{i:02d}",
-                        "project": "save-the-children",
-                        "frontmatter": {"title": f"Drift {i}",
-                                        "sequence_id": "seq-discovery",
-                                        "value_at_open": "positive",
-                                        "value_at_close": "negative",
-                                        "shift": "blind trust → first doubt",
-                                        "y": -0.3}},
-                       root_path=vault)
+        create_entity(project, "scene", f"drift-{i:02d}",
+                      {"title": f"Drift {i}",
+                       "sequence_id": "seq-discovery",
+                       "value_at_open": "positive",
+                       "value_at_close": "negative",
+                       "shift": "blind trust → first doubt",
+                       "y": -0.3})
     per_scene = (size() - small) / 40
     # MEASURED at 153.75, not guessed: a fully recorded scene costs that much
     # because the view's whole job is to carry four value fields per scene
