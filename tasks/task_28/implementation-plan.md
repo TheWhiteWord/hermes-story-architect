@@ -143,13 +143,28 @@ reaching into the handlers for more than they return.
 
 ## Phase 4 — The tool and its three registration sites
 
-**Assumptions to verify**
+**Assumptions — one resolved, two still open**
 
-1. `plugin.yaml`'s `provides_tools` is actually read by the loader, not
-   decorative. *Check:* grep the installed Hermes plugin loader
-   (`~/.hermes/` or the Hermes source) for `provides_tools`. If it is read
-   only at install time, the entry is still correct but the *timing* differs
-   and that matters for testing.
+1. ~~`provides_tools` is read by the loader~~ **RESOLVED 2026-09-27, against
+   the Hermes source at `~/.hermes/hermes-agent/hermes_cli/`:**
+
+   `provides_tools` is **not** the registration mechanism for this plugin. The
+   gate at `plugins_loader.py:304` applies only to deferred **platform**
+   plugins shipping a top-level `tools.py` with a `register_tools(ctx)`; this
+   plugin is `kind: backend` and has neither. For it, `register(ctx)` in
+   `__init__.py` is the only path that registers a tool.
+
+   The manifest entry is still **required**, because three readers consume it:
+   - `plugins_activation.py:62` builds the plugin's `deferred.tools` list from
+     `provides_tools` **unioned with what actually registered** — so a name
+     declared but never registered is *reported as a tool this plugin has*.
+   - `plugins_cmd.py:858` (`_get_plugin_toolset_key`) falls back to the
+     manifest on disk to resolve the toolset for `platform_toolsets`.
+   - `plugin_validate.py:445` checks declared names against built-in
+     collisions.
+
+   Timing: registration at **load** time via `__init__.py`; the manifest is
+   read at **reporting and validation** time. Both are exercised by a test.
 2. The dashboard hook's `post_tool_call` receives enough to distinguish a
    commit from a stage. *Check:* re-read `__init__.py:205-222` — it gets
    `tool_name`, `result` and `kwargs["args"]`. A committed response must be
@@ -167,8 +182,12 @@ reaching into the handlers for more than they return.
 - Add `story_draft` to the dashboard hook tuple, gated on a commit.
 
 **Check** — the full existing suite plus the four parametrised schema tests
-now covering `story_draft`. Then a manual end-to-end against a real project:
-stage a batch, confirm nothing changed, commit, confirm it did.
+now covering `story_draft`. Plus a new test asserting **the manifest's
+`provides_tools` set equals the set `register()` actually registered** —
+nothing makes that check today, and it is the only thing that catches both
+failure modes (a declared tool that does not exist, a registered tool nobody
+declared). Then a manual end-to-end against a real project: stage a batch,
+confirm nothing changed, commit, confirm it did.
 
 ---
 
