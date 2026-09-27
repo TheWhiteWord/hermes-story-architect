@@ -15,7 +15,7 @@ import sqlite3
 
 import pytest
 
-from tools.story_create import handler as create_handler
+from core.writes import create_entity
 from tools.story_import import handler as import_handler
 
 
@@ -25,6 +25,12 @@ def _ids(project_path):
         return {r[0] for r in conn.execute("SELECT id FROM entities").fetchall()}
     finally:
         conn.close()
+
+
+def _seed_nova(proj):
+    """An entity with no Markdown behind it — exactly what an import destroys."""
+    create_entity(proj, "character", "nova",
+                  {"name": "Nova", "story_role": "Supporting"})
 
 
 def _run(args, vault):
@@ -51,8 +57,7 @@ class TestDryRun:
 
     def test_reports_what_would_be_lost(self, imported):
         proj, vault = imported
-        create_handler({"entity_type": "character", "slug": "nova", "project": str(proj),
-                        "frontmatter": {"name": "Nova", "story_role": "Supporting"}})
+        _seed_nova(proj)
         result = _run({"project": str(proj), "dry_run": True}, vault)
         assert "nova" in result["would_be_destroyed"]
         assert "DESTROYED" in result["warning"]
@@ -67,8 +72,7 @@ class TestDryRun:
 class TestGuard:
     def test_refuses_when_work_would_be_lost(self, imported):
         proj, vault = imported
-        create_handler({"entity_type": "character", "slug": "nova", "project": str(proj),
-                        "frontmatter": {"name": "Nova", "story_role": "Supporting"}})
+        _seed_nova(proj)
         result = _run({"project": str(proj)}, vault)          # no confirm
         assert result["success"] is False
         assert "nova" in result["would_be_destroyed"]
@@ -76,8 +80,7 @@ class TestGuard:
 
     def test_refusal_creates_a_backup(self, imported):
         proj, vault = imported
-        create_handler({"entity_type": "character", "slug": "nova", "project": str(proj),
-                        "frontmatter": {"name": "Nova", "story_role": "Supporting"}})
+        _seed_nova(proj)
         result = _run({"project": str(proj)}, vault)
         assert (proj / ".story" / "backup_check").parent.exists()
         from pathlib import Path
@@ -86,8 +89,7 @@ class TestGuard:
     def test_confirm_proceeds_and_really_destroys(self, imported):
         """The guard is a speed bump, not a wall — consent must still work."""
         proj, vault = imported
-        create_handler({"entity_type": "character", "slug": "nova", "project": str(proj),
-                        "frontmatter": {"name": "Nova", "story_role": "Supporting"}})
+        _seed_nova(proj)
         result = _run({"project": str(proj), "confirm": True}, vault)
         assert result["success"] is True
         assert "nova" not in _ids(proj)

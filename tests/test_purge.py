@@ -38,14 +38,15 @@ def vault(tmp_path, monkeypatch):
     return v
 
 
-TARGET = {"entity_type": "character", "slug": "kael", "project": "stc"}
+TARGET = {"entity_type": "character", "slug": "kael"}
 
 
 def _edit(vault, action, **args):
-    from tools.story_edit import handler
+    """The two admin-only actions that act on one entity: purge and restore."""
+    from tools.story_admin import handler
     return json.loads(handler({
-        "action": action, "target": TARGET, "summary": "test", **args},
-        root_path=str(vault)))
+        "action": action, "target": TARGET, "project": "stc",
+        "summary": "test", **args}, root_path=str(vault)))
 
 
 def _exists(vault, entity_id):
@@ -59,7 +60,9 @@ def _exists(vault, entity_id):
 
 
 def _delete(vault):
-    return _edit(vault, "delete_entity", confirm=True)
+    from core.writes import delete_entity
+    return delete_entity(vault / "projects" / "stc",
+                         "character", "kael", "test", True)
 
 
 class TestGuardOneTheConfirmPhrase:

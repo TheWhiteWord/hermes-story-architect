@@ -1,42 +1,37 @@
 """A project slug is a directory name, so it gets the same validation as any id.
 
-Regression: story_create returned to _create_project() before the slug check
+Regression: the create path returned to project creation before the slug check
 ran, so slug='../escape' became a literal path under projects/.
 """
-import json
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from tools.story_create import handler  # noqa: E402
+from core.writes import create_project  # noqa: E402
 
 
 def _create(slug, root, **extra):
-    args = {
-        "entity_type": "project",
-        "slug": slug,
-        "project": str(root),
-        "frontmatter": {"name": "T", "logline": "L", "genre": "G", "status": "draft"},
-    }
-    args.update(extra)
-    return json.loads(handler(args, root_path=str(root)))
+    frontmatter = {"name": "T", "logline": "L", "genre": "G", "status": "draft"}
+    frontmatter.update(extra)
+    return create_project(slug, frontmatter, root)
 
 
 def test_project_slug_rejects_path_traversal(tmp_path):
-    r = _create("../escape", tmp_path)
-    assert r.get("error")
+    with pytest.raises(ValueError, match="alphanumeric"):
+        _create("../escape", tmp_path)
     assert not (tmp_path.parent / "escape").exists()
 
 
-def test_project_slug_rejects_spaces_and_slashes(tmp_path):
-    for bad in ("My Story", "a/b", "", ".."):
-        r = _create(bad, tmp_path)
-        assert r.get("error"), f"expected rejection for {bad!r}, got {r}"
+@pytest.mark.parametrize("bad", ["My Story", "a/b", "", ".."])
+def test_project_slug_rejects_spaces_and_slashes(tmp_path, bad):
+    with pytest.raises(ValueError, match="alphanumeric"):
+        _create(bad, tmp_path)
 
 
 def test_valid_project_slug_still_works(tmp_path):
-    r = _create("my-story_2", tmp_path)
-    assert r.get("success"), r
+    assert _create("my-story_2", tmp_path)["success"] is True
     assert (tmp_path / "projects" / "my-story_2" / ".story" / "story.db").exists()

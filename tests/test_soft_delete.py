@@ -45,10 +45,18 @@ def _db(vault):
 
 
 def _edit(vault, action, entity_type="character", slug="kael", **extra):
-    from tools.story_edit import handler
+    """route the two admin actions (purge/restore) and the two write ones."""
+    from core.writes import delete_entity, edit_entity
+    from tools.story_admin import handler
+    project = vault / "projects" / "stc"
+    if action == "delete_entity":
+        return delete_entity(project, entity_type, slug, "test",
+                             extra.get("confirm"))
+    if action == "edit_note":
+        return edit_entity(project, entity_type, slug, extra.get("data", {}), "test")
     return json.loads(handler({
-        "action": action,
-        "target": {"entity_type": entity_type, "slug": slug, "project": "stc"},
+        "action": action, "project": "stc",
+        "target": {"entity_type": entity_type, "slug": slug},
         "summary": "test", **extra}, root_path=str(vault)))
 
 
@@ -153,8 +161,8 @@ class TestDeletedEntitiesAreInvisible:
 
     def test_it_is_not_an_edit_target(self, vault):
         _delete(vault)
-        r = _edit(vault, "edit_note", data={"goals_short": "x"})
-        assert "error" in r
+        with pytest.raises(ValueError, match="not found"):
+            _edit(vault, "edit_note", data={"goals_short": "x"})
 
     def test_story_load_arc_view_omits_its_beats(self, vault):
         from tools.story_load import handler
