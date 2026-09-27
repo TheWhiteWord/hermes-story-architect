@@ -8,8 +8,6 @@ provides_tools:
   - story_load
   - story_retrieve
   - story_search
-  - story_edit
-  - story_create
   - story_draft
   - story_admin
   - story_dashboard

@@ -26,8 +26,8 @@ sys.modules["hermes_story_architect"] = plugin
 _spec.loader.exec_module(plugin)
 
 TOOLS = [
-    "story_admin", "story_backup", "story_create", "story_dashboard", "story_describe",
-    "story_draft", "story_edit", "story_export", "story_import", "story_load",
+    "story_admin", "story_backup", "story_dashboard", "story_describe",
+    "story_draft", "story_export", "story_import", "story_load",
     "story_memory", "story_retrieve", "story_search",
 ]
 
@@ -88,7 +88,7 @@ def registered():
 class TestRegistryIntegration:
     def test_registry_actually_receives_the_parameters(self, registered):
         """End-to-end: run register() for real and read back every schema."""
-        assert len(registered) == 13
+        assert set(registered) == set(TOOLS)
         for name, schema in registered.items():
             assert schema["parameters"]["properties"], f"{name} registered with no parameters"
             assert schema["description"], f"{name} registered with no description"

@@ -745,7 +745,7 @@ class TestScreenplayStatsFromSceneContent:
         create_entity(project_path, "scene", "scene-1",
             {"title": "The Institute", "sequence_id": "seq-1", "act_id": "act-1"})
 
-        # Update the Content section (story_create already created it empty)
+        # Update the Content section (created empty alongside the entity)
         conn = get_db(project_path)
         try:
             conn.execute(

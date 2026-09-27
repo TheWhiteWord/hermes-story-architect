@@ -16,7 +16,7 @@ import sqlite3
 
 import pytest
 
-from core.writes import current_values, delete_entity, edit_entity, preview_reorder
+from core.writes import current_values, delete_entity, edit_entity
 from tools.story_import import handler as import_handler
 from tools.story_retrieve import handler as retrieve_handler
 
@@ -141,15 +141,6 @@ class TestPreviews:
         r = _delete(p, "character", "kael")
         assert "kael" in r["would_delete"]
         assert _col(p, "kael", "one_sentence") is not None
-
-    def test_reorder_preview_changes_nothing(self, proj):
-        p, _ = proj
-        before = _col(p, "central-room-day", "order_key")
-        r = preview_reorder(p, "scene", ["the-core-day", "central-room-night",
-                                         "central-room-day"])
-        assert r["dry_run"] is True
-        assert r["changes"]
-        assert _col(p, "central-room-day", "order_key") == before
 
 
 class TestDeleteGuard:

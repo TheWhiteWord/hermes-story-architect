@@ -13,7 +13,7 @@ import pytest
 from tools import story_describe
 
 ALL_TOOLS = [
-    "story_backup", "story_create", "story_dashboard", "story_describe", "story_edit",
+    "story_backup", "story_dashboard", "story_describe",
     "story_export", "story_import", "story_load", "story_memory", "story_retrieve",
     "story_search",
 ]
@@ -82,14 +82,13 @@ class TestEntityFields:
 class TestEntityTypeEnumsStayInSync:
     """Every tool that takes an entity_type must accept every one ENTITY_SCHEMAS defines.
 
-    A hand-written enum had already dropped 'project' from story_edit, so the model
-    could not edit the project entity even though the handler supports it.
+    A hand-written enum once dropped 'project', so the model could not act on the
+    project entity even though the handler supported it. story_draft and
+    story_admin route entity_type through core.writes and have no enum of their own.
     """
 
     @pytest.mark.parametrize("tool,path", [
-        ("story_create", ["entity_type"]),
         ("story_retrieve", ["entity_type"]),
-        ("story_edit", ["target", "properties", "entity_type"]),
         ("story_describe", ["entity_type"]),
     ])
     def test_enum_matches_entity_schemas(self, tool, path):

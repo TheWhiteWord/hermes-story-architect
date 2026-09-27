@@ -92,8 +92,6 @@ def register(ctx) -> None:
     from .tools import story_load
     from .tools import story_retrieve
     from .tools import story_search
-    from .tools import story_edit
-    from .tools import story_create
     from .tools import story_draft
     from .tools import story_admin
     from .tools import story_memory
@@ -136,14 +134,6 @@ def register(ctx) -> None:
         emoji="🔎",
     )
     ctx.register_tool(
-        name="story_edit",
-        toolset="story_architect",
-        schema=_tool_schema(story_edit.SCHEMA),
-        handler=story_edit.handler,
-        check_fn=_requirements_met,
-        emoji="✏️",
-    )
-    ctx.register_tool(
         name="story_admin",
         toolset="story_architect",
         schema=_tool_schema(story_admin.SCHEMA),
@@ -159,15 +149,6 @@ def register(ctx) -> None:
         handler=story_memory.handler,
         check_fn=_requirements_met,
         emoji="🧠",
-    )
-
-    ctx.register_tool(
-        name="story_create",
-        toolset="story_architect",
-        schema=_tool_schema(story_create.SCHEMA),
-        handler=story_create.handler,
-        check_fn=_requirements_met,
-        emoji="➕",
     )
 
     ctx.register_tool(
@@ -223,8 +204,7 @@ def register(ctx) -> None:
 
     # Auto-refresh dashboard after any data-modifying action
     def auto_refresh_dashboard(*, tool_name, result, **kwargs):
-        if tool_name not in ("story_dashboard", "story_edit", "story_create",
-                             "story_memory", "story_draft"):
+        if tool_name not in ("story_dashboard", "story_memory", "story_draft"):
             return
         try:
             data = json.loads(result)

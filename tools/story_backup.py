@@ -4,10 +4,10 @@ from pathlib import Path
 
 SCHEMA = {
     "description": "Copy the project database to a timestamped file. The database holds every "
-                   "write — story_edit, story_create and story_memory all persist there, and the "
-                   "Markdown files are only a stale export. Take one before a delete_entity, and "
+                   "write — story_draft commits and story_memory all persist there, and the "
+                   "Markdown files are only a stale export. Take one before a delete, and "
                    "before finishing a working session. Note: a backup can be copied but NOT "
-                   "restored by any tool yet, and story_edit does not take one automatically.",
+                   "restored by any tool yet.",
     "type": "object",
     "properties": {
         "project": {"type": "string", "description": "Project slug or path"},

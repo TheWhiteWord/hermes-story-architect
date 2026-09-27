@@ -607,34 +607,6 @@ def reorder(project_path: Path, entity_type: str, ordered_ids: list,
     }
 
 
-def preview_reorder(project_path: Path, entity_type: str, ordered_ids: list) -> dict:
-    """What a reorder would change. Reads only; touches nothing."""
-    from .db import get_db
-
-    if entity_type not in ("scene", "sequence"):
-        raise ValueError(f"Reorder not supported for {entity_type}")
-    if not ordered_ids:
-        raise ValueError("ordered_ids required for reorder")
-
-    conn = get_db(project_path)
-    try:
-        changes = []
-        for new_order, item_id in enumerate(ordered_ids, 1):
-            row = conn.execute(
-                "SELECT order_key FROM entities WHERE type=? AND id=?",
-                (entity_type, item_id)).fetchone()
-            if not row:
-                raise ValueError(f"{entity_type} not found: {item_id}")
-            if row[0] != new_order:
-                changes.append({"id": item_id, "from": row[0], "to": new_order})
-        return {
-            "dry_run": True, "changes": changes,
-            "message": f"Nothing was changed. {len(changes)} of {len(ordered_ids)} would move.",
-        }
-    finally:
-        conn.close()
-
-
 # ─── shared helpers ───
 
 def _check_slug(slug: str) -> None:

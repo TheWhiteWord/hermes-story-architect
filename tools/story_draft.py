@@ -9,9 +9,9 @@ Per-entity staging would not work here. A new scene implies a location, two
 character-appearance relations, a sequence order_key and a value_at_close:
 one decision, six changes, five entities, and five confirmations.
 
-A dedicated tool rather than a `draft` param on story_create/story_edit,
-because a batch draft spans a create, an edit and a reorder — it has no valid
-`target` for story_edit and no valid `action` on either. Design of record:
+A batch draft spans a create, an edit and a reorder at once, so it has no
+single target entity and no single action — which is why staging is a tool
+of its own rather than a parameter on any one write. Design of record:
 tasks/task_28/draft-staging-design.md.
 """
 import json
@@ -19,16 +19,18 @@ import json
 SCHEMA = {
     "name": "story_draft",
     "description": "Propose a batch of entity changes, show them to the user, and write them "
-                   "only when the user confirms. Use this instead of story_create / story_edit "
-                   "whenever the user is still deciding — a draft is inert: staging writes one "
-                   "row in the project's drafts table and nothing else. RELAY preview_md "
+                   "only when the user confirms. This is the only way to create, edit or "
+                   "reorder an entity — every write goes through a draft, so use it "
+                   "whenever the user is still deciding, and commit once they agree. A draft "
+                   "is inert: staging writes one row in the project's drafts table and "
+                   "nothing else. RELAY preview_md "
                    "VERBATIM to the user; it is the whole message, and it is what they are "
                    "approving — do not summarise it away. Report anything in `validation` "
                    "alongside it, and fix a finding before asking for confirmation rather "
                    "than after. Call action=\"list\" at the start of a session to find drafts "
                    "left open by a previous one. Deleting is reversible, so a delete op is a "
-                   "soft delete. Projects themselves cannot be drafted — call story_create for "
-                   "those.",
+                   "soft delete. Projects themselves cannot be drafted — call "
+                   "story_admin(action=\"create_project\") for those.",
     "type": "object",
     "properties": {
         "action": {

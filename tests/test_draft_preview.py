@@ -171,8 +171,8 @@ def test_a_missing_required_field_is_measured_on_the_merged_frontmatter(fixture_
 
 
 def test_an_unknown_field_is_reported_rather_than_written(fixture_path):
-    """It would land in `extra` verbatim — the trap story_edit already closed
-    for edits, closed here for creates."""
+    """It would land in `extra` verbatim — a field the caller misspelled
+    would be indistinguishable from one the schema does not define."""
     findings = validate_shape([_create({
         "title": "T", "sequence_id": "s", "act_id": "a", "colour": "blue"})])
     assert any("unknown scene field 'colour'" in f for f in findings)
@@ -204,8 +204,8 @@ def test_shape_validation_needs_no_database(fixture_path):
 
 
 def test_edits_and_deletes_and_reorders_produce_no_findings(fixture_path):
-    """Nothing shape-checkable in them: their fields are checked by
-    story_edit at commit, against the real row."""
+    """Nothing shape-checkable in them: their fields are checked
+    at commit, against the real row."""
     assert validate_shape(BATCH[1:]) == []
 
 

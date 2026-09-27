@@ -948,7 +948,7 @@ def get_dashboard_data(project_path: Path) -> dict:
         for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
                 # Relation may be stored character→scene OR scene→character
-                # (import vs story_create conventions). Detect by checking
+                # (direction depends on who wrote it). Detect by checking
                 # which side is a character vs scene entity.
                 if from_id in entity_by_id and entity_by_id[from_id]["type"] == "character":
                     scene_chars.setdefault(to_id, []).append(from_id)

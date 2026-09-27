@@ -89,7 +89,7 @@ def validate_ops(ops) -> list[dict]:
                 # and _create_project is a separate arg shape entirely.
                 raise DraftError(
                     f"{where}: projects cannot be drafted. "
-                    "Call story_create(entity_type='project') directly."
+                    "Call story_admin(action=\"create_project\") directly."
                 )
             if not op["slug"].replace("-", "").replace("_", "").isalnum():
                 raise DraftError(
@@ -123,7 +123,7 @@ def validate_shape(ops: list) -> list[str]:
     where the earlier op has already landed.
 
     A `create` is checked on the frontmatter merged over its schema defaults —
-    the same merge story_create does, so the check sees what will actually be
+    the same merge the write path does, so the check sees what will actually be
     written rather than what was explicitly passed.
 
     That merge makes `validate_entity`'s own required-field check inert: it
@@ -534,7 +534,8 @@ def _render_op(project_path: Path, op: dict) -> list[str]:
         return _render_edit(project_path, op)
     if kind == "delete":
         return [f"**🗑 DELETE** · `{op['entity_type']}/{op['entity_id']}`",
-                f"_{op['summary']}_ — reversible; `story_edit(action=\"restore\")` undoes it."]
+                f"_{op['summary']}_ — reversible; "
+                f"`story_admin(action=\"restore\")` undoes it."]
     return _render_reorder(op)
 
 

@@ -46,7 +46,7 @@ ENTITY_LABELS = {
     "relationship": "Relationship",
 }
 
-# Full field schemas — used by story_create and story_edit to ensure all fields
+# Full field schemas — used by the write path to ensure all fields
 # are present. Each field carries type, default value, and description.
 # This makes the schema self-documenting — the LLM can discover expected fields
 # and their meanings from this dictionary alone, without external reference files.

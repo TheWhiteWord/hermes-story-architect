@@ -7,7 +7,7 @@ SCHEMA = {
                    "and re-imports, discarding all work done since the last story_export. The "
                    "database is the source of truth, not Markdown. Only for an intentional re-sync "
                    "from Markdown files. Never use this to repair a problem — take a "
-                   "story_backup first, and prefer story_edit or story_create to change things.",
+                   "story_backup first, and prefer story_draft to change things.",
     "type": "object",
     "properties": {
         "project": {"type": "string", "description": "Project slug or path"},
@@ -35,8 +35,8 @@ def _backup(project_path: Path) -> str:
 def _diff(project_path: Path) -> dict:
     """Which database entities have no Markdown note behind them.
 
-    Those are the ones an import destroys. An entity created at runtime with
-    story_create has no .md file — that is exactly the set the wipe deletes.
+    Those are the ones an import destroys. An entity created at runtime
+    has no .md file — that is exactly the set the wipe deletes.
 
     Deliberately one-directional: an entity with a note file is never reported as
     at risk, even when the importer keys it differently (the project row uses the
@@ -100,7 +100,7 @@ def handler(args, **kwargs) -> str:
     # ── Safety gate ────────────────────────────────────────────────────────────
     # An import DELETEs every row and rebuilds from Markdown. The database is the
     # source of truth, so anything that exists only in the database is lost — the
-    # character a user created five minutes ago, every story_edit since the last
+    # character a user created five minutes ago, every commit since the last
     # export. This is the one tool that can silently destroy work, so it reports
     # first and refuses without explicit consent.
     if db_file.exists() and args.get("dry_run"):

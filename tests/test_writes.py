@@ -1,10 +1,10 @@
 """core/writes.py — the write path, called directly.
 
-These functions are the DB effect that `story_create` / `story_edit` used to
-produce behind a JSON string. A staged draft replays ops straight into them,
-so the invariant worth holding here is narrow and specific: **calling them
-directly must land exactly the same rows the handlers landed.** A divergence
-here is invisible until a committed draft quietly writes the wrong thing.
+Every mutation in the plugin funnels through these functions. A staged draft
+replays ops straight into them, so the invariant worth holding here is narrow
+and specific: **calling them directly must land exactly the rows a committed
+draft would land.** A divergence here is invisible until a committed draft
+quietly writes the wrong thing.
 """
 import json
 import sys
@@ -22,10 +22,9 @@ from core.db import get_db  # noqa: E402
 def test_core_never_imports_tools():
     """`core/` is the layer everything else sits on; `tools/` imports down into it.
 
-    Draft staging was the one module that reached back up, to replay a
-    committed op through the story_create / story_edit handlers. It no longer
-    does, and an import going the other way would invert the layering again —
-    silently, because nothing else would fail.
+    Draft staging is the temptation: a committed op has to be replayed
+    somewhere, and reaching up into `tools/` to do it would invert the layering
+    again — silently, because nothing else would fail.
     """
     import ast
 
@@ -226,7 +225,7 @@ class TestEditEntity:
         assert not result["applied"]["fields"]
 
 
-# ─── current_values / preview_reorder ───
+# ─── current_values ───
 
 class TestPreviews:
     def test_current_values_reports_before_and_to(self, fixture_path):
@@ -241,16 +240,6 @@ class TestPreviews:
         writes.current_values(fixture_path, "location", "the-central-room",
                               {"mood": "new mood", "Description": "new prose"})
         assert _q(fixture_path, "SELECT id, name, extra FROM entities ORDER BY id") == before
-
-    def test_preview_reorder_reports_moves_without_writing(self, fixture_path):
-        ids = [r[0] for r in _q(
-            fixture_path,
-            "SELECT id FROM entities WHERE type='scene' AND parent_id='seq-discovery'")]
-        before = _q(fixture_path, "SELECT id, order_key FROM entities ORDER BY id")
-        result = writes.preview_reorder(fixture_path, "scene", list(reversed(ids)))
-        assert result["dry_run"] is True
-        assert result["changes"]
-        assert _q(fixture_path, "SELECT id, order_key FROM entities ORDER BY id") == before
 
 
 # ─── delete_entity ───

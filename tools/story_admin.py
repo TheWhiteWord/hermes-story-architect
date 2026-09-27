@@ -6,9 +6,9 @@ say so. What is here cannot be drafted at all: a project has no database to hold
 a draft before it exists, and purge/restore/delete-project are the operations
 that must never be a side effect of committing a batch.
 
-`purge` and `restore` moved in from the deleted story_edit unchanged.
-`create_project` moved from story_create. `list_projects` and `delete_project`
-are new — nothing in the plugin covered either.
+`purge` and `restore` are the undo pair. `create_project`, `list_projects` and
+`delete_project` are the project lifecycle; nothing drafts, because a draft
+exists to exist before it is written.
 """
 import json
 import shutil

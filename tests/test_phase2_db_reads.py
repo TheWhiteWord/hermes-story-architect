@@ -509,7 +509,7 @@ class TestStoryDashboardDB:
 
 
 class TestAutoReimport:
-    """story_edit/story_create auto-reimport to DB in Phase 2."""
+    """A write syncs to the DB on the same call."""
 
     def test_create_entity_syncs_to_db(self, db_project):
         proj, vault = db_project

@@ -364,7 +364,7 @@ def test_a_committed_delete_soft_deletes_and_is_reversible(fixture_path):
     assert _rows(fixture_path,
                  "SELECT is_deleted FROM entities WHERE id='the-central-room'"
                  )[0][0] == 1
-    # Prose survives, so story_edit(action="restore") is an exact inverse.
+    # Prose survives, so `restore` is an exact inverse.
     assert _rows(fixture_path,
                  "SELECT COUNT(*) FROM sections WHERE entity_id='the-central-room'"
                  )[0][0] > 0
