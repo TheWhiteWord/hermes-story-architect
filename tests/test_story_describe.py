@@ -13,9 +13,9 @@ import pytest
 from tools import story_describe
 
 ALL_TOOLS = [
-    "story_backup", "story_dashboard", "story_describe",
-    "story_export", "story_import", "story_load", "story_memory", "story_retrieve",
-    "story_search",
+    "story_admin", "story_backup", "story_dashboard", "story_describe",
+    "story_draft", "story_export", "story_import", "story_load",
+    "story_memory", "story_retrieve", "story_search",
 ]
 
 
