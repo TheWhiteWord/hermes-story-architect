@@ -67,6 +67,7 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     Also migrates soft-delete columns: every reader filters on
     ``is_deleted``, and a read-only tool never calls create_schema(), so a
     project created by an earlier build failed with "no such column" on read.
+    The same applies to the ``drafts`` table.
     """
     db_path = project_path / ".story" / "story.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -74,6 +75,7 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=3000")
     conn.execute("PRAGMA foreign_keys=ON")
+    ensure_drafts_table(conn)
     # No entities table yet (fresh project) — create_schema() adds it with the
     # columns already present, so there is nothing to migrate.
     if conn.execute(
@@ -131,6 +133,31 @@ def ensure_soft_delete_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
     if "deleted_at" not in have:
         conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
+
+
+DRAFTS_SQL = """
+CREATE TABLE IF NOT EXISTS drafts (
+    id         TEXT PRIMARY KEY,
+    ops        JSON NOT NULL,
+    prev_ops   JSON,
+    summary    TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+)
+"""
+
+
+def ensure_drafts_table(conn: sqlite3.Connection) -> None:
+    """Create the staged-change table if it is missing.
+
+    Same reasoning as ensure_soft_delete_columns: a project created by an
+    earlier build has no such table, and read-only tools never call
+    create_schema(). Unlike the column migration this is unconditional — a
+    draft is a proposal, so it belongs to any project, created or not.
+    Idempotent.
+    """
+    # execute, not executescript: this runs on every get_db, and executescript
+    # issues an implicit COMMIT that would close a transaction a caller opened.
+    conn.execute(DRAFTS_SQL)
 
 
 def create_schema(conn: sqlite3.Connection) -> None:

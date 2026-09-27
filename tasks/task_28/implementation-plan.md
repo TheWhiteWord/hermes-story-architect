@@ -1,9 +1,13 @@
 # Task 28 — Implementation plan: draft staging
 
-**Status: plan only.** Nothing implemented. Design of record is
+**Status: all six phases implemented.** Baseline 679 → **758**, green at
+every phase boundary (680 / 703 / 711 / 737 / 758). Design of record is
 `draft-staging-design.md`; the intended chat interaction and the seven
-presentation decisions are in `chat-preview.md`. Read the design first — this
-file only says *in what order*, and *what to check before each step*.
+presentation decisions are in `chat-preview.md`.
+
+Each phase below opens with its **Status: DONE** block — what shipped, which
+assumptions did not hold, and what the check was — followed by the original
+plan text it was written against, kept for the record.
 
 **Baseline: 679 tests passing** on `dev` at `a838bb0`, working tree clean apart
 from this task folder. Every phase ends with the full suite green. A phase that
@@ -28,6 +32,28 @@ require touching something listed here as out of scope.
 ---
 
 ## Phase 1 — The table and its migration
+
+### Status: DONE
+
+`ensure_drafts_table` in `core/db.py`, called unconditionally
+from `get_db`. Suite: **680** (679 + 1 new).
+
+*Assumption 1 was wrong in detail, harmlessly.* Besides `story_resolve`, three
+readers open their own connection and were not listed: `story_load.py:85`,
+`story_dashboard.py:305`, and three helpers inside `core/db.py` itself
+(`get_unfilled_map`, `get_character_arcs`, `get_value_drift`). All are
+read-only and none of them reads `drafts`; only `get_db` needs the migration.
+
+*One deviation from the plan.* `ensure_drafts_table` uses `conn.execute`, not
+`executescript` — the latter issues an implicit `COMMIT`, which would close a
+transaction a caller had open. The table is one statement, so `execute` is
+enough.
+
+*One deviation from the design.* `ensure_drafts_table` is called
+**unconditionally**, not inside the `entities`-exists branch. The soft-delete
+migration is conditional because there is nothing to migrate on a fresh DB;
+for `drafts` the table is wanted on every project either way, and one
+`CREATE TABLE IF NOT EXISTS` no-op per open is the same cost.
 
 The smallest thing that works: the `drafts` table exists on every project DB,
 old and new. No tool yet.
@@ -68,6 +94,32 @@ written without the `drafts` table is repaired on `get_db`, and
 
 ## Phase 2 — Core: stage, list, discard
 
+### Status: DONE
+
+`core/drafts.py`: `validate_ops`, `stage`, `list_drafts`,
+`discard`, plus `diff_ops` for the restage. Suite: **703**.
+
+All four assumptions held. Notes:
+
+* **Draft ids** follow `backup_database`'s pattern: a second-granularity
+  timestamp with a counter suffix. A 4-hex id from the design's `d-3f2a`
+  example would need a collision loop anyway, and the timestamp is sortable —
+  which is what makes `list` order by `created_at` meaningful.
+* **`_find_entity_id_db` does no fuzzy matching** for `edit`/`delete`: the
+  non-arc branch is a bare `WHERE type=? AND id=?`. Only `arc_beat` has a
+  `LIKE '%-slug'` fallback, so the identity mapping is exact for every type an
+  edit op can target except arc beats — where the fallback is the documented
+  behaviour anyway.
+* **`prev_ops` is a straight copy**, as assumed.
+* The diff walks the op lists rather than indexing them by key. A batch may
+  hold two ops on the same entity (two field edits to one location, say) and a
+  dict would collapse them, silently reporting one as added and one as
+  dropped. `test_a_batch_may_hold_two_ops_on_the_same_entity` covers it.
+* A reorder has no single target entity, so the diff names it by its item
+  count (`reorder sequence (3 items)`) rather than inventing an entity id.
+
+**The plan as written**
+
 Read/write the draft row. No commits yet. This is where the op format gets
 proved against the real schemas.
 
@@ -103,6 +155,38 @@ one: row counts in all three tables identical before and after a stage.
 ---
 
 ## Phase 3 — Commit
+
+### Status: DONE
+
+`commit`, `sorted_ops`, `_dispatch`, `_call` in
+`core/drafts.py`. Suite: **711**.
+
+* **Assumption 1 held and still holds**: `story_create` is autocommit
+  (`story_create.py:205`), `story_edit` wraps each call in its own
+  `BEGIN`/`COMMIT` (`:374/:438`, `:509/:515`). The batch is therefore not one
+  transaction, and the design's per-op guarantee is the right one.
+* **Assumption 2 was wrong, and it is why `_call` exists.** Both handlers
+  index their required args *before* their first `try` — `story_edit.handler`
+  reads `args["action"]`, `args["target"]`, `args["summary"]` at lines 93-96,
+  `story_create.handler` reads `args["entity_type"]`, `args["slug"]`,
+  `args["frontmatter"]` at 96-98. A missing key raises out of the handler
+  rather than returning `{"error": ...}`, and an exception mid-batch would
+  leave the loop reporting nothing about what had already landed. `validate_ops`
+  should catch these first; `_call` is the backstop that turns an escape into
+  the same `{"error": ...}` shape as any other failure.
+* **Assumption 3 held.** `_delete_entity` without `confirm` returns a report
+  carrying `"error": "Delete refused without confirm..."` and deletes nothing
+  (`:702-728`) — that is the refusal the loop would have hit. The synthesised
+  `confirm: True` carries the comment saying why it is not a bypass.
+  `test_a_committed_delete_soft_deletes_and_is_reversible` asserts the delete
+  is still a flag with its sections intact.
+* **Assumption 4 held.** `sorted_ops` is a stable sort keyed on `OP_ORDER`.
+
+*Reported per the plan's "report if":* the failure path names what landed
+using only what the handlers return, so nothing reaches into them. No
+constraint here.
+
+**The plan as written**
 
 The risky phase. Everything above is bookkeeping; this writes.
 
@@ -142,6 +226,134 @@ reaching into the handlers for more than they return.
 ---
 
 ## Phase 4 — The tool and its three registration sites
+
+### Status: DONE
+
+`tools/story_draft.py`, registered in `__init__.py` and
+`plugin.yaml`, `TOOLS` + `11 → 12`, and the dashboard hook gated on a commit.
+Suite: **737**.
+
+* **Assumption 1 held** (already resolved in the plan): `register(ctx)` is the
+  registration path; the manifest is still required.
+* **Assumption 2 held, and the trap was live.** The hook reads `result` and
+  `kwargs["args"]`, and a *stage* response carries `success: True` — which is
+  the same shape `story_edit` and `story_create` return. Left ungated, every
+  staged draft would have regenerated the dashboard for a change the user had
+  not accepted. The gate is `data.get("success") and data.get("committed")`;
+  `commit` returns `committed: True` only on full success, so a **partial
+  failure does not redraw either** — the project is in a mixed state the user
+  has not seen, and the draft row is the resume token. Four tests drive the
+  real hook with a real result payload.
+* **Assumption 3 held** — same `ctx.register_tool` call as the other eleven.
+
+*New test, as the plan asked:* `TestManifestMatchesRegistration` reads
+`plugin.yaml` and compares `provides_tools` to what `register()` actually
+handed the ctx. Nothing else compared them. To make it shareable, the
+`registered` fixture moved to module level.
+
+**Manual end-to-end** (real fixture project, the three-op batch from
+`chat-preview.md`):
+
+```
+before        {'entities': 29, 'sections': 139, 'relations': 11}
+staged        {'success': True, 'draft_id': 'd-20260927-143451', 'op_count': 3}
+after stage   {'entities': 29, 'sections': 139, 'relations': 11}   ← unchanged
+restage diff  {"added": [], "dropped": ["reorder scene (4 items)"], "changed": []}
+after restage {'entities': 29, 'sections': 139, 'relations': 11}   ← still unchanged
+commit        {'success': true, 'committed': true, 'applied': [create, edit]}
+after commit  {'entities': 30, 'sections': 147, 'relations': 13}
+relations     [('mira-tells-kael','kael','character_scene'),
+               ('mira-tells-kael','mira','character_scene')]
+mood          ('claustrophobic warmth',)
+open drafts   0
+```
+
+Staging and restaging wrote nothing; the commit landed the scene with **both
+cast relations** and the location edit, and the draft row was consumed.
+
+---
+
+## Phase 5 — The preview renderer
+
+### Status: DONE
+
+`render_preview_md` in `core/drafts.py`, reused by the stage
+response; `_commit_report` for the commit response. Suite: **758**.
+
+* **Assumption 1 held.** `story_export._frontmatter_for` builds a frontmatter
+  dict for a `.md` file and `core/screenplay.py` is Fountain — neither
+  produces a preview block. New renderer.
+* **Assumption 2 held, and the denominator rule matters.** The count is over
+  non-`computed` fields only, so it matches what the model was ever offered.
+  A real render: `12 of 23 fields set`.
+* **Assumption 3 held, with one correction.** The `before` value comes from
+  `story_edit._preview_edit` — reused, not re-derived, because that function
+  already knows whether a field lives in a column, in `extra` or in a section.
+  The correction: the fixture's `the-central-room` has `extra = {}`, so its
+  `mood` is genuinely unset. The first render produced `` `mood`:  → ``, which
+  reads as a rendering fault rather than as "this was empty". It now renders
+  `_not set_`.
+
+**Deviation from the plan's wording.** The plan says one renderer reused by
+both responses; decision 4 says commit is terse. Those pull against each other,
+and the plan's own check ("the rendered block contains each op kind's marker")
+is a *stage*-time check. So: `render_preview_md` for stage (the full
+presentation), `_commit_report` for commit (a one-line-per-op outcome, with
+partial failure getting the full warning). One renderer per audience, not one
+for both.
+
+**Manual read-as-a-user** — full block rendered and inspected, real fixture
+project. Staging and restaging left 29/139/11 unchanged; the restage printed
+`· － reorder scene (4 items)`; the commit reported
+`✅ create scene/mira-tells-kael` and `✅ edit location/the-central-room`
+without repeating the field table; a forced partial failure printed
+`⚠️ Partly saved` with the resume instruction.
+
+## Phase 6 — Shape validation
+
+### Status: DONE
+
+`validate_shape` in `core/drafts.py`, surfaced as
+`validation` on the stage response. Suite: **758** (21 new tests in
+`tests/test_draft_preview.py`).
+
+* **Assumption 1 held** — `validate_entity(entity_type, frontmatter)` is pure.
+* **Assumption 2 held exactly.** `core/entity.py` has three `get_db` calls, at
+  lines 349, 366 and 389 — `validate_scene_act_id`, `validate_arc_parents`,
+  `validate_plot_characters`, the three the design names. Nothing else opens a
+  connection, so nothing else is out.
+
+**A real bug this phase found, in my own code.** `validate_entity` checks
+required fields with `field not in frontmatter`. `validate_shape` validates the
+frontmatter *merged over the schema defaults* (the correct thing — it is what
+`story_create` will actually write), and a merge puts every schema field in the
+dict. So the required-field check was **inert**: it could never fire. Required
+fields are now checked on their merged *value* — present-but-empty is the real
+failure, and it is the one the merge hides. Caught by
+`test_a_missing_required_field_is_measured_on_the_merged_frontmatter`, which
+was written to assert the merge and failed for the wrong reason.
+
+**The `chat-preview.md` mock is not valid input, and the validator is right.**
+The mock writes `value_at_open: "hope"`, but `VALUE_CHARGES` is
+`["positive", "negative", "mixed", "ironic"]` (`core/constants.py:12`). The
+renderer reports both as findings. The plan's closing note warned about the
+mock's *ids*; its *field values* are wrong too. Recorded as
+`test_the_chat_preview_mock_would_not_pass_validation` so nobody later
+"fixes" the validator to match the mock.
+
+The plan's own checks, both asserted rather than merely absent: a stage with a
+bad enum and a missing required field reports both, and a cross-entity
+reference to an id created by a later op in the same batch reports nothing
+(`test_a_valid_cross_entity_reference_that_does_not_exist_yet_is_silent`).
+
+---
+
+## The plan as written — phases 4 to 6
+
+Kept for the record. The status blocks above are what actually shipped; what
+follows is the text each phase was written against.
+
+### Phase 4 — The tool and its three registration sites
 
 **Assumptions — one resolved, two still open**
 
@@ -191,7 +403,7 @@ confirm nothing changed, commit, confirm it did.
 
 ---
 
-## Phase 5 — The preview renderer
+### Phase 5 — The preview renderer
 
 The part the user actually sees. Build it against `chat-preview.md`, not
 against imagination.
@@ -222,7 +434,7 @@ user would.
 
 ---
 
-## Phase 6 — Shape validation
+### Phase 6 — Shape validation
 
 Last, because it is the only phase that can be wrong harmlessly.
 
@@ -286,3 +498,84 @@ tools; the functions stay callable.
 The fixture uses `act-1`, `the-central-room`, `seq-discovery`. The renderer
 takes ids as given, so this does not affect the code — but a test written from
 the mock will fail on a missing entity, and the real ids are above.
+
+**Its field values are wrong too, which the ids note did not cover.** The mock
+writes `value_at_open: "hope"` and `value_at_close: "doubt"`, but
+`VALUE_CHARGES` (`core/constants.py:12`) is
+`["positive", "negative", "mixed", "ironic"]`. The renderer reports both as
+findings, correctly. A test copied from the mock's frontmatter will fail on the
+validator, not on the entity. `test_the_chat_preview_mock_would_not_pass_validation`
+in `tests/test_draft_preview.py` pins this so nobody later relaxes the
+validator to make the mock pass.
+
+
+---
+
+# Final brief
+
+**All six phases complete. Suite 679 → 758, green at every phase boundary
+(680 / 703 / 711 / 737 / 758).**
+
+**What shipped**
+
+| Phase | File | What |
+|---|---|---|
+| 1 | `core/db.py` | `ensure_drafts_table` + `DRAFTS_SQL`, called from `get_db` |
+| 2 | `core/drafts.py` | `validate_ops`, `stage`, `list_drafts`, `discard`, `diff_ops` |
+| 3 | `core/drafts.py` | `commit`, `sorted_ops`, `_dispatch`, `_call` |
+| 4 | `tools/story_draft.py` | `SCHEMA` + `handler`; 3 registration sites; hook gate |
+| 5 | `core/drafts.py` | `render_preview_md`, `_commit_report`, `_render_*` |
+| 6 | `core/drafts.py` | `validate_shape` → the stage response's `validation` |
+
+79 new tests: `test_drafts.py` (31), `test_story_draft_tool.py` (23),
+`test_draft_preview.py` (21), plus the manifest check and the legacy-migration
+test.
+
+**Six assumptions did not hold** — each found by checking the code, each
+recorded in its phase:
+
+1. **P1/A1** — three read-only readers open their own `sqlite3.connect` beyond
+   the two the plan listed (`story_load.py:85`, `story_dashboard.py:305`, and
+   three helpers in `core/db.py`). None needs `drafts`.
+2. **P1/A2** — `executescript` issues an implicit `COMMIT`; used `execute`.
+3. **P3/A2** — **the one that mattered.** Both write handlers index their
+   required args *before* their first `try`, so a missing key raises out of
+   `handler` instead of returning `{"error": ...}`. Mid-batch that would have
+   aborted the loop and reported nothing about what had already landed.
+4. **P4/A2** — the dashboard trap was live: a stage response is
+   `{"success": true, …}`, identical in shape to a real write, so the hook
+   would have redrawn for unaccepted changes.
+5. **P5/A3** — the `before` value was available, but the fixture's location
+   has `extra = {}`, so a first render showed an empty gap before the arrow.
+6. **P6/A1** — `validate_entity`'s required-field check is *inert* under a
+   schema merge (`field not in frontmatter` can never fire once every field is
+   in the dict). Required fields are now checked on their merged value.
+
+**Two places the plan's own source material was wrong**, both recorded as tests
+so they are not "corrected" later:
+
+- The `chat-preview.md` mock writes `value_at_open: "hope"`, but `VALUE_CHARGES`
+  is `["positive", "negative", "mixed", "ironic"]`. The validator is right.
+- The plan asked for one renderer reused by both responses, while decision 4
+  says commit is terse. Resolved as one renderer *per audience*.
+
+**Deferred, unchanged from the design** — nothing here blocks the six phases:
+
+- **Staleness detection** on `edit` ops. `ponytail:` no check — add an
+  expected-`from` per field if it ever bites.
+- **Draft TTL / expiry.** A stale draft is inert; `discard` removes it.
+- **Skill text.** Its own work. The `story_draft` schema description now says
+  to relay `preview_md` verbatim and to report `validation`, so the tool is not
+  silent, but the *judgement* of when to stage still lives in `SKILL.md`.
+- **A `story_draft` for project creation.** Out of scope by decision.
+
+**Follow-up outside this task:** task 29 (collapse `story_create` /
+`story_edit` into `story_admin` and close the bypass) is still *required* and
+still separate; while both stay registered, staging is a suggestion rather than
+the only path.
+
+**Naming note.** `list_drafts`, not `list` — it shadows a builtin, and every
+other public function in `core` is `verb_noun` (`get_project_memory`,
+`search_sections`, `backup_database`). The tool's JSON key is still `list`,
+which is what the model sees.
+
