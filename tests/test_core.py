@@ -6,10 +6,11 @@ from core.section_parser import list_sections, get_section, replace_section
 from core.entity import extract_entity, validate_entity, update_sections
 from core.screenplay import extract_scenes, match_character, match_location, extract_location
 from core.constants import ENTITY_SCHEMAS
+from core.writes import (create_entity, create_project, delete_entity,
+                          edit_entity, reorder)
 
 
 # ---- Imports for tool tests ----
-from tools.story_create import handler as create_handler
 from tools.story_load import handler as load_handler
 
 
@@ -204,17 +205,11 @@ class TestNoteCreation:
 
     def test_create_character_has_all_fields(self, tmp_path):
         """Creating a character with minimal fields should still produce all fields."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "character",
-            "slug": "test-char",
-            "project": str(project_path),
-            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "character", "test-char",
+            {"name": "Test Char", "story_role": "Protagonist"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -237,17 +232,11 @@ class TestNoteCreation:
 
     def test_create_character_has_all_sections(self, tmp_path):
         """Creating a character should produce all standard body sections."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "character",
-            "slug": "test-char",
-            "project": str(project_path),
-            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "character", "test-char",
+            {"name": "Test Char", "story_role": "Protagonist"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -271,17 +260,11 @@ class TestNoteCreation:
 
     def test_create_plot_has_all_fields(self, tmp_path):
         """Creating a plot with minimal fields should produce all fields."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "plot",
-            "slug": "test-plot",
-            "project": str(project_path),
-            "frontmatter": {"name": "Test Plot"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "plot", "test-plot",
+            {"name": "Test Plot"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -302,17 +285,11 @@ class TestNoteCreation:
 
     def test_create_plot_has_all_sections(self, tmp_path):
         """Creating a plot should produce all standard body sections."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "plot",
-            "slug": "test-plot",
-            "project": str(project_path),
-            "frontmatter": {"name": "Test Plot"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "plot", "test-plot",
+            {"name": "Test Plot"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -333,18 +310,12 @@ class TestNoteCreation:
 
     def test_create_plot_with_scope_and_arc(self, tmp_path):
         """Creating a plot with plot_scope and value_arc."""
-        from tools.story_create import handler as create_handler
         from core.db import get_db
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "plot",
-            "slug": "main-plot",
-            "project": str(project_path),
-            "frontmatter": {"name": "Main Plot", "plot_scope": "main", "value_arc": "Maturation"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "plot", "main-plot",
+            {"name": "Main Plot", "plot_scope": "main", "value_arc": "Maturation"})
         assert result["success"] is True
 
         conn = get_db(project_path)
@@ -378,27 +349,17 @@ class TestNoteCreation:
 
     def test_create_scene_has_all_fields_and_sections(self, tmp_path):
         """Creating a scene with minimal fields should still produce all fields and body sections."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
         # Create parent entities first (required for scene validation)
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
 
-        args = {
-            "entity_type": "scene",
-            "slug": "test-scene",
-            "project": str(project_path),
-            "frontmatter": {"title": "Test Scene", "sequence_id": "seq-1", "act_id": "act-1"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "scene", "test-scene",
+            {"title": "Test Scene", "sequence_id": "seq-1", "act_id": "act-1"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -435,23 +396,15 @@ class TestNoteCreation:
 
     def test_create_sequence_has_all_fields_and_sections(self, tmp_path):
         """Creating a sequence should produce all fields and body sections."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
         # Create parent act first (required for sequence validation)
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
 
-        args = {
-            "entity_type": "sequence",
-            "slug": "test-sequence",
-            "project": str(project_path),
-            "frontmatter": {"title": "Test Sequence", "act_id": "act-1"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "sequence", "test-sequence",
+            {"title": "Test Sequence", "act_id": "act-1"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -483,17 +436,11 @@ class TestNoteCreation:
 
     def test_create_act_has_all_fields_and_sections(self, tmp_path):
         """Creating an act should produce all fields and body sections."""
-        from tools.story_create import handler as create_handler
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "act",
-            "slug": "test-act",
-            "project": str(project_path),
-            "frontmatter": {"title": "Test Act"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "act", "test-act",
+            {"title": "Test Act"})
         assert result["success"] == True
 
         from core.db import get_db
@@ -522,16 +469,10 @@ class TestNoteCreation:
 
 
 class TestProjectCreation:
-    """Tests for story_create(entity_type='project', ...)."""
+    """Tests for create_project."""
 
     def test_create_project_is_db_only(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {"name": "Test Project", "logline": "A test"},
-        }
-        create_handler(args, root_path=str(tmp_path))
+        create_project("test-proj", {"name": "Test Project", "logline": "A test"}, tmp_path)
         proj = tmp_path / "projects" / "test-proj"
         assert (proj / ".story" / "story.db").exists()
         assert not (proj / "project.md").exists()
@@ -539,23 +480,11 @@ class TestProjectCreation:
             assert not (proj / folder).exists(), f"Unexpected folder: {folder}"
 
     def test_create_project_does_not_create_project_markdown(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {"name": "Test Project"},
-        }
-        create_handler(args, root_path=str(tmp_path))
+        create_project("test-proj", {"name": "Test Project"}, tmp_path)
         assert not (tmp_path / "projects" / "test-proj" / "project.md").exists()
 
     def test_create_project_does_not_require_memory_file(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {"name": "Test Project"},
-        }
-        create_handler(args, root_path=str(tmp_path))
+        create_project("test-proj", {"name": "Test Project"}, tmp_path)
         project = tmp_path / "projects" / "test-proj"
         assert not (project / ".story" / "memory.md").exists()
         from core.db import get_db, get_project_memory, empty_memory
@@ -568,14 +497,8 @@ class TestProjectCreation:
         assert get_project_memory(project) == empty_memory()
 
     def test_create_project_creates_db(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {"name": "Test Project"},
-        }
-        result = create_handler(args, root_path=str(tmp_path))
-        assert json.loads(result)["success"] is True
+        result = create_project("test-proj", {"name": "Test Project"}, tmp_path)
+        assert result["success"] is True
         db_path = tmp_path / "projects" / "test-proj" / ".story" / "story.db"
         assert db_path.exists()
         from core.db import get_db
@@ -588,35 +511,16 @@ class TestProjectCreation:
             conn.close()
 
     def test_create_project_validates_required_fields(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {},
-        }
-        result = json.loads(create_handler(args, root_path=str(tmp_path)))
-        assert "error" in result
-        assert "Missing required" in result["error"]
+        with pytest.raises(ValueError, match="Missing required"):
+            create_project("test-proj", {}, tmp_path)
 
     def test_create_project_idempotent(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {"name": "Test Project"},
-        }
-        create_handler(args, root_path=str(tmp_path))
-        result = json.loads(create_handler(args, root_path=str(tmp_path)))
-        assert "error" in result
+        create_project("test-proj", {"name": "Test Project"}, tmp_path)
+        with pytest.raises(ValueError):
+            create_project("test-proj", {"name": "Test Project"}, tmp_path)
 
     def test_story_load_works_after_create(self, tmp_path):
-        args = {
-            "entity_type": "project",
-            "slug": "test-proj",
-            "project": "",
-            "frontmatter": {"name": "Test Project"},
-        }
-        create_handler(args, root_path=str(tmp_path))
+        create_project("test-proj", {"name": "Test Project"}, tmp_path)
         load_args = {"project": str(tmp_path / "projects" / "test-proj")}
         result = json.loads(load_handler(load_args, root_path=str(tmp_path)))
         assert result["loaded"] is True
@@ -647,37 +551,25 @@ def _make_project_with_structure(tmp):
 
 
 class TestPhase3ToolSurface:
-    """Tests for Phase 3 tool surface: edit_note data bag, reorder, cascade blocking, auto-order, parent validation, structure-index update."""
+    """Tests for Phase 3: edit data bag, reorder, cascade blocking, auto-order, parent validation."""
 
     def test_edit_note_with_data_bag(self, tmp_path):
-        """edit_note with data bag updates entity columns + sections in DB."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-
+        """edit_entity with a data bag updates entity columns + sections in DB."""
         project_path = _make_project_with_structure(tmp_path)
 
         # Create parents (now writes DB directly)
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
-        create_handler({
-            "entity_type": "scene", "slug": "test-scene", "project": str(project_path),
-            "frontmatter": {"title": "Test Scene", "sequence_id": "seq-1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project_path, "scene", "test-scene",
+            {"title": "Test Scene", "sequence_id": "seq-1", "act_id": "act-1"})
 
         # Edit with data bag: frontmatter field + body section
-        result = edit_handler({
-            "action": "edit_note",
-            "target": {"entity_type": "scene", "slug": "test-scene", "project": str(project_path)},
-            "data": {"status": "written", "Content": "Updated content text."},
-            "summary": "Update status and content"
-        })
-        assert json.loads(result)["success"] is True
+        result = edit_entity(project_path, "scene", "test-scene",
+            {"status": "written", "Content": "Updated content text."},
+            "Update status and content")
+        assert result["success"] is True
 
         # Assert on DB state
         from core.db import get_db
@@ -692,34 +584,22 @@ class TestPhase3ToolSurface:
 
     def test_reorder_scene_within_sequence(self, tmp_path):
         """Reorder scenes → order_key renumbered 1-2-3 in DB."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
         from core.db import get_db
 
         project_path = _make_project_with_structure(tmp_path)
 
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
         for slug in ["scene-1", "scene-2", "scene-3"]:
-            create_handler({
-                "entity_type": "scene", "slug": slug, "project": str(project_path),
-                "frontmatter": {"title": f"Scene {slug[-1]}", "sequence_id": "seq-1", "act_id": "act-1"}
-            })
+            create_entity(project_path, "scene", slug,
+                {"title": f"Scene {slug[-1]}", "sequence_id": "seq-1", "act_id": "act-1"})
 
         # Reorder: move scene-3 to front
-        result = edit_handler({
-            "action": "reorder",
-            "target": {"entity_type": "scene", "project": str(project_path)},
-            "order_context": {"ordered_ids": ["scene-3", "scene-1", "scene-2"]},
-            "summary": "Reorder scenes"
-        })
-        assert json.loads(result)["success"] is True
+        result = reorder(project_path, "scene", ["scene-3", "scene-1", "scene-2"],
+                         "Reorder scenes")
+        assert result["success"] is True
 
         # Assert DB order_key values
         conn = get_db(project_path)
@@ -733,34 +613,20 @@ class TestPhase3ToolSurface:
             conn.close()
 
     def test_delete_sequence_with_scenes_blocked(self, tmp_path):
-        """Delete sequence with child scenes → error."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-
+        """Delete sequence with child scenes → refused."""
         project_path = _make_project_with_structure(tmp_path)
 
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
-        create_handler({
-            "entity_type": "scene", "slug": "scene-1", "project": str(project_path),
-            "frontmatter": {"title": "Scene 1", "sequence_id": "seq-1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project_path, "scene", "scene-1",
+            {"title": "Scene 1", "sequence_id": "seq-1", "act_id": "act-1"})
 
-        result = edit_handler({
-            "action": "delete_entity",
-            "target": {"entity_type": "sequence", "slug": "seq-1", "project": str(project_path)},
-            "summary": "Delete seq-1",
-            "confirm": True
-        })
-        parsed = json.loads(result)
-        assert "error" in parsed
-        assert "Cannot delete" in parsed["error"] or "reference" in parsed["error"]
+        result = delete_entity(project_path, "sequence", "seq-1",
+                               "Delete seq-1", True)
+        assert "Cannot delete" in result["error"]
+        assert [c["id"] for c in result["blocking_children"]] == ["scene-1"]
 
         # Entity should still exist (delete was blocked)
         from core.db import get_db
@@ -770,30 +636,17 @@ class TestPhase3ToolSurface:
         conn.close()
 
     def test_delete_act_with_sequences_blocked(self, tmp_path):
-        """Delete act with child sequences → error."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-
+        """Delete act with child sequences → refused."""
         project_path = _make_project_with_structure(tmp_path)
 
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
 
-        result = edit_handler({
-            "action": "delete_entity",
-            "target": {"entity_type": "act", "slug": "act-1", "project": str(project_path)},
-            "summary": "Delete act-1",
-            "confirm": True
-        })
-        parsed = json.loads(result)
-        assert "error" in parsed
-        assert "Cannot delete" in parsed["error"] or "reference" in parsed["error"]
+        result = delete_entity(project_path, "act", "act-1", "Delete act-1", True)
+        assert "Cannot delete" in result["error"]
+        assert [c["id"] for c in result["blocking_children"]] == ["seq-1"]
 
         # Entity should still exist (delete was blocked)
         from core.db import get_db
@@ -804,26 +657,16 @@ class TestPhase3ToolSurface:
 
 
 
-    def test_delete_character_hard_delete(self, tmp_path):
-        """Delete character without children → hard delete from DB."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-
+    def test_delete_character_soft_delete(self, tmp_path):
+        """Delete character without children → gone from every read."""
         project_path = _make_project_with_structure(tmp_path)
 
-        create_handler({
-            "entity_type": "character", "slug": "solo-char", "project": str(project_path),
-            "frontmatter": {"name": "Solo", "story_role": "Minor"}
-        })
+        create_entity(project_path, "character", "solo-char",
+            {"name": "Solo", "story_role": "Minor"})
 
-        result = edit_handler({
-            "action": "delete_entity",
-            "target": {"entity_type": "character", "slug": "solo-char", "project": str(project_path)},
-            "summary": "Delete solo-char",
-            "confirm": True
-        })
-        parsed = json.loads(result)
-        assert parsed["success"] is True
+        result = delete_entity(project_path, "character", "solo-char",
+                               "Delete solo-char", True)
+        assert result["success"] is True
 
         # The row survives, flagged — that is what makes restore an exact
         # inverse (task_18 soft delete). What must be true is that no reader
@@ -842,30 +685,20 @@ class TestPhase3ToolSurface:
 
     def test_create_scene_auto_order(self, tmp_path):
         """Create scene without order → auto-assigned next position."""
-        from tools.story_create import handler as create_handler
-
         project_path = _make_project_with_structure(tmp_path)
 
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
 
         # Create first scene — auto-order = 1
-        create_handler({
-            "entity_type": "scene", "slug": "scene-a", "project": str(project_path),
-            "frontmatter": {"title": "Scene A", "sequence_id": "seq-1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "scene", "scene-a",
+            {"title": "Scene A", "sequence_id": "seq-1", "act_id": "act-1"})
         # Create second scene — auto-order = 2
-        result = create_handler({
-            "entity_type": "scene", "slug": "scene-b", "project": str(project_path),
-            "frontmatter": {"title": "Scene B", "sequence_id": "seq-1", "act_id": "act-1"}
-        })
-        assert json.loads(result)["success"] is True
+        result = create_entity(project_path, "scene", "scene-b",
+            {"title": "Scene B", "sequence_id": "seq-1", "act_id": "act-1"})
+        assert result["success"] is True
 
         # Verify auto-order in DB
         from core.db import get_db
@@ -880,27 +713,15 @@ class TestPhase3ToolSurface:
 
     def test_create_scene_validates_parent(self, tmp_path):
         """Create scene with non-existent sequence_id → error."""
-        from tools.story_create import handler as create_handler
-        from tools.story_edit import handler as edit_handler
-
         project_path = _make_project_with_structure(tmp_path)
 
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
 
         # No seq-99 exists — scene creation should fail
-        result = create_handler({
-            "entity_type": "scene", "slug": "orphan", "project": str(project_path),
-            "frontmatter": {"title": "Orphan", "sequence_id": "seq-99", "act_id": "act-1"}
-        })
-        parsed = json.loads(result)
-        assert "error" in parsed
-        assert "seq-99" in parsed["error"] or "Sequence" in parsed["error"]
-
-        # No scene file should have been created
-        assert not (project_path / "scenes" / "orphan.md").exists()
+        with pytest.raises(ValueError, match="seq-99|Sequence"):
+            create_entity(project_path, "scene", "orphan",
+                {"title": "Orphan", "sequence_id": "seq-99", "act_id": "act-1"})
 
 # ---- Phase 4: screenplay stats from DB scene content ----
 
@@ -910,7 +731,6 @@ class TestScreenplayStatsFromSceneContent:
     def test_pipeline_produces_stats_with_scriptHtml(self, tmp_path):
         """_compute_screenplay_stats(get_screenplay_text(...)) returns valid stats incl scriptHtml."""
         from core.db import get_db, get_screenplay_text
-        from tools.story_create import handler as create_handler
         import importlib.util
 
         project_path = tmp_path / "test-project"
@@ -918,18 +738,12 @@ class TestScreenplayStatsFromSceneContent:
         (project_path / ".story").mkdir()
         (project_path / "project.md").write_text("---\nname: Test\n---\n")
 
-        create_handler({
-            "entity_type": "act", "slug": "act-1", "project": str(project_path),
-            "frontmatter": {"title": "Act 1"}
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1", "project": str(project_path),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"}
-        })
-        create_handler({
-            "entity_type": "scene", "slug": "scene-1", "project": str(project_path),
-            "frontmatter": {"title": "The Institute", "sequence_id": "seq-1", "act_id": "act-1"}
-        })
+        create_entity(project_path, "act", "act-1",
+            {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+            {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project_path, "scene", "scene-1",
+            {"title": "The Institute", "sequence_id": "seq-1", "act_id": "act-1"})
 
         # Update the Content section (story_create already created it empty)
         conn = get_db(project_path)
@@ -1110,18 +924,12 @@ class TestUnfilledFields:
             assert "shift" not in filled, entity_type
 
     def test_get_unfilled_map(self, tmp_path):
-        from tools.story_create import handler as create_handler
         from core.db import get_unfilled_map
 
         project_path = _make_minimal_project(tmp_path)
 
-        args = {
-            "entity_type": "character",
-            "slug": "test-char",
-            "project": str(project_path),
-            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
-        }
-        result = json.loads(create_handler(args))
+        result = create_entity(project_path, "character", "test-char",
+            {"name": "Test Char", "story_role": "Protagonist"})
         assert result["success"]
 
         unfilled = get_unfilled_map(project_path)
@@ -1131,18 +939,12 @@ class TestUnfilledFields:
         assert "goals_long" in unfilled
 
     def test_get_project_summary_excludes_unfilled(self, tmp_path):
-        from tools.story_create import handler as create_handler
         from core.db import get_project_summary
 
         project_path = _make_minimal_project(tmp_path)
 
-        char_args = {
-            "entity_type": "character",
-            "slug": "test-char",
-            "project": str(project_path),
-            "frontmatter": {"name": "Test Char", "story_role": "Protagonist"}
-        }
-        json.loads(create_handler(char_args))
+        create_entity(project_path, "character", "test-char",
+            {"name": "Test Char", "story_role": "Protagonist"})
 
         summary = get_project_summary(project_path)
         # Unfilled moved to view="unfilled" (task_21 spec §3.5) — backend get_unfilled_map
