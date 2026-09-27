@@ -241,3 +241,76 @@ list is 11 and contains no authoring path.
 - Moving `purge` / `restore` into `core/`. They are admin-only with no other
   caller; `core/` should not hold code nothing in `core/` calls.
 - Any backward compatibility. Nothing has shipped.
+
+---
+
+# Final brief — Phases 1, 3, 4
+
+**Status: complete.** 811 passing, down from 819 at the start of Phase 4.
+
+## The test number, and why it moved
+
+819 → 811. Every drop is accounted for; none is lost coverage.
+
+| Δ | Cause |
+|---|---|
+| −2 | `test_story_describe`'s enum parametrize: the `story_create` and `story_edit` params died with the modules. The guard still runs for `story_retrieve` / `story_describe`. |
+| −4 | `test_plugin_registration`'s `TOOLS` 13 → 11, across two parametrized tests. |
+| −2 | `preview_reorder` and its two tests — see below. |
+
+## What Phase 4 actually removed
+
+`tools/story_create.py` and `tools/story_edit.py`, their `register()` calls,
+the `tools/__init__` imports, the `plugin.yaml` entries, and the two dead
+names in the dashboard-refresh tuple. Verified for real, not just by test:
+`register()` emits 11 tools and neither deleted name appears.
+
+**Model-facing text was repointed, not left dangling.** `story_draft`'s
+description now reads as the only way to create, edit or reorder an entity —
+it previously told the model to prefer draft over create/edit, which after
+the deletion would have been a preference with nothing to prefer over.
+`restore` and `create_project` now name `story_admin`.
+
+## `preview_reorder` — resolved, not deferred
+
+Phase 1 flagged this for re-check. `story_edit` was its only caller and the
+draft preview renders a reorder inline (`_render_reorder`), so nothing calls
+it. Dropped, per the plan's own instruction.
+
+## Two things the plan's assumptions did not anticipate
+
+1. **`test_plugin_registration` asserted a hardcoded `13`.** It was not in
+   the plan's list of things to update, and it failed only after the files
+   were gone. It now compares against the `TOOLS` list, so dropping a tool
+   can never silently desync it again.
+2. **A layer-inversion guard earned its keep.** `test_core_never_imports_tools`
+   (an AST scan) is what proves `core/` no longer reaches up into `tools/`.
+   It was verified to fail on an injected import, so it is a real guard and
+   not decoration.
+
+## Deferred — out of scope, needs your call
+
+**`skills/story-editor/` and `skills/story-loader/` are unregistered
+directories that document the deleted tools.** Neither appears in
+`provides_skills` nor in `_register_skills`, so nothing loads them today —
+they were already dead before this task. They now also describe a tool
+surface that no longer exists. The registered skill,
+`skills/hermes-story-architect/`, is clean.
+
+I did not touch them: they are not in the plan, and deleting skill
+directories is a structural decision that is yours. Either remove them or
+rewrite them against the draft-based surface.
+
+## Note on a boundary I crossed deliberately
+
+Phase 5 owns the `core/drafts.py` model-facing strings. I fixed two of them
+anyway, because Phase 4 deleted the tools they named and leaving them would
+have meant closing my phase with the plugin pointing at nothing.
+
+## Method note
+
+Two scripted conversion passes were reverted. Regex cannot find the end of a
+nested dict argument; the first mangled `str(tmp_path)` and the second ate
+the variables its own output depended on. The pattern that held throughout
+is that a converter's output must be checked against a real run rather than
+trusted because it parsed.
