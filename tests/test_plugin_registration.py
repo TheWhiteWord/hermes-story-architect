@@ -32,6 +32,13 @@ TOOLS = [
 ]
 
 
+def _manifest_tools():
+    import yaml
+    return set(yaml.safe_load(
+        (Path(__file__).parent.parent / "plugin.yaml").read_text(encoding="utf-8")
+    )["provides_tools"])
+
+
 class TestRegisteredSchemaShape:
     @pytest.mark.parametrize("name", TOOLS)
     def test_has_parameters_object(self, name):
@@ -109,12 +116,31 @@ class TestManifestMatchesRegistration:
     different times.
     """
 
-    def _manifest_tools(self):
-        import yaml
-        manifest = yaml.safe_load(
-            (Path(__file__).parent.parent / "plugin.yaml").read_text(encoding="utf-8")
-        )
-        return set(manifest["provides_tools"])
-
     def test_manifest_and_registration_agree(self, registered):
-        assert self._manifest_tools() == set(registered)
+        assert _manifest_tools() == set(registered)
+
+
+class TestNoDirectAuthoringPath:
+    """The authoring path is closed; this is the canary that says so.
+
+    The model must reach every write through a staged draft. If a direct
+    create or edit tool ever comes back, the consent step goes with it and
+    the user is shown a write they never agreed to.
+    """
+
+    DELETED = ("story_create", "story_edit")
+
+    def test_not_registered(self, registered):
+        for name in self.DELETED:
+            assert name not in registered, (
+                f"{name} is registered again: writes bypass the draft consent step")
+
+    def test_not_declared_in_manifest(self):
+        for name in self.DELETED:
+            assert name not in _manifest_tools(), \
+                f"{name} is declared in plugin.yaml again"
+
+    def test_module_is_gone(self):
+        """Not merely unregistered: the module itself must not exist."""
+        for name in self.DELETED:
+            assert not (Path(__file__).parent.parent / "tools" / f"{name}.py").exists()
