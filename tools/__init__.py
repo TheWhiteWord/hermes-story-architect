@@ -12,6 +12,7 @@ from . import story_retrieve
 from . import story_search
 from . import story_edit
 from . import story_create
+from . import story_admin
 from . import story_resolve
 from . import story_import
 from . import story_export

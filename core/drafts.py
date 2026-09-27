@@ -2,11 +2,11 @@
 
 A draft is a row in the project's own `drafts` table holding a list of ops.
 Nothing here touches `entities`, `sections` or `relations` until `commit_draft`
-dispatches the ops into the existing write handlers, so a staged batch is
-inert: staging a change and never committing it leaves no trace in the story.
+dispatches the ops into `core.writes`, so a staged batch is inert: staging a
+change and never committing it leaves no trace in the story.
 
-Ops mirror what story_create / story_edit already accept, so staging is the
-same computation as `dry_run` with a different sink. Design of record:
+Ops mirror what the write functions already take, so staging is the same
+computation as a dry run with a different sink. Design of record:
 tasks/task_28/draft-staging-design.md.
 """
 import json
@@ -290,14 +290,14 @@ def sorted_ops(ops: list) -> list:
 
 
 def commit(project_path: Path, draft_id: str) -> dict:
-    """Write a staged draft by replaying its ops into the existing handlers.
+    """Write a staged draft by replaying its ops into `core.writes`.
 
     No re-implementation of the writes: each op dispatches in-process to the
-    handler the tool already exposes, so there is one place where a create
-    means what a create means.
+    function that means what a create means, so there is one place where that
+    meaning lives.
 
-    The guarantee is **atomic per op, resumable per batch**. `story_create`
-    runs in autocommit and `story_edit` wraps each call in its own
+    The guarantee is **atomic per op, resumable per batch**. `create_entity`
+    runs in autocommit and the rest wrap each call in their own
     BEGIN/COMMIT, so a multi-op draft cannot be one transaction without
     threading a shared connection through every write path in the plugin. On
     failure the draft row is KEPT and the response names exactly what landed:
@@ -378,70 +378,55 @@ def _commit_report(landed: list, failed: dict | None, draft_id: str) -> str:
 
 
 def _dispatch(project_path: Path, op: dict) -> dict:
-    """Translate one op into its handler's argument shape and call it.
+    """Apply one op by calling the core write function for its kind.
 
-    Three translations the design fixes, and they differ per op:
-    `project` is top-level for story_create and nested in `target` for
-    story_edit; relations ride inside `frontmatter` (story_create has no
-    `relations` argument, and a separate list would lose every relation);
-    `reorder` takes its list as `order_context.ordered_ids`.
+    The op fields are already what the write functions take, so there is
+    nothing to translate: `project_path` is resolved, and each op names its
+    entity directly. The tool-boundary shapes this used to build — a top-level
+    `project` for one handler and a nested `target.project` for the other,
+    relations folded into `frontmatter`, the reorder list as
+    `order_context.ordered_ids` — were artifacts of the JSON handlers and do
+    not exist here.
     """
-    from tools import story_create, story_edit
+    from . import writes
 
-    project = str(project_path)
     kind = op["op"]
     if kind == "create":
-        args = {
-            "entity_type": op["type"],
-            "slug": op["slug"],
-            "project": project,
-            "frontmatter": op["frontmatter"],
-            "sections": op.get("sections") or {},
-        }
-        return _call(story_create.handler, args)
+        return _call(
+            writes.create_entity, project_path,
+            op["type"], op["slug"], op["frontmatter"], op.get("sections") or {},
+        )
     if kind == "edit":
-        args = {
-            "action": "edit_note",
-            "target": {"entity_type": op["entity_type"],
-                       "slug": op["entity_id"], "project": project},
-            "data": op["data"],
-            "summary": op["summary"],
-        }
-        return _call(story_edit.handler, args)
+        return _call(
+            writes.edit_entity, project_path,
+            op["entity_type"], op["entity_id"], op["data"], op["summary"],
+        )
     if kind == "delete":
-        args = {
-            "action": "delete_entity",
-            "target": {"entity_type": op["entity_type"],
-                       "slug": op["entity_id"], "project": project},
-            "summary": op["summary"],
-            # NOT a safety bypass: delete_entity's `confirm` gate exists so the
-            # user sees what is about to go before it goes. Committing a draft
-            # IS that confirmation — the user read the preview and said save.
-            # The delete is still reversible, and the preview still listed the
-            # cascade, so nothing is hidden from the person deciding.
-            "confirm": True,
-        }
-        return _call(story_edit.handler, args)
-    # reorder
-    args = {
-        "action": "reorder",
-        "target": {"entity_type": op["entity_type"], "project": project},
-        "order_context": {"ordered_ids": op["ordered_ids"]},
-        "summary": op["summary"],
-    }
-    return _call(story_edit.handler, args)
+        # NOT a safety bypass: delete_entity's `confirm` gate exists so the
+        # user sees what is about to go before it goes. Committing a draft
+        # IS that confirmation — the user read the preview and said save.
+        # The delete is still reversible, and the preview still listed the
+        # cascade, so nothing is hidden from the person deciding.
+        return _call(
+            writes.delete_entity, project_path,
+            op["entity_type"], op["entity_id"], op["summary"], True,
+        )
+    return _call(
+        writes.reorder, project_path,
+        op["entity_type"], op["ordered_ids"], op["summary"],
+    )
 
 
-def _call(handler, args: dict) -> dict:
-    """Call a write handler and get its JSON back as a dict.
+def _call(fn, *args) -> dict:
+    """Run a write function and get its result or its error as a dict.
 
-    Both handlers index required args (`args["action"]`, `args["target"]`,
-    `args["summary"]`) before their first try, so a KeyError escapes rather
-    than being returned. validate_ops should already have caught that; this
-    keeps a surprise from aborting a half-applied batch.
+    The write functions raise on failure; the commit loop keys off a returned
+    `error` key so it can name the op that failed and keep the draft. Funnel
+    the raise into that shape here — and keep a surprise from aborting a
+    half-applied batch, which validate_ops should already have prevented.
     """
     try:
-        return json.loads(handler(args))
+        return fn(*args)
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
 
@@ -606,23 +591,19 @@ def _render_edit(project_path: Path, op: dict) -> list[str]:
 
 
 def _current_values(project_path: Path, op: dict) -> dict:
-    """Current value per edited field, via the same lookup story_edit uses.
+    """Current value per edited field, via the same lookup the edit uses.
 
-    Reusing `_preview_edit` rather than re-deriving it: that function already
-    knows a field lives in a column, in `extra`, or in a section, and getting
-    that wrong would show the user a `before` that is not the real one.
+    Reusing `writes.current_values` rather than re-deriving it: that function
+    already knows a field lives in a column, in `extra`, or in a section, and
+    getting that wrong would show the user a `before` that is not the real one.
     """
-    from tools.story_edit import _preview_edit
+    from .writes import current_values
 
     try:
-        result = json.loads(_preview_edit(
-            project_path,
-            {"entity_type": op["entity_type"], "slug": op["entity_id"]},
-            op["data"],
-        ))
+        result = current_values(
+            project_path, op["entity_type"], op["entity_id"], op["data"],
+        )
     except Exception:
-        return {}
-    if result.get("error"):
         return {}
     return {c["field"]: (c.get("from"), c.get("to")) for c in result.get("changes", [])}
 

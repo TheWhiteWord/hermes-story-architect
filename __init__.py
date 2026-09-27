@@ -95,6 +95,7 @@ def register(ctx) -> None:
     from .tools import story_edit
     from .tools import story_create
     from .tools import story_draft
+    from .tools import story_admin
     from .tools import story_memory
     from .tools import story_describe
     from .tools import story_import
@@ -142,6 +143,15 @@ def register(ctx) -> None:
         check_fn=_requirements_met,
         emoji="✏️",
     )
+    ctx.register_tool(
+        name="story_admin",
+        toolset="story_architect",
+        schema=_tool_schema(story_admin.SCHEMA),
+        handler=story_admin.handler,
+        check_fn=_requirements_met,
+        emoji="🗂️",
+    )
+
     ctx.register_tool(
         name="story_memory",
         toolset="story_architect",

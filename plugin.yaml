@@ -11,6 +11,7 @@ provides_tools:
   - story_edit
   - story_create
   - story_draft
+  - story_admin
   - story_dashboard
   - story_import
   - story_export
