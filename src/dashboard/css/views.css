@@ -291,6 +291,12 @@
 .title-bl { grid-column: 1 / 4; grid-row: 3; align-self: end; color: var(--muted-foreground); }
 .title-br { grid-column: 4 / 7; grid-row: 3; text-align: right; align-self: end; color: var(--muted-foreground); }
 
+/* A title-page slot the user has not filled. It must not read as typeset
+   content — a title page is the most deliberately-typeset surface in the app,
+   and "Credit: N.A." printed in the credit line looks like a credit. Italic and
+   faint, so it reads as an annotation over the page rather than part of it. */
+.tp-unfilled { font-style: italic; opacity: 0.55; font-weight: normal; }
+
 /* Soft page break between scenes */
 .screenplay-page-break {
   border: none;

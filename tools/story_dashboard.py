@@ -3,6 +3,8 @@ import json
 import re
 from pathlib import Path
 
+from core.constants import ENTITY_SCHEMAS, UNFILLED
+
 CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css", "graph.css"]
 JS_ORDER = [
     "core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
@@ -207,36 +209,42 @@ def _hsl_from_name(name):
     return f'hsl({h}, 60%, 65%)'
 
 
+def _slot(fm: dict, field: str, token_type: str) -> dict:
+    """A title-page token, or a labelled reminder when the field is empty.
+
+    An unfilled slot shows `<label>: N.A.` rather than nothing, so the reader can
+    see which slots are open — otherwise a filled page and an empty one are
+    structurally identical. The token carries `unfilled: True` so the dashboard
+    styles it as a reminder rather than as typeset content; a printed page has
+    no such distinction, and there the label is the whole signal.
+
+    Always returns a token, never None. A slot that could be dropped would make
+    the consumer index by position, and the first `cc` entry is the title *only*
+    because it is written first — `screenplay_title` is empty in the fixture, and
+    a position-based split put the credit line where the title belongs.
+    """
+    value = (fm.get(field) or "").strip()
+    if value:
+        return {"text": value, "type": token_type}
+    label = ENTITY_SCHEMAS["project"].get(field, {}).get("label") or field.replace("_", " ").title()
+    return {"text": f"{label}: {UNFILLED}", "type": f"{token_type}_unfilled", "unfilled": True}
+
+
 def _build_title_page(project_frontmatter: dict) -> dict:
     """Build a title page dict from DB-backed project data.
 
     Returns the {tl, tc, tr, cc, bl, br, hidden} structure expected by
     buildScriptView() in the dashboard. Fields are output-only — never indexed.
     """
-    cc = []
-    bl = []
-    br = []
+    cc, bl, br = [], [], []
 
-    title = project_frontmatter.get("screenplay_title", "")
-    if title:
-        cc.append({"text": title, "type": "title"})
-    credit = project_frontmatter.get("credit", "")
-    if credit:
-        cc.append({"text": credit, "type": "credit"})
-    author = project_frontmatter.get("author", "")
-    if author:
-        cc.append({"text": author, "type": "author"})
-
-    draft_date = project_frontmatter.get("draft_date", "")
-    if draft_date:
-        bl.append({"text": draft_date, "type": "draft_date"})
-    draft = project_frontmatter.get("draft", "")
-    if draft:
-        bl.append({"text": draft, "type": "draft"})
-
-    contact = project_frontmatter.get("contact", "")
-    if contact:
-        br.append({"text": contact, "type": "contact"})
+    title = project_frontmatter.get("screenplay_title") or ""
+    cc.append(_slot({"screenplay_title": title}, "screenplay_title", "title"))
+    for field, token_type in (("credit", "credit"), ("author", "author")):
+        cc.append(_slot(project_frontmatter, field, token_type))
+    for field, token_type in (("draft_date", "draft_date"), ("draft", "draft")):
+        bl.append(_slot(project_frontmatter, field, token_type))
+    br.append(_slot(project_frontmatter, "contact", "contact"))
 
     return {"tl": [], "tc": [], "tr": [], "cc": cc, "bl": bl, "br": br, "hidden": []}
 

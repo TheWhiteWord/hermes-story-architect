@@ -184,6 +184,53 @@ class TestScreenplayStats:
         page = _build_title_page({"screenplay_title": "Hades", "author": "A"})
         assert any("Hades" == t["text"] for t in page["cc"])
 
+    def test_unfilled_title_page_slot_shows_its_label(self):
+        """An empty slot says which one it is, and is marked as a reminder.
+
+        The token carries `unfilled: True` because the dashboard styles on it —
+        without the flag a "Credit: N.A." reminder is typeset exactly like a
+        credit, which is the defect B12b exists to remove.
+        """
+        from tools.story_dashboard import _build_title_page
+        page = _build_title_page({"screenplay_title": "Hades"})
+        by_type = {t["type"]: t for t in page["cc"] + page["bl"] + page["br"]}
+        assert by_type["credit_unfilled"]["text"] == "Credit: N.A."
+        assert by_type["credit_unfilled"]["unfilled"] is True
+        assert by_type["author_unfilled"]["text"] == "Author: N.A."
+        assert by_type["draft_unfilled"]["text"] == "Draft: N.A."
+        assert by_type["contact_unfilled"]["text"] == "Contact: N.A."
+        # The title is a real value, never a reminder.
+        assert by_type["title"]["text"] == "Hades"
+        assert "unfilled" not in by_type["title"]
+
+    def test_an_empty_title_still_emits_a_title_token(self):
+        """A slot that could vanish must not.
+
+        screenplay_title is empty in the fixture. When the title token was
+        dropped for being empty, cc[0] became the credit line and the dashboard —
+        which split the block by position — typeset "Credit: N.A." as the title.
+        The token is now always present, and the dashboard finds it by `type`.
+        """
+        from tools.story_dashboard import _build_title_page
+        page = _build_title_page({"screenplay_title": "", "credit": "Written by"})
+        types = [t["type"] for t in page["cc"]]
+        # The suffix, because the slot is empty — the point is that a token
+        # exists at all, not which spelling it has.
+        assert types[0] == "title_unfilled", f"the title is not first: {types}"
+        assert page["cc"][0]["unfilled"] is True
+        assert page["cc"][0]["text"] == "Screenplay Title: N.A."
+        # The credit is still a credit, not the title.
+        assert [t for t in page["cc"] if t["type"] == "credit"][0]["text"] == "Written by"
+
+    def test_a_filled_slot_is_not_a_reminder(self):
+        from tools.story_dashboard import _build_title_page
+        page = _build_title_page({"screenplay_title": "Hades", "credit": "Written by"})
+        credit = next(t for t in page["cc"] if t["type"] == "credit")
+        assert credit["text"] == "Written by"
+        assert "unfilled" not in credit
+        # The rest still show their reminders, so a partly-filled page is legible.
+        assert any(t["type"] == "author_unfilled" for t in page["cc"])
+
 
 @pytest.mark.skipif(not shutil.which("google-chrome"),
                     reason="headless chrome not available")
@@ -214,3 +261,37 @@ class TestActuallyRenders:
         # The DOM must be larger than the static file: the JS built it.
         assert len(dom) > len(html), "dashboard JS did not build any DOM"
         assert "Kael" in dom, "story content never rendered"
+
+    def test_unfilled_title_page_reminder_reaches_the_dom(self, vault, tmp_path):
+        """B12b, end to end: the reminder must survive Python -> JSON -> JS.
+
+        The unit test proves `_build_title_page` emits the token. This proves the
+        dashboard's JS still renders it — the layer that used to join every
+        token into one string and drop `type`, which is why the flag exists.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        # The fixture project has no credit/author, so the reminders are live.
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        served = tmp_path / "site_tp"
+        served.mkdir()
+        (served / "index.html").write_text(html)
+
+        out = subprocess.run(
+            ["google-chrome", "--headless=new", "--disable-gpu", "--no-sandbox",
+             "--virtual-time-budget=6000", "--dump-dom",
+             f"file://{served / 'index.html'}"],
+            capture_output=True, text=True, timeout=120)
+        assert "Uncaught" not in out.stderr, out.stderr[-800:]
+        dom = out.stdout
+        # The label reached the page...
+        assert "Credit: N.A." in dom, "unfilled slot reminder never rendered"
+        # ...and it is marked as a reminder, not typeset as a credit.
+        assert "tp-unfilled" in dom, "reminder is not distinguishable from content"
+        # The fixture has no screenplay_title, so the title slot is a reminder
+        # too — and it must sit in the title position, not be replaced by the
+        # credit line. This is the assertion that catches a positional split.
+        assert "Screenplay Title: N.A." in dom, "the title slot vanished"
+        assert '<span class="tp-unfilled">Credit: N.A.</span>' in dom, (
+            "the credit reminder is in the title position")
