@@ -44,6 +44,10 @@ EST. CITY - NIGHT
 ```
 The leading `.` is removed in formatted output.
 
+A forced heading **is a scene heading** — it is recognised as one, and it opens a
+new scene. So it is only valid as a scene's *opening* line. If you want a POV
+shift in the middle of a scene, write it as action, not as a forced heading.
+
 ---
 
 ### Character Cues
@@ -178,6 +182,10 @@ The men look at each other.
 - Must end with `TO:`, `TO BLACK.`, or `OUT.`
 - Must have blank line before AND after
 - Can be forced with `>`
+- **Go at the END of the scene you cut FROM**, never at the top of the next one.
+  `CUT TO:` closes the scene you are leaving; it introduces the next one. Putting
+  it at the start of a scene means it is discarded — see the note at the end of
+  this file.
 
 **Examples:**
 ```
@@ -265,20 +273,8 @@ Steel enters the code on the keypad: **\*9765\***
 
 **Rules:**
 - Wrapped in `/* */`
-- Removed from formatted output
-
----
-
-### Sections
-
-```
-# Section heading
-## Sub-section
-```
-
-**Rules:**
-- Starts with `#` (up to 6 levels)
-- Used for outline/structure
+- Removed from formatted output, and never reaches the script view — so a
+  comment is a safe place for anything you do not want on the page
 
 ---
 
@@ -437,16 +433,33 @@ EXT. PALATIAL MANSION - DAY
 
 ---
 
+## A Scene's Content Must Open With a Heading
+
+This is the one rule with a visible consequence, and it is enforced —
+`story_draft` reports it as a validation finding before anything is written.
+
+A scene's `Content` is rendered on its own. Two things happen if it does not
+begin with a scene heading:
+
+- **No heading anywhere in the section** — the scene does not appear in the
+  script at all. It looks like a dashboard bug, not a formatting one.
+- **A heading, but not on the first line** — the scene renders, and everything
+  before the heading is silently dropped. This is the more dangerous one,
+  because the scene is there and looks correct.
+
+So: heading first, always. A forced heading (`.SNIPER SCOPE POV`) counts.
+
+---
+
 ## When Writing New Screenplays
 
 1. Start with Title Page (optional)
-2. Use `#` for acts/sections
-3. Write scenes with proper headings
-4. Character cues: ALL CAPS, blank line before
-5. Dialogue: no blank line after character
-6. Parentheticals: wrapped in `()`
-7. Action: full width paragraphs
-8. Transitions: ALL CAPS, ending in `TO:`
+2. Write scenes with proper headings (or a forced `.` heading)
+3. Character cues: ALL CAPS, blank line before
+4. Dialogue: no blank line after character
+5. Parentheticals: wrapped in `()`
+6. Action: full width paragraphs
+7. Transitions: ALL CAPS, ending in `TO:`, at the END of the scene you cut from
 
 ## When Editing Existing Screenplays
 
@@ -454,4 +467,5 @@ EXT. PALATIAL MANSION - DAY
 2. Parse with `screenplay-tools` Parser to understand structure
 3. Use `screenplay-tools` Writer for round-trip (preserves formatting)
 4. Follow the same conventions as new writing
-5. Validate with `fountain_validator.py` before saving
+5. Stage the edit with `story_draft` and read the `validation` findings before
+   committing — that is where a scene missing its heading is reported

@@ -133,6 +133,7 @@ def validate_shape(ops: list) -> list[str]:
     merge would otherwise hide.
     """
     from .entity import REQUIRED_FIELDS, validate_entity
+    from .scene_content_lint import check_scene_content
 
     findings = []
     for i, op in enumerate(ops):
@@ -151,6 +152,20 @@ def validate_shape(ops: list) -> list[str]:
                 findings.append(
                     f"{where}: '{key}' is read-only (computed from "
                     f"{entity_type} entities) — it cannot be set")
+
+        # A scene whose Content has no opening scene heading renders as nothing,
+        # or silently drops the lines before its heading. Nothing downstream
+        # reports it, so the preview is the last place the agent can hear.
+        # Sections arrive under `sections` on a create and inside `data` on an
+        # edit, so both have to be read or the edit path is unchecked — which is
+        # where a reformat usually happens.
+        if entity_type == "scene" and op["op"] != "delete":
+            content = (op.get("sections") or {}).get("Content")
+            if not content and op["op"] == "edit":
+                content = (payload or {}).get("Content")
+            if content:
+                for f in check_scene_content(content, (payload or {}).get("heading", "")):
+                    findings.append(f"{where}: {f}")
 
         if op["op"] != "create":
             continue

@@ -1526,6 +1526,81 @@ is not) or takes a simpler line of its own. Decide when the fix is scheduled.
 
 ---
 
+## B11. Scene Content has no format check — **DONE 2026-09-28**
+
+`core/scene_content_lint.py`, wired into `validate_shape`. **One rule:** the
+first non-blank line of a scene's `Content` must be a scene heading.
+
+### Why only that one rule
+
+Everything else the format allows is the agent's business, and restating it in
+code means two things to update when the format evolves. This one case is worth
+a check because the failure is **silent** — `core/screenplay.py:33` only
+accumulates into a scene once a heading has been seen, so:
+
+| Content | result, measured |
+|---|---|
+| no heading anywhere | **0 scenes** — the scene is absent from the script |
+| heading, but not on the first line | scene renders, **everything before the heading is dropped** |
+
+Both look like a working dashboard. Neither is signalled anywhere. The second
+is the more dangerous of the two, because the scene *is* there and looks right.
+
+The message names which of the two happened — they look identical from the
+dashboard, and "my scene is missing" sends the agent looking in the wrong place.
+
+### Forced headings are headings
+
+`.SNIPER SCOPE POV` and `.OPENING TITLES` are recognised as scene headings and
+are **accepted, with no special case**: the linter imports `SCENE_HEADING_RE`
+from the renderer rather than re-deriving it, so the two cannot disagree about
+what a heading is. (Verified: the existing regex already matches all of
+`INT.`/`EXT.`/`EST.`/`INT./EXT.`, forced, lowercase-forced, and `#1A#` numbers,
+and correctly rejects action lines, transitions, cues and `#` headings.)
+
+### Three things ruled out by measurement, not assumption
+
+- **Sections (`#`)** — never appear in a scene's Content; structure comes from
+  acts. Removed from the reference.
+- **Boneyards (`/* */`)** — stripped before rendering, so nothing to check. The
+  reference now says so explicitly.
+- **Transitions before a heading** — legitimate in Fountain generally, but a
+  transition belongs to the scene you cut *from*, so at the top of a scene it is
+  the error. That is a **note in the reference**, not a code check.
+
+Once those three are excluded, **nothing** legitimately precedes a heading —
+which is what collapses the rule to a single predicate with no exemption list.
+
+### Data
+
+6 of 6 real scenes in `browser-verification-test` open with their heading. The
+3 fixture scenes that do not are one-line stubs carrying `heading` in
+frontmatter — unfinished, not a pattern, and they render as 0 scenes today.
+
+### The constraint held
+
+`core/fountain_validator.py` is **untouched**. It is a permissive parser for
+importing a user's own script, where a fragment with no heading is legitimate
+input; this is a linter for an agent writing from a documented format. Same
+naming, opposite correct answers — two modules, not one configurable one.
+
+### Not done, on purpose
+
+- **Inline cue near-miss** (`MIRA: You knew?`) — real, but cosmetic: it becomes
+  `action` and still renders. Left until it actually bites.
+- **The inline-cue/adjacency checks** the original B11 note proposed — same
+  reason: they restate the spec, and the silent failures are the ones worth a
+  check.
+- **`fountain_lexer.py:614` `extract_scenes`** — a stale duplicate of
+  `core/screenplay.py`'s, **crashing on any dialogue** (`text: None`
+  concatenation, no `or ''` guard). No callers import it, so it is dead, but it
+  is a trap for whoever reaches for it. Deletion not done here because it is
+  part of the retained-for-future-import module — flagged for a decision.
+
+889 pass; 2 integration tests fail without the wiring.
+
+---
+
 ## Verified sound
 
 Recorded so the skill does not hedge on what is solid.
