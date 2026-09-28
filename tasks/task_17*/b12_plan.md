@@ -398,7 +398,28 @@ members are left alone.**
 
 ---
 
-## B12b — not built, and why that is the right call
+## B12b — BUILT 2026-09-28 (the decision was made, then the plan's assumption failed)
+
+**The user chose the labelled reminder** (`Credit: N.A.`) over an empty page.
+The decision was already recorded below; what was not known is that **the plan's
+styling hook does not exist.** It said `type` is "what the dashboard styles on" —
+`script-view.js` joined every token's `.text` into one string and discarded
+`type`. Real JS was required, not the ~10 lines of Python budgeted.
+
+**A bug the green tick could not see.** `_slot()` returned `None` for an empty
+title; `screenplay_title` is empty in the fixture; so `cc[0]` was the credit
+line and the position-based split typeset **`Credit: N.A.` as the title**. The
+unit tests passed. Reading the rendered DOM is what caught it.
+
+**The fix is a shape, not a patch: a token that can be absent invites its
+consumer to index by position, and position is not an identity.** `_slot()` now
+always returns a token; the dashboard finds the title by `type`.
+
+**896 pass.**
+
+---
+
+## B12b as originally planned (kept; the render shape was right)
 
 **The title page is the one place in the plugin where B12 changed output.**
 `_build_title_page` gates on truthiness, so an unfilled project rendered

@@ -92,7 +92,7 @@ land with fewer.**
 | # | fix | state |
 |---|---|---|
 | 1 | **B6** — `REQUIRED_FIELDS` derived from the schema | **done, 891 pass** |
-| 2 | **B12** — placeholder defaults out of the data; one voice for "not set" | **done, 892 pass** — 10 false findings → 0; B12b (the title-page render) is deliberately separate |
+| 2 | **B12 + B12b** — placeholder defaults out of the data, and the title page says which slots are open | **done, 896 pass** — 10 false findings → 0 |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
@@ -146,7 +146,6 @@ valuable part, and because the next keeper will suspect them again.
 
 | id | what | why it matters |
 |---|---|---|
-| **B12b** | The title page now prints **only the title** for an unfilled project, where it used to print `'Credit N.A.'`, `'Author N.A.'`, `'Draft Date N.A.'` and `'N.A.'` as if they were content. The data is clean (B12); **what an empty slot shows is a display decision, deliberately not bundled.** One voice, decided: `<label>: N.A.`, with `type: "credit_unfilled"` so a reminder is stylistically distinct from typeset content. | A filled page and an empty one are currently structurally identical, so the reader cannot tell which slots are open. Only the title page does this — the other 30 fields each decide separately, and not drawing a row is right for most. |
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
@@ -674,9 +673,63 @@ what gets **stored** became the guard instead, and
 `test_stored_default_is_never_prose`, which fails if a placeholder default is
 ever added back. **892 pass, unchanged.**
 
-### B12b — the display side, deliberately NOT bundled
+### B12b — the display side — **BUILT 2026-09-28**
 
-**Decided earlier and left as its own commit: one voice, `<label>: N.A.`**
+**Decided: one voice, `<label>: N.A.`, on the title page only.** The user chose
+the labelled reminder over an empty page. The other 30 fields each decide
+separately — *not drawing* a row is the right default for most of them.
+
+| | change | where |
+|---|---|---|
+| one helper, every slot, no per-field code | `_slot()` | `story_dashboard.py:212` |
+| each token keeps its own class instead of being flattened | `tokenHtml` + type lookup | `script-view.js:25-42` |
+| a reminder is italic, faint, normal weight | `.tp-unfilled` | `views.css:294` |
+
+**The plan's central assumption was wrong.** It said `type` is "what the
+dashboard styles on". **`type` was never read** — `script-view.js:27-30` joined
+every token's `.text` into one string and dropped it. So the styling needed real
+JS, not just the Python the plan budgeted. Worth recording because the plan was
+reasoning about an interface it had not checked.
+
+**A bug I introduced, caught by reading the rendered DOM instead of the tick.**
+`_slot()` returned `None` for an empty title, so with `screenplay_title` empty —
+which it is in the fixture — `cc[0]` became the credit line, and the JS, which
+split the block by position, typeset **`Credit: N.A.` as the title**:
+
+```html
+<div class="title-cc">
+  <span class="tp-unfilled">Credit: N.A.</span>     <-- the title position
+```
+
+The unit tests passed. The assertion could not see it.
+
+**The lesson is the shape of the fix, not the miss: a token that can be absent
+invites its consumer to index by position, and position is not an identity.**
+`_slot()` now always returns a token, and the dashboard finds the title by
+`type` (prefix-matched, since an empty one is `title_unfilled`).
+
+**The Chrome test was proved, not trusted.** It passed in 1.5s — too fast for a
+browser. Running the same steps by hand and printing what it got showed 241k of
+static HTML becoming a **480k DOM** with both markers present. My first probe
+showed neither, because it built a bare project instead of importing the
+fixture: the probe's bug, not the test's, and **that difference is the whole
+reason the hand-run was worth doing.**
+
+**The rendered result, unfilled project:**
+
+```html
+<span class="tp-unfilled">Screenplay Title: N.A.</span>
+<span class="tp-credit"><span class="tp-unfilled">Credit: N.A.</span><br>
+  <span class="tp-unfilled">Author: N.A.</span></span>
+<div class="title-bl"><span class="tp-unfilled">Draft Date: N.A.</span><br>
+  <span class="tp-unfilled">Draft: N.A.</span></div>
+<div class="title-br"><span class="tp-unfilled">Contact: N.A.</span></div>
+```
+
+**896 pass** (was 892; four new tests — two unit, one for the empty-title token,
+one end-to-end in headless Chrome).
+
+**B12 is closed: the data is clean and the surface is honest.**
 
 **What changed visibly, and it is not cosmetic.** `_build_title_page` gates on
 truthiness, so before this commit an unfilled project rendered:
