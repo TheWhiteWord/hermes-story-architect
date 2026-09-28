@@ -56,7 +56,7 @@ def _edit(vault, action, entity_type="character", slug="kael", **extra):
         return edit_entity(project, entity_type, slug, extra.get("data", {}), "test")
     return json.loads(handler({
         "action": action, "project": "stc",
-        "target": {"entity_type": entity_type, "slug": slug},
+        "target": {"entity_type": entity_type, "id": slug},
         "summary": "test", **extra}, root_path=str(vault)))
 
 

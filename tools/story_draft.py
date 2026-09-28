@@ -48,8 +48,9 @@ SCHEMA = {
         "ops": {
             "type": "array",
             "description": "For action=\"stage\": the changes to propose, in any order — commit "
-                           "sorts them. Four kinds. create: {op, type, slug, frontmatter, "
-                           "sections?, summary} — relations such as a scene's characters ride "
+                           "sorts them. Four kinds. create: {op, type, id, frontmatter, "
+                           "sections?, summary} — `id` is the entity's own identifier, and "
+                           "relations such as a scene's characters ride "
                            "INSIDE frontmatter, there is no separate relations key. edit: {op, "
                            "entity_type, entity_id, data, summary} where data is flat "
                            "{field: value} or {Section Name: prose}. delete: {op, entity_type, "

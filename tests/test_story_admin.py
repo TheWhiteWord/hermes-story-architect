@@ -189,7 +189,7 @@ class TestRestore:
         delete_entity(project, "location", "the-garden", "s", confirm=True)
 
         result = _run({"action": "restore", "project": "save-the-children",
-                       "target": {"entity_type": "location", "slug": "the-garden"},
+                       "target": {"entity_type": "location", "id": "the-garden"},
                        "summary": "the garden"}, root)
         assert result["success"] is True
         assert result["entity_id"] == "the-garden"
@@ -208,13 +208,13 @@ class TestRestore:
     def test_restoring_a_live_entity_reports_rather_than_pretending(self, root):
         result = _run({"action": "restore", "project": "save-the-children",
                        "target": {"entity_type": "location",
-                                  "slug": "the-central-room"}}, root)
+                                  "id": "the-central-room"}}, root)
         assert "error" in result
         assert "not deleted" in result["error"]
 
     def test_unknown_entity_reports(self, root):
         result = _run({"action": "restore", "project": "save-the-children",
-                       "target": {"entity_type": "location", "slug": "nowhere"}}, root)
+                       "target": {"entity_type": "location", "id": "nowhere"}}, root)
         assert "error" in result
 
 

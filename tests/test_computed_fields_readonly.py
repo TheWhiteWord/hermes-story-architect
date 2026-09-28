@@ -36,7 +36,7 @@ def test_creating_with_a_computed_field_is_reported(fixture_path):
     """A create cannot actually write one — the schema merge drops it — so the
     finding is the only place that says so."""
     r = _stage(fixture_path, [{
-        "op": "create", "type": "character", "slug": "someone-new",
+        "op": "create", "type": "character", "id": "someone-new",
         "frontmatter": {"name": "Someone", "relationships": []},
         "summary": "probe",
     }])

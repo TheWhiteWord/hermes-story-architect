@@ -38,7 +38,7 @@ def vault(tmp_path, monkeypatch):
     return v
 
 
-TARGET = {"entity_type": "character", "slug": "kael"}
+TARGET = {"entity_type": "character", "id": "kael"}
 
 
 def _edit(vault, action, **args):

@@ -35,7 +35,7 @@ author: TWW
 
 ## story_retrieve
 
-- Uses `refs` (list of entity keys from load output), not single `slug`. Batch by default.
+- Uses `refs` (list of entity keys from load output). Batch by default.
 - `fields` and `sections` are composable in one call.
 - No field grouping — agent requests exactly what it wants.
 - `fields=["all"]` returns all FM; `sections=["all"]` returns all sections.

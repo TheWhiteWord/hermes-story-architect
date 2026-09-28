@@ -33,7 +33,7 @@ class TestArcValidation:
         what the schema asks for must be silent.
         """
         findings = validate_shape([{
-            "op": "create", "type": "arc_beat", "slug": "kael-1",
+            "op": "create", "type": "arc_beat", "id": "kael-1",
             "frontmatter": {"character": "kael", "scene": "s1", "label": "First Doubt"},
         }])
         assert not [f for f in findings if "Missing required field" in f]

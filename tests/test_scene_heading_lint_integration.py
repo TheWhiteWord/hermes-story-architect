@@ -23,7 +23,7 @@ def _stage(project, ops):
 
 def test_creating_a_scene_without_a_heading_is_reported(fixture_path):
     r = _stage(fixture_path, [{
-        "op": "create", "type": "scene", "slug": "mira-tells-kael",
+        "op": "create", "type": "scene", "id": "mira-tells-kael",
         "frontmatter": {"title": "The Telling", "sequence_id": "seq-discovery",
                         "heading": "INT. THE INSTITUTE - NIGHT"},
         "sections": {"Content": BAD},
@@ -34,7 +34,7 @@ def test_creating_a_scene_without_a_heading_is_reported(fixture_path):
 
 def test_creating_a_scene_with_a_heading_is_not_reported(fixture_path):
     r = _stage(fixture_path, [{
-        "op": "create", "type": "scene", "slug": "mira-tells-kael",
+        "op": "create", "type": "scene", "id": "mira-tells-kael",
         "frontmatter": {"title": "The Telling", "sequence_id": "seq-discovery",
                         "heading": "INT. THE INSTITUTE - NIGHT"},
         "sections": {"Content": GOOD},
@@ -58,7 +58,7 @@ def test_a_forced_heading_is_accepted_on_create(fixture_path):
     """.SNIPER SCOPE POV is a heading, not an error — the whole point of
     reusing the renderer's own regex."""
     r = _stage(fixture_path, [{
-        "op": "create", "type": "scene", "slug": "scope-pov",
+        "op": "create", "type": "scene", "id": "scope-pov",
         "frontmatter": {"title": "Scope", "sequence_id": "seq-discovery"},
         "sections": {"Content": ".SNIPER SCOPE POV\n\nA face fills the frame."},
         "summary": "New scene",
@@ -69,7 +69,7 @@ def test_a_forced_heading_is_accepted_on_create(fixture_path):
 def test_a_non_scene_with_a_content_section_is_not_checked(fixture_path):
     """`Content` on a character is prose, not Fountain. Only scenes are."""
     r = _stage(fixture_path, [{
-        "op": "create", "type": "character", "slug": "someone-new",
+        "op": "create", "type": "character", "id": "someone-new",
         "frontmatter": {"name": "Someone", "one_sentence": "A person.",
                         "story_role": "Minor"},
         "sections": {"Content": "Not a screenplay, just prose about a person."},
@@ -81,7 +81,7 @@ def test_a_non_scene_with_a_content_section_is_not_checked(fixture_path):
 def test_a_scene_with_no_content_section_is_not_reported(fixture_path):
     """Planned scenes have no script yet. That is a normal state, not a fault."""
     r = _stage(fixture_path, [{
-        "op": "create", "type": "scene", "slug": "planned-scene",
+        "op": "create", "type": "scene", "id": "planned-scene",
         "frontmatter": {"title": "Planned", "sequence_id": "seq-discovery",
                         "status": "planned"},
         "sections": {"Objective": "Something happens."},

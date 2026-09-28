@@ -24,7 +24,7 @@ OP_ORDER = {"create": 0, "edit": 1, "delete": 2, "reorder": 3}
 # Per-kind required keys. Mirrors what the replayed handler needs, so a missing
 # key is reported at stage time rather than escaping the commit loop.
 _REQUIRED = {
-    "create": ("type", "slug", "frontmatter", "summary"),
+    "create": ("type", "id", "frontmatter", "summary"),
     "edit": ("entity_type", "entity_id", "data", "summary"),
     "delete": ("entity_type", "entity_id", "summary"),
     "reorder": ("entity_type", "ordered_ids", "summary"),
@@ -91,9 +91,9 @@ def validate_ops(ops) -> list[dict]:
                     f"{where}: projects cannot be drafted. "
                     "Call story_admin(action=\"create_project\") directly."
                 )
-            if not op["slug"].replace("-", "").replace("_", "").isalnum():
+            if not op["id"].replace("-", "").replace("_", "").isalnum():
                 raise DraftError(
-                    f"{where}.slug must be alphanumeric with hyphens/underscores only."
+                    f"{where}.id must be alphanumeric with hyphens/underscores only."
                 )
             if not isinstance(op["frontmatter"], dict):
                 raise DraftError(f"{where}.frontmatter must be an object.")
@@ -118,7 +118,7 @@ def validate_shape(ops: list) -> list[str]:
     create can be checked before the row exists. Cross-entity references are
     deliberately NOT checked here: validate_plot_characters, validate_scene_act_id
     and validate_arc_parents each open their own connection and read committed
-    state, so a staged create's slug is not there yet and every cross-op
+    state, so a staged create's id is not there yet and every cross-op
     reference in a batch would report a false error. Those surface at commit,
     where the earlier op has already landed.
 
@@ -330,7 +330,7 @@ def commit(project_path: Path, draft_id: str) -> dict:
     threading a shared connection through every write path in the plugin. On
     failure the draft row is KEPT and the response names exactly what landed:
     the agent re-stages the remainder and commits again, and an op that
-    already landed refuses correctly (a create whose slug now exists fails on
+    already landed refuses correctly (a create whose id now exists fails on
     uniqueness). A temporarily inconsistent project, never lost work.
     """
     from .db import get_db
@@ -422,7 +422,7 @@ def _dispatch(project_path: Path, op: dict) -> dict:
     if kind == "create":
         return _call(
             writes.create_entity, project_path,
-            op["type"], op["slug"], op["frontmatter"], op.get("sections") or {},
+            op["type"], op["id"], op["frontmatter"], op.get("sections") or {},
         )
     if kind == "edit":
         return _call(
@@ -469,7 +469,7 @@ def op_key(op: dict) -> tuple:
     """
     kind = op.get("op")
     if kind == "create":
-        return (kind, "create", op.get("type"), op.get("slug"))
+        return (kind, "create", op.get("type"), op.get("id"))
     if kind in ("edit", "delete"):
         return (kind, op.get("entity_type"), op.get("entity_id"))
     if kind == "reorder":
@@ -524,7 +524,7 @@ def _describe(op: dict) -> str:
     entity_type = op.get("entity_type") or op.get("type", "")
     if kind == "reorder":
         return f"reorder {entity_type} ({len(op.get('ordered_ids') or [])} items)"
-    return f"{kind} {entity_type}/{op.get('entity_id') or op.get('slug', '')}"
+    return f"{kind} {entity_type}/{op.get('entity_id') or op.get('id', '')}"
 
 
 # ─── preview renderer ───
@@ -576,7 +576,7 @@ def _render_create(op: dict) -> list[str]:
     non-computed fields count — a computed field was never offered to the
     model, so including it would inflate the denominator.
     """
-    entity_type, slug = op["type"], op["slug"]
+    entity_type, entity_id = op["type"], op["id"]
     fm = op["frontmatter"]
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     settable = {f: m for f, m in schema.items() if not m.get("computed")}
@@ -585,7 +585,7 @@ def _render_create(op: dict) -> list[str]:
     # so including them would inflate the denominator.
     unset = sum(1 for f, m in settable.items() if _empty(fm.get(f, m["default"]), m))
 
-    out = [f"**＋ NEW {entity_type.upper()}** · `{entity_type}/{slug}`"]
+    out = [f"**＋ NEW {entity_type.upper()}** · `{entity_type}/{entity_id}`"]
     if unset:
         out[0] += f"  ·  {len(settable) - unset} of {len(settable)} fields set"
     if fm:

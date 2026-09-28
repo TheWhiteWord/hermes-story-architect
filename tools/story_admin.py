@@ -51,7 +51,7 @@ SCHEMA = {
             "properties": {
                 "entity_type": {"type": "string",
                                 "description": "Type of entity to restore"},
-                "slug": {"type": "string", "description": "Entity id, as returned by story_load"},
+                "id": {"type": "string", "description": "Entity id, as returned by story_load"},
             },
         },
         "summary": {
@@ -296,17 +296,17 @@ def _restore_entity(args: dict, project_path: Path) -> dict:
 
     target = args.get("target") or {}
     entity_type = target.get("entity_type") or ""
-    slug = target.get("slug") or ""
+    entity_id = target.get("id") or ""
     summary = args.get("summary", "")
     conn = get_db(project_path)
     try:
         # Deliberately NOT filtered on is_deleted — that is the point.
         row = conn.execute(
-            "SELECT id, is_deleted, deleted_at FROM entities WHERE id=? OR id=?",
-            (slug, slug),
+            "SELECT id, is_deleted, deleted_at FROM entities WHERE id=?",
+            (entity_id,),
         ).fetchone()
         if not row:
-            return {"error": f"Entity not found: {entity_type}/{slug}"}
+            return {"error": f"Entity not found: {entity_type}/{entity_id}"}
         entity_id, is_deleted, deleted_at = row
         if not is_deleted:
             return {

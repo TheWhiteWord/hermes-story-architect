@@ -17,7 +17,7 @@ sys.path.insert(0, str(REPO))
 from core.drafts import commit, render_preview_md, stage, validate_shape  # noqa: E402
 
 BATCH = [
-    {"op": "create", "type": "scene", "slug": "mira-tells-kael",
+    {"op": "create", "type": "scene", "id": "mira-tells-kael",
      "frontmatter": {"title": "The Telling", "sequence_id": "seq-discovery",
                      "act_id": "act-1", "status": "drafted", "time_of_day": "DUSK",
                      "location": "the-central-room", "characters": ["mira", "kael"],
@@ -93,7 +93,7 @@ def test_the_prose_an_op_carries_is_rendered(fixture_path):
 def test_a_scene_content_section_is_fenced_as_fountain(fixture_path):
     """Only script is labelled. A generic fence would be fine too, but the tag
     costs nothing and names the format for whatever renders the block."""
-    op = {"op": "create", "type": "scene", "slug": "probe",
+    op = {"op": "create", "type": "scene", "id": "probe",
           "frontmatter": {"title": "Probe", "time_of_day": "NIGHT"},
           "sections": {"Content": "INT. LAMP ROOM - NIGHT\n\n                ELIAS\n        Still going.\n"},
           "summary": "probe"}
@@ -185,7 +185,7 @@ def test_rendering_reads_but_never_writes(fixture_path):
 # ─── shape validation ───
 
 def _create(fm, entity_type="scene", slug="new-scene"):
-    return {"op": "create", "type": entity_type, "slug": slug,
+    return {"op": "create", "type": entity_type, "id": slug,
             "frontmatter": fm, "sections": {}, "summary": "x"}
 
 

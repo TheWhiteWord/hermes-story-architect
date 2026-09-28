@@ -18,7 +18,7 @@ from tools.story_draft import handler  # noqa: E402
 from tools.story_draft import SCHEMA  # noqa: E402
 
 OPS = [{
-    "op": "create", "type": "scene", "slug": "mira-tells-kael",
+    "op": "create", "type": "scene", "id": "mira-tells-kael",
     "frontmatter": {"title": "The Telling", "sequence_id": "seq-discovery",
                     "act_id": "act-1", "characters": ["mira", "kael"]},
     "sections": {"Objective": "Mira confesses the reservoir is failing."},
@@ -46,12 +46,12 @@ def test_stage_rejects_a_malformed_op_with_a_readable_error(fixture_path):
     result = call({"action": "stage", "ops": [{"op": "create", "type": "scene"}]},
                   fixture_path)
     assert "error" in result
-    assert "missing: slug, frontmatter" in result["error"]
+    assert "missing: id, frontmatter" in result["error"]
 
 
 def test_stage_rejects_a_project_op(fixture_path):
     result = call({"action": "stage", "ops": [{
-        "op": "create", "type": "project", "slug": "new-film",
+        "op": "create", "type": "project", "id": "new-film",
         "frontmatter": {}, "summary": "a new film"}]}, fixture_path)
     assert "projects cannot be drafted" in result["error"]
 

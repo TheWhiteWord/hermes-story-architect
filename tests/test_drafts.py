@@ -32,7 +32,7 @@ def _counts(project_path):
 
 def _batch():
     return [
-        {"op": "create", "type": "scene", "slug": "mira-tells-kael",
+        {"op": "create", "type": "scene", "id": "mira-tells-kael",
          "frontmatter": {"title": "The Telling", "sequence_id": "seq-discovery",
                          "act_id": "act-1", "characters": ["mira", "kael"]},
          "sections": {"Objective": "Mira confesses."},
@@ -199,14 +199,14 @@ def test_list_on_a_project_with_no_drafts_is_empty_not_an_error(fixture_path):
 @pytest.mark.parametrize("bad,message", [
     ([], "non-empty list"),
     ([{"op": "explode", "summary": "x"}], "must be one of"),
-    ([{"op": "create", "type": "scene", "summary": "x"}], "missing: slug, frontmatter"),
+    ([{"op": "create", "type": "scene", "summary": "x"}], "missing: id, frontmatter"),
     ([{"op": "edit", "entity_type": "scene", "summary": "x"}],
      "missing: entity_id, data"),
-    ([{"op": "create", "type": "sculpture", "slug": "x", "frontmatter": {},
+    ([{"op": "create", "type": "sculpture", "id": "x", "frontmatter": {},
        "summary": "x"}], "unknown entity_type"),
-    ([{"op": "create", "type": "project", "slug": "new-film", "frontmatter": {},
+    ([{"op": "create", "type": "project", "id": "new-film", "frontmatter": {},
        "summary": "x"}], "projects cannot be drafted"),
-    ([{"op": "create", "type": "scene", "slug": "bad slug!", "frontmatter": {},
+    ([{"op": "create", "type": "scene", "id": "bad slug!", "frontmatter": {},
        "summary": "x"}], "alphanumeric"),
     ([{"op": "reorder", "entity_type": "sequence", "ordered_ids": [],
        "summary": "x"}], "non-empty list"),
@@ -255,7 +255,7 @@ def _rows(project_path, sql, *params):
 def _create_scene(slug, sequence_id="seq-discovery", **frontmatter):
     fm = {"title": slug, "sequence_id": sequence_id, "act_id": "act-1"}
     fm.update(frontmatter)
-    return {"op": "create", "type": "scene", "slug": slug,
+    return {"op": "create", "type": "scene", "id": slug,
             "frontmatter": fm, "sections": {}, "summary": f"new {slug}"}
 
 

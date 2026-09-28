@@ -267,11 +267,15 @@ class TestOneVocabularyAcrossReadAndWrite:
 
         walk(self._load_payload())
 
-    def test_story_describe_says_id_is_the_op_slug_argument(self):
+    def test_story_describe_uses_one_name_for_the_entity_id(self):
+        """The op argument is `id` and the field is `id`, so no bridging note.
+
+        This description once ended "an entity's `id` is the `slug` argument of its
+        op" — a sentence that exists only because the two names disagreed.
+        """
         from tools.story_describe import SCHEMA
 
-        text = SCHEMA["description"]
-        assert "`id`" in text and "slug" in text
+        assert "slug" not in SCHEMA["description"]
 
 
 class TestEntityTypeEnumsStayInSync:
