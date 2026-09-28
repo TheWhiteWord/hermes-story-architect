@@ -1591,11 +1591,6 @@ naming, opposite correct answers — two modules, not one configurable one.
 - **The inline-cue/adjacency checks** the original B11 note proposed — same
   reason: they restate the spec, and the silent failures are the ones worth a
   check.
-- **`fountain_lexer.py:614` `extract_scenes`** — a stale duplicate of
-  `core/screenplay.py`'s, **crashing on any dialogue** (`text: None`
-  concatenation, no `or ''` guard). No callers import it, so it is dead, but it
-  is a trap for whoever reaches for it. Deletion not done here because it is
-  part of the retained-for-future-import module — flagged for a decision.
 
 889 pass; 2 integration tests fail without the wiring.
 
