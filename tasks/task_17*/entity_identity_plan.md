@@ -124,6 +124,15 @@ rewritten ones now exercise the real path.
 
 ## Step 2 — drop the arc_beat composite id  ← *fixes a reproduced bug*
 
+> **Read with step 4.** Dropping the composite and generating the id both
+> change *how an arc beat is created*, and in opposite directions: step 2 says
+> "the beat's own slug is its id", step 4 says "nobody supplies a slug". Doing
+> them together would be smaller, but they are separate fixes for separate
+> bugs, and step 2 fixes a live silent wrong-entity write that step 4 does not
+> touch. **Do step 2 alone.** The creation path it leaves behind — slug
+> supplied, used as-is — is exactly what step 4 replaces, so nothing is built
+> twice.
+
 **Why:** this is a live, silent, wrong-entity write. Two characters each own an
 arc beat labelled "The Choice"; `edit_entity(..., "arc_beat", "the-choice", …)`
 resolves through `writes.py:689`'s `id LIKE '%-{slug}'` fallback, matches the
@@ -185,7 +194,15 @@ them. The suite at 889.
 
 ## Step 4 — generate the id
 
-**Why after step 2:** compositing a generated id gives the 73-char artefact.
+> **The agent's burden and the fixture's readability are separable.** A
+> generated id is decided in step 4; whether the *fixtures and tests* keep
+> readable ids is a separate question, and answering it wrongly turns a
+> two-line change into a 493-occurrence rewrite. See "What step 4 does NOT
+> have to touch" below — read it before starting.
+
+**Why after step 2:** compositing a generated id gives the 73-char artefact
+measured in Part A″ — a worse thing than either the old composite or a clean
+uuid. Drop the composite first, then generate.
 
 ```python
 # core/writes.py, in create_entity, replacing the slug parameter
@@ -212,8 +229,57 @@ Q4's finding, fixed at the same time because both are the same missing field.
 **Cost, measured:** +87 tokens per `story_load` (ids appear 90× in the payload;
 +4.1% → +8.4%). Accepted deliberately, against +717 for `uuid4()`.
 
+### What step 4 does NOT have to touch — measured, and it is the whole step
+
+**A generated id is not the same thing as an unreadable id.** The agent stops
+supplying one; nothing forces the *fixtures* to stop having readable ones. The
+code is agnostic — `entities.id` is a TEXT primary key, and relations,
+`parent_id` and every `extra` link store whatever string is there. A fixture
+built by hand, with `kael` as its id, works unchanged under a code path that
+generates ids for anything the *agent* creates.
+
+So the two halves are separable:
+
+| | what changes | size |
+|---|---|---|
+| **the code** | generate the id on create; stop requiring the agent to send one | ~10 lines, plus the uniqueness message |
+| **the fixtures** | nothing, if they keep their readable ids | **0** |
+| **the tests** | nothing, if the fixtures keep theirs | **0** |
+
+**Measured cost of the alternative** — converting the fixtures to generated ids
+too:
+
+```
+kael                 25 files, 272 occurrences
+act-1                10 files,  88
+mira                 15 files,  72
+central-room-day     13 files,  54
+the-central-room      8 files,  45
+seq-discovery         8 files,  25
+the-resistance        5 files,   9
+dr-elena-voss         3 files,   8
+                     ─────────────────────
+                     493 occurrences across 25 test files
+```
+
+Plus the markdown fixture, where **the filename is the id** — 20 note files
+(`dr-elena-voss.md`, `kael.md`, …) and 11 arc beats keyed `parent-child`. Every
+one of those would need renaming, and `test_round_trip.py` asserts those exact
+paths.
+
+**Recommendation: do not convert the fixtures.** A test that says
+`edit_entity(..., "kael", ...)` states its intent; the same test saying
+`edit_entity(..., "95b392b8", ...)` states nothing. The fixtures are the
+readable case, and they exercise the same code the generated case uses. If a
+generated id ever needs testing, that is one new test asserting distinctness
+and a retry — not a migration of the corpus.
+
+**The one thing that must change either way:** the uniqueness error at
+`writes.py:132-143` says *"choose a different slug"*, which stops making sense
+the moment the agent is not choosing one.
+
 **Check:** create ten entities, assert ten distinct 8-char hex ids; assert a
-forced collision is retried rather than raised. Suite at 889.
+forced collision is retried rather than raised. Suite at 892.
 
 ---
 

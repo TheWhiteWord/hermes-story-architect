@@ -509,6 +509,36 @@ still needs the rename (`slug` → `id` on the create op) for the vocabulary to
 be consistent. Uuids fix who supplies the value; the rename fixes what it is
 called. **Both, and they are independent.**
 
+### What a generated id does and does not change — measured
+
+**The agent stops supplying an id. The corpus does not have to stop having
+readable ones.** These are separable, and conflating them is what would make
+step 4 expensive. `entities.id` is a TEXT primary key; relations, `parent_id`
+and every `extra` link store whatever string is there. A fixture built by hand
+with `kael` as its id works unchanged under a code path that generates ids for
+whatever the agent creates.
+
+Measured cost of converting the fixtures as well:
+
+```
+kael 272 · act-1 88 · mira 72 · central-room-day 54 · the-central-room 45
+seq-discovery 25 · the-resistance 9 · dr-elena-voss 8
+= 493 occurrences across 25 test files
+```
+
+plus the markdown fixture, where **the filename is the id** — 20 note files and
+11 arc beats keyed `parent-child`, all asserted by path in `test_round_trip.py`.
+
+**Recommendation, now recorded in the build plan: do not convert them.** A test
+saying `edit_entity(..., "kael", ...)` states its intent; the same test saying
+`"95b392b8"` states nothing. The fixtures are the readable case and they
+exercise the same code. One new test asserting distinctness and a retry covers
+the generated case — that is the whole cost, against 493.
+
+**What does change, necessarily:** the uniqueness error at `writes.py:132-143`
+tells the caller to *"choose a different slug"*, which stops making sense the
+moment the caller is not choosing one.
+
 ---
 
 ### Part A″ — how long does the id need to be? (2026-09-28)
