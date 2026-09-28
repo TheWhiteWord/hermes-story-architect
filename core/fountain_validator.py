@@ -1,10 +1,44 @@
-"""Fountain syntax validator — ensures screenplays follow Fountain conventions.
+"""Fountain syntax validator — for the future script-import feature.
 
-Retained for future "import entities/stats from existing .fountain script" feature.
-Not currently consumed by any tool handler. Pure functions only — no DB, no tool imports.
-Pairs with core/screenplay.py for Fountain→entity extraction pipeline.
+DO NOT WIRE THIS INTO THE AUTHORING PATH. It is not the check you want, and
+it is not broken. Read the two sections below before changing anything here.
 
-Validates that a .fountain file follows proper syntax so it parses correctly.
+WHAT THIS IS FOR
+    A future "import entities/stats from an existing .fountain script"
+    feature, which is not implemented. No tool handler calls this today. It is
+    a *parser-side* check: given a screenplay someone else wrote, say what is
+    in it. Pure functions only — no DB, no tool imports. Pairs with
+    core/screenplay.py for the Fountain→entity extraction pipeline.
+
+WHY IT MUST NOT BE MODIFIED FOR AUTHORING
+    The authoring path needs the opposite job. An agent is *writing* script
+    from a documented format and needs to be told where it departed. That is a
+    linter; this is a parser. The same input gets opposite verdicts:
+
+        ELIAS: You could have telephoned.
+
+    _classify_line requires `stripped.isupper()` for a character cue, and the
+    dialogue after the colon is lowercase, so this line classifies as `action`.
+
+    - Here (import): correct. In Fountain the line genuinely IS action.
+      Reporting "unknown element" would be a false alarm on a valid file.
+    - For a linter (authoring): a missed catch. The author almost certainly
+      meant a cue — it is what an agent naturally produces.
+
+    Also: every rule here is local (does this line agree with its neighbour).
+    A scene with no scene heading has no misbehaving line, so it passes — which
+    is right for a partial screenplay and wrong for authoring feedback, where
+    the missing heading is exactly the finding.
+
+    Making this stricter to serve authoring would break a working importer to
+    solve an unrelated problem. The fix is a SEPARATE module wired into
+    `validate_shape` in core/drafts.py, taking inspiration from this one. See
+    tasks/task_17*/bugs.md (B11). Do not rename this file either: a new module
+    must not look like a variant of this one, or the two "validate Fountain"
+    while answering different questions.
+
+TODO(import feature): this is the only intended caller. Until then, leave
+this file untouched.
 """
 import re
 from typing import Optional
