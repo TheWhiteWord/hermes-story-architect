@@ -289,10 +289,23 @@ Not yet investigated. Listed so the next step is unambiguous.
       answer came from *deliberately trying to make the agent get it wrong*,
       exactly as this entry proposed.
 
-- [ ] **Q3. Is `type` vs `entity_type` in scope?** It is the same class of
-      defect in the same op list. Fixing `slug` and leaving `type` fixes half
-      the inconsistency. Both together is a bigger diff; slug alone is a
-      smaller one that leaves a known wart.
+- [x] **Q3. Is `type` vs `entity_type` in scope? — NO, assessed 2026-09-28.**
+      It looked like the same class of defect as `slug`/`id`, in the same op
+      list. Measured, it behaves the opposite way in the one way that matters:
+      **sending the wrong name fails immediately and legibly**
+      (`ops[0] (create) is missing: type.`), where `slug` was *accepted and
+      silently reinterpreted* — the thing D5 step 2 existed to kill.
+
+      **And the naming is internally consistent across both key pairs.** After
+      step 3, `create` takes `{type, id}` and the others
+      `{entity_type, entity_id}` — a create names a *new* entity, the others
+      refer to an *existing* one, and both pairs follow that rule. It is one
+      convention applied twice, not one name split in two.
+
+      Both shapes are already documented in the `ops` description, so there is
+      no bridge sentence to delete either. **Left as is.** Written up in
+      `bugs.md` under "Resolved by investigation" so the next reader does not
+      re-raise it as the obvious loose end from step 3.
 
 - [x] **Q4. What about `FIELDS_TO_SKIP = {"id", "type"}`? — RESOLVED by D5
       step 5, in the opposite direction to what this entry assumed.** The id is

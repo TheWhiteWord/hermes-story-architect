@@ -145,6 +145,7 @@ valuable part, and because the next keeper will suspect them again.
 |---|---|
 | D3 | **Not a defect.** The nine undeclared link fields (`scene.act_id`, `arc_beat.scene`, `plot.characters`, …) are documented as `extra` in `task_20/archived/data_model.md`, and the `act_id`/`sequence_id` redundancy is deliberate — see `verification_findings.md:45`. Columns are the load payload's spine, `extra` holds the rest *including links*, relations are many-to-many. Under that rule all nine are correct. **D3 is closed.** |
 | D2 (naming) | **Not a defect.** `story_load` emits `chars`/`loc` for token cost (the redesign spec's first principle) and `story_describe` uses the names `story_draft` takes, where `edit_entity` rejects unknown keys by design. Neither side can be renamed. Resolved as a bridge (I3), then the bridge was deleted when the abbreviations went (I4). |
+| `type` vs `entity_type` | **Not a defect — assessed 2026-09-28 (this is Q3, which had never been written up here).** `create` takes `{type, id}`; `edit`/`delete`/`reorder` take `{entity_type, entity_id}`. **The name tracks the role, and the convention holds across *both* key pairs**: a create names a *new* entity, the others refer to an *existing* one. Sending the wrong name fails immediately and legibly — `ops[0] (create) is missing: type.` — which is the opposite of the `slug` case, where the wrong name was accepted and silently reinterpreted. Both shapes are documented in the ops description. |
 | B3 | **Not a bug.** `has_database: db.exists()` on a markdown-only project reports `false`, which is accurate — there is genuinely no database. Recorded so it is not re-investigated. |
 | `id` vs `slug` | **Superseded — this entry was the wrong conclusion, and it is kept because it is instructive.** It read: *"both correct, in different places — `id` is the column, `slug` is the op argument."* True as a description, wrong as a verdict: the bridge between them had to be *written down twice* in prose, and a tool that must explain that two names are one value is telling you they should not both exist. D5 step 3 made the op argument `id`; `slug` now means only a project directory. |
 | B8's original symptom | The orphan-check claim could not be reproduced. The check tests `world`. Correction is in the B8 entry above the original text. |
@@ -152,10 +153,13 @@ valuable part, and because the next keeper will suspect them again.
 
 ### Still open
 
+**Two items, and neither is ours to fix.** Everything raised by the live test
+that lives in this repo is closed.
+
 | id | what | why it matters |
 |---|---|---|
-| **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
-| **D1** | The tool cannot show the shape of a structured value. **Both halves now fixed** — the read side by B7/B9/I5, the write side by D4. | — |
+| **B1 cause** | **Why does a second `commit` arrive at all?** The symptom is fixed — `commit` is idempotent and can no longer report a lie — but the duplicate call itself is unexplained. **Ruled out in this repo, by measurement:** one call is truthful; the `post_tool_call` hook never re-commits; `registry.dispatch` fires no hooks and calls a handler once; a commit is ~100ms, too fast to invite a retry. Candidates are the agent retrying after not seeing a response, or the Hermes bridge dispatching twice. **Upstream, in `hermes-agent`.** The cheapest test is the one already built: watch `<tmpdir>/<slug>.html`, which the dashboard rewrites on every build, and count rebuilds while triggering an open. |
+| **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. **Same layer as B1's cause** — if the bridge is mangling or duplicating calls, they are likely one defect. |
 
 ### Deliberately not done
 
