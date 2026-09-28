@@ -20,19 +20,6 @@ MEMORY_CATEGORIES = ("decisions", "directions", "open_questions", "continuity_wa
 MEMORY_CHAR_LIMIT = 3000
 MEMORY_ENTRY_LIMIT = 300
 
-REQUIRED_FIELDS = {
-    "character": ["name", "story_role", "one_sentence"],
-    "location": ["name", "one_sentence"],
-    "world": ["name", "one_sentence"],
-    "plot": ["name", "status"],
-    "project": ["name", "logline"],
-    "scene": ["title", "sequence_id", "act_id"],
-    "sequence": ["title", "act_id"],
-    "act": ["title"],
-    "arc_beat": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
-    "relationship": ["name", "characters"],
-}
-
 ENTITY_LABELS = {
     "character": "Character",
     "location": "Location",
@@ -212,4 +199,26 @@ ENTITY_SCHEMAS = {
         "status": {"type": "string", "default": "active", "optional": True, "description": "active/resolved/complex"},
         "history": {"type": "string", "default": "", "optional": True, "description": "How this relationship evolved"},
     },
+}
+
+# ─── Required fields ───
+# Derived from ENTITY_SCHEMAS rather than maintained beside it. A hand-written
+# copy drifted: it demanded an arc_beat `id` the write path never reads (the id
+# is built from the slug), listed five fields the schema marks optional, and
+# listed two more — plot.status, project.logline — that survived only because
+# their defaults happen to be truthy. Three notes on the rule:
+#
+#   * `id` and `type` are in FIELDS_TO_SKIP, so the write path discards them.
+#   * `order` is auto-numbered by create_entity.
+#   * `status` defaults to a valid value.
+#
+# All four are supplied here, so requiring them asks for something the caller
+# cannot meaningfully provide. Duplicating ENTITY_SCHEMAS is what created the
+# bug; this is the one place the answer is written down.
+WRITE_PATH_SUPPLIED = {"id", "type", "order", "status"}
+
+REQUIRED_FIELDS = {
+    entity_type: [field for field, meta in schema.items()
+                  if not meta.get("optional", True) and field not in WRITE_PATH_SUPPLIED]
+    for entity_type, schema in ENTITY_SCHEMAS.items()
 }

@@ -2,7 +2,8 @@
 import pytest
 from pathlib import Path
 from core.entity import validate_entity
-from core.constants import ARC_TYPES, ENTITY_SCHEMAS
+from core.constants import ARC_TYPES, ENTITY_SCHEMAS, REQUIRED_FIELDS, WRITE_PATH_SUPPLIED
+from core.drafts import validate_shape
 from core.db import get_db
 from core.writes import create_entity, edit_entity
 
@@ -23,6 +24,32 @@ def _beat(project, **overrides):
 
 
 class TestArcValidation:
+    def test_minimal_arc_beat_reports_no_missing_field(self):
+        """The schema's non-optional fields are the only ones that can be required.
+
+        `id` can never be satisfied — the write path builds the composite id
+        from the slug — and `order`/`y` default to 0, which a falsy check reads
+        as absent. None of the three is non-optional, so a beat carrying only
+        what the schema asks for must be silent.
+        """
+        findings = validate_shape([{
+            "op": "create", "type": "arc_beat", "slug": "kael-1",
+            "frontmatter": {"character": "kael", "scene": "s1", "label": "First Doubt"},
+        }])
+        assert not [f for f in findings if "Missing required field" in f]
+
+    def test_required_fields_is_derived_from_the_schema(self):
+        """REQUIRED_FIELDS is not a second copy of the schema.
+
+        It was hand-maintained and drifted: arc_beat demanded an `id` the write
+        path ignores, plus five fields the schema marks optional. Deriving it
+        means there is nothing left to drift.
+        """
+        for entity_type, schema in ENTITY_SCHEMAS.items():
+            expected = {f for f, m in schema.items()
+                        if not m.get("optional", True) and f not in WRITE_PATH_SUPPLIED}
+            assert set(REQUIRED_FIELDS[entity_type]) == expected, entity_type
+
     def test_validate_arc_valid(self):
         fm = {
             "id": "beat-1", "character": "kael", "scene": "central-room-day",
@@ -37,7 +64,7 @@ class TestArcValidation:
         warnings = validate_entity("arc_beat", {"id": "beat-1"})
         assert any("character" in w for w in warnings)
         assert any("scene" in w for w in warnings)
-        assert any("order" in w for w in warnings)
+        assert any("label" in w for w in warnings)
 
     def test_validate_arc_y_out_of_range(self):
         fm = {"id": "b1", "character": "k", "scene": "s", "label": "L",
