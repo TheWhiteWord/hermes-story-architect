@@ -1,5 +1,16 @@
 # Task 25 — Standard Sections Design
 
+> **Formatting note.** A section body is rendered verbatim in the draft preview,
+> inside a fenced block, because its whitespace is load-bearing — a Fountain cue
+> is defined by its indentation, and markdown collapses that. Keep the leading
+> `- ` out of a section body: the Hermes desktop client drops the box around a
+> fenced block whose first line starts with a list marker, and shows the lines as
+> a bare list. Confirmed by A/B — the same batch, `Desires` the only variable, and
+> removing the two `- ` markers brought the box back with nothing else changed.
+> A conformant GitHub-flavoured parser (checked against `marked`) keeps the block
+> either way, so the emitted markdown is correct and this is the client's
+> renderer. Prefer prose, or a body that opens with a word.
+
 ## Project
 
 ### Theory Foundation
