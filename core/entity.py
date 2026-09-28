@@ -3,7 +3,7 @@ import json
 import frontmatter
 from pathlib import Path
 from .constants import (
-    REQUIRED_FIELDS, VALID_ROLES, VALID_STATUSES,
+    REQUIRED_FIELDS, ENTITY_SCHEMAS, VALID_ROLES, VALID_STATUSES,
     SCENE_STATUSES, SEQUENCE_STATUSES, ACT_STATUSES,
     SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
     VALUE_CHARGES, STRUCTURE_TYPES, PLOT_TYPES,
@@ -37,6 +37,8 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
     for field in REQUIRED_FIELDS.get(entity_type, []):
         if field not in frontmatter:
             warnings.append(f"Missing required field: {field}")
+
+    _validate_shapes(entity_type, frontmatter, warnings)
 
     if entity_type == "character":
         if "story_role" in frontmatter and frontmatter["story_role"] not in VALID_ROLES:
@@ -90,6 +92,11 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         if len(chars) != 2:
             warnings.append(f"relationship requires exactly 2 characters, got {len(chars)}")
         perspectives = frontmatter.get("perspectives", {})
+        # _validate_shapes has already reported a wrong type; iterating it here
+        # would raise on the very value we just complained about, and the agent
+        # would get a traceback instead of the finding.
+        if not isinstance(perspectives, dict):
+            perspectives = {}
         for char in chars:
             if char not in perspectives:
                 warnings.append(f"Missing perspective for character: {char}")
@@ -99,6 +106,39 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
                     warnings.append(f"strength out of range for {char}: {p['strength']}")
 
     return warnings
+
+
+def _validate_shapes(entity_type: str, frontmatter: dict, warnings: list[str]) -> None:
+    """A field that declares a shape must actually hold it.
+
+    Six fields declare `sub_fields`, and everything downstream trusts that: a
+    `perspectives` string makes `.items()` raise, and a `setups` string is
+    iterated one *character* at a time into relation rows — eight rows pointing
+    at `' '`, `'e'`, `'f'` for the plot "the first scene". Both were measured,
+    and both are silent until something downstream trips.
+
+    Checked here, at stage time, because that is the last point where the agent
+    is still looking at a preview and can be told what is wrong.
+    """
+    for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
+        sub = meta.get("sub_fields")
+        if not sub or field not in frontmatter:
+            continue
+        value = frontmatter[field]
+        keys = ", ".join(sub)
+        if meta["type"] == "list":
+            if not isinstance(value, list):
+                warnings.append(
+                    f"{field} must be a list of objects with keys [{keys}] "
+                    f"— got {type(value).__name__}")
+            elif any(not isinstance(i, dict) for i in value):
+                warnings.append(
+                    f"{field} must be a list of objects with keys [{keys}] "
+                    f"— got a list containing a non-object")
+        elif not isinstance(value, dict):
+            warnings.append(
+                f"{field} must be an object with keys [{keys}] "
+                f"— got {type(value).__name__}")
 
 
 def _validate_enum(frontmatter: dict, field: str, valid: list[str], warnings: list[str], empty_ok: bool = False) -> None:
@@ -374,6 +414,13 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
         if not value:
             continue
         if is_list:
+            # Guard, not validation: a string here is iterated one character at
+            # a time, so `setups: "the first scene"` writes eight relation rows
+            # pointing at ' ', 'e', 'f'. Measured. The shape is reported at stage
+            # time by _validate_shapes; this stops the garbage reaching the
+            # database from any path that skipped that check.
+            if not isinstance(value, list):
+                continue
             for i, item in enumerate(value):
                 if isinstance(item, dict):
                     if kind in ("plot_setup", "plot_payoff"):
