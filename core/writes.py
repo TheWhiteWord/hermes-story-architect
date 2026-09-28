@@ -260,6 +260,18 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
             elif key in column_map:
                 column_updates[column_map[key]] = value
             else:
+                # A field the schema calls a `number` must be stored as one.
+                # `extra` is a JSON blob and does not enforce it, so a value
+                # arriving as '3' is stored as '3' and later breaks any reader
+                # that compares it (the dashboard's max() on act_count). Cheap
+                # to enforce here; not cheap to find later. Readers also coerce
+                # — see db._coerce_number — because existing rows are already
+                # wrong and a write-side fix alone would not reach them.
+                if schema.get(key, {}).get("type") == "number" and isinstance(value, str):
+                    try:
+                        value = int(value) if value.strip().lstrip("-").isdigit() else float(value)
+                    except ValueError:
+                        pass  # not a number; validation will say so
                 extra_updates[key] = value
 
         from .entity import _RELATION_FIELDS

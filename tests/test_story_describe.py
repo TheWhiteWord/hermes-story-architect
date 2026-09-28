@@ -79,6 +79,63 @@ class TestEntityFields:
         assert "Unknown entity_type" in _handler({"entity_type": "nope"})["error"]
 
 
+class TestStructuredFieldShapesAreVisible:
+    """D1: the schema knows the shape, so story_describe must say it.
+
+    The output builder used to copy four keys by hand and drop `sub_fields`.
+    A `relationship.perspectives` object was then written as a bare string
+    (crashing story_load) and a plot's `setups` descriptions were silently
+    discarded on write — the schema carried the shape and the tool did not
+    show it.
+    """
+
+    def test_sub_fields_present_on_every_field_that_has_them(self):
+        from core.constants import ENTITY_SCHEMAS
+
+        out = _handler({})["entity_schemas"]
+        expected = {
+            f"{et}.{f}"
+            for et, fields in ENTITY_SCHEMAS.items()
+            for f, meta in fields.items()
+            if "sub_fields" in meta
+        }
+        assert expected, "no field has sub_fields — the premise of this test is gone"
+        got = {
+            f"{et}.{f}"
+            for et, fields in out.items()
+            for f, meta in fields.items()
+            if "sub_fields" in meta
+        }
+        assert got == expected
+
+    def test_an_object_sub_field_says_which_keys_it_takes(self):
+        perspectives = _handler({"entity_type": "relationship"})["entity_schemas"]["relationship"]["perspectives"]
+        assert perspectives["type"] == "object"
+        assert set(perspectives["sub_fields"]) == {
+            "label", "feeling", "type", "strength", "secret"}
+        assert perspectives["sub_fields"]["strength"]["type"] == "number"
+
+    def test_a_list_sub_field_says_what_each_item_holds(self):
+        setups = _handler({"entity_type": "plot"})["entity_schemas"]["plot"]["setups"]
+        assert setups["type"] == "list"
+        assert set(setups["sub_fields"]) == {"scene_id", "description"}
+
+    def test_no_schema_key_is_dropped(self):
+        """The invariant, not a spot check: a new annotation must not vanish.
+
+        This is the assertion that would have caught the original bug, and it
+        keeps catching it if someone adds a key to ENTITY_SCHEMAS later.
+        """
+        from core.constants import ENTITY_SCHEMAS
+
+        out = _handler({})["entity_schemas"]
+        missing = set()
+        for et, fields in ENTITY_SCHEMAS.items():
+            for field, meta in fields.items():
+                missing |= set(meta) - set(out[et][field])
+        assert not missing, f"schema keys dropped by story_describe: {sorted(missing)}"
+
+
 class TestEntityTypeEnumsStayInSync:
     """Every tool that takes an entity_type must accept every one ENTITY_SCHEMAS defines.
 

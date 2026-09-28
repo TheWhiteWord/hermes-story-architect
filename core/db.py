@@ -299,6 +299,32 @@ def set_project_memory(project_path: Path, memory: dict) -> dict:
         conn.close()
 
 
+def _coerce_number(value, default):
+    """A `number` field, whatever the JSON blob handed back.
+
+    `extra` is a JSON blob, and a value that went in as a string comes back a
+    string — so a `"type": "number"` field can hold `'3'`. The first live test
+    hit exactly this: `act_count` stored as `'3'` made `max('3', 3)` raise and
+    took the whole dashboard down.
+
+    Coerce on *read* as well as on write, because databases written before any
+    write-side fix already hold the wrong type, and a write-side fix alone
+    leaves every existing project broken while looking complete.
+
+    A value that is not a number at all is returned as-is rather than replaced
+    by the default: a wrong value the reader can see beats a plausible one it
+    cannot.
+    """
+    if isinstance(value, str):
+        if not value.strip():
+            return default  # "" is "not set" here, same as None
+        try:
+            value = int(value) if value.strip().lstrip("-").isdigit() else float(value)
+        except ValueError:
+            return value
+    return default if value is None else value
+
+
 def get_project_summary(project_path: Path) -> dict:
     """Return nested project summary for story_load (spec §2).
 
@@ -317,7 +343,8 @@ def get_project_summary(project_path: Path) -> dict:
             project = {"name": proj_name, "logline": proj_one_sentence, "status": proj_extra.get("status", "")}
             # name/logline/status are set above; the rest come from extra.
             project.update({k: proj_extra.get(k, "") for k in _PROJECT_DEFAULTS if k not in project})
-            project["act_count"] = proj_extra.get("act_count", 3)
+            project["act_count"] = _coerce_number(
+                proj_extra.get("act_count", 3), ENTITY_SCHEMAS["project"]["act_count"]["default"])
             project = {k: v for k, v in project.items()
                        if k in ("name", "status", "act_count") or (v and v != _PROJECT_DEFAULTS.get(k))}
         else:
@@ -1291,7 +1318,11 @@ def get_dashboard_data(project_path: Path) -> dict:
             proj_dict["world_count"] = len(worlds)
             proj_dict["plot_count"] = len(plots)
             proj_dict["sequence_count"] = len(sequences)
-            proj_dict["act_count"] = max(proj_dict.get("act_count", 3), len(acts))
+            # Coerced on read: a `number` field stored as a string ('3') makes
+            # this max() raise, and the dashboard is the only reader that
+            # compares it. See _coerce_number.
+            proj_dict["act_count"] = max(
+                _coerce_number(proj_dict.get("act_count"), 3), len(acts))
             proj_dict["arc_count"] = len(story_arcs)
 
         story_data = {

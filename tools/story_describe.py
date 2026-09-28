@@ -19,19 +19,23 @@ _RELATION_FIELDS_BY_NAME = {field for fields in _RELATION_FIELDS.values() for fi
 
 
 def _entity_schemas(entity_types: list) -> dict:
-    """Field metadata per entity type, flagging relation-backed and computed fields."""
+    """Field metadata per entity type, flagging relation-backed and computed fields.
+
+    Every key the schema carries is emitted, not a hand-picked few. The
+    hand-picked version silently dropped `sub_fields`, which is how a
+    `relationship.perspectives` object came to be written as a bare string and
+    a plot's `setups` descriptions were discarded on write — the schema knew
+    the shape and the tool did not say so. A schema key nobody is shown is a
+    schema key that does not exist, and the list of missing ones is only
+    discoverable by reading this function. Copy the dict; decorate it.
+    """
     out = {}
     for entity_type in entity_types:
         fields = {}
         for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
-            entry = {
-                "type": meta["type"],
-                "default": meta["default"],
-                "optional": meta.get("optional", True),
-                "description": meta["description"],
-            }
+            entry = dict(meta)
+            entry.setdefault("optional", True)
             if meta.get("computed"):
-                entry["computed"] = True
                 entry["description"] += " (read-only, computed — do not set)"
             if field in _RELATION_FIELDS_BY_NAME:
                 entry["stored_as"] = "relation"
