@@ -95,6 +95,7 @@ land with fewer.**
 | 6 | **B12 + B12b** — placeholder defaults out of the data, and the title page says which slots are open | **done, 896 pass** — 10 false findings → 0 |
 | 7 | **B15** — a lost check-then-insert race leaked `IntegrityError` to the user | **done, 897 pass** — found while investigating B1; 40/40 → 0/40 |
 | 8 | **B1** — commit reported failure for a commit that succeeded | **symptom fixed, 901 pass** — commit is idempotent; **the cause is still unknown and upstream** |
+| 9 | **D4** — no shape validation at write time | **done, 907 pass** — a failed commit was leaving 8 garbage relation rows; a string crashed the tool |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
@@ -122,6 +123,7 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. **Write side since rewritten** — one `entity.coerce_number` helper on every path; see B13. | — |
 | I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
+| D4 | **A field that declares a shape must hold it at write time.** Six fields declare `sub_fields`; nothing checked. A string where a list belongs was iterated one *character* at a time — eight relation rows pointing at `' '`, `'e'`, `'f'` — and the commit that created them reported failure with `0 committed`. A string where an object belongs made `story_draft` raise `AttributeError`. | A *failed* commit corrupted the project while the response said nothing landed. `_validate_shapes` reports it at stage time from the schema's own declaration; `relations_for_insert` skips a non-list for paths that never stage. |
 | B1 | **`commit` is idempotent.** It marks the draft row `committed` instead of deleting it, so a repeated commit replays the same success instead of reporting `"No open draft"` about changes that are already in the database. Reproduced end to end through the tool, before and after. | The damage was never the error, it was the claim: the agent tells the user *"that did not save"* and the obvious response is to write it again on top. **The cause of the duplicate call is not fixed and is not claimed to be** — it comes from outside this repo. |
 | B15 | **A lost check-then-insert race leaked a raw database error.** `create_entity` checks for a duplicate with a SELECT and inserts separately, so a concurrent writer wins in between and the primary key's `IntegrityError: UNIQUE constraint failed: entities.id` reached the user verbatim. One `try`/`except` at the INSERT raises the message the check would have. | The user was told a constraint name and nothing about what to do. Measured 40/40 raw errors before, 0/40 after. The behaviour is unchanged — only the message. |
 | B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
@@ -150,10 +152,9 @@ valuable part, and because the next keeper will suspect them again.
 
 | id | what | why it matters |
 |---|---|---|
-| **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
 | **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
-| **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
+| **D1** | The tool cannot show the shape of a structured value. **Both halves now fixed** — the read side by B7/B9/I5, the write side by D4. | — |
 
 ### Deliberately not done
 
@@ -2471,9 +2472,9 @@ both recorded in full in `entity_identity.md`:
 
 ---
 
-## D4. No shape validation at write time for structured values — **OPEN, the remaining half of D1**
+## D4 original entry (superseded — see the FIXED entry above)
 
-**Verified still open** (no `sub_fields` check in `core/writes.py` or
+**Verified still open at the time of writing** (no `sub_fields` check in `core/writes.py` or
 `core/drafts.py`). D1 fixed the read side; this is the write side. Highest
 value of the open items: the agent can now see the shape but is not stopped
 from writing a wrong one, so a bare string can still land where an object
@@ -2495,6 +2496,80 @@ written.
 **This is the same argument as B9's fix, from the other side.** Showing the
 shape prevents the mistake; checking the shape catches it when the display is
 not consulted. Both are cheap; neither is a substitute for the other.
+
+---
+
+## D4. No shape validation at write time for structured values — **FIXED 2026-09-28**
+
+**Six fields declare `sub_fields` and nothing checked the value against that
+declaration.** The entry predicted "a bare string can land where an object
+belongs". Measured, it was worse than that.
+
+### What actually happened, through the real tool
+
+**A string where a list belongs was iterated one character at a time:**
+
+```
+stage   plot with setups: "the first scene"   ->  validation: NONE
+commit  ->  {"success": false, "committed": [],
+              "failed": {"error": "IntegrityError: UNIQUE constraint failed:
+                         relations.from_id, relations.to_id, relations.kind"}}
+relations now: 8
+   ('the-resistance', ' ', 'plot_setup')   ('the-resistance', 'e', ...)
+   ('the-resistance', 'f', ...)            ... one row per character
+```
+
+**The database was left holding eight rows pointing at single letters, while
+the response said nothing landed.** That is the part worth naming: a *failed*
+commit corrupted the project, and the report contradicted what was on disk.
+
+**A string where an object belongs was worse — a hard crash:**
+
+```
+stage  relationship with perspectives: "just a string"
+  ->  story_draft raised AttributeError: 'str' object has no attribute 'items'
+```
+
+The tool returned a traceback rather than a finding, on a plausible LLM
+mistake. `entity.py:96` did `perspectives.items()` and trusted the declaration.
+
+### Two guards, because they answer different questions
+
+| guard | where | answers |
+|---|---|---|
+| `_validate_shapes` | `core/entity.py`, called from `validate_entity` at stage time | "what did you send, and what should it be?" |
+| skip a non-list | `relations_for_insert` | "what reaches the database, whatever path called it?" |
+
+**The first is driven by the schema's own `sub_fields`** — the shape is already
+written down, so this reads it rather than restating it, and the finding names
+the keys so the agent can fix it from the message:
+
+```
+'setups must be a list of objects with keys [scene_id, description] — got str'
+```
+
+**The crash itself is guarded separately**, because a validator that raises on
+the value it just complained about reports nothing at all.
+
+**The second guard is the data-integrity half** and covers every path that never
+reaches stage time — the importer and the tests call `create_entity` directly.
+
+**The malformed list is dropped, not repaired.** The entity is still created and
+the agent is told. Inventing relation rows from a string would be a guess.
+
+**After, through the real tool:**
+
+```
+validation: 'setups must be a list of objects with keys [scene_id, description] — got str'
+commit:     success
+relations:  0
+```
+
+**907 pass** (was 901). Five of the six new tests fail with the fix stashed.
+
+**This is the second half of D1.** B7/B9/I5 made the shape *visible*; this
+catches the mistake when the display is not consulted. Neither substitutes for
+the other — an agent that never calls `story_describe` still gets caught here.
 
 ---
 
