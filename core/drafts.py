@@ -211,9 +211,10 @@ def stage(project_path: Path, ops, summary: str = "",
         # Straight copy — the same agent writes the op list each time, and the
         # diff compares it structurally, so there is nothing to normalise.
         conn.execute(
-            "INSERT INTO drafts (id, ops, prev_ops, summary, created_at) "
-            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
-            "ops=excluded.ops, prev_ops=excluded.prev_ops, summary=excluded.summary",
+            "INSERT INTO drafts (id, ops, prev_ops, summary, created_at, status) "
+            "VALUES (?, ?, ?, ?, ?, 'open') ON CONFLICT(id) DO UPDATE SET "
+            "ops=excluded.ops, prev_ops=excluded.prev_ops, "
+            "summary=excluded.summary, status='open'",
             (
                 new_id,
                 json.dumps(ops, ensure_ascii=False),
@@ -275,7 +276,8 @@ def list_drafts(project_path: Path) -> dict:
     conn = get_db(project_path)
     try:
         rows = conn.execute(
-            "SELECT id, ops, summary, created_at FROM drafts ORDER BY created_at, id"
+            "SELECT id, ops, summary, created_at FROM drafts "
+            "WHERE status='open' ORDER BY created_at, id"
         ).fetchall()
         drafts = [
             {
@@ -338,7 +340,7 @@ def commit(project_path: Path, draft_id: str) -> dict:
     conn = get_db(project_path)
     try:
         row = conn.execute(
-            "SELECT ops FROM drafts WHERE id=?", (draft_id,)
+            "SELECT ops, status FROM drafts WHERE id=?", (draft_id,)
         ).fetchone()
     finally:
         conn.close()
@@ -346,6 +348,26 @@ def commit(project_path: Path, draft_id: str) -> dict:
         raise DraftError(f"No open draft: {draft_id}")
 
     ops = sorted_ops(json.loads(row[0]))
+
+    if row[1] == "committed":
+        # This draft already landed. Reporting "No open draft" here would tell
+        # the caller its changes were lost when they are in the database, and
+        # the obvious response to that is to write them again on top. Replay
+        # the same answer instead — the ops are still on the row, so the landed
+        # list is the same list, not a reconstruction.
+        landed = [_describe(op) for op in ops]
+        return {
+            "success": True,
+            "committed": True,
+            "already_committed": True,
+            "draft_id": draft_id,
+            "applied": landed,
+            "preview_md": _commit_report(landed, None, draft_id),
+            "message": (f"Draft {draft_id} was already committed — "
+                        f"{len(landed)} change(s) are in the project. "
+                        f"Nothing was written twice."),
+        }
+
     landed, failed = [], None
     for op in ops:
         result = _dispatch(project_path, op)
@@ -371,9 +393,11 @@ def commit(project_path: Path, draft_id: str) -> dict:
             ),
         }
 
+    # Marked, not deleted: the row is the receipt that makes a repeated commit
+    # replay instead of claiming the work was lost. `discard` removes it.
     conn = get_db(project_path)
     try:
-        conn.execute("DELETE FROM drafts WHERE id=?", (draft_id,))
+        conn.execute("UPDATE drafts SET status='committed' WHERE id=?", (draft_id,))
     finally:
         conn.close()
     return {

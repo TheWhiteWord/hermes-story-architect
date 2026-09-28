@@ -277,6 +277,90 @@ def test_commit_of_an_unknown_draft_is_refused(fixture_path):
         drafts.commit(fixture_path, "d-nope")
 
 
+def test_a_second_commit_replays_instead_of_claiming_the_work_is_lost(fixture_path):
+    """B1. Committing the same draft twice must not report failure the second time.
+
+    The first commit marks the row rather than deleting it, so the repeat finds
+    the ops still on it and answers with the same success. The old behaviour —
+    delete, then "No open draft" — told the caller its changes were lost when
+    they were in the database, and the obvious response to that is to write them
+    again on top.
+    """
+    staged = drafts.stage(fixture_path, _batch(), "Mira tells Kael")
+    first = drafts.commit(fixture_path, staged["draft_id"])
+    before = _counts(fixture_path)
+
+    second = drafts.commit(fixture_path, staged["draft_id"])
+
+    assert second["success"] is True
+    assert second["committed"] is True
+    assert second["already_committed"] is True
+    assert "already committed" in second["message"]
+    # The same ops, listed the same way — not a reconstruction.
+    assert second["applied"] == first["applied"]
+    # And nothing was written a second time.
+    assert _counts(fixture_path) == before
+
+
+def test_a_committed_draft_is_not_listed_as_open(fixture_path):
+    """A receipt must not look like pending work, or the agent will re-commit it."""
+    staged = drafts.stage(fixture_path, _batch(), "Mira tells Kael")
+    assert drafts.list_drafts(fixture_path)["count"] == 1
+    drafts.commit(fixture_path, staged["draft_id"])
+    assert drafts.list_drafts(fixture_path)["count"] == 0
+
+
+def test_restaging_a_committed_draft_id_reopens_it(fixture_path):
+    """Reusing a draft id is an explicit request for a new draft on that id.
+
+    Without this the row would stay marked committed and the fresh ops could
+    never be committed — the receipt would outlive the draft it described.
+
+    The re-staged batch edits rather than creates: re-staging the original batch
+    would try to create an entity the first commit already made, and refusing
+    that is correct, not the bug.
+    """
+    staged = drafts.stage(fixture_path, _batch(), "Mira tells Kael")
+    drafts.commit(fixture_path, staged["draft_id"])
+
+    edit_only = [{"op": "edit", "entity_type": "location",
+                  "entity_id": "the-central-room", "data": {"mood": "colder"},
+                  "summary": "The room cools"}]
+    drafts.stage(fixture_path, edit_only, "again", draft_id=staged["draft_id"])
+    assert drafts.list_drafts(fixture_path)["count"] == 1
+
+    result = drafts.commit(fixture_path, staged["draft_id"])
+    assert result["success"] is True
+    assert "already_committed" not in result
+
+
+def test_a_database_with_the_old_drafts_table_still_works(fixture_path):
+    """The live plugin's database predates `status`. Prove the upgrade, do not assume it.
+
+    Every other test in this file runs against a fixture whose drafts table is
+    copied from disk, so whether the migration path works or is silently unused
+    is not obvious from a green run. This builds the pre-change table by hand and
+    runs the whole cycle over it.
+    """
+    old = "CREATE TABLE drafts (id TEXT PRIMARY KEY, ops JSON NOT NULL, " \
+          "prev_ops JSON, summary TEXT NOT NULL DEFAULT '', " \
+          "created_at TEXT NOT NULL)"
+    conn = sqlite3.connect(str(Path(fixture_path) / ".story" / "story.db"))
+    conn.execute("DROP TABLE IF EXISTS drafts")
+    conn.execute(old)
+    conn.commit()
+    conn.close()
+
+    staged = drafts.stage(fixture_path, _batch(), "Mira tells Kael")
+    first = drafts.commit(fixture_path, staged["draft_id"])
+    second = drafts.commit(fixture_path, staged["draft_id"])
+
+    assert first["success"] is True
+    assert second["success"] is True and second["already_committed"] is True
+    cols = {r[1] for r in get_db(fixture_path).execute("PRAGMA table_info(drafts)")}
+    assert "status" in cols
+
+
 # ─── Guard 2: partial failure keeps the draft and names what landed ───
 
 def test_a_failing_batch_keeps_the_draft_and_names_what_landed(fixture_path):

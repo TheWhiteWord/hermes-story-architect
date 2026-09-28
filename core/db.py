@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS drafts (
     ops        JSON NOT NULL,
     prev_ops   JSON,
     summary    TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'open'
 );
 """
 
@@ -95,6 +96,14 @@ def get_db(project_path: Path) -> sqlite3.Connection:
             conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
         if "deleted_at" not in have:
             conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
+    # Same for the drafts table's `status`, which a commit sets instead of
+    # deleting the row (see drafts.commit — a repeated commit must replay, not
+    # report that nothing was open).
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='drafts'"
+    ).fetchone():
+        if "status" not in {r[1] for r in conn.execute("PRAGMA table_info(drafts)")}:
+            conn.execute("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'open'")
     return conn
 
 
