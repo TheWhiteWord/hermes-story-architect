@@ -336,6 +336,34 @@ class TestCreateProject:
         with pytest.raises(ValueError, match="Missing required fields"):
             writes.create_project("thin", {}, tmp_path)
 
+    def test_a_number_field_is_stored_as_a_number(self, tmp_path):
+        """create_project coerces `number` fields, as every other write path does.
+
+        `extra` is a JSON blob and enforces nothing, so a `number` arriving as
+        a string is stored as a string — and the dashboard's `max()` on
+        act_count then raises and takes the whole view down. This path had no
+        coercion at all while edit_entity did, which is the same value being a
+        string, an int and an int in three readers.
+        """
+        import json
+        writes.create_project("coerced", {"name": "C", "act_count": "4"}, tmp_path)
+        proj = tmp_path / "projects" / "coerced"
+        extra = json.loads(_q(proj, "SELECT extra FROM entities WHERE type='project'")[0][0])
+        assert extra["act_count"] == 4
+        assert isinstance(extra["act_count"], int)
+
+    def test_a_non_numeric_value_is_left_alone_for_validation(self, tmp_path):
+        """A value that is not a number is stored as sent, not silently replaced.
+
+        A wrong value the reader can see beats a plausible one it cannot — and
+        `validate_shape` reports it.
+        """
+        import json
+        writes.create_project("bad", {"name": "B", "act_count": "four"}, tmp_path)
+        proj = tmp_path / "projects" / "bad"
+        extra = json.loads(_q(proj, "SELECT extra FROM entities WHERE type='project'")[0][0])
+        assert extra["act_count"] == "four"
+
     def test_traversal_slug_rejected_before_touching_disk(self, tmp_path):
         """A project slug IS a directory name, so this is a traversal, not hygiene."""
         with pytest.raises(ValueError, match="Slug must be alphanumeric"):

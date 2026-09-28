@@ -254,6 +254,26 @@ def standard_sections(entity_type: str) -> list[str]:
     return sections.get(entity_type, [])
 
 
+def coerce_number(value):
+    """A `number` field as a number, whatever arrived.
+
+    `extra` is a JSON blob and does not enforce types, so a value arriving as
+    '3' is stored as '3' and later breaks any reader that compares it — the
+    dashboard's `max()` on `act_count` raised and took the whole view down.
+
+    Lives here because `columns_for_insert` is the one place every write path
+    passes through, so a third path cannot forget it. A value that is not a
+    number is returned as-is: validation reports it, and a wrong value the
+    reader can see beats a plausible one it cannot.
+    """
+    if not isinstance(value, str):
+        return value
+    try:
+        return int(value) if value.strip().lstrip("-").isdigit() else float(value)
+    except ValueError:
+        return value
+
+
 def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
     """Map frontmatter to entity columns for INSERT.
 
@@ -262,6 +282,8 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
     """
     column_map = ENTITY_COLUMN_MAP.get(entity_type, {})
     relation_fields = _RELATION_FIELDS.get(entity_type, {})
+    from .constants import ENTITY_SCHEMAS
+    schema = ENTITY_SCHEMAS.get(entity_type, {})
 
     columns = {
         "id": slug,
@@ -282,6 +304,8 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
         # in addition to the arc_beat relation created separately
         if key in relation_fields and not (entity_type == "arc_beat" and key == "scene"):
             continue  # handled separately as relations
+        if schema.get(key, {}).get("type") == "number":
+            value = coerce_number(value)
         if key in column_map:
             columns[column_map[key]] = value
         else:

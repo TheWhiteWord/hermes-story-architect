@@ -236,7 +236,8 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
         if not entity_id:
             raise ValueError(f"Entity not found: {entity_type}/{slug}")
 
-        from .entity import ENTITY_COLUMN_MAP, standard_sections as get_std_sections
+        from .entity import (ENTITY_COLUMN_MAP, coerce_number,
+                             standard_sections as get_std_sections)
         standard_sections = set(get_std_sections(entity_type))
         # The one column map, owned by core.entity. An out-of-tree copy that
         # was missing `project` made editing a logline write it into `extra` and
@@ -260,19 +261,17 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
             elif key in column_map:
                 column_updates[column_map[key]] = value
             else:
-                # A field the schema calls a `number` must be stored as one.
-                # `extra` is a JSON blob and does not enforce it, so a value
-                # arriving as '3' is stored as '3' and later breaks any reader
-                # that compares it (the dashboard's max() on act_count). Cheap
-                # to enforce here; not cheap to find later. Readers also coerce
-                # — see db._coerce_number — because existing rows are already
-                # wrong and a write-side fix alone would not reach them.
-                if schema.get(key, {}).get("type") == "number" and isinstance(value, str):
-                    try:
-                        value = int(value) if value.strip().lstrip("-").isdigit() else float(value)
-                    except ValueError:
-                        pass  # not a number; validation will say so
-                extra_updates[key] = value
+                # `extra` is a JSON blob and does not enforce types, so a
+                # `number` field arriving as '3' is stored as '3' and later
+                # breaks any reader that compares it — the dashboard's max()
+                # on act_count raised and took the whole view down. This path
+                # UPDATEs rather than inserting, so it does not go through
+                # columns_for_insert where the same coercion lives; both call
+                # the one helper, because two copies of these four lines is
+                # how create_project came to disagree with edit_entity.
+                extra_updates[key] = coerce_number(value) if (
+                    schema.get(key, {}).get("type") == "number"
+                ) else value
 
         from .entity import _RELATION_FIELDS
         rel_fields = _RELATION_FIELDS.get(entity_type, {})
