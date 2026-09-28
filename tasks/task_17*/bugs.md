@@ -95,7 +95,8 @@ fewer.**
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
 | 5a | **D5 step 3** — one name for the entity id in the op vocabulary | **done, 892 pass** — `slug` now means only a project directory |
-| 6 | **D5 steps 4–5** — generated ids, title filenames | sequenced, not built |
+| 5b | **D5 step 4** — generate the id | **CANCELLED** — breaks one-batch creation; 3 round trips per reference |
+| 6 | **D5 step 5** — filenames by title, id in the frontmatter | **done, 892 pass** — the id/title division, and a round trip that no longer loses data |
 
 **B6 and B12 are the same lesson applied twice**: the schema already knew the
 answer and a hand-maintained list beside it had drifted. B6 fixes the
@@ -1810,10 +1811,141 @@ stops supplying one, then id-into-frontmatter and title filenames.
 
 ---
 
-## D5. One concept, three names — `slug` / `entity_id` / `id` — **AGREED, PARTLY BUILT**
+## D5 step 4. Generate the id — **CANCELLED 2026-09-28, and the reason matters**
 
-**Steps 1, 2 and 3 are done** (see the entries above). Steps 4–5 remain, and
-the position below is unchanged by them.
+**Measured before building, not after. The idea is sound and it does not pay.**
+
+**The blocker:** a relation is a lookup by id, validated at commit. A scene's
+`characters: ["kael"]` resolves with `SELECT id FROM entities WHERE id=?`. So
+today the agent creates a character *and* a scene that uses it **in one batch** —
+verified:
+
+```
+2 ops staged -> commit: success
+```
+
+That works **only because the agent chose the id.** With a generated id the
+agent cannot write `"characters": ["???"]` for a character it is creating in the
+same batch. It would have to commit the character, `story_load` to learn the hex
+id, then commit the scene — **three round trips per referenced entity**, and for
+a 40-entity project that is a hundred-plus places to lose the thread.
+
+**The obvious fix is the bug step 2 just fixed.** Matching relations by *name*
+instead of id is exactly the silent wrong-entity write: two characters named
+"Kael", the scene goes to the wrong one. Rejected.
+
+**And it does not buy the thing it was for.** The goal was a clean division —
+*id for data, title for user-facing* — and **step 5 delivers that**. Generated
+ids add nothing to it; they only remove the agent's ability to write its own
+references.
+
+| | agent supplies id | agent doesn't |
+|---|---|---|
+| one batch, entity + its references | yes | **3 round trips each** |
+| readable ids in fixtures/tests | yes | yes (fixtures unaffected either way) |
+| id/title division (step 5) | yes | yes |
+
+**Kept:** agent-supplied ids. A generated id is a legitimate design — it just
+costs more than it returns here, and the cost lands on the agent.
+
+---
+
+## D5 step 5. Filenames by title, id in the frontmatter — **FIXED 2026-09-28**
+
+**The filename *was* the id.** Renaming a note silently renamed the entity and
+every relation pointing at it. Now:
+
+```
+characters/Kael.md            id: kael
+arcs/Kael/The Choice.md       id: kael-3   character: kael
+```
+
+This is the division of function the whole D5 investigation was after, and it
+was the last step standing between the plan and the goal.
+
+**The premise was stated for the wrong reason, and the right one is stronger.**
+The plan said this needs a generated id to put in the frontmatter. It does not —
+it needs the id *written down*, because the filename is the only place it used
+to live. Only four of the ten types declared `id` in their schema; for the rest
+the filename carried it silently. `fm["id"] = entity_id` is now set once after
+the per-type branch, rather than in ten of them.
+
+**Collisions are real but harmless, and the reason is worth keeping.** "The
+Choice" is one beat per character in `save-the-children` — but they land in
+different folders. The counter only fires for two entities in one folder:
+
+```
+The Choice.md, then The Choice 2.md
+```
+
+It is **cosmetic**: nothing references a filename, whereas an id collision would
+be silent. That asymmetry is the entire reason `id` is the primary key, so the
+counter is cheap insurance rather than a correctness mechanism.
+
+**One bug, found by a test rather than by reading the code.** The counter is
+per *note*; applied to the **arc folder** it gave every beat of one character
+their own directory, so Kael's three beats landed in `Kael/`, `Kael 2/` and
+`Kael 3/`. Caught by a test asserting on the file list:
+
+```
+assert 'characters/kael.md' in ['arcs/Kael/First Doubt.md', ...]
+```
+
+The folder is cached per character id now. **A counter's scope is a decision, and
+getting it wrong fails loudly in a file listing** — which is the good kind.
+
+**The fixture needed a real conversion, and the failure mode was silent.** Its
+31 notes were named for the id with **no `id:` field**, because the filename
+carried it. Converting to titles meant adding the field; without it, an export
+wrote `Kael.md` beside the old `kael.md` and the re-import died:
+
+```
+import: {'error': 'UNIQUE constraint failed: entities.id'}
+after re-import: 0 entities        <- everything gone
+```
+
+**A real project does not hit this** — the sweep deletes the id-named note,
+because the previous export wrote it and the manifest remembers. The fixture
+ships without a manifest, so it needed doing by hand. Worth recording: the
+manifest is what makes a layout change safe, and a fixture without one is the
+only place the hazard is visible.
+
+**The fixture's `story.db` is gitignored** — a build artifact; the markdown is
+the source. It also still said `type='arc'` on disk, stale from before that
+rename, so no code path read those 11 rows as beats. Corrected, but the
+markdown is what makes it stick:
+
+```
+rebuild from markdown alone: success
+32 entities, type='arc_beat' for all 11 beats, 12 relations
+```
+
+**Tests:** 9 assertions that hardcoded a filename now look the note up by its
+frontmatter id (`note_for` / `note_rel` in `test_round_trip`). That is the
+property this step provides, so the tests use it too.
+
+**The property, measured — and it was not true before.** Export, **delete the
+database outright**, re-import from the notes alone:
+
+| | before step 5 | after |
+|---|---|---|
+| entities | **lost 3, gained 3** | **identical** |
+| relations | **lost all** | **identical** |
+| sections | **lost prose, incl. whole beats** | **identical** |
+
+And the case that was impossible before — rename a note by hand, re-import:
+
+```
+'Kael.md' -> 'Renamed By Hand.md'  ->  ('kael', 'Kael')
+```
+
+**892 pass, unchanged.**
+
+**D5 is complete: steps 1, 2, 3 and 5 built; step 4 cancelled with its reason.**
+
+---
+
+## D5. One concept, three names — `slug` / `entity_id` / `id` — **DONE, with one step cancelled**
 
 **A position was reached on 2026-09-28.**
 `tasks/task_17*/entity_identity.md` holds the full investigation, the

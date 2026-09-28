@@ -242,7 +242,32 @@ Inverted, it guards the fix.
 
 ---
 
-## Step 4 — generate the id (not built)
+## Step 4 — generate the id — **CANCELLED 2026-09-28. Do not build this.**
+
+> **Read this before considering step 4 again.** The plan below is sound and
+> was measured carefully. It was cancelled for one reason, found by measuring
+> the *current* system rather than the proposed one: **relations are looked up
+> by id, and the agent can only write a relation to an entity whose id it chose.**
+>
+> Today one batch creates a character and a scene that uses it:
+> `2 ops staged -> commit: success`. With a generated id the agent cannot write
+> `"characters": ["???"]` for a character it is creating in that same batch. It
+> would need commit -> `story_load` -> commit, **three round trips per
+> referenced entity.**
+>
+> The only way to keep one-batch authoring is to match relations by *name* —
+> which is **the silent wrong-entity write step 2 exists to kill** (two
+> characters named "Kael"; the scene goes to the wrong one).
+>
+> And it does not buy the goal. The goal was *id for data, title for
+> user-facing*; **step 5 delivers that**, and generated ids add nothing to it.
+> The cost lands entirely on the agent, for no gain.
+>
+> A generated id remains a legitimate design for a system where the agent never
+> authors relations. That is not this one.
+
+<details>
+<summary>The original step 4 plan (kept for the reasoning; do not implement)</summary>
 
 > **The agent's burden and the fixture's readability are separable.** A
 > generated id is decided in step 4; whether the *fixtures and tests* keep
@@ -331,53 +356,63 @@ the moment the agent is not choosing one.
 **Check:** create ten entities, assert ten distinct 8-char hex ids; assert a
 forced collision is retried rather than raised. Suite at 892.
 
+</details>
+
 ---
 
-## Step 5 — id in frontmatter, filenames by title
+## Step 5 — id in frontmatter, filenames by title — **BUILT 2026-09-28**
 
-**Why last:** it changes the file layout, and it needs a generated id to put in
-the frontmatter.
+**The filename was the id.** Renaming a note silently renamed the entity and
+every relation pointing at it. Now `characters/Kael.md` carries `id: kael`.
 
-| change | where |
-|---|---|
-| filename = the title, uniquified per folder by counter | `story_export.py:171` |
-| write `id` into every note's frontmatter (all ten types) | `story_export.py:177-274` |
-| read the id from frontmatter, fall back to the stem | `story_import.py:279` |
-| the arc-beat filename uses its own id, not `{char}-{beat}` | `story_export.py:162-168` |
-| `_diff` matches DB ids against frontmatter, not stems | `story_import.py:55-77` |
-| the 4 dead-link fallbacks say "⚠ unresolved" | `entity-panels.js:70,165,364,78` |
+**The plan's premise was right for the wrong reason, and the right reason is
+stronger.** It said this needs a generated id in the frontmatter; what it
+actually needs is the id *written down*, because the filename was the only place
+it lived. Only four of ten types declared `id` in their schema — for the rest
+the filename carried it silently. So the fix does not depend on step 4, which is
+why cancelling step 4 did not block it.
 
-**Counter policy:** `Kael.md`, then `Kael 2.md`. Needed because titles are not
-unique — *"The Choice"* is two arc beats in `save-the-children` today.
-Nothing references a filename, so this collision is cosmetic; an id collision
-would be silent.
+**Three things the plan did not anticipate:**
 
-**`_diff` is the real work in this step** — it currently globs stems and would
-have to open every note. Same function that already reads each file to import
-it, one pass.
+1. **The arc folder was still the character id.** `arcs/kael/` beside
+   `characters/Kael.md` is the exact inconsistency this step removes. The
+   character link already rides in the frontmatter, so the folder is grouping
+   only — it is now `arcs/Kael/`.
+2. **The counter's scope is a decision.** Per note is right for files and wrong
+   for the arc folder: applied to the folder, every beat of one character got
+   their own directory (`Kael/`, `Kael 2/`, `Kael 3/`). Caught by a test
+   asserting on the file list, not by reading the code. The folder is cached per
+   character id now.
+3. **The fixture needed `id:` added, and without it the failure is silent.** Its
+   notes were named for the id with no `id:` field. Converting to titles put
+   `Kael.md` beside the old `kael.md`, both claiming `id: kael`, and the
+   re-import died on the primary key with an empty database. A real project is
+   saved by the manifest sweep; the fixture ships without one.
 
-**This step will break tests that hardcode filenames.** Measured: 9 test files,
-23 sites, including `test_round_trip.py:60-61` (`kael.md`, `arcs/kael/1.md`)
-and `test_export_sweep.py`. Update them to look the file up by frontmatter id
-rather than by name — which is also the behaviour the change is meant to
-enable.
+**Two of the plan's four dashboard sites were left alone** — `entity-panels.js`
+is a legibility fix, independent of this step, and belongs in its own commit.
 
-**The 4 dashboard sites are independent of everything above** and could be a
-separate commit. They are a legibility fix, not a refactor.
+**The check, and it is the check that matters.** Export, delete the database
+outright, re-import from the notes alone:
 
-**Check:** the round trip still closes — import → export → wipe → re-import
-yields identical entities, sections and relations, **with the ids surviving**,
-which is the property that was impossible before. That is the test that proves
-this step.
+| | before | after |
+|---|---|---|
+| entities | lost 3, gained 3 | identical |
+| relations | lost all | identical |
+| sections | lost prose, incl. whole beats | identical |
+
+renaming a note by hand now survives the round trip — the case that was
+impossible while the filename was the id. **892 pass, unchanged.**
 
 ---
 
 ## Explicitly not in this plan
 
-- **B6 / B12** (`REQUIRED_FIELDS` and the enum placeholder defaults). Separate
-  defects in `bugs.md`, separate fixes. B6 is arguably fixed *by* step 4, since
-  an unsatisfiable `id` requirement disappears when the agent stops supplying
-  the id — **verify that when step 4 lands** rather than assuming it.
+- **B6** — whether an unsatisfiable `id` requirement is fixed. **Answered, and
+  not by step 4.** `WRITE_PATH_SUPPLIED = {"id", "type", "order", "status"}` and
+  `REQUIRED_FIELDS` filters it out, so `id` is required by no type today —
+  already handled, and cancelling step 4 did not regress it. Verified rather
+  than assumed: `[t for t, f in REQUIRED_FIELDS.items() if 'id' in f]` is empty.
 - **Q2** — whether the naming caused a live mis-call. Still unanswered, and it
   does not gate this plan: steps 1, 2 and 5 are justified on their own merits
   (two fix reproduced bugs, one is a legibility fix), and steps 3 and 4 are
