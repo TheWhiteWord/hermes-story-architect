@@ -15,6 +15,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from core import drafts  # noqa: E402
+from core.constants import ENTITY_SCHEMAS  # noqa: E402
 from core.db import get_db  # noqa: E402
 
 
@@ -210,10 +211,36 @@ def test_list_on_a_project_with_no_drafts_is_empty_not_an_error(fixture_path):
        "summary": "x"}], "alphanumeric"),
     ([{"op": "reorder", "entity_type": "sequence", "ordered_ids": [],
        "summary": "x"}], "non-empty list"),
+    ([{"op": "reorder", "entity_type": "act", "ordered_ids": ["act-1"],
+       "summary": "x"}], "cannot reorder act"),
 ])
 def test_a_malformed_op_is_refused_at_stage_time(bad, message):
     with pytest.raises(drafts.DraftError, match=message):
         drafts.validate_ops(bad)
+
+
+def test_every_reorderable_type_stages_and_commits(fixture_path):
+    """The stage guard and the write path must agree on which types reorder.
+
+    Asserting one bad type is refused only pins the refusal. This pins the
+    invariant: whatever `writes.reorder` accepts, stage must accept, so a type
+    added to the write path without the stage guard cannot ship — that
+    disagreement is what made `reorder act` render a full preview and then
+    fail on commit with a raw ValueError.
+    """
+    from core.writes import REORDERABLE_TYPES
+    for entity_type in REORDERABLE_TYPES:
+        op = {"op": "reorder", "entity_type": entity_type,
+              "ordered_ids": ["a", "b"], "summary": "x"}
+        drafts.validate_ops([op])          # must not raise
+
+    for entity_type in ENTITY_SCHEMAS:
+        if entity_type in REORDERABLE_TYPES:
+            continue
+        op = {"op": "reorder", "entity_type": entity_type,
+              "ordered_ids": ["a"], "summary": "x"}
+        with pytest.raises(drafts.DraftError, match="cannot reorder"):
+            drafts.validate_ops([op])
 
 
 def test_a_malformed_op_never_reaches_the_drafts_table(fixture_path):
@@ -431,7 +458,13 @@ def test_sorted_ops_is_stable_within_a_kind():
 
 def test_a_committed_create_carrying_cast_produces_relation_rows(fixture_path):
     """Guard 6: relations come from frontmatter, and an op that lost them would
-    pass every other test in this file."""
+    pass every other test in this file.
+
+    Direction matters as much as existence. `character_scene` is stored
+    from_id=character, to_id=scene — the importer's direction, and the one every
+    reader assumes. The authoring path used to write it the other way, so the
+    rows existed and every reader still reported an empty cast.
+    """
     staged = drafts.stage(
         fixture_path,
         [_create_scene("mira-tells-kael", characters=["mira", "kael"])],
@@ -441,9 +474,19 @@ def test_a_committed_create_carrying_cast_produces_relation_rows(fixture_path):
 
     rels = _rows(fixture_path,
                  "SELECT from_id, to_id, kind FROM relations "
-                 "WHERE from_id='mira-tells-kael'")
-    assert ("mira-tells-kael", "mira", "character_scene") in rels
-    assert ("mira-tells-kael", "kael", "character_scene") in rels
+                 "WHERE to_id='mira-tells-kael'")
+    assert ("mira", "mira-tells-kael", "character_scene") in rels
+    assert ("kael", "mira-tells-kael", "character_scene") in rels
+
+    # And the rows are readable by the tool that consumes them — the existence
+    # assertion above passed even while every reader saw an empty cast.
+    from tools.story_retrieve import handler as retrieve_handler
+    out = json.loads(retrieve_handler({
+        "project": str(fixture_path), "entity_type": "scene",
+        "id": ["mira-tells-kael"], "fields": ["characters"],
+    }, vault_path=fixture_path.parent))
+    assert out["entities"][0]["fields"]["characters"] == ["mira", "kael"]
+    assert "characters" not in out["entities"][0]["unfilled_fields"]
 
 
 # ─── delete ───

@@ -200,6 +200,22 @@ ENTITY_COLUMN_MAP = {
 
 FIELDS_TO_SKIP = {"id", "type"}
 
+# Relation kinds stored from the OTHER side: a scene's cast rows point AT the
+# scene (`from_id=character, to_id=scene`), so a scene does not own them.
+# The importer, every existing row, and every reader (story_retrieve,
+# story_export, core/db.py) assume this direction; writing it the other way
+# left the cast unreadable the moment a scene was authored through story_draft.
+# Single authority — relation_endpoints() is the only place direction is decided.
+REVERSED_RELATION_KINDS = {"character_scene"}
+
+
+def relation_endpoints(owner_id: str, kind: str, to_id: str) -> tuple[str, str]:
+    """(from_id, to_id) for one relation row, honouring the stored direction."""
+    if kind in REVERSED_RELATION_KINDS:
+        return to_id, owner_id
+    return owner_id, to_id
+
+
 # Fields that become relations rows (not extra JSON or columns)
 # Maps field name → (kind, is_list)
 _RELATION_FIELDS = {
@@ -433,8 +449,9 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
                     to_id = str(item)
                     note = ""
                 if to_id:
+                    from_id, to_id = relation_endpoints(slug, kind, to_id)
                     relations.append({
-                        "from_id": slug,
+                        "from_id": from_id,
                         "to_id": to_id,
                         "kind": kind,
                         "note": note,
@@ -444,9 +461,10 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
             # Non-list: single string value
             value = fm.get(field)
             if value:
+                from_id, to_id = relation_endpoints(slug, kind, str(value))
                 relations.append({
-                    "from_id": slug,
-                    "to_id": str(value),
+                    "from_id": from_id,
+                    "to_id": to_id,
                     "kind": kind,
                     "note": "",
                     "order": 1,

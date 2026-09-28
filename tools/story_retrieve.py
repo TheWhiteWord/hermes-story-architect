@@ -13,7 +13,8 @@ import json
 from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
-from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+from core.entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS as REVERSED_KINDS,
+                          _RELATION_FIELDS)
 
 SCHEMA = {
     "description": "Read one or more entities: their field values and section prose, plus which "
@@ -46,10 +47,6 @@ SCHEMA = {
     },
     "required": ["project", "entity_type", "id"],
 }
-
-# Relations stored from the opposite side: a scene's characters are the
-# character_scene rows pointing AT it, not rows it owns.
-REVERSED_KINDS = {"character_scene"}
 
 def _columns(conn) -> list:
     # Never cached across calls: tests and the dashboard use different databases

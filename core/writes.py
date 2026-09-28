@@ -285,7 +285,8 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                     schema.get(key, {}).get("type") == "number"
                 ) else value
 
-        from .entity import _RELATION_FIELDS
+        from .entity import (REVERSED_RELATION_KINDS, _RELATION_FIELDS,
+                             relation_endpoints)
         rel_fields = _RELATION_FIELDS.get(entity_type, {})
 
         # ── Reject what cannot be applied, BEFORE writing anything ──
@@ -337,9 +338,12 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
         for field, (kind, is_list) in rel_fields.items():
             if field not in data:
                 continue
-            # Delete old relations of this kind for this entity
+            # Delete old relations of this kind for this entity. The key column
+            # follows the stored direction — a reversed kind (a scene's cast) is
+            # keyed on to_id, not from_id. See entity.relation_endpoints.
+            own_col = "to_id" if kind in REVERSED_RELATION_KINDS else "from_id"
             conn.execute(
-                "DELETE FROM relations WHERE from_id=? AND kind=?", (entity_id, kind)
+                f"DELETE FROM relations WHERE {own_col}=? AND kind=?", (entity_id, kind)
             )
             value = data[field]
             if is_list:
@@ -347,22 +351,24 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                     continue
                 for i, beat in enumerate(value):
                     if isinstance(beat, dict):
-                        to_id = beat.get("scene_id", str(beat))
+                        target = beat.get("scene_id", str(beat))
                         note = beat.get("description", "")
                     else:
-                        to_id = str(beat)
+                        target = str(beat)
                         note = ""
-                    if to_id:
+                    if target:
+                        from_id, to_id = relation_endpoints(entity_id, kind, target)
                         conn.execute(
                             "INSERT INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
-                            (entity_id, to_id, kind, note, i + 1)
+                            (from_id, to_id, kind, note, i + 1)
                         )
             else:
                 # Non-list: single string value
                 if value:
+                    from_id, to_id = relation_endpoints(entity_id, kind, str(value))
                     conn.execute(
                         "INSERT INTO relations (from_id, to_id, kind) VALUES (?, ?, ?)",
-                        (entity_id, str(value), kind)
+                        (from_id, to_id, kind)
                     )
             applied_relations.append(field)
 
@@ -593,6 +599,13 @@ def delete_entity(project_path: Path, entity_type: str, slug: str,
 
 # ─── reorder ───
 
+# Entity types reorder can renumber. Declared here, next to the function that
+# enforces it, and imported by the draft validator so a type that stages is a
+# type that commits — the two checks used to disagree, and the disagreement
+# only surfaced as a raw ValueError after the user had approved the preview.
+REORDERABLE_TYPES = ("scene", "sequence")
+
+
 def reorder(project_path: Path, entity_type: str, ordered_ids: list,
             summary: str) -> dict:
     """Renumber scenes/sequences within their parent.
@@ -603,7 +616,7 @@ def reorder(project_path: Path, entity_type: str, ordered_ids: list,
     """
     from .db import get_db
 
-    if entity_type not in ("scene", "sequence"):
+    if entity_type not in REORDERABLE_TYPES:
         raise ValueError(f"Reorder not supported for {entity_type}")
     if not ordered_ids:
         raise ValueError("ordered_ids required for reorder")

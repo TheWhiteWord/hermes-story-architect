@@ -151,21 +151,25 @@ class TestEditEntity:
         assert body and body[0][0] == "A low room."
 
     def test_relation_field_rewrites_only_its_own_kind(self, fixture_path):
-        """Writing a scene's cast must not disturb existing relations."""
+        """Writing a scene's cast must not disturb existing relations.
+
+        The scene's cast rows are keyed on to_id (character→scene, the
+        importer's direction), so the delete is keyed there too. Keying the
+        delete on from_id would leave the old cast in place and append a
+        second copy of the new one.
+        """
         before = _q(fixture_path, "SELECT from_id, to_id, kind FROM relations ORDER BY from_id, to_id")
         writes.edit_entity(fixture_path, "scene", "central-room-day",
                            {"characters": ["mira"]}, "recast")
-        # The new rows are owned by the scene; the pre-existing character→scene
-        # rows point the other way and must be untouched.
         owned = [r[0] for r in _q(
             fixture_path,
-            "SELECT to_id FROM relations WHERE from_id=? AND kind='character_scene'",
+            "SELECT from_id FROM relations WHERE to_id=? AND kind='character_scene'",
             ("central-room-day",))]
         assert owned == ["mira"]
         survivors = [r for r in _q(
             fixture_path, "SELECT from_id, to_id, kind FROM relations ORDER BY from_id, to_id")
-            if r[0] != "central-room-day"]
-        assert survivors == [r for r in before if r[0] != "central-room-day"]
+            if r[1] != "central-room-day"]
+        assert survivors == [r for r in before if r[1] != "central-room-day"]
 
     def test_response_names_what_landed(self, fixture_path):
         result = writes.edit_entity(

@@ -65,6 +65,8 @@ def validate_ops(ops) -> list[dict]:
     if not isinstance(ops, list) or not ops:
         raise DraftError("`ops` must be a non-empty list of op objects.")
 
+    from .writes import REORDERABLE_TYPES
+
     for i, op in enumerate(ops):
         where = f"ops[{i}]"
         if not isinstance(op, dict):
@@ -108,6 +110,16 @@ def validate_ops(ops) -> list[dict]:
             not isinstance(op["ordered_ids"], list) or not op["ordered_ids"]
         ):
             raise DraftError(f"{where}.ordered_ids must be a non-empty list of ids.")
+        if kind == "reorder" and op["entity_type"] not in REORDERABLE_TYPES:
+            # Refused here, not at commit. A reorder the write path cannot do
+            # rendered a full preview and blew up on commit with a raw
+            # ValueError, so the confirmation step promised something the
+            # commit would refuse. Stage is the last place the agent can be
+            # told, and the same place every other bad shape is caught.
+            raise DraftError(
+                f"{where}: cannot reorder {op['entity_type']}. "
+                f"Reorder works for: {', '.join(sorted(REORDERABLE_TYPES))}."
+            )
     return ops
 
 
@@ -599,19 +611,23 @@ def _render_create(op: dict) -> list[str]:
     enumerating sixteen empty fields buries the six that matter. Only
     non-computed fields count — a computed field was never offered to the
     model, so including it would inflate the denominator.
+
+    The numerator counts the keys the op actually set, NOT keys holding a
+    value that differs from their schema default. The two are not the same:
+    `type: "act"` is set and its default is "act", so a default comparison
+    called a fully-filled act "7 of 8" and left the reader unable to tell a
+    complete entity from one missing a field. Default-equal is still a
+    deliberate choice, and the table below shows every key regardless.
     """
     entity_type, entity_id = op["type"], op["id"]
     fm = op["frontmatter"]
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     settable = {f: m for f, m in schema.items() if not m.get("computed")}
-    # A draft is expected to be thin, so this count is the informative part.
-    # Only non-computed fields count: the model was never offered the others,
-    # so including them would inflate the denominator.
-    unset = sum(1 for f, m in settable.items() if _empty(fm.get(f, m["default"]), m))
+    set_count = sum(1 for f in settable if _is_set(fm.get(f)))
 
     out = [f"**＋ NEW {entity_type.upper()}** · `{entity_type}/{entity_id}`"]
-    if unset:
-        out[0] += f"  ·  {len(settable) - unset} of {len(settable)} fields set"
+    if set_count < len(settable):
+        out[0] += f"  ·  {set_count} of {len(settable)} fields set"
     if fm:
         out += ["", "| field | value |", "|---|---|"]
         out += [f"| {field} | {_fmt(value)} |" for field, value in fm.items()]
@@ -657,7 +673,7 @@ def _section_note(entity_type: str, field: str, before, after) -> str:
         return f"`{field}` — new section, {n} line{'' if n == 1 else 's'}."
     was, now = len(before.splitlines()), len(after.splitlines())
     if was == now:
-        return f"`{field}` — rewritten, {now} lines."
+        return f"`{field}` — rewritten, {now} line{'' if now == 1 else 's'}."
     arrow = f"{was} → {now} lines"
     if field == "Content":
         # Only claim cues were added when they were: the count going *down*
@@ -677,10 +693,16 @@ def _render_edit(project_path: Path, op: dict) -> list[str]:
     out = [f"**✏ EDIT** · `{op['entity_type']}/{op['entity_id']}`"]
     changes = _current_values(project_path, op)
     for field, value in op["data"].items():
-        before = changes.get(field, (None, None))[0]
+        before, stored_in = changes.get(field, (None, None))
         if before == value:
             continue
-        if isinstance(value, str) and "\n" in value:
+        # A section body is fenced however short it is, and so is any value
+        # with real newlines (a multi-line address in `extra`, say). The test
+        # is where the value lives, not what it contains: a one-line `Notes`
+        # body has no newline, and guessing from content rendered it as a
+        # `before → after` scalar while the same section on a create was
+        # fenced. One rule, so the next short section cannot fall through it.
+        if stored_in == "section" or (isinstance(value, str) and "\n" in value):
             out += [_section_note(op["entity_type"], field, before, value), ""]
             out += _fence(value, _fence_lang(op["entity_type"], field))
             out.append("")
@@ -709,7 +731,8 @@ def _current_values(project_path: Path, op: dict) -> dict:
         )
     except Exception:
         return {}
-    return {c["field"]: (c.get("from"), c.get("to")) for c in result.get("changes", [])}
+    return {c["field"]: (c.get("from"), c.get("stored_in"))
+            for c in result.get("changes", [])}
 
 
 def _render_reorder(op: dict) -> list[str]:
@@ -780,3 +803,15 @@ def _empty(value, meta: dict) -> bool:
     if value is None or value == "" or value == [] or value == {}:
         return True
     return value == meta.get("default")
+
+
+def _is_set(value) -> bool:
+    """A field the op filled, for the preview's `N of M fields set` count.
+
+    Presence, not default-divergence: `type: "act"` is explicitly set even
+    though "act" is also its default, and _empty() called that "unset" — so a
+    fully-filled act read "7 of 8" and the reader could not tell a complete
+    entity from one missing a field. A key present but blank is still unset;
+    that is an author leaving a field empty, not filling it with its default.
+    """
+    return not (value is None or value == "" or value == [] or value == {})

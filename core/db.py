@@ -986,15 +986,11 @@ def get_dashboard_data(project_path: Path) -> dict:
         variant_map = {}  # entity_id → variant_of (location_variant / world_variant)
         for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
-                # Relation may be stored character→scene OR scene→character
-                # (direction depends on who wrote it). Detect by checking
-                # which side is a character vs scene entity.
-                if from_id in entity_by_id and entity_by_id[from_id]["type"] == "character":
-                    scene_chars.setdefault(to_id, []).append(from_id)
-                    char_scenes.setdefault(from_id, []).append(to_id)
-                elif to_id in entity_by_id and entity_by_id[to_id]["type"] == "character":
-                    scene_chars.setdefault(from_id, []).append(to_id)
-                    char_scenes.setdefault(to_id, []).append(from_id)
+                # Stored character→scene, so the scene is to_id. The old
+                # direction-sniffing here papered over story_draft writing it
+                # the other way; the writer now matches every other row.
+                scene_chars.setdefault(to_id, []).append(from_id)
+                char_scenes.setdefault(from_id, []).append(to_id)
             elif kind == "location_scene":
                 scene_locs.setdefault(to_id, []).append(from_id)
             elif kind in ("plot_setup", "plot_crisis", "plot_climax", "plot_payoff"):

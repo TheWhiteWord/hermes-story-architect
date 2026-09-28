@@ -14,6 +14,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+from core.constants import ENTITY_SCHEMAS  # noqa: E402
 from core.drafts import commit, render_preview_md, stage, validate_shape  # noqa: E402
 
 BATCH = [
@@ -63,6 +64,30 @@ def test_the_count_never_enumerates_the_empty_fields(fixture_path):
     md = stage(fixture_path, BATCH, "The Telling")["preview_md"]
     header = md.split("\n")[4]
     assert "unset" not in header and "missing" not in header
+
+
+def test_a_field_set_to_its_own_default_still_counts_as_set(fixture_path):
+    """A fully-filled entity must not read as one field short.
+
+    `_empty()` treats a value equal to its schema default as unfilled, which is
+    right for `unfilled_fields` but wrong here: `type: "act"` is explicitly
+    set and "act" is also its default, so every complete act rendered "7 of 8"
+    and a complete character rendered no count at all. Presence is the test.
+    """
+    act = {f: m["default"] for f, m in ENTITY_SCHEMAS["act"].items()
+           if not m.get("computed")}
+    md = stage(fixture_path, [{"op": "create", "type": "act", "id": "a-full",
+                               "frontmatter": act, "summary": "s"}],
+               "a complete act")["preview_md"]
+    assert "fields set" not in md.split("\n")[4]
+
+    # `title`'s default is "", so it is not a set field — only `type` and
+    # `order` carry a value. 2 of 8, and both of those equal their defaults.
+    thin = {f: act[f] for f in ("type", "order")}
+    md = stage(fixture_path, [{"op": "create", "type": "act", "id": "a-thin",
+                               "frontmatter": thin, "summary": "s"}],
+               "a thin act")["preview_md"]
+    assert "2 of 8 fields set" in md
 
 
 def test_an_edit_renders_one_line_per_changed_field(fixture_path):
@@ -116,6 +141,23 @@ def test_a_multi_line_section_change_is_stated_then_fenced(fixture_path):
     assert "`Content` —" in md
     assert "~~" not in md.split("```fountain")[0]  # no struck-through body
     assert "```fountain\nINT. ROOM - NIGHT" in md
+
+
+def test_a_one_line_section_is_still_fenced(fixture_path):
+    """A section is fenced by where it lives, not by whether it has newlines.
+
+    `Notes` with a single line has no `\\n`, and the renderer used to decide
+    from content alone — so the same section was fenced on a create and
+    rendered as a `before → after` scalar on an edit. Two shapes for one
+    thing, and the short one was the broken one.
+    """
+    op = {"op": "edit", "entity_type": "scene", "entity_id": "central-room-day",
+          "data": {"Notes": "Do not cut the pause before she answers."},
+          "summary": "one line of prose"}
+    md = stage(fixture_path, [op], "a note")["preview_md"]
+    assert "`Notes` —" in md
+    assert "```\nDo not cut the pause before she answers." in md
+    assert "`Notes`: _not set_ →" not in md
 
 
 def test_a_scalar_field_still_renders_before_after(fixture_path):
