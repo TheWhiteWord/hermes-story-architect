@@ -45,31 +45,82 @@ if there is a generated id to put in it.
 
 ---
 
-## Step 1 — delete the compatibility shims
+## Step 1 — delete the compatibility shims — **BUILT, with two corrections**
 
-**Why first:** they are complexity guarding a constraint that no longer exists,
-they are independent of everything else, and the test suite is a sufficient
-check.
+**Two of the three were safe. One was not, and checking first is what caught
+it.** The plan below originally called all three deletions and claimed the test
+suite was a sufficient check. Both statements were wrong, and the corrections
+are recorded here rather than quietly applied.
 
-Measured across every `story.db` on the machine: all three real databases
-already carry `is_deleted`/`deleted_at`, **none** has a `drafts` table, and
-**zero** number-typed fields are stored as a string.
+### Correction 1 — `drafts` was the ONLY table not in `SCHEMA_SQL`
 
-| delete | where | why it is dead |
-|---|---|---|
-| `ensure_soft_delete_columns` | `core/db.py:125-134`, called at `:84` | every real DB has the columns; `SCHEMA_SQL` gives them to a fresh one |
-| `ensure_drafts_table` | `core/db.py:149-160`, called at `:78` | no real DB has the table; drafts are transient |
-| the read half of `_coerce_number` | `core/db.py:302-325`, used at `:346` and `:1328` | zero string-in-number rows anywhere. **Keep the write-side fix** at `writes.py:270-274` — that is the one doing real work. |
+```
+tables SCHEMA_SQL creates: ['entities', 'relations', 'sections']
+tables DRAFTS_SQL creates: ['drafts']
+```
 
-**Check:** the suite passes at 889, and `save-the-children` still imports,
-exports and re-imports (`test_round_trip.py` covers exactly that).
+`ensure_drafts_table` was not merely redundant — it was the **sole creator** of
+the table. Deleting it as written broke draft staging on every fresh project,
+and **no test caught it**, because every test uses a fixture whose database the
+shim had already prepared.
 
-**Risk:** low, and the failure mode is loud — a missing column raises
-`no such column` immediately on the first read, which is what these shims were
-written to prevent. A test that passes while a shim was needed would be a test
-that never reads the column.
+Two tests guarded it, not one. `test_legacy_db_migration.py` and
+`test_drafts.py` ("Guard 7"), both constructing a database from before draft
+staging existed. **I had not read either file before writing this plan.**
+
+### Correction 2 — `_coerce_number` is NOT legacy, it is load-bearing
+
+`create_project` **does not coerce** `number` fields; only `edit_entity` does
+(the write-side fix at `writes.py:270-274`). Measured:
+
+```
+create_project with act_count='5'  ->  stored: '5'  type=str
+   get_dashboard_data: OK, act_count=5        <- only because _coerce_number ran
+edit_entity with act_count='5'     ->  stored: 5   type=int
+```
+
+So the read half is the **only** thing standing between a string `act_count`
+and `max('3', 3)` taking the dashboard down — the original B10 symptom, still
+reachable. The justification for deleting it was "zero string-in-number rows
+exist", which is true of the *fixtures* and irrelevant: `create_project` writes
+one on demand.
+
+**Kept.** The real defect is the asymmetry, and the honest fix is to make
+`create_project` coerce like every other write path — one call, at the same
+place `edit_entity` does it. Filed as a new entry rather than smuggled in here.
+
+### What was actually deleted
+
+| | |
+|---|---|
+| `DRAFTS_SQL` | folded into `SCHEMA_SQL` — it is a table like any other, and `create_schema` is called by `create_project` (`writes.py:45`), `create_entity` (`:119`) and `story_import` (`:157`) |
+| `ensure_drafts_table` | deleted, and its call removed from `get_db` |
+| `ensure_soft_delete_columns` | deleted as a function; the two `ALTER TABLE` lines inlined into `get_db`, which every caller reaches first — including read-only tools, the ones that never call `create_schema` |
+| `_coerce_number` | **kept** — see Correction 2 |
+
+`core/db.py`: **49 lines deleted, 26 added.** Net −23.
+
+### Tests
+
+- `test_legacy_db_migration.py` — the drafts test **deleted**; the other two
+  kept (one guards a *column*, which `ALTER TABLE` is still needed for; one
+  guards a fresh folder). The module docstring now says why the drafts half
+  went and why the column half stayed.
+- `test_drafts.py` — "Guard 7" **replaced**, not just deleted, with
+  `test_drafts_table_exists_on_a_fresh_project`: a real `create_project()`
+  database has the table and staging works against it. That is the case that
+  can actually happen, and it would fail if the shim were removed without
+  moving `DRAFTS_SQL`.
+- `test_soft_delete.py` — two tests rewritten off the deleted function onto
+  `get_db`, which is where the repair lives. `test_migration_is_idempotent`
+  now asserts the columns appear exactly once after two opens, rather than
+  calling a function twice.
+
+**Suite: 891 → 890.** One test removed and one added, net −1, and the two
+rewritten ones now exercise the real path.
 
 ---
+
 
 ## Step 2 — drop the arc_beat composite id  ← *fixes a reproduced bug*
 

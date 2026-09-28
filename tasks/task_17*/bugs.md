@@ -91,7 +91,7 @@ fewer.**
 |---|---|---|
 | 1 | **B6** — `REQUIRED_FIELDS` derived from the schema | **done, 891 pass** |
 | 2 | **B12** — placeholder defaults out of the data; one voice for "not set" | plan ready, not built (`b12_plan.md`) |
-| 3 | **D5 step 1** — delete three compatibility shims | sequenced, not built |
+| 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **D5 step 2** — drop the arc_beat composite id | sequenced, not built — **fixes a reproduced silent wrong-entity write** |
 | 5 | **D5 steps 3–5** — one name for the op, generated ids, title filenames | sequenced, not built |
 
@@ -112,7 +112,7 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B4 / B5 | `stored_as` was guessed from the field's *name*, so `plot.characters` was called a relation when it is `extra`. Now derived from the declared maps, plus a new `is_reference` flag marking all 21 references. | `780b426` |
 | I4 | `chars`/`loc` dropped. They cost 12 tokens (0.7% of the payload) and bought a second vocabulary. The 12.9k in the redesign spec is for the whole redesign, not these two keys. | `ce799d2` |
 | D1a | `story_draft` skipped validation for every non-`create` op, so a preview could promise a change that was then dropped. Computed-field writes are now refused at preview. | `8ec315c` |
-| B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. | — |
+| B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. **Partly reopened as B13** — `create_project` never coerced at all. | — |
 | I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
 | B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
@@ -139,6 +139,7 @@ valuable part, and because the next keeper will suspect them again.
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
+| **B13** | `create_project` does not coerce `number` fields — only `edit_entity` does. B10's fix was applied to one write path and not the other. | The read-side `_coerce_number` is the only thing preventing `max('3', 3)` from taking the dashboard down. Found 2026-09-28 while deleting the compat shims it was nearly deleted with. |
 | **B12** | The enum check rejects the schema's **own placeholder defaults**. Eleven optional fields default to a prose placeholder (`'Not set'`, `'Arc type not set'`, …) that is not in the valid set, so every `character`, `plot` and `project` create reports 1–3 findings that mean nothing. Found while measuring B6; **not** part of it. **Plan ready, not built** — see `b12_plan.md`. | Same harm as B6, much wider blast radius — it fires on the three most-used entity types. Noise that trains the agent to ignore `validation`, which is the one thing `validation` exists to prevent. |
 | **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
 | **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
@@ -765,6 +766,52 @@ duplication is pre-existing and outside this fix.
 
 **The two remaining findings on a minimal arc beat are B12**, not this entry.
 See below.
+
+---
+
+## B13. `create_project` never coerced a `number` field — **OPEN, found 2026-09-28**
+
+**B10's fix, applied to one write path and not the other.** Found while
+deleting the compatibility shims — `_coerce_number`'s read half was on the
+deletion list and was nearly removed as "legacy". It is not legacy. It is
+currently the only thing standing between a string `act_count` and the
+dashboard dying.
+
+**Measured.**
+
+```
+create_project(act_count='5')  ->  stored '5'  (str)
+   get_dashboard_data            ->  act_count=5   <- only because _coerce_number ran
+edit_entity(act_count='5')      ->  stored 5     (int)
+```
+
+`edit_entity` coerces at `writes.py:270-274`. `create_project`
+(`writes.py:25-83`) merges frontmatter over schema defaults and hands it
+straight to `columns_for_insert` — no coercion anywhere on that path.
+
+**Why it is not currently breaking anything.** `project.act_count` defaults to
+`3` (an int), so a project created without specifying it stores an int. The
+string only appears when the caller passes one — which the live test did, and
+which produced B10 in the first place. So the bug is latent and reachable, not
+hypothetical: one `create_project(..., act_count="3")` away.
+
+**Two fixes, and the second is the real one.**
+
+1. **Coerce in `create_project`** — the same four lines `edit_entity` has, at
+   the same place. This stops new data being wrong.
+2. **Make the coercion shared.** Two copies of the same four lines in two
+   write paths is how they drifted in the first place, and a third path will
+   eventually arrive. The lazy version is one helper in `core/entity.py` called
+   from both — the schema is already available at both call sites.
+
+**Do (2) and (1) together, or (2) alone.** With a shared helper in both
+paths, `_coerce_number`'s read half is still worth keeping until no project can
+hold a string — measured across the real databases, none does, so it becomes
+removable the moment both write paths agree. **Do not delete the read half
+first**: that is the mistake this entry exists to prevent.
+
+**Check:** `create_project` with a string `act_count` stores an int, and
+`get_dashboard_data` returns one without needing the read-side coercion.
 
 ---
 
