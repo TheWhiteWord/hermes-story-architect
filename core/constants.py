@@ -120,7 +120,6 @@ ENTITY_SCHEMAS = {
         "act_count": {"type": "number", "default": 3, "optional": True, "description": "Number of acts in story structure (default 3, auto-adjusts upward if more act files exist)"},
     },
     "scene": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug reflecting dramatic function (e.g., 'mara-discovers-files'), NOT the physical heading"},
         "type": {"type": "string", "default": "scene", "optional": False, "description": "Always 'scene'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name (freely editable) reflecting dramatic function"},
         "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the scene"},
@@ -145,7 +144,6 @@ ENTITY_SCHEMAS = {
         "is_story_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as the story's climax"},
     },
     "sequence": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug"},
         "type": {"type": "string", "default": "sequence", "optional": False, "description": "Always 'sequence'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent act (float for insertions)"},
@@ -158,7 +156,6 @@ ENTITY_SCHEMAS = {
         "purpose": {"type": "string", "default": "", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
     },
     "act": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug"},
         "type": {"type": "string", "default": "act", "optional": False, "description": "Always 'act'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name. Use 'Act I', 'Act II', 'Act III', etc."},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within story (float for insertions)"},
@@ -169,7 +166,6 @@ ENTITY_SCHEMAS = {
         "act_objective": {"type": "string", "default": "", "label": "Objective", "optional": True, "description": "Protagonist's immediate goal for this act"},
     },
     "arc_beat": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Beat slug (unique within character)"},
         "character": {"type": "string", "default": "", "optional": False, "description": "Character slug this beat belongs to"},
         "scene": {"type": "string", "default": "", "optional": False, "description": "Scene slug where this beat occurs"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within character's arc"},

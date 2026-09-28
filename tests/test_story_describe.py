@@ -187,10 +187,17 @@ class TestStorageLabelsAreTrue:
 
     def test_an_id_is_not_a_reference(self):
         """`id` says "slug" because it IS one. Calling it a reference to
-        another entity would be wrong in the other direction."""
-        out = _handler({})["entity_schemas"]
+        another entity would be wrong in the other direction.
+
+        No schema declares `id` any more — the row key is the id, so a declared
+        field could only ever render blank. The guard below therefore has nothing
+        left to act on today, and stays only as a backstop should one reappear.
+        """
+        from core.constants import ENTITY_SCHEMAS
         for et in ("scene", "act", "arc_beat"):
-            assert not out[et]["id"].get("is_reference"), et
+            assert "id" not in ENTITY_SCHEMAS[et], (
+                f"{et} declares an id field, which the write path discards "
+                f"and the read path can only render empty")
 
     def test_a_plain_value_is_not_labelled(self):
         """`name`, `order`, `status` are columns like everything else; saying so
@@ -253,6 +260,9 @@ class TestOneVocabularyAcrossReadAndWrite:
         # `milestone` is the load payload's own climax marker, deliberately not
         # a stored field — the spec derives it from four scene booleans.
         known |= {"milestone"}
+        # `id` is the entity's own key, not a field: it identifies the node
+        # rather than describing it, and no schema declares it.
+        known |= {"id"}
 
         def walk(node, is_entity=False):
             if isinstance(node, dict):
