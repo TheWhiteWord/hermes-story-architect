@@ -73,7 +73,66 @@ leaves the trap in place.
 
 ---
 
-## B1. `commit` sometimes reports failure for a commit that succeeded
+## Status index
+
+Last reconciled **2026-09-28**, after B8 / B4 / B5 / I3 / I4 / I5 / D1a / B11
+were closed. Entries are not deleted when superseded — a wrong diagnosis that
+vanishes is worth nothing — so the original text stays under its correction.
+
+### Fixed
+
+| id | what | commit |
+|---|---|---|
+| B8 | `location_scene` relation now written on create and edit. **The recorded symptom was wrong** (the orphan check tests `world`, not scenes); the real cost was an empty location→scenes view in the dashboard. | `c8c31c3` |
+| B4 / B5 | `stored_as` was guessed from the field's *name*, so `plot.characters` was called a relation when it is `extra`. Now derived from the declared maps, plus a new `is_reference` flag marking all 21 references. | `780b426` |
+| I4 | `chars`/`loc` dropped. They cost 12 tokens (0.7% of the payload) and bought a second vocabulary. The 12.9k in the redesign spec is for the whole redesign, not these two keys. | `ce799d2` |
+| D1a | `story_draft` skipped validation for every non-`create` op, so a preview could promise a change that was then dropped. Computed-field writes are now refused at preview. | `8ec315c` |
+| B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. | — |
+| I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
+| B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
+
+### Resolved by investigation — not bugs
+
+These were investigated and dismissed. Kept because the reasoning is the
+valuable part, and because the next keeper will suspect them again.
+
+| id | finding |
+|---|---|
+| D3 | **Not a defect.** The nine undeclared link fields (`scene.act_id`, `arc_beat.scene`, `plot.characters`, …) are documented as `extra` in `task_20/archived/data_model.md`, and the `act_id`/`sequence_id` redundancy is deliberate — see `verification_findings.md:45`. Columns are the load payload's spine, `extra` holds the rest *including links*, relations are many-to-many. Under that rule all nine are correct. **D3 is closed.** |
+| D2 (naming) | **Not a defect.** `story_load` emits `chars`/`loc` for token cost (the redesign spec's first principle) and `story_describe` uses the names `story_draft` takes, where `edit_entity` rejects unknown keys by design. Neither side can be renamed. Resolved as a bridge (I3), then the bridge was deleted when the abbreviations went (I4). |
+| B3 | **Not a bug.** `has_database: db.exists()` on a markdown-only project reports `false`, which is accurate — there is genuinely no database. Recorded so it is not re-investigated. |
+| `id` vs `slug` | **Both correct, in different places.** `id` is the column, `slug` is the op argument (`{op, type, slug, data}`), and `FIELDS_TO_SKIP` keeps `id` out of writes deliberately. Documented, not renamed. |
+| B8's original symptom | The orphan-check claim could not be reproduced. The check tests `world`. Correction is in the B8 entry above the original text. |
+| D3's `location_scene` symptom | Same shape as B8 — the write was missing, the symptom was not where it was recorded. |
+
+### Still open
+
+| id | what | why it matters |
+|---|---|---|
+| **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
+| **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
+| **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
+| **B6** | `arc_beat` demands a frontmatter `id` the write path ignores. **Verified still present**: `REQUIRED_FIELDS["arc_beat"]` in `core/constants.py:32` still lists `"id"`. A false positive, but it fires on every arc beat, so every arc draft shows three findings that mean nothing. | Noise that trains the agent to ignore findings. |
+| **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
+| **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
+
+### Deliberately not done
+
+- **Inline-cue near-miss** (`MIRA: You knew?`) and the other adjacency checks
+  B11 originally proposed. Real, but cosmetic: they become `action` and still
+  render. Restating the spec in code would mean two things to update when the
+  format evolves — the silent failures are the ones worth a check.
+
+### The lesson from this round
+
+Three of the diagnoses above were **wrong before measurement corrected them**
+(the nine `extra` links, B8's orphan symptom, and the "load-bearing" 12.9k
+figure). In each case the repo already had the answer written down in
+`task_20/`. **Check the design docs before calling something a defect.**
+
+---
+
+## B1. `commit` sometimes reports failure for a commit that succeeded — **OPEN**
 
 **Severity: high.** A successful write reported as a failure. **Intermittent.**
 
@@ -121,7 +180,7 @@ upstream with B2, and the two are likely one defect.
 
 ---
 
-## B2. Objects nested inside array arguments lose their keys
+## B2. Objects nested inside array arguments lose their keys — **OPEN**
 
 **Severity: high, but not ours to fix.**
 
@@ -157,7 +216,7 @@ whatever the schema implies, and the schema implies a native array.
 
 ---
 
-## B3. `list_projects` reports `has_database: false` for a markdown-only project
+## B3. `list_projects` reports `has_database: false` for a markdown-only project — **NOT A BUG**
 
 **Severity: none — correct behaviour, recorded so it is not re-investigated.**
 
@@ -175,7 +234,7 @@ tools for real.
 
 ---
 
-## I1. Scene script content is not presented as a screenplay
+## I1. Scene script content is not presented as a screenplay — **RESOLVED (render side)**
 
 **Superseded in part by B11.** The rendering half stands; the *detection* half
 now has a fuller answer, and the two should be read together.
@@ -239,7 +298,7 @@ readouts, which strengthens the case for one shared renderer (B11).
 
 ---
 
-## I2. Nested object fields render as a raw Python dict repr
+## I2. Nested object fields render as a raw Python dict repr — **OPEN**
 
 **Found:** 2026-09-28, staging a `relationship`.
 
@@ -329,7 +388,7 @@ up — and the label was the only place the disagreement was visible.
 
 ---
 
-## B4 / B5 (original entries)
+## B4 / B5 (original entries) — **SUPERSEDED by the entry above**
 
 ### B4. `stored_as: relation` is advertised for fields that store in `extra`
 
@@ -438,7 +497,7 @@ decorative and the comment should go.
 
 ---
 
-## B6. `arc_beat` requires an `id` in frontmatter that the write path ignores
+## B6. `arc_beat` requires an `id` in frontmatter that the write path ignores — **OPEN**
 
 **Severity: low, and a false positive** — but it fires on every arc beat, so
 every arc draft shows three findings that mean nothing.
@@ -495,7 +554,7 @@ any type, not just arc_beat.
 
 ---
 
-## B7. `story_describe` hides `sub_fields`, and nothing guards the shape
+## B7. `story_describe` hides `sub_fields`, and nothing guards the shape — **FIXED (read side)**
 
 **Severity: high, and the root cause is the tool's, not the author's.** A read
 tool dies on data the schema permits the agent to write, because the agent was
@@ -582,7 +641,7 @@ map rather than an error. That closes the gap that let this ship.
 
 ---
 
-## B8. A scene's location is invisible to every relation-based reader
+## B8. A scene's location is invisible to every relation-based reader — **FIXED 2026-09-28**
 
 **Severity: medium. FIXED 2026-09-28 — but the symptom originally recorded
 below was wrong, and the correction comes first.**
@@ -687,7 +746,7 @@ that makes an equality check miss. Worth folding into the same pass.
 
 ---
 
-## B9. `sub_fields` is dropped by `story_describe` for every field that has it
+## B9. `sub_fields` is dropped by `story_describe` for every field that has it — **FIXED (read side)**
 
 **Severity: high. One root cause, five fields, two failure modes.** This is the
 general case of B7; that entry is kept because the crash it causes is the most
@@ -780,12 +839,12 @@ Investigated without assuming a conclusion. **The premise turned out to be
 partly wrong, and the real finding is narrower and more actionable.** Recorded
 before any decision, so the reasoning is auditable.
 
-## What I expected to find
+### What I expected to find
 
 Two competing authorities per link type, each with readers that picked one.
 Pick the winner per link, derive the other, done.
 
-## What is actually there
+### What is actually there
 
 **1. Every declared link is unambiguous — the overlap is one field.**
 `ENTITY_COLUMN_MAP` and `_RELATION_FIELDS` never both claim the same field.
@@ -865,7 +924,7 @@ inconsistency: same field, same entity, two mechanisms.
 > `task_20/archived/verification_findings.md:45`. **Nothing here needs fixing.**
 > Full assessment in the section that follows.
 
-## What follows
+### What follows
 
 - **The authority question is already answered by the existing code** — single
   links in columns, multi-links-with-metadata in relations. Nothing needs
@@ -887,7 +946,7 @@ surfaced — the ones that make an agent slow, wrong, or uncertain, and that
 would do the same to a human writing the same data. They are collected here
 because fixing one symptom at a time leaves the cause in place.
 
-## Are the nine undeclared link fields undeclared BY DESIGN? (assessed 2026-09-28)
+### Are the nine undeclared link fields undeclared BY DESIGN? (assessed 2026-09-28)
 
 **Yes — by design, and documented. This is not an oversight, and "fixing" them
 would be a regression.** The question was worth asking separately, and the
@@ -1100,9 +1159,15 @@ so that entry needs updating. Left unedited here to keep this commit to code.
 
 ---
 
-## I3. The two vocabularies were never bridged
+## I3. The two vocabularies were never bridged — **SUPERSEDED by I4**
 
-One sentence per tool description, which is the whole fix:
+**Kept for the reasoning, not the fix.** The bridge sentences below were the
+right answer to the wrong question: I4 removed the need for them by dropping
+`chars`/`loc` altogether, so the two vocabularies no longer differ. The
+measurement that superseded this is in I4; the table explaining why neither
+side could be renamed is still the reason the write vocabulary is exact.
+
+The fix as first written (one sentence per tool description):
 
 - `story_load`: *"Abbreviated keys `chars` and `loc` are the links
   `story_describe` calls `characters` and `location`."*
@@ -1142,7 +1207,7 @@ column or the op arg, which is a data-model change and not made here.
 
 ---
 
-## D2. `story_load` and `story_describe` use different names for the same links
+## D2. `story_load` and `story_describe` use different names for the same links — **RESOLVED; see the status index**
 
 **Found 2026-09-28, while fixing B4/B5. Raised as a question: should the
 descriptions change so the model's two vocabularies line up? Answer below.**
@@ -1245,7 +1310,11 @@ question about the *write* path, not the read path.
 
 ---
 
-## D1. The tool cannot show the agent the shape of a structured value
+## D1. The tool cannot show the agent the shape of a structured value — **READ SIDE FIXED; write side is D4**
+
+**`story_describe` now emits every schema key, including `sub_fields`**
+(`commit` for that fix is folded into B7/B9 above). What remains is the
+write side: nothing validates a structured value at write time. That is D4.
 
 **The pattern.** `ENTITY_SCHEMAS` documents shape with `sub_fields` (B9) and
 `stored_as` (B4). `story_describe` copies `type`, `default`, `optional` and
@@ -1269,7 +1338,11 @@ half a schema. Whatever the schema asserts about a field is only true of the
 
 ---
 
-## D2. One concept, two names, and the schema is not the one that wins
+## D2. One concept, two names, and the schema is not the one that wins — **RESOLVED ABOVE**
+
+**Investigated and closed: not a defect.** The corrected analysis is in the
+D2 entry above, under the status index. Neither side could be renamed, and
+the `chars`/`loc` half was resolved by deleting the abbreviations (I4).
 
 **The pattern.** `perspective` vs `perspectives`. `gap` (the field) vs `The
 Gap` (the section). `op` vs `summary` vs `entity_id` across four op kinds.
@@ -1293,7 +1366,12 @@ distinction visible — visibility first, renaming second.
 
 ---
 
-## D3. The same link is expressible two ways, and readers disagree
+## D3. The same link is expressible two ways, and readers disagree — **NOT A DEFECT**
+
+**Investigated and closed.** The nine undeclared link fields are documented as
+`extra` and the redundancy is deliberate. The full assessment, with the two
+pieces of evidence, is in the D3 assessment above. B8 was the one real defect
+in this area and it is fixed.
 
 **The pattern, and it is the widest one here.** A scene's location is a
 `location_id` column *and* — in the reference corpus — a `location_scene`
@@ -1320,7 +1398,13 @@ correct by construction instead of by having chosen the right source.
 
 ---
 
-## D4. No shape validation at write time for structured values
+## D4. No shape validation at write time for structured values — **OPEN, the remaining half of D1**
+
+**Verified still open** (no `sub_fields` check in `core/writes.py` or
+`core/drafts.py`). D1 fixed the read side; this is the write side. Highest
+value of the open items: the agent can now see the shape but is not stopped
+from writing a wrong one, so a bare string can still land where an object
+belongs — the B7 crash, silent instead of loud.
 
 **The pattern.** A `create` op is validated for required fields and enum
 membership (both work — see the verified list). But a value's *shape* is not
@@ -1341,7 +1425,7 @@ not consulted. Both are cheap; neither is a substitute for the other.
 
 ---
 
-## B10. A `number` field stores as a string and breaks the dashboard
+## B10. A `number` field stores as a string and breaks the dashboard — **FIXED**
 
 **Severity: high.** The dashboard does not open for the project, and the cause
 is a type the schema says cannot happen.
@@ -1418,7 +1502,7 @@ so they are the same risk waiting for a comparison.
 
 ---
 
-## B11. No format check on the authoring path (the existing validator is not the tool for it)
+## B11. No format check on the authoring path — **RESOLVED, see the entry below**
 
 **Severity: high.** The safeguard for scene formatting does not exist on the
 path that writes scene script. **This is not a defect in
