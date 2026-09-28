@@ -99,7 +99,6 @@ land with fewer.**
 | 5a | **D5 step 3** — one name for the entity id in the op vocabulary | **done, 892 pass** — `slug` now means only a project directory |
 | 5b | **D5 step 4** — generate the id | **CANCELLED** — breaks one-batch creation; 3 round trips per reference |
 | 6 | **D5 step 5** — filenames by title, id in the frontmatter | **done, 892 pass** — the id/title division, and a round trip that no longer loses data |
-| 7 | **B14** — six skill files document `story_create` / `story_edit`, which do not exist | **OPEN** — found while answering Q6; 18 occurrences, worse than recorded |
 
 **B6 and B12 are the same lesson applied twice**: the schema already knew the
 answer and a hand-maintained list beside it had drifted. B6 fixes the
@@ -146,7 +145,6 @@ valuable part, and because the next keeper will suspect them again.
 
 | id | what | why it matters |
 |---|---|---|
-| **B14** | **Six skill files document two tools that do not exist** — `story_create` and `story_edit`, 18 occurrences across `story-editor` and `story-loader`. The real tools are `story_draft` (stage/commit) and `story_admin`. Found while answering Q6, which had recorded only one occurrence. | The agent is told to call a tool it cannot call, and it will fail in a way that looks like a broken tool rather than a broken doc. `story-editor/SKILL.md:46` is doubly stale: a missing tool **and** the `slug` argument D5 step 3 renamed. Independent of D5 — the naming is now right, the docs still say otherwise. |
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
@@ -156,6 +154,13 @@ valuable part, and because the next keeper will suspect them again.
 
 ### Deliberately not done
 
+- **`skills/story-editor` and `skills/story-loader` are obsolete and stay that
+  way.** They document `story_create` / `story_edit` (tools that do not exist)
+  and the old `slug` argument, across 18 occurrences in six files. They are
+  **kept deliberately as reference material** for the proper skill, which is
+  still to be written. Fixing the names in a document that is about to be
+  replaced would be maintenance of a corpse. The measurement is kept above so
+  the new skill does not repeat it.
 - **Inline-cue near-miss** (`MIRA: You knew?`) and the other adjacency checks
   B11 originally proposed. Real, but cosmetic: they become `action` and still
   render. Restating the spec in code would mean two things to update when the
@@ -183,57 +188,44 @@ precisely what the code does does not establish that it *should* do that.
 
 ---
 
-## B14. Six skill files document two tools that do not exist — **OPEN**
+## Stale tool names in `skills/` — **NOT A BUG, by decision**
 
-**Found 2026-09-28, while answering Q6** ("do the reference docs need the same
-edit?"). Q6 had recorded one occurrence of a stale tool name. Measuring it
-properly found **18, across six files, in two skills.**
+**Raised as B14 and withdrawn the same day. Recorded so it is not re-raised.**
 
-**What exists:**
-
-```
-story_admin  story_backup  story_dashboard  story_describe  story_draft
-story_export  story_import  story_load  story_memory  story_resolve
-story_retrieve  story_search
-```
-
-**What the docs tell the agent to call:** `story_create` and `story_edit`.
-Neither exists. The real tools are `story_draft` (stage/commit) and
-`story_admin` (project lifecycle, restore, purge).
-
-| file | occurrences |
-|---|---|
-| `skills/story-editor/SKILL.md` | 6 |
-| `skills/story-loader/SKILL.md` | 6 |
-| `skills/story-editor/references/continuity-checks.md` | 3 |
-| `skills/story-editor/references/action-types.md` | 1 |
-| `skills/story-editor/references/index-format.md` | 1 |
-| `skills/story-loader/references/index-format.md` | 1 |
-
-**`skills/story-editor/SKILL.md:46` is doubly stale:**
+**What was found.** Six files across `story-editor` and `story-loader` document
+`story_create` and `story_edit`. Neither tool exists — the real ones are
+`story_draft` (stage/commit) and `story_admin`. 18 occurrences. The worst row is
+`skills/story-editor/SKILL.md:46`:
 
 ```
 | `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
 ```
 
-A tool that does not exist, **and** a `slug` argument that D5 step 3 renamed to
-`id`. So the one row an agent is most likely to read is wrong in both halves.
+A missing tool, and a `slug` argument that D5 step 3 renamed to `id`.
 
-**Why this is its own bug and not a D5 leftover.** D5 made the *code* right. It
-did not make the docs say so, and the failure mode is misleading: the agent
-calls `story_create`, gets "unknown tool", and concludes the plugin is broken
-rather than the doc. A doc bug that presents as a tool bug costs more to
-diagnose than it costs to fix.
+**Why it is not a bug: `skills/story-editor` and `skills/story-loader` are
+obsolete.** They are kept deliberately as **reference material** for the proper
+skill, which is still to be written. Fixing the tool names in a document that is
+about to be replaced would be maintenance of a corpse.
 
-**`index-format.md` was already correct** — it documents `id: project-slug` /
-`id: character-slug`, so it was *ahead* of the code and D5 step 3 caught up to
-it. Worth noting as the counter-example: this is what a doc looks like when it
-is maintained.
+**The measurement is still worth keeping** — when the proper skill is written,
+these are the traps it has to avoid:
 
-**Fix:** rewrite both skills against the real tool surface. Not a rename — the
-shape changed too (`story_create` created directly; `story_draft` stages a
-batch and commits it), so the prose about *how* to create an entity is stale as
-well as the tool name.
+- the tool surface is `story_admin, story_backup, story_dashboard,
+  story_describe, story_draft, story_export, story_import, story_load,
+  story_memory, story_resolve, story_retrieve, story_search`;
+- `story_draft` does not create directly — it **stages a batch, then commits**,
+  so the prose about *how* to create an entity is stale as well as the name;
+- the id argument is `id`, never `slug` (D5 step 3).
+
+**One exception worth noting:** `index-format.md` documents `id: project-slug` /
+`id: character-slug` — it was *ahead* of the code, and D5 step 3 caught up to it.
+That is what a maintained doc looks like, and it is the standard for the new one.
+
+**This is the fourth time the pattern appeared this round** — a hand-maintained
+list or document beside something the code already knows, drifting. B6 was the
+schema, I4 the abbreviations, D5 the vocabulary, and this the docs. The fix is
+the same in each case: derive it, or delete it.
 
 ---
 

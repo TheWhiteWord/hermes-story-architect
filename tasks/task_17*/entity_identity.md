@@ -323,39 +323,21 @@ Not yet investigated. Listed so the next step is unambiguous.
       staged in the window between deploying the change and committing it.
       An alias would be permanent code guarding a window that lasts seconds.
 
-- [x] **Q6. Do the reference docs need the same edit? — YES, and the problem is
-      worse than recorded here. This is now its own bug, not a D5 leftover.**
+- [x] **Q6. Do the reference docs need the same edit? — NO, and the question is
+      moot.** `skills/story-editor` and `skills/story-loader` are **obsolete**,
+      kept deliberately as reference material for the proper skill that is still
+      to be written. So `story_create` / `story_edit` / the `slug` argument in
+      them are not drift to be fixed — they are a document waiting to be
+      replaced. Editing a corpse is not maintenance.
 
-      Measured, not assumed. The tools that exist are:
+      Measured anyway, because the measurement is what the new skill needs:
+      **18 occurrences across six files**, and the real tool surface is
       `story_admin, story_backup, story_dashboard, story_describe, story_draft,
       story_export, story_import, story_load, story_memory, story_resolve,
-      story_retrieve, story_search`.
-
-      **Six files across two skills document two tools that do not exist** —
-      `story_create` and `story_edit`. 18 occurrences:
-
-      | file | occurrences |
-      |---|---|
-      | `skills/story-editor/SKILL.md` | 6 |
-      | `skills/story-loader/SKILL.md` | 6 |
-      | `skills/story-editor/references/continuity-checks.md` | 3 |
-      | `skills/story-editor/references/action-types.md` | 1 |
-      | `skills/story-editor/references/index-format.md` | 1 |
-      | `skills/story-loader/references/index-format.md` | 1 |
-
-      `skills/story-editor/SKILL.md:46` documents
-      `story_create | entity_type, slug, frontmatter` — **two** stale things in
-      one row: a tool that is gone, and a `slug` argument that D5 step 3
-      renamed. The agent is being told to call a tool it cannot call, with an
-      argument shape that no longer exists.
-
-      `index-format.md` documents `id: project-slug` / `id: character-slug` —
-      already using `id`, so it was *ahead* of the code and is now correct.
-
-      **Worth its own entry in `bugs.md`, not folded into D5.** D5 made the
-      naming right; it did not make the docs say so, and an agent reading
-      `story_create` will fail in a way that looks like a broken tool rather
-      than a broken doc.
+      story_retrieve, story_search`. `story_draft` also *stages* a batch and
+      commits it, so the prose about how to create is stale as well as the name.
+      Recorded in `bugs.md` under "Stale tool names in `skills/`" so it is not
+      re-raised as a bug.
 
 - [x] **Q11. If ids become uuids, what does the exported vault look like? —
       MOOT.** Step 4 (generated ids) was cancelled: relations are looked up by
@@ -858,7 +840,7 @@ applied literally to this directory, breaks every click handler in the app.
 
 **892 tests, unchanged throughout.** The investigation's own questions are
 answered: Q2 (a live mis-call, reproduced), Q4 (resolved by step 5, the
-opposite way to what was assumed), Q6 (**worse than recorded — it is now B14**),
+opposite way to what was assumed), Q6 (moot — the skills are obsolete, kept as reference),
 Q11 (moot, step 4 is cancelled). Q3 (`type` vs `entity_type`) is still open and
 is the obvious next piece of the same class.
 
