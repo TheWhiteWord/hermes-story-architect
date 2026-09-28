@@ -122,44 +122,48 @@ rewritten ones now exercise the real path.
 ---
 
 
-## Step 2 — drop the arc_beat composite id  ← *fixes a reproduced bug*
+## Step 2 — drop the arc_beat composite id — **BUILT 2026-09-28** ← *fixed a reproduced bug*
 
-> **Read with step 4.** Dropping the composite and generating the id both
-> change *how an arc beat is created*, and in opposite directions: step 2 says
-> "the beat's own slug is its id", step 4 says "nobody supplies a slug". Doing
-> them together would be smaller, but they are separate fixes for separate
-> bugs, and step 2 fixes a live silent wrong-entity write that step 4 does not
-> touch. **Do step 2 alone.** The creation path it leaves behind — slug
-> supplied, used as-is — is exactly what step 4 replaces, so nothing is built
-> twice.
+**The suite did not drop:** 892 before, 892 after. But it went through 57
+failures first, and the shape of those is the useful part.
 
-**Why:** this is a live, silent, wrong-entity write. Two characters each own an
-arc beat labelled "The Choice"; `edit_entity(..., "arc_beat", "the-choice", …)`
-resolves through `writes.py:689`'s `id LIKE '%-{slug}'` fallback, matches the
-first row, and **edits the wrong beat while returning `success: true`**.
+**What broke, and why it was not arc-specific.** The fixture's note files were
+named after the beat number alone — `arcs/kael/1.md` — because the id used to
+be reassembled from the directory. With that derivation gone, `_diff` matched
+DB ids against stems that no longer corresponded, decided 11 entities were
+"only in the database", and **refused to import**. Everything downstream
+failed from a half-built database: the load view gained `orphaned_locations`
+(the world links never made it in), the key-set assertions broke, round-trip
+counts were wrong. 49 of the 57 were `story_import.py`.
 
-| change | where |
-|---|---|
-| `columns["id"] = slug`, not `f"{char}-{slug}"` | `core/entity.py:290-294` |
-| drop the `LIKE '%-{slug}'` fallback from the lookup | `core/writes.py:682-693` |
-| drop the `id[len(parent_id)+1:]` slice in export (×2) | `story_export.py:164`, `:256` |
-| arc-beat notes get an `id` in frontmatter; the beat slug comes from it | `story_export.py:254-264` |
-| the import fallback `fm.get("id", note.stem)` stays | `story_import.py:302` — already correct |
+**Bisected per file rather than guessed at** — each change stashed in turn:
 
-**The character link is unaffected:** it lives in the `parent_id` column, which
-is set from `fm["character"]` independently of the id. Nothing references the
-composite.
+```
+without core/entity.py       55 failed
+without core/writes.py       57 failed
+without tools/story_export.py 57 failed
+without tools/story_import.py  8 failed   <- the cause
+```
 
-**Check:** a test that creates two arc beats with the same label under
-different characters, edits one **by its full id**, and asserts the other is
-untouched. Plus the existing arc tests. The `save-the-children` fixture has 11
-composite-id beats, so the fixture ids change — `test_round_trip.py:61` asserts
-`arcs/kael/1.md` and will need updating to whatever the new layout is.
+**The conversion was in the markdown, not the database.** Renamed each note to
+`{parent}-{stem}.md` with `id:` matching — `arcs/kael/1.md` →
+`arcs/kael/kael-1.md` — which is **exactly what the fixture database already
+held**. So there was no data migration at all, which is the deployment
+constraint paying for itself a second time. Git tracked all 11 as renames.
 
-**This step is worth doing even if nothing else is.** It is a bug fix, it is
-small, and it is a prerequisite for step 4 being clean.
+After that, 9 failures remained, every one a test asserting the old
+convention. Six were updated (`test_arcs`, `test_field_coverage` ×2,
+`test_export_sweep`, `test_round_trip`, and the composite's own two).
+
+**The class check came first and is in the entry.** Every other type resolves
+by exact `(type, id)` against the PRIMARY KEY; duplicate names are harmless.
+Only the `LIKE` branch looked up by anything else, and it is gone.
+
+**Fixture conversion, run once, not committed as a script** — it was 11 renames
+performed by a throwaway script, and the result is in the tree.
 
 ---
+
 
 ## Step 3 — one name for the op argument
 

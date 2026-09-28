@@ -93,7 +93,7 @@ fewer.**
 | 2 | **B12** — placeholder defaults out of the data; one voice for "not set" | plan ready, not built (`b12_plan.md`) |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
-| 5 | **D5 step 2** — drop the arc_beat composite id | sequenced, not built — **fixes a reproduced silent wrong-entity write** |
+| 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
 | 6 | **D5 steps 3–5** — one name for the op, generated ids, title filenames | sequenced, not built |
 
 **B6 and B12 are the same lesson applied twice**: the schema already knew the
@@ -1680,9 +1680,83 @@ correct by construction instead of by having chosen the right source.
 
 ---
 
-## D5. One concept, three names — `slug` / `entity_id` / `id` — **AGREED, not built**
+## D5 step 2. The arc_beat composite id enabled a silent wrong-entity write — **FIXED 2026-09-28**
 
-**A position was reached on 2026-09-28. No code written.**
+**A beat's id was `{character}-{beat}`, and a bare beat label was resolved
+with `id LIKE '%-{slug}'` — which matched every character owning a beat of that
+name and took the first.**
+
+**Reproduced, not theorised.** Two characters, each with an arc beat labelled
+"The Choice":
+
+```
+before:  edit_entity(..., 'arc_beat', 'the-choice', {...})
+         -> wrote to kael-the-choice, returned success: true
+         -> mira-the-choice untouched, nothing reported
+
+after:   the same call -> ValueError: Entity not found: arc_beat/the-choice
+         edit by full id touches exactly one row
+```
+
+This was the only reproduced *silent data-corruption* bug in the whole live-test
+round. Everything else found was noise in a report or a confusing vocabulary.
+
+**The composite was also wrong on its own terms.** It is ambiguous to parse
+back: a character `kael-the` with a beat `choice` yields `kael-the-choice`,
+identical to kael/the-choice. That collision *was* caught by the primary key,
+so it was loud — but it means the id was incorrect for inputs an author could
+plausibly write, which is a defect independent of the lookup.
+
+**Nothing referenced the composite.** The character link is the `parent_id`
+column, set from the `character` frontmatter field — it never came from the id.
+So the id is now simply the slug, and:
+
+| change | where |
+|---|---|
+| `columns["id"] = slug`, not `f"{char}-{slug}"` | `core/entity.py:290-294` |
+| the whole `arc_beat` branch deleted, `LIKE` fallback included | `core/writes.py:672-694` |
+| two `entity_id[len(parent_id)+1:]` slices removed | `tools/story_export.py:164`, `:256` |
+| the id is read from the note, not reassembled from the directory | `tools/story_import.py:302` |
+| `_diff` matches note stems, not `{char}-{beat}` | `tools/story_import.py:70` |
+
+**Checked across the class, not just the reported case.** Every other type
+resolves by exact `(type, id)` and `id` is the PRIMARY KEY, so at most one row
+can match. Duplicate *names* on other types are harmless — measured: two
+characters named "Kael" and two locations named "The Garden", each edited by
+id, **every edit touched exactly one row.** The `LIKE` branch was the only
+lookup in the file by anything other than the primary key, and it is gone.
+
+**The fixture needed converting, and not in the database.** The 11 arc-beat
+notes were named after the beat number alone (`arcs/kael/1.md`) — fine as a
+path, but two characters each have a `1.md`, so the stem is not an id.
+Renamed to `arcs/kael/kael-1.md` with `id:` matching, which is **exactly what
+the fixture database already held**. No data migration, and the round trip
+(export → wipe → re-import) passes.
+
+**Cost, measured before starting:** 892 tests, 57 failed on the first run, and
+the failures were not arc-beat-specific — the import's `_diff` stopped matching
+the renamed notes and refused to import, which cascaded into the load view and
+the orphan check. Bisected per file rather than guessed: `story_import.py`
+accounted for 49 of the 57. After the fixture conversion, 9 remained, all of
+them tests asserting the old convention.
+
+**Tests.** Two in `TestEditSafety` replaced the two that encoded the composite:
+`test_arc_beat_id_is_the_beat_own_slug` asserts the id and that `parent_id`
+still carries the character, and `test_arc_beat_edits_the_beat_named_and_no_other`
+is the regression — two characters, same label, each full id edits only its
+own. Six further tests across `test_arcs`, `test_field_coverage`,
+`test_export_sweep` and `test_round_trip` updated off the old convention.
+
+**Suite: 892, unchanged.**
+
+---
+
+## D5. One concept, three names — `slug` / `entity_id` / `id` — **AGREED, PARTLY BUILT**
+
+**Steps 1 and 2 are done** (see the entries above). Steps 3–5 remain, and the
+position below is unchanged by them.
+
+**A position was reached on 2026-09-28.**
 `tasks/task_17*/entity_identity.md` holds the full investigation, the
 measurements, the two positions that were **wrong and later overturned**, and
 `tasks/task_17*/entity_identity_plan.md` holds the build order — five steps,
