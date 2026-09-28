@@ -94,6 +94,7 @@ land with fewer.**
 | 1 | **B6** — `REQUIRED_FIELDS` derived from the schema | **done, 891 pass** |
 | 6 | **B12 + B12b** — placeholder defaults out of the data, and the title page says which slots are open | **done, 896 pass** — 10 false findings → 0 |
 | 7 | **B15** — a lost check-then-insert race leaked `IntegrityError` to the user | **done, 897 pass** — found while investigating B1; 40/40 → 0/40 |
+| 8 | **B1** — commit reported failure for a commit that succeeded | **symptom fixed, 901 pass** — commit is idempotent; **the cause is still unknown and upstream** |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
@@ -121,6 +122,7 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. **Write side since rewritten** — one `entity.coerce_number` helper on every path; see B13. | — |
 | I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
+| B1 | **`commit` is idempotent.** It marks the draft row `committed` instead of deleting it, so a repeated commit replays the same success instead of reporting `"No open draft"` about changes that are already in the database. Reproduced end to end through the tool, before and after. | The damage was never the error, it was the claim: the agent tells the user *"that did not save"* and the obvious response is to write it again on top. **The cause of the duplicate call is not fixed and is not claimed to be** — it comes from outside this repo. |
 | B15 | **A lost check-then-insert race leaked a raw database error.** `create_entity` checks for a duplicate with a SELECT and inserts separately, so a concurrent writer wins in between and the primary key's `IntegrityError: UNIQUE constraint failed: entities.id` reached the user verbatim. One `try`/`except` at the INSERT raises the message the check would have. | The user was told a constraint name and nothing about what to do. Measured 40/40 raw errors before, 0/40 after. The behaviour is unchanged — only the message. |
 | B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
 | B13 | `create_project` never coerced a `number` field — B10's fix was on `edit_entity` only. **One helper, `entity.coerce_number`, now reached from every write path**; `create_entity` had neither fix and gained `order` coercion. The read half stays as defence in depth. | The same value was a string, an int and an int in three readers. The dashboard's `max()` on `act_count` was one string away from raising. |
@@ -149,7 +151,6 @@ valuable part, and because the next keeper will suspect them again.
 | id | what | why it matters |
 |---|---|---|
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
-| **B1** | `commit` reports failure for a commit that succeeded. **Re-measured: not this plugin** — one call is truthful, a second correctly says "No open draft", the hook never re-commits, and `registry.dispatch` fires no hooks. The symptom needs a *second* call from outside. **Not disproven either** — the bridge is upstream and still uninstrumented. | Silent — the agent may retry a write that landed. Belongs upstream with B2, which is the same layer. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
 | **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
 | **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
@@ -284,7 +285,71 @@ justified until something actually needs it.
 
 ---
 
-## B1. `commit` sometimes reports failure for a commit that succeeded — **OPEN, not ours**
+## B1. `commit` sometimes reports failure for a commit that succeeded — **SYMPTOM FIXED, cause unknown**
+
+**The reported symptom, reproduced end to end through `story_draft`, before and
+after:**
+
+```
+before:  1st call -> success=True, kael written
+         2nd call -> {"error": "No open draft: d-..."}      <- the data IS there
+after:   2st call -> {"success": true, "already_committed": true,
+                       "message": "...already committed... Nothing was written twice."}
+```
+
+**The damage was never the error — it was the claim.** The agent tells the user
+*"that did not save"* about changes that are in the database, and the obvious
+response to that is to write them again on top. That is the part worth killing,
+and it can be killed without knowing the cause.
+
+### What was changed, and what deliberately was not
+
+**`commit` now marks the draft row `committed` instead of deleting it.** A
+repeat finds the ops still on the row and replays the same success. The landed
+list is *read back off the row*, so it is the same list rather than a
+reconstruction. **A write that is safe to call twice is a property** — it does
+not require knowing who called twice, and that remains unknown.
+
+**The cause is NOT fixed and is NOT claimed to be.** The second call comes from
+outside this repo and the double-dispatch hypothesis is still only a
+hypothesis. What changed is that the plugin can no longer *lie* about it.
+
+**Three other readers of the drafts table had to follow** — found by reading
+every site, not the one the bug named:
+
+| site | change | why |
+|---|---|---|
+| `list_drafts` | filter `status='open'` | a receipt must not look like pending work, or the agent re-commits it |
+| `stage` | upsert `status='open'` | reusing a draft id is an explicit request for a new draft; the receipt must not outlive it |
+| `discard` | unchanged — still deletes | that is how a receipt is dropped |
+
+### The live database, and the question that caught it
+
+**`get_db` carries the same guarded `ALTER` the `entities` columns already use**,
+because the live plugin's database predates `status`. Asked whether the tests
+would have caught it if that were wrong — they would not have, and that is the
+point:
+
+> every test in `test_drafts.py` copies a fixture whose `drafts` table is on
+> disk, so a green run does not show whether the migration is *used* or merely
+> *unused*.
+
+So it is proved instead: `test_a_database_with_the_old_drafts_table_still_works`
+builds the pre-change table by hand and runs stage → commit → commit over it.
+**Three of the four new tests fail with the fix stashed**, migration test
+included.
+
+**One test was wrong and the code was right.** The re-stage test re-staged the
+original batch, which tries to create an entity the first commit already made —
+refusing that is correct. It re-stages an edit now.
+
+**901 pass** (was 897). The dashboard file-watch approach for counting live
+rebuilds is recorded below; it did not fire in its window, and the trigger was
+never performed.
+
+---
+
+## B1 original entry (superseded in its conclusion — kept)
 
 **Severity: high.** A successful write reported as a failure. **Intermittent.**
 
