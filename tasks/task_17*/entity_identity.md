@@ -277,21 +277,35 @@ Not yet investigated. Listed so the next step is unambiguous.
       migration), and making the composite the id the agent supplies directly
       would delete all three sites. **Decide after Q2.**
 
-- [ ] **Q2. What exactly is broken *today*, in a live session?** So far the
-      evidence is: a confusing vocabulary, and the B6 false positive. The B6
-      symptom is real and user-visible. **A concrete live mis-call caused by
-      the naming has not been reproduced.** That matters: if the only harm is
-      confusion that the agent papers over, this is an I-improvement, not a
-      high-severity fix, and it should be scheduled as one. Worth one more
-      deliberate attempt to make the agent get it wrong before sizing the work.
-      **This is the gate.** Nothing below should be built before it is answered.
+- [x] **Q2. What exactly is broken *today*, in a live session? — ANSWERED
+      2026-09-28: a silent wrong-entity write, reproduced.** Not confusion. The
+      arc-beat composite id was resolved with `id LIKE '%-{slug}'`, so
+      `edit_entity(..., 'arc_beat', 'the-choice', ...)` matched every character
+      owning a beat of that label, took the first, and returned
+      `success: true`. Two characters, same beat label, one silently wrong
+      write. Fixed by D5 step 2.
+      **So it was a high-severity fix, not an I-improvement** — and the
+      question that was right to ask first was the one that found it. Note the
+      answer came from *deliberately trying to make the agent get it wrong*,
+      exactly as this entry proposed.
 
 - [ ] **Q3. Is `type` vs `entity_type` in scope?** It is the same class of
       defect in the same op list. Fixing `slug` and leaving `type` fixes half
       the inconsistency. Both together is a bigger diff; slug alone is a
       smaller one that leaves a known wart.
 
-- [ ] **Q4. What about `FIELDS_TO_SKIP = {"id", "type"}`?** The write path
+- [x] **Q4. What about `FIELDS_TO_SKIP = {"id", "type"}`? — RESOLVED by D5
+      step 5, in the opposite direction to what this entry assumed.** The id is
+      still skipped on the *write* path (correct: the write path is given the id
+      as an argument, so a frontmatter copy would be a second source). But the
+      id is now written to the *note* by export, for all ten types, and read
+      back by import. So the id round-trips through the vault, and `story_describe`
+      advertising `id` on four types while six had none is now moot — the note
+      carries it either way. The "third naming problem" is gone.
+
+      Original entry follows:
+
+      **Q4. What about `FIELDS_TO_SKIP = {"id", "type"}`?** The write path
       silently discards a frontmatter `id` (`core/entity.py:279`,
       `core/writes.py:253`, `:442`), while `story_describe` advertises `id` as
       a non-optional field on four types (scene, sequence, act, arc_beat) and
@@ -309,15 +323,51 @@ Not yet investigated. Listed so the next step is unambiguous.
       staged in the window between deploying the change and committing it.
       An alias would be permanent code guarding a window that lasts seconds.
 
-- [ ] **Q6. Do the reference docs need the same edit?** `skills/story-editor/
-      references/index-format.md:16-60` documents `id: project-slug` /
-      `id: character-slug` — already using `id`, so it is *ahead* of the code.
-      `skills/story-loader/SKILL.md:41` documents a `story_create` tool with a
-      `slug` parameter, which **no longer exists** (the tool is `story_draft`).
-      That is a stale doc independent of this decision, worth fixing either
-      way.
+- [x] **Q6. Do the reference docs need the same edit? — YES, and the problem is
+      worse than recorded here. This is now its own bug, not a D5 leftover.**
 
-- [ ] **Q11. If ids become uuids, what does the exported vault look like?**
+      Measured, not assumed. The tools that exist are:
+      `story_admin, story_backup, story_dashboard, story_describe, story_draft,
+      story_export, story_import, story_load, story_memory, story_resolve,
+      story_retrieve, story_search`.
+
+      **Six files across two skills document two tools that do not exist** —
+      `story_create` and `story_edit`. 18 occurrences:
+
+      | file | occurrences |
+      |---|---|
+      | `skills/story-editor/SKILL.md` | 6 |
+      | `skills/story-loader/SKILL.md` | 6 |
+      | `skills/story-editor/references/continuity-checks.md` | 3 |
+      | `skills/story-editor/references/action-types.md` | 1 |
+      | `skills/story-editor/references/index-format.md` | 1 |
+      | `skills/story-loader/references/index-format.md` | 1 |
+
+      `skills/story-editor/SKILL.md:46` documents
+      `story_create | entity_type, slug, frontmatter` — **two** stale things in
+      one row: a tool that is gone, and a `slug` argument that D5 step 3
+      renamed. The agent is being told to call a tool it cannot call, with an
+      argument shape that no longer exists.
+
+      `index-format.md` documents `id: project-slug` / `id: character-slug` —
+      already using `id`, so it was *ahead* of the code and is now correct.
+
+      **Worth its own entry in `bugs.md`, not folded into D5.** D5 made the
+      naming right; it did not make the docs say so, and an agent reading
+      `story_create` will fail in a way that looks like a broken tool rather
+      than a broken doc.
+
+- [x] **Q11. If ids become uuids, what does the exported vault look like? —
+      MOOT.** Step 4 (generated ids) was cancelled: relations are looked up by
+      id, so a generated id costs three round trips per referenced entity, and
+      the alternative is matching relations by name, which is the silent
+      wrong-entity write. Ids stay agent-supplied and readable. The underlying
+      product question stands for whoever proposes uuids later, and it is
+      recorded below — the vault is for reading, not only for backup.
+
+      Original entry follows:
+
+      **Q11. If ids become uuids, what does the exported vault look like?**
       `characters/1a28e84f-a0a8-45bf-b163-7b5a6cd4f4bc.md`. The file is
       filename-safe and the round trip is intact, but the vault stops being
       browsable — which is the export tool's stated purpose
@@ -796,8 +846,27 @@ applied literally to this directory, breaks every click handler in the app.
 
 ## The synthesis
 
-**To build it, see `entity_identity_plan.md`** — five steps, sequenced so the
-two that fix reproduced bugs land first and the file-layout change lands last.
+**Built. See `entity_identity_plan.md`** for the step-by-step record.
+
+| step | outcome |
+|---|---|
+| 1 — delete two compatibility shims | done |
+| 2 — drop the arc_beat composite id | **done — fixed a reproduced silent wrong-entity write** |
+| 3 — one name for the entity id | done |
+| 4 — generate the id | **cancelled** — costs three round trips per referenced entity |
+| 5 — filenames by title, id in the frontmatter | done |
+
+**892 tests, unchanged throughout.** The investigation's own questions are
+answered: Q2 (a live mis-call, reproduced), Q4 (resolved by step 5, the
+opposite way to what was assumed), Q6 (**worse than recorded — it is now B14**),
+Q11 (moot, step 4 is cancelled). Q3 (`type` vs `entity_type`) is still open and
+is the obvious next piece of the same class.
+
+**What this investigation got wrong, kept because it is the useful part:** the
+`id` vs `slug` verdict. Every measurement in it was correct and the conclusion
+was not — see the reversed entry in `bugs.md`. Measuring precisely what the
+code does does not establish that it *should* do that, and "a missing bridge"
+is not a defence of two names.
 Baseline: 889 tests pass, and no step may commit with fewer.
 
 > **The id is generated, stored, and never derived from anything. The title is

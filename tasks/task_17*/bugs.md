@@ -75,17 +75,19 @@ leaves the trap in place.
 
 ## Status index
 
-Last reconciled **2026-09-28**, after B8 / B4 / B5 / I3 / I4 / I5 / D1a / B11
-/ B6 were closed. Entries are not deleted when superseded — a wrong diagnosis
-that vanishes is worth nothing — so the original text stays under its
-correction.
+Last reconciled **2026-09-28**, after **D5** closed (steps 1, 2, 3 and 5 built;
+step 4 cancelled with its reason). Entries are not deleted when superseded — a
+wrong diagnosis that vanishes is worth nothing — so the original text stays
+under its correction. Two verdicts were reversed this round: the nine `extra`
+links (D3) and `id` vs `slug`, which was recorded as "both correct in different
+places" and was the wrong call.
 
 ## Where the bug-fix work stands (2026-09-28)
 
 A sequence of live-test fixes is being landed one at a time, each with its own
 analysis and its own commit, so any of them can be reverted independently.
-**The test suite is the gate: 889 before this round, and no fix may land with
-fewer.**
+**The test suite is the gate: 889 before this round, 892 now, and no fix may
+land with fewer.**
 
 | # | fix | state |
 |---|---|---|
@@ -97,6 +99,7 @@ fewer.**
 | 5a | **D5 step 3** — one name for the entity id in the op vocabulary | **done, 892 pass** — `slug` now means only a project directory |
 | 5b | **D5 step 4** — generate the id | **CANCELLED** — breaks one-batch creation; 3 round trips per reference |
 | 6 | **D5 step 5** — filenames by title, id in the frontmatter | **done, 892 pass** — the id/title division, and a round trip that no longer loses data |
+| 7 | **B14** — six skill files document `story_create` / `story_edit`, which do not exist | **OPEN** — found while answering Q6; 18 occurrences, worse than recorded |
 
 **B6 and B12 are the same lesson applied twice**: the schema already knew the
 answer and a hand-maintained list beside it had drifted. B6 fixes the
@@ -120,6 +123,10 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
 | B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
 | B13 | `create_project` never coerced a `number` field — B10's fix was on `edit_entity` only. **One helper, `entity.coerce_number`, now reached from every write path**; `create_entity` had neither fix and gained `order` coercion. The read half stays as defence in depth. | The same value was a string, an int and an int in three readers. The dashboard's `max()` on `act_count` was one string away from raising. |
+| **D5 s2** | A beat's id is its own slug, not `{character}-{beat}`. The `id LIKE '%-{slug}'` fallback is gone; the resolver is one exact primary-key match for every type. | **The one reproduced silent wrong-entity write of the round**: two characters each own a beat labelled "The Choice"; `edit(..., 'arc_beat', 'the-choice')` wrote to the first and returned `success: true`. |
+| **D5 s3** | One name for the entity id in the op vocabulary. `create` says `id`, not `slug`; both prose bridges deleted. `slug` now means only a project directory. | A tool that has to explain that two names are one value is telling you they should not both exist. `story_admin` had the same defect in another shape — `WHERE id=? OR id=?`, both parameters bound to the same value. |
+| **D5 s5** | Filenames are the title; the id lives in the frontmatter for all ten types; the arc folder is the character's title too. | The filename *was* the id, so renaming a note silently renamed the entity and every relation pointing at it. Now a hand-renamed note survives a round trip — and export → delete the database → re-import is **identical**, which it was not before. |
+| **D5 s4** | **Cancelled, not built.** Relations are looked up by id, so a generated id costs three round trips per referenced entity, and the only way around that is to match relations by name — the silent wrong-entity write D5 s2 exists to kill. | Recorded because the plan is sound and someone will otherwise build it. The reasoning is kept in a collapsed section of the plan. |
 
 ### Resolved by investigation — not bugs
 
@@ -131,7 +138,7 @@ valuable part, and because the next keeper will suspect them again.
 | D3 | **Not a defect.** The nine undeclared link fields (`scene.act_id`, `arc_beat.scene`, `plot.characters`, …) are documented as `extra` in `task_20/archived/data_model.md`, and the `act_id`/`sequence_id` redundancy is deliberate — see `verification_findings.md:45`. Columns are the load payload's spine, `extra` holds the rest *including links*, relations are many-to-many. Under that rule all nine are correct. **D3 is closed.** |
 | D2 (naming) | **Not a defect.** `story_load` emits `chars`/`loc` for token cost (the redesign spec's first principle) and `story_describe` uses the names `story_draft` takes, where `edit_entity` rejects unknown keys by design. Neither side can be renamed. Resolved as a bridge (I3), then the bridge was deleted when the abbreviations went (I4). |
 | B3 | **Not a bug.** `has_database: db.exists()` on a markdown-only project reports `false`, which is accurate — there is genuinely no database. Recorded so it is not re-investigated. |
-| `id` vs `slug` | **Both correct, in different places.** `id` is the column, `slug` is the op argument (`{op, type, slug, data}`), and `FIELDS_TO_SKIP` keeps `id` out of writes deliberately. Documented, not renamed. |
+| `id` vs `slug` | **Superseded — this entry was the wrong conclusion, and it is kept because it is instructive.** It read: *"both correct, in different places — `id` is the column, `slug` is the op argument."* True as a description, wrong as a verdict: the bridge between them had to be *written down twice* in prose, and a tool that must explain that two names are one value is telling you they should not both exist. D5 step 3 made the op argument `id`; `slug` now means only a project directory. |
 | B8's original symptom | The orphan-check claim could not be reproduced. The check tests `world`. Correction is in the B8 entry above the original text. |
 | D3's `location_scene` symptom | Same shape as B8 — the write was missing, the symptom was not where it was recorded. |
 
@@ -139,7 +146,7 @@ valuable part, and because the next keeper will suspect them again.
 
 | id | what | why it matters |
 |---|---|---|
-| **D5** | One concept, three names: `slug` / `entity_id` / `id` for one value, plus `type` vs `entity_type`. **Position agreed 2026-09-28, not built** — id is generated (`secrets.token_hex(4)`), stored in frontmatter too, filenames become titles. Analysis and sizing in `tasks/task_17*/entity_identity.md`. | Two tools carried a prose bridge explaining `id` ≡ `slug`, which is the tell. Falls out as a fix for the silent wrong-entity arc-beat write. |
+| **B14** | **Six skill files document two tools that do not exist** — `story_create` and `story_edit`, 18 occurrences across `story-editor` and `story-loader`. The real tools are `story_draft` (stage/commit) and `story_admin`. Found while answering Q6, which had recorded only one occurrence. | The agent is told to call a tool it cannot call, and it will fail in a way that looks like a broken tool rather than a broken doc. `story-editor/SKILL.md:46` is doubly stale: a missing tool **and** the `slug` argument D5 step 3 renamed. Independent of D5 — the naming is now right, the docs still say otherwise. |
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
@@ -156,10 +163,77 @@ valuable part, and because the next keeper will suspect them again.
 
 ### The lesson from this round
 
-Three of the diagnoses above were **wrong before measurement corrected them**
-(the nine `extra` links, B8's orphan symptom, and the "load-bearing" 12.9k
-figure). In each case the repo already had the answer written down in
-`task_20/`. **Check the design docs before calling something a defect.**
+**Four** of the diagnoses above were **wrong before measurement corrected them**:
+the nine `extra` links, B8's orphan symptom, the "load-bearing" 12.9k figure,
+and `id` vs `slug`. Two distinct failure shapes, and the second is the more
+dangerous one:
+
+1. **The symptom was in the wrong place** (the nine links, B8). The repo had the
+   answer written down in `task_20/`. *Check the design docs before calling
+   something a defect.*
+2. **The code was described accurately and that was mistaken for a defence**
+   (`id` vs `slug`). Every measurement was right — `id` was the column, `slug`
+   was the op argument — and the conclusion *"not a bug, a missing bridge"* was
+   still wrong. **A bridge that must be written down is not documentation, it is
+   the cost of having two names.** The tell is a sentence explaining that two
+   things are the same thing.
+
+Failure shape 2 is the one to watch for, because it feels like rigour. Measuring
+precisely what the code does does not establish that it *should* do that.
+
+---
+
+## B14. Six skill files document two tools that do not exist — **OPEN**
+
+**Found 2026-09-28, while answering Q6** ("do the reference docs need the same
+edit?"). Q6 had recorded one occurrence of a stale tool name. Measuring it
+properly found **18, across six files, in two skills.**
+
+**What exists:**
+
+```
+story_admin  story_backup  story_dashboard  story_describe  story_draft
+story_export  story_import  story_load  story_memory  story_resolve
+story_retrieve  story_search
+```
+
+**What the docs tell the agent to call:** `story_create` and `story_edit`.
+Neither exists. The real tools are `story_draft` (stage/commit) and
+`story_admin` (project lifecycle, restore, purge).
+
+| file | occurrences |
+|---|---|
+| `skills/story-editor/SKILL.md` | 6 |
+| `skills/story-loader/SKILL.md` | 6 |
+| `skills/story-editor/references/continuity-checks.md` | 3 |
+| `skills/story-editor/references/action-types.md` | 1 |
+| `skills/story-editor/references/index-format.md` | 1 |
+| `skills/story-loader/references/index-format.md` | 1 |
+
+**`skills/story-editor/SKILL.md:46` is doubly stale:**
+
+```
+| `story_create` | Create new entity notes | `entity_type`, `slug`, `frontmatter` |
+```
+
+A tool that does not exist, **and** a `slug` argument that D5 step 3 renamed to
+`id`. So the one row an agent is most likely to read is wrong in both halves.
+
+**Why this is its own bug and not a D5 leftover.** D5 made the *code* right. It
+did not make the docs say so, and the failure mode is misleading: the agent
+calls `story_create`, gets "unknown tool", and concludes the plugin is broken
+rather than the doc. A doc bug that presents as a tool bug costs more to
+diagnose than it costs to fix.
+
+**`index-format.md` was already correct** — it documents `id: project-slug` /
+`id: character-slug`, so it was *ahead* of the code and D5 step 3 caught up to
+it. Worth noting as the counter-example: this is what a doc looks like when it
+is maintained.
+
+**Fix:** rewrite both skills against the real tool surface. Not a rename — the
+shape changed too (`story_create` created directly; `story_draft` stages a
+batch and commits it), so the prose about *how* to create an entity is stale as
+well as the tool name.
 
 ---
 
@@ -1560,7 +1634,31 @@ Cheap, no data-model risk, and it removes the guess that produced both B7-style
 errors and this confusion. **Recorded as an improvement (I3), not a defect** —
 nothing is broken, something is undocumented.
 
-### `id` vs `slug` — settled: both are correct, in different places
+### `id` vs `slug` — investigated, and the verdict was WRONG — **reversed 2026-09-28**
+
+> **Read this as the reasoning, not the conclusion.** The measurements below are
+> all correct. The verdict they produced — *"not a bug, a missing bridge"* — was
+> wrong, and it is the same error the D3 investigation made: **describing what
+> the code does and calling that a defence.** The code *worked*. What it needed
+> was one fewer name.
+>
+> Two things this entry got right and then talked itself out of:
+>
+> 1. It called the problem *"a missing bridge, not a wrong name"* and proposed
+>    fixing it **in prose**. That sentence is the mistake. A bridge that has to
+>    be written down is the cost of the two names, not a gap in the bridge — and
+>    `chars`/`loc` had already been deleted on exactly that reasoning (I4), so
+>    the same argument was available here and not applied.
+> 2. It noted that `id`'s description says *"Stable slug reflecting dramatic
+>    function"* — i.e. the schema was inviting the model to treat the id as a
+>    dramaturgical slug. That is a design smell, and it was read as a
+>    documentation detail rather than as the naming problem it was.
+>
+> **What it is now:** D5 step 3. The op argument is `id`, both prose bridges
+> are deleted, and `slug` means only a project directory. The measurement
+> stands; only the conclusion fell.
+>
+> Original entry follows, unchanged, as the record of how it was reasoned:
 
 Checked rather than assumed, since it was raised as a possible bug:
 
@@ -1947,20 +2045,41 @@ And the case that was impossible before — rename a note by hand, re-import:
 
 ## D5. One concept, three names — `slug` / `entity_id` / `id` — **DONE, with one step cancelled**
 
+> **This is the parent entry, and it is now half-superseded by its own steps.**
+> The position it records assumed the id would be *generated*. That part was
+> cancelled — see the step 4 entry. The other three parts shipped. Read the
+> per-step entries above for what is true now; this one is kept because its
+> measurements and its two overturned positions are the reasoning the steps rest
+> on.
+
 **A position was reached on 2026-09-28.**
 `tasks/task_17*/entity_identity.md` holds the full investigation, the
 measurements, the two positions that were **wrong and later overturned**, and
 `tasks/task_17*/entity_identity_plan.md` holds the build order — five steps,
 sequenced so the two that fix reproduced bugs land first and the file-layout
-change lands last. **Baseline: 889 tests pass; no step may commit with fewer.**
+change lands last. **Baseline: 889 tests pass; no step may commit with fewer.
+Final: 892, unchanged by every step.**
 
-**The agreed position:**
+**The position as agreed, with what actually happened marked:**
 
 > The id is **generated** (`secrets.token_hex(4)`, 8 chars), never supplied by
 > the agent, stored in the DB **and** in every note's frontmatter, and never
 > derived from anything. The **title** is the only user-facing name — in the
 > dashboard, in the payload, and in the exported filename. The op argument is
 > `id` everywhere; the word `slug` survives only for a *project directory*.
+
+| clause | outcome |
+|---|---|
+| id generated, never agent-supplied | **CANCELLED (step 4)** — three round trips per referenced entity |
+| id stored in the DB **and** in every note's frontmatter | **done (step 5)** — and it was never about generation |
+| title is the user-facing name, including the filename | **done (step 5)** |
+| op argument is `id` everywhere; `slug` only for a project directory | **done (step 3)** |
+
+**The third clause is the one that mattered, and it did not depend on the
+first.** The filename was the id, so a title-keyed filename needed the id
+written down somewhere else — but "somewhere else" is the *frontmatter*, not a
+generator. The coupling that made this look impossible was removable on its own,
+which is why step 5 was unaffected by cancelling step 4.
 
 **What was established by measurement.** One value had four names depending on
 the op: `create` took `slug`, `edit`/`delete` took `entity_id`, `story_retrieve`
@@ -1979,9 +2098,14 @@ earlier proposals wrong.
 - *"Name the files after the title"* was **rejected** — correctly, at the time,
   because the filename *is* the id, so a title-keyed filename made the id
   derive from a mutable field and a retitle silently orphaned every reference.
-  **That objection is void once the id is generated**, because the id is then
-  derived from nothing. The proposal was right and was only wrong about the
-  thing it depended on.
+  **That objection was real, and step 5 answered it a different way than this
+  entry assumed.** The objection said *"that objection is void once the id is
+  generated"* — and step 4 was then cancelled, so that escape route closed. The
+  proposal shipped anyway, because the id did not need generating: writing it
+  into the frontmatter removes the coupling directly. The filename stopped
+  being the id's only home, and a retitle no longer touches it. **The right fix
+  for "the filename is a bad place to keep the id" was never "make the id
+  independent of everything" — it was "stop keeping it there only".**
 
 **Two fixes fall out of it, and are not chores:** dropping the arc_beat
 composite id (a generated id would make it 73 chars, and the character link
