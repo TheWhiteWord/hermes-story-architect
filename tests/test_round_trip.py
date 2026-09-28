@@ -9,6 +9,25 @@ from tools.story_import import handler as import_handler
 from tools.story_export import handler as export_handler
 
 
+def note_for(export_path: Path, folder: str, entity_id: str) -> Path:
+    """The exported note for an entity id — found by frontmatter, not by name.
+
+    The filename is the title now, so a test that wants kael's note cannot know
+    it is `Kael.md` without duplicating the naming rule. Looking it up by the id
+    is what the frontmatter is for, and it is how a reader would find it too.
+    """
+    import frontmatter
+    for f in sorted((export_path / folder).rglob("*.md")):
+        if str(frontmatter.load(f).metadata.get("id") or "") == entity_id:
+            return f
+    raise AssertionError(f"no exported note has id {entity_id!r} in {folder}/")
+
+
+def note_rel(export_path: Path, folder: str, entity_id: str) -> str:
+    """`note_for` as a project-relative path, for comparing against the manifest."""
+    return str(note_for(export_path, folder, entity_id).relative_to(export_path))
+
+
 def test_import_creates_schema_and_entities(fixture_path):
     """Import creates schema and populates all tables."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -57,9 +76,9 @@ def test_round_trip_preserves_entities(fixture_path):
 
         # Verify key files exist
         assert (export_path / "project.md").exists()
-        assert (export_path / "characters" / "kael.md").exists()
-        assert (export_path / "arcs" / "kael" / "kael-1.md").exists()
-        assert (export_path / "scenes" / "central-room-day.md").exists()
+        assert note_for(export_path, "characters", "kael").exists()
+        assert note_for(export_path, "arcs", "kael-1").exists()
+        assert note_for(export_path, "scenes", "central-room-day").exists()
         # No recycle bin with hard delete — soren.md is simply absent
         assert not (export_path / "_recycle-bin" / "character" / "soren.md").exists()
 
@@ -141,10 +160,9 @@ def test_round_trip_kael_note(fixture_path):
             f.unlink()
         export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
-        orig = frontmatter.load(project_path / "characters" / "kael.md")
-        exported = frontmatter.load(export_path / "characters" / "kael.md")
+        orig = frontmatter.load(project_path / "characters" / "Kael.md")
+        exported = frontmatter.load(note_for(export_path, "characters", "kael"))
 
-        # Compare frontmatter keys
         assert set(orig.metadata.keys()) == set(exported.metadata.keys())
 
         # Compare frontmatter values (as strings for simplicity)
@@ -220,8 +238,8 @@ def test_world_fields_round_trip(fixture_path):
             f.unlink()
         export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
-        orig = frontmatter.load(project_path / "worlds" / "the-i.md")
-        exported = frontmatter.load(export_path / "worlds" / "the-i.md")
+        orig = frontmatter.load(project_path / "worlds" / "The I.md")
+        exported = frontmatter.load(note_for(export_path, "worlds", "the-i"))
 
         # FM keys match
         assert set(orig.metadata.keys()) == set(exported.metadata.keys())
@@ -251,8 +269,8 @@ def test_location_world_and_variant_fields_round_trip(fixture_path):
             f.unlink()
         export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
-        orig = frontmatter.load(project_path / "locations" / "the-central-room.md")
-        exported = frontmatter.load(export_path / "locations" / "the-central-room.md")
+        orig = frontmatter.load(project_path / "locations" / "The Central Room.md")
+        exported = frontmatter.load(note_for(export_path, "locations", "the-central-room"))
 
         # FM keys match
         assert set(orig.metadata.keys()) == set(exported.metadata.keys())
@@ -340,5 +358,5 @@ def test_world_variant_of_round_trip(fixture_path):
             f.unlink()
         export_handler({"project": str(export_path), "root_path": str(export_dir)})
 
-        exported = frontmatter.load(export_path / "worlds" / "the-real-world.md")
+        exported = frontmatter.load(note_for(export_path, "worlds", "the-real-world"))
         assert exported.metadata["variant_of"] == "the-i"

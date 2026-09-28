@@ -1,10 +1,11 @@
 ---
+dramatic_function: where the children's hope is tested
+id: the-central-room
+mood: oppressive stillness
 name: The Central Room
 one_sentence: The heart of the Institute — where children believe freedom waits beyond
   the door.
 world: the-i
-mood: oppressive stillness
-dramatic_function: where the children's hope is tested
 ---
 
 ## Description

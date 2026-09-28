@@ -24,8 +24,8 @@ def project_path():
 
 @pytest.fixture
 def kael_note(project_path):
-    """Path to Kael's character note."""
-    return project_path / "characters" / "kael.md"
+    """Path to Kael's character note — `Kael.md`, named for the title."""
+    return project_path / "characters" / "Kael.md"
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ class TestEntityExtraction:
         assert "logline" in entity
 
     def test_extract_world(self, project_path):
-        entity = extract_entity(project_path / "worlds" / "the-i.md", "world")
+        entity = extract_entity(project_path / "worlds" / "The I.md", "world")
         assert entity["name"] == "The I"
         assert "sections" in entity
 

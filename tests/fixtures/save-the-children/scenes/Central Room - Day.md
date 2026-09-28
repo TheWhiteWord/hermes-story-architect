@@ -16,13 +16,13 @@ is_story_climax: false
 location: the-central-room
 order: 1
 sequence_id: seq-discovery
+shift: blind trust → first doubt
 status: drafted
 time_of_day: DAY
 title: Central Room - Day
 type: scene
 value_at_close: negative
 value_at_open: positive
-shift: blind trust → first doubt
 y: -0.3
 ---
 

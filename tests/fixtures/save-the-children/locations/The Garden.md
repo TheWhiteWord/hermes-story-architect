@@ -1,10 +1,11 @@
 ---
+dramatic_function: Kael's emotional anchor
+id: the-garden
+mood: fragile peace
 name: The Garden
 one_sentence: A simulated outdoor space where Kael dreams — the only place that feels
   real.
 world: the-i
-mood: fragile peace
-dramatic_function: Kael's emotional anchor
 ---
 
 ## Description

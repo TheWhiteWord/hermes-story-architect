@@ -1,5 +1,6 @@
 """story_export tool — reads story.db → writes markdown vault."""
 import json
+import re
 from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
@@ -60,6 +61,30 @@ _FOLDERS = {
 }
 
 
+def _filename(title: str, folder: Path, used: set) -> str:
+    """A readable, unique `.md` stem for one entity, for a folder being written.
+
+    Titles are what a person reads, so the filename is the title — with the
+    characters a filesystem cannot take removed. Two entities can share a title
+    ("The Choice" is one beat per character in `save-the-children`), and they
+    land in different folders, but nothing stops one folder holding two, so a
+    counter settles it: `The Choice.md`, then `The Choice 2.md`.
+
+    Nothing references a filename, so a collision is cosmetic — an id collision
+    would be silent, and `id` is the primary key for that reason. A title that
+    sanitises to nothing falls back to the entity's id, which is never empty.
+    """
+    stem = "".join(c for c in (title or "") if c.isalnum() or c in " -_").strip()
+    stem = re.sub(r"\s+", " ", stem).strip(" .")
+    candidate = stem or "untitled"
+    n = 2
+    while f"{candidate}.md" in used:
+        candidate = f"{stem} {n}"
+        n += 1
+    used.add(f"{candidate}.md")
+    return candidate
+
+
 def _sweep_stale(project_path: Path, written: set) -> list:
     """Delete notes a previous export wrote that the database no longer has.
 
@@ -102,6 +127,17 @@ def _sweep_stale(project_path: Path, written: set) -> list:
 
 def _export_all(conn, project_path: Path) -> set:
     """Export all entities to markdown files. Returns the set of paths written."""
+    # Per folder, the names claimed so far *in this pass*. Deliberately not
+    # seeded from disk: re-exporting overwrites Kael.md with Kael.md, so a
+    # second export is idempotent. The counter only fires when two entities in
+    # one folder want the same title.
+    used_names = {}
+    # A beat's folder is its character's title, so the id -> title map is needed
+    # before the beats are written.
+    char_titles = dict(conn.execute(
+        "SELECT id, name FROM entities WHERE type='character' AND is_deleted=0"))
+    # character id -> the folder name their beats are filed under
+    arc_dirs = {}
     written = set()
     entity_rows = conn.execute(
         "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
@@ -141,6 +177,10 @@ def _export_all(conn, project_path: Path) -> set:
                     extra[field] = [{"scene_id": r[0], "description": r[1]} for r in beat_rows]
 
         fm = _frontmatter_for(entity_type, entity_id, name, one_sentence, order_key, status, parent_id, location_id, extra)
+        # The filename is the title, so `id` is the only thing that survives a
+        # rename — it has to be in the note for every type, not just the four
+        # that happened to declare it. Set here rather than in each branch.
+        fm["id"] = entity_id
         sections = conn.execute(
             "SELECT heading, body FROM sections WHERE entity_id = ? ORDER BY rowid",
             (entity_id,)
@@ -159,17 +199,31 @@ def _export_all(conn, project_path: Path) -> set:
             from core.db import get_project_memory
             _write_note(project_path / ".story" / "memory.md", get_project_memory(project_path), "")
             written.add(project_path / ".story" / "memory.md")
-        elif entity_type == "arc_beat":
-            # A beat's id is its own slug; the character link is parent_id and
-            # becomes the directory it is filed under.
-            char_dir = project_path / "arcs" / (parent_id or "")
-            char_dir.mkdir(parents=True, exist_ok=True)
-            _write_note(char_dir / f"{entity_id}.md", fm, body)
-            written.add(char_dir / f"{entity_id}.md")
+            continue
+
+        if entity_type == "arc_beat":
+            # The character is the folder, named by their title like every other
+            # note. The character link itself rides in the frontmatter, so this
+            # is grouping, not identity. Cached per character: the counter in
+            # _filename is for siblings, and every beat of one character has to
+            # land in the *same* folder.
+            arcs = project_path / "arcs"
+            if parent_id not in arc_dirs:
+                arc_dirs[parent_id] = _filename(
+                    char_titles.get(parent_id, parent_id or "unknown"),
+                    arcs, used_names.setdefault(arcs, set()))
+            folder = arcs / arc_dirs[parent_id]
+            folder.mkdir(parents=True, exist_ok=True)
         else:
-            folder = _folder_for(entity_type)
-            _write_note(project_path / folder / f"{entity_id}.md", fm, body)
-            written.add(project_path / folder / f"{entity_id}.md")
+            folder = project_path / _folder_for(entity_type)
+
+        # The filename is the title, so the id has to live in the frontmatter —
+        # it is the only thing that survives the name change. `used` is per
+        # folder, so two characters may each own a "The Choice" note.
+        used = used_names.setdefault(folder, set())
+        note = folder / f"{_filename(name, folder, used)}.md"
+        _write_note(note, fm, body)
+        written.add(note)
 
     return written
 

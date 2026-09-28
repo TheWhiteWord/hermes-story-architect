@@ -1,4 +1,5 @@
 ---
+id: mira
 name: Mira
 one_sentence: Kael's closest friend — believes in the feeling before believing in
   the cause.

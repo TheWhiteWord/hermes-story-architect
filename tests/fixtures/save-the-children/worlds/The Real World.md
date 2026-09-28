@@ -1,16 +1,17 @@
 ---
+id: the-real-world
 name: The Real World
 one_sentence: 400 years after the Institute went silent — green, vast, indifferent.
 period: +405y after the collapse
+power:
+- Nature is the only authority
+- Survival belongs to those who learn
 rules:
 - Nothing is provided — you must find or make what you need
 - The world does not care if you survive
 values:
 - Resilience over comfort
 - Adaptation is sacred
-power:
-- Nature is the only authority
-- Survival belongs to those who learn
 variant_of: the-i
 ---
 

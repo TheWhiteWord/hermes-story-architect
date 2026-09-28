@@ -1,14 +1,18 @@
 ---
-name: "Kael & The Administrator"
-characters: ["kael", "the-administrator"]
+characters:
+- kael
+- the-administrator
+id: kael-the-administrator
+name: Kael & The Administrator
 perspectives:
   kael:
-    label: "Antagonist"
-    feeling: "Doesn't hate them; pities them. Which is worse."
-    type: "rival"
+    feeling: Doesn't hate them; pities them. Which is worse.
+    label: Antagonist
     strength: -0.3
-scenes: ["central-room-day"]
-status: "active"
+    type: rival
+scenes:
+- central-room-day
+status: active
 ---
 
 ## Description

@@ -19,6 +19,8 @@ import pytest
 from tools.story_export import handler as export_handler
 from tools.story_import import handler as import_handler
 
+from test_round_trip import note_for, note_rel
+
 
 def _export(project, vault):
     # Resolve by name against the vault so the tool's own path resolution runs.
@@ -70,9 +72,9 @@ class TestIdempotent:
         p, vault = proj
         for _ in range(3):
             _export(p, vault)
-        assert (p / "characters" / "kael.md").exists()
+        assert note_for(p, "characters", "kael").exists()
         assert (p / "project.md").exists()
-        assert (p / "arcs" / "kael" / "kael-1.md").exists()
+        assert note_for(p, "arcs", "kael-1").exists()
         assert (p / ".story" / "memory.md").exists()
 
     def test_first_export_never_removes(self, proj):
@@ -86,9 +88,12 @@ class TestDeleteSurvivesRoundTrip:
     def test_deleted_note_is_swept(self, proj):
         p, vault = proj
         _export(p, vault)                       # establishes the manifest
+        # The filename is the title, so the path is looked up by id before the
+        # note is deleted — after that there is nothing left to find.
+        kael_note = note_rel(p, "characters", "kael")
         _delete(p, "kael")
-        assert "characters/kael.md" in _export(p, vault)["files_removed"]
-        assert not (p / "characters" / "kael.md").exists()
+        assert kael_note in _export(p, vault)["files_removed"]
+        assert not (p / kael_note).exists()
 
     def test_deleted_entity_stays_deleted(self, proj):
         p, vault = proj
@@ -110,13 +115,16 @@ class TestDeleteSurvivesRoundTrip:
     def test_emptied_arc_folder_is_pruned(self, proj):
         p, vault = proj
         _export(p, vault)
+        # The folder is the character's title, not their id. marcus-chen has two
+        # beats; mira has none, so the folder cannot be found through her.
+        marcus_dir = note_for(p, "arcs", "marcus-chen-1").parent
         conn = sqlite3.connect(str(p / ".story" / "story.db"))
         beats = [r[0] for r in conn.execute(
-            "SELECT id FROM entities WHERE type='arc_beat' AND parent_id='mira'")]
+            "SELECT id FROM entities WHERE type='arc_beat' AND parent_id='marcus-chen'")]
         conn.close()
         _delete(p, *beats)
         _export(p, vault)
-        assert not (p / "arcs" / "mira").exists()
+        assert not marcus_dir.exists()
 
 
 class TestHandAuthoredNotesAreSafe:
@@ -136,7 +144,7 @@ class TestHandAuthoredNotesAreSafe:
         result = _export(p, vault)
         assert result["success"] is True
         assert result["files_removed"] == []
-        assert (p / "characters" / "kael.md").exists()
+        assert note_for(p, "characters", "kael").exists()
 
     def test_manifest_omits_its_own_and_story_dir(self, proj):
         p, vault = proj

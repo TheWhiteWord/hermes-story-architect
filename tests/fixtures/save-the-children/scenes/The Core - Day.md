@@ -15,13 +15,13 @@ is_story_climax: false
 location: the-garden
 order: 3
 sequence_id: seq-discovery
+shift: fragile trust → trust earned
 status: written
 time_of_day: DAY
 title: The Core - Day
 type: scene
 value_at_close: positive
 value_at_open: positive
-shift: fragile trust → trust earned
 y: 0.4
 ---
 

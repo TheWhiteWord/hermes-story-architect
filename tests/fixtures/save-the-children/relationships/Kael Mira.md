@@ -1,20 +1,25 @@
 ---
-name: "Kael & Mira"
-characters: ["kael", "mira"]
+characters:
+- kael
+- mira
+id: kael-mira
+name: Kael & Mira
 perspectives:
   kael:
-    label: "Closest friend"
-    feeling: "Trusts her feelings more than their own logic"
-    type: "family"
+    feeling: Trusts her feelings more than their own logic
+    label: Closest friend
     strength: 0.9
+    type: family
   mira:
-    label: "Friend, anchor"
-    feeling: "Understands his silences better than their words"
-    type: "romantic"
-    strength: 0.7
+    feeling: Understands his silences better than their words
+    label: Friend, anchor
     secret: true
-scenes: ["central-room-day", "central-room-night"]
-status: "active"
+    strength: 0.7
+    type: romantic
+scenes:
+- central-room-day
+- central-room-night
+status: active
 ---
 
 ## Description

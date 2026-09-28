@@ -40,9 +40,8 @@ def _diff(project_path: Path) -> dict:
 
     Deliberately one-directional: an entity with a note file is never reported as
     at risk, even when the importer keys it differently (the project row uses the
-    folder name, arc beats a `{char}-{beat}` composite). A missed warning only
-    means the guard stays quiet; a false "you will lose data" would block every
-    legitimate re-import.
+    folder name). A missed warning only means the guard stays quiet; a false
+    "you will lose data" would block every legitimate re-import.
     """
     from core.db import get_db
 
@@ -52,23 +51,34 @@ def _diff(project_path: Path) -> dict:
     finally:
         conn.close()
 
+    # The filename is the title, so the id is only in the frontmatter. This has
+    # to read every note — the same pass the import already makes.
+    import frontmatter
+
+    def _ids_in(folder: Path) -> set:
+        found = set()
+        if not folder.exists():
+            return found
+        for f in folder.glob("*.md"):
+            if f.name.startswith("_"):
+                continue
+            found.add(str(frontmatter.load(f).metadata.get("id") or f.stem))
+        return found
+
     markdown_ids = set()
     for folder in ("characters", "locations", "worlds", "plots", "scenes",
                    "sequences", "acts", "relationships"):
-        d = project_path / folder
-        if d.exists():
-            markdown_ids |= {f.stem for f in d.glob("*.md") if not f.name.startswith("_")}
+        markdown_ids |= _ids_in(project_path / folder)
 
-    # Arc beats live in arcs/{character}/{beat}.md, keyed by their own id — the
-    # directory carries the character, which is not part of the id. They do not
-    # appear in the flat folders above, and a database may hold them typed as
-    # 'character', so match them by the note tree as well.
+    # Arc beats live in arcs/{character}/{beat}.md. They do not appear in the
+    # flat folders above, and a database may hold them typed as 'character', so
+    # match them by the note tree as well.
     arc_beat_ids = set()
     arcs = project_path / "arcs"
     if arcs.exists():
         for char_dir in arcs.iterdir():
             if char_dir.is_dir() and not char_dir.name.startswith(("_", ".")):
-                arc_beat_ids |= {f.stem for f in char_dir.glob("*.md")}
+                arc_beat_ids |= _ids_in(char_dir)
 
     at_risk = sorted(
         entity_id for entity_id, entity_type in rows
@@ -277,9 +287,12 @@ def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str)
         post = frontmatter.load(note)
         fm = dict(post.metadata)
         body = post.content
-        slug = note.stem
-        _insert_entity(conn, entity_type, slug, fm, body)
-        _insert_relations(conn, entity_type, slug, fm)
+        # The filename is the title, so the id comes from the frontmatter. The
+        # stem is only the fallback, for a note written before ids were written
+        # out — or by hand.
+        entity_id = str(fm.get("id") or note.stem)
+        _insert_entity(conn, entity_type, entity_id, fm, body)
+        _insert_relations(conn, entity_type, entity_id, fm)
 
 
 def _import_arcs(conn, project_path: Path) -> None:
@@ -299,11 +312,11 @@ def _import_arcs(conn, project_path: Path) -> None:
             post = frontmatter.load(note)
             fm = dict(post.metadata)
             body = post.content
-            char_slug = char_folder.name
-            # A beat's id is its own slug. The directory gives the character, and
-            # that link belongs in parent_id — it is not part of the id, which
-            # used to be '{character}-{beat}' and had to be reassembled here.
-            beat_id = fm.get("id", note.stem)
+            # The folder is the character's *title* for grouping, so the link
+            # comes from the frontmatter. The folder name is only the fallback,
+            # for a tree written before the folder was renamed.
+            char_slug = str(fm.get("character") or char_folder.name)
+            beat_id = str(fm.get("id") or note.stem)
             _insert_entity(conn, "arc_beat", beat_id, fm, body, char_slug=char_slug)
 
 

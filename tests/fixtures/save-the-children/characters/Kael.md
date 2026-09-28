@@ -1,4 +1,5 @@
 ---
+id: kael
 name: Kael
 one_sentence: A young person inside The I who begins to feel the system is wrong.
 story_role: Protagonist

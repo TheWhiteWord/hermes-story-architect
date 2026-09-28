@@ -1,4 +1,5 @@
 ---
+id: the-administrator
 name: The Administrator
 one_sentence: The face of the Institute's control — theatrical, precise, almost too
   perfect an opponent.

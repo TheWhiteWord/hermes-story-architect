@@ -1,16 +1,17 @@
 ---
+id: the-i
 name: The I
 one_sentence: A simulation environment where developing consciousness forms.
 period: +400y after the collapse
+power:
+- The Administrator sanctions all decisions
+- The system enforces compliance automatically
 rules:
 - The children cannot leave
 - The Administrator controls all systems
 values:
 - Preservation over freedom
 - Stability is sacred
-power:
-- The Administrator sanctions all decisions
-- The system enforces compliance automatically
 ---
 
 ## Description

@@ -14,13 +14,13 @@ is_story_climax: false
 location: the-central-room
 order: 2
 sequence_id: seq-discovery
+shift: doubt → chosen trust
 status: drafted
 time_of_day: NIGHT
 title: Central Room - Night
 type: scene
 value_at_close: positive
 value_at_open: negative
-shift: doubt → chosen trust
 y: 0.6
 ---
 

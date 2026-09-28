@@ -4,6 +4,7 @@ arc_type: negative
 character_value: Redemption
 character_value_at_close: negative
 character_value_at_open: positive
+id: dr-elena-voss
 name: Dr. Elena Voss
 one_sentence: Lead scientist on Project Save the Children — chose to preserve the
   minds even knowing the bodies would never come.

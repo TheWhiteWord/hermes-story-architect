@@ -186,12 +186,15 @@ class TestPurgeLeavesNoMarkdownToResurrect:
         from tools.story_export import handler as export_handler
         from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
+        from test_round_trip import note_for, note_rel
 
-        note = vault / "projects" / "stc" / "characters" / "kael.md"
         # The sweep only touches files a previous export wrote, so the entity
-        # has to be exported once while it still exists.
+        # has to be exported once while it still exists. The filename is the
+        # title, so the path is only knowable after that first export.
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
+        proj = vault / "projects" / "stc"
+        note = note_for(proj, "characters", "kael")
         assert note.exists()
 
         _delete(vault)
@@ -216,13 +219,17 @@ class TestSoftDeleteSurvivesAnExportImportRoundTrip:
         from tools.story_export import handler as export_handler
         from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
-        # Export first, so the manifest knows the file exists.
+        from test_round_trip import note_for, note_rel
+        # Export first, so the manifest knows the file exists. The filename is
+        # the title, so the path is captured while the note still exists.
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
+        proj = vault / "projects" / "stc"
+        note = note_for(proj, "characters", "kael")
         _delete(vault)
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
-        assert not (vault / "projects" / "stc" / "characters" / "kael.md").exists()
+        assert not note.exists()
         import_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
         r = json.loads(retrieve_handler({
@@ -232,10 +239,14 @@ class TestSoftDeleteSurvivesAnExportImportRoundTrip:
 
     def test_its_arc_beats_are_swept_too(self, vault):
         from tools.story_export import handler as export_handler
+        from test_round_trip import note_for, note_rel
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
+        proj = vault / "projects" / "stc"
+        kael_note = note_rel(proj, "characters", "kael")
+        beat_notes = [note_rel(proj, "arcs", b) for b in ("kael-1", "kael-2", "kael-3")]
         _delete(vault)
         r = json.loads(export_handler({"project": "stc", "confirm": True},
                                       root_path=str(vault)))
-        assert "characters/kael.md" in r["files_removed"]
-        assert any("arcs/kael" in f for f in r["files_removed"])
+        assert kael_note in r["files_removed"]
+        assert all(b in r["files_removed"] for b in beat_notes)

@@ -1,14 +1,18 @@
 ---
-name: "Mira & The Administrator"
-characters: ["mira", "the-administrator"]
+characters:
+- mira
+- the-administrator
+id: mira-the-administrator
+name: Mira & The Administrator
 perspectives:
   mira:
-    label: "Understands them"
-    feeling: "Understands them better than Kael does, which makes her more dangerous"
-    type: "rival"
+    feeling: Understands them better than Kael does, which makes her more dangerous
+    label: Understands them
     strength: 0.0
-scenes: ["central-room-night"]
-status: "active"
+    type: rival
+scenes:
+- central-room-night
+status: active
 ---
 
 ## Description
