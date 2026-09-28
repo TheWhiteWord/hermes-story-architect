@@ -202,6 +202,51 @@ class TestStorageLabelsAreTrue:
             assert not out[et][field].get("is_reference"), f"{et}.{field}"
 
 
+class TestLoadAndWriteVocabulariesAreBridged:
+    """The read and write tools name the same links differently, on purpose.
+
+    `story_load` abbreviates (`chars`, `loc`) to keep the payload small — the
+    redesign spec's first principle. `story_describe` uses the names
+    `story_draft` takes, and `edit_entity` rejects unknown keys so a wrong
+    name cannot be silently dropped. So neither side can be renamed, and both
+    descriptions have to say how the vocabularies correspond.
+    """
+
+    def test_story_load_says_how_its_abbreviations_map_to_write_names(self):
+        from tools.story_load import SCHEMA
+
+        text = SCHEMA["description"]
+        assert "chars" in text and "characters" in text
+        assert "loc" in text and "location" in text
+
+    def test_story_describe_says_id_is_the_op_slug_argument(self):
+        from tools.story_describe import SCHEMA
+
+        text = SCHEMA["description"]
+        assert "`id`" in text and "slug" in text
+        assert "chars" in text and "loc" in text
+
+    def test_the_short_names_are_really_what_story_load_emits(self):
+        """Guards the descriptions above: if the payload ever stops abbreviating,
+        the bridge text is wrong and should fail here rather than mislead."""
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from core.db import get_project_summary
+
+        src = Path(__file__).parent / "fixtures" / "save-the-children"
+        tmp = Path(tempfile.mkdtemp()) / "p"
+        shutil.copytree(src, tmp)
+        try:
+            blob = json.dumps(get_project_summary(tmp))
+        finally:
+            shutil.rmtree(tmp.parent)
+
+        assert '"chars"' in blob, "story_load no longer emits `chars`"
+        assert '"loc"' in blob, "story_load no longer emits `loc`"
+
+
 class TestEntityTypeEnumsStayInSync:
     """Every tool that takes an entity_type must accept every one ENTITY_SCHEMAS defines.
 

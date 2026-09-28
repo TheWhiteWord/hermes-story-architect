@@ -977,6 +977,48 @@ frontmatter round-trips its own `act_id`), so removing the storage would break
 
 ---
 
+## I3. The two vocabularies were never bridged — **FIXED 2026-09-28**
+
+One sentence per tool description, which is the whole fix:
+
+- `story_load`: *"Abbreviated keys `chars` and `loc` are the links
+  `story_describe` calls `characters` and `location`."*
+- `story_describe`: *"These are the field names to pass to `story_draft`: an
+  entity's `id` is the `slug` argument of its op, and `story_load` returns some
+  links under short names (`chars`=characters, `loc`=location)."*
+
+**Why descriptions and not a rename** — the two tools do different jobs, so
+unifying the names would break one of them:
+
+| | `story_load` | `story_describe` / `story_draft` |
+|---|---|---|
+| job | compressed read summary | the write vocabulary |
+| `location` | `loc` | `location` |
+| `characters` | `chars` | `characters` |
+| drops fields? | yes, by design (`heading`, `time_of_day`, `value*`, `conflict_levels`) | no |
+| unknown key on write | n/a | **hard error** — `edit_entity` rejects it |
+
+`chars`/`loc` exist to serve the spec's first principle (remove ~12.9k tokens);
+the write names are op keys that must stay exact or a write fails. Both are
+load-bearing, so the bridge is prose.
+
+**Tests: 3 added, one of which is a real guard.** The third asserts the
+fixture's load payload actually contains `"chars"` and `"loc"` — if the
+abbreviation is ever dropped from the read side, the descriptions become wrong
+and this fails instead of misleading an agent. That test caught the first draft
+of the `story_load` sentence, which named only the targets and not the
+abbreviations, so it earned its keep immediately.
+
+847 pass; 2 of the 3 fail without the change.
+
+**Still open from the same investigation:** the `id`-in-output / `slug`-in-op
+half is *described* but the op schema still says `slug` while `story_describe`
+lists a field called `id`. Both are documented now, so an agent can follow it,
+but the naming asymmetry itself is unchanged — settling it means renaming the
+column or the op arg, which is a data-model change and not made here.
+
+---
+
 ## D2. `story_load` and `story_describe` use different names for the same links
 
 **Found 2026-09-28, while fixing B4/B5. Raised as a question: should the
