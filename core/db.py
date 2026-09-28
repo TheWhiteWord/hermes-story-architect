@@ -484,7 +484,7 @@ def get_project_summary(project_path: Path) -> dict:
             if stub:
                 result = {"id": sid}
                 if chars:
-                    result["chars"] = chars
+                    result["characters"] = chars
                 return result
             result = {
                 "id": sid,
@@ -492,11 +492,15 @@ def get_project_summary(project_path: Path) -> dict:
                 "status": s["status"],
                 "one_sentence": s["one_sentence"],
                 "dramatic_role": s["dramatic_role"],
-                "chars": chars,
-                "loc": scene_loc.get(sid),
+                # `characters`/`location`, not `chars`/`loc`: the write tools
+                # use these names, and the abbreviations saved 12 tokens
+                # (0.7% of the payload) at the cost of a second vocabulary
+                # every agent has to learn and bridge.
+                "characters": chars,
+                "location": scene_loc.get(sid),
                 "milestone": _milestone_marker(s["_extra"]),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "chars": [], "loc": None, "milestone": None},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": None},
                          always_keep={"status"})
 
         # ── Build sequence output ──

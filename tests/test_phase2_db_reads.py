@@ -168,30 +168,30 @@ class TestStubClassification:
 class TestEmbeddedCrossReferences:
     """Cross-references are embedded directly, not in a relations table."""
 
-    def test_scene_has_chars(self, db_project):
-        """scene.chars populated from character_scene relations."""
+    def test_scene_has_characters(self, db_project):
+        """scene.characters populated from character_scene relations."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
                     if isinstance(scene, dict) and scene.get("dramatic_role"):
-                        # chars may be omitted when empty, but must be present for
-                        # scenes that have characters assigned
-                        if scene.get("chars"):
-                            assert isinstance(scene["chars"], list)
+                        # characters may be omitted when empty, but must be
+                        # present for scenes that have characters assigned
+                        if scene.get("characters"):
+                            assert isinstance(scene["characters"], list)
 
-    def test_scene_has_loc(self, db_project):
-        """scene.loc populated from location_scene relation."""
+    def test_scene_has_location(self, db_project):
+        """scene.location populated from location_scene relation."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
                     if isinstance(scene, dict) and scene.get("dramatic_role"):
-                        # loc may be omitted when unassigned
-                        if scene.get("loc"):
-                            assert isinstance(scene["loc"], str)
+                        # location may be omitted when unassigned
+                        if scene.get("location"):
+                            assert isinstance(scene["location"], str)
 
     def test_character_has_rel(self, db_project):
         """character.relationships populated from relationship entities."""
@@ -360,12 +360,12 @@ class TestNavigationalQueries:
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         kael = next(e for e in result["characters"] if e["id"] == "kael")
-        # Navigate: find scenes where kael is in chars
+        # Navigate: find scenes where kael is in characters
         kael_scenes = []
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and "kael" in scene.get("chars", []):
+                    if isinstance(scene, dict) and "kael" in scene.get("characters", []):
                         kael_scenes.append(scene["id"])
         assert "central-room-day" in kael_scenes
 

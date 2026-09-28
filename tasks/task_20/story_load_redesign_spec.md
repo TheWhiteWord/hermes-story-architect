@@ -6,7 +6,7 @@ Target: reduce feature-scale load payload from ~47,000 tokens to ~8,000–8,500 
 
 ## 1. Core Principles
 
-1. **No flat `relations` table.** Every relation is an attribute of one of its two endpoints and gets embedded there (scene carries `chars`, plot carries scene-id arrays, character carries `rel`). This removes ~12.9k tokens with no loss of navigability, since reverse lookups ("what scenes is this character in?") become a scan of the already-present scene list rather than a join.
+1. **No flat `relations` table.** Every relation is an attribute of one of its two endpoints and gets embedded there (scene carries `characters`, plot carries scene-id arrays, character carries `rel`). This removes ~12.9k tokens with no loss of navigability, since reverse lookups ("what scenes is this character in?") become a scan of the already-present scene list rather than a join. **Abbreviating those keys was part of the original design (`chars`, `loc`) and is no longer: it saved ~12 tokens and cost a second vocabulary. Full field names throughout — see task_17/bugs.md I4.**
 2. **Structure is implied by nesting, not by `parent_id`.** `act → sequences → scenes` is expressed as literal JSON nesting. `sequence_id`, `act_id`, and `parent_id` fields disappear entirely — containment *is* the pointer.
 3. **Order is implied by array position, not an `order` field.** Progression (scene order, arc-beat order) is real signal worth keeping, but position in an array carries it for free.
 4. **Hybrid full/stub representation for scenes and arc beats.** Entities with no creative work done yet collapse to a bare id string inside the same ordered array as fully-detailed entities. Consumers branch on `typeof`. This is the same classifier used for unfilled-field surfacing (§4), so it's one mechanism serving two purposes, not two systems.
@@ -63,13 +63,13 @@ Target: reduce feature-scale load payload from ~47,000 tokens to ~8,000–8,500 
               "title": "<display title>",
               "status": "<planned|drafted|written|locked>",
               "dramatic_role": "<optional>",
-              "chars": ["<char-slug>", "<char-slug>"],
-              "loc": "<location-slug>",
+              "characters": ["<char-slug>", "<char-slug>"],
+              "location": "<location-slug>",
               "climax": "<inciting|seq|act|story|null>",
               "sections": ["<section-name>"]
             },
             {"id": "<scene-slug-stub-without-dramatic-role>"},
-            {"id": "<scene-slug-stub-planned>", "chars": ["<char-slug>"]}
+            {"id": "<scene-slug-stub-planned>", "characters": ["<char-slug>"]}
           ]
         }
       ]
@@ -188,7 +188,7 @@ The section names are derived from the actual headings the user/agent wrote (par
 |---|---|---|
 | id, title, status | keep | Identity, readability without a retrieve round-trip |
 | dramatic_role | keep | Reveals whether structure is functional |
-| chars, loc | keep | Structural cross-reference, replaces `character_scene`/`location_scene` relations |
+| characters, location | keep | Structural cross-reference, replaces `character_scene`/`location_scene` relations. **Originally specced as `chars`/`loc`**; dropped 2026-09-28 — they saved ~12 tokens (0.7% of the payload) and cost a second vocabulary the write tools did not use. See task_17/bugs.md I4. |
 | climax (single marker: `"inciting"\|"seq"\|"act"\|"story"\|null`) | keep | Replaces 4 booleans with 1 field. Derived from the scene's boolean frontmatter; if multiple are true, priority is `inciting > story > act > seq`. |
 | order, sequence_id, act_id, parent_id | **drop** | Implicit via nesting + array position |
 | heading, time_of_day | **drop** | Screenplay-formatting detail → `story_retrieve(scene, slug, sections=["Content"])` |
@@ -196,7 +196,7 @@ The section names are derived from the actual headings the user/agent wrote (par
 | conflict_levels | **drop** | → same retrieve call as above |
 
 ### Scene (stub form)
-Compact object. Criterion: `status == "planned"` OR no `dramatic_role` (either condition is sufficient — a planned scene is a stub even with a dramatic_role assigned; a scene in any status without a dramatic_role is also a stub). Shown in the nested tree as `{"id": "<scene-slug>"}` or `{"id": "<scene-slug>", "chars": ["<char-slug>"]}` when characters are present. Characters are included for context but do not affect stub classification.
+Compact object. Criterion: `status == "planned"` OR no `dramatic_role` (either condition is sufficient — a planned scene is a stub even with a dramatic_role assigned; a scene in any status without a dramatic_role is also a stub). Shown in the nested tree as `{"id": "<scene-slug>"}` or `{"id": "<scene-slug>", "characters": ["<char-slug>"]}` when characters are present. Characters are included for context but do not affect stub classification.
 
 ### Sequence / Act
 

@@ -977,7 +977,56 @@ frontmatter round-trips its own `act_id`), so removing the storage would break
 
 ---
 
-## I3. The two vocabularies were never bridged — **FIXED 2026-09-28**
+## I4. The `chars`/`loc` abbreviations are gone — **DONE 2026-09-28**
+
+I3 bridged the two vocabularies in prose. That was the wrong fix, and the
+question "do we need the abbreviations at all?" is what showed it.
+
+**Measured, on the real `browser-verification-test` project:**
+
+| | payload | tokens |
+|---|---|---|
+| with `chars`/`loc` | 6,830 chars | ~1,707 |
+| with `characters`/`location` | 6,880 chars | ~1,720 |
+| **cost of abbreviating** | **50 chars** | **~12 tokens, 0.73%** |
+
+**The 12.9k figure was a category error on my part.** `story_load_redesign_spec`
+quotes ~12.9k tokens for the *whole* redesign — dropping the flat `relations`
+table and expressing structure as nesting. `chars`/`loc` are a rounding error
+inside that, and I attributed the redesign's saving to these two keys when I
+wrote I3. **They were never load-bearing.** Paying 12 tokens for a second
+vocabulary — and for the bridge text, the two tool-description sentences, and
+the three tests guarding them — was a bad trade by any measure.
+
+**The change: four lines in one function**, `_build_scene` in `core/db.py`
+(`core/db.py:485-500`). Plus the two now-obsolete bridge sentences deleted, and
+the tests updated to assert the abbreviations **stay gone** rather than to
+document them.
+
+**What it removes, not just renames:** the whole class of agent error where a
+read key and a write key don't match. The names are now identical, so an agent
+that copies `scene.characters` from a load payload into a `story_draft` op is
+correct by construction rather than by having read a bridge note. That is the
+same class of defect as B4/B5 and B8 — a tool telling the agent something
+subtly untrue — resolved by deletion instead of documentation.
+
+**Tests: 4, one of which is a real guard.** The strongest asserts that every
+key `story_load` puts on an *entity* node is a name `story_describe` accepts.
+Written from the actual failure mode, not from the two keys I happened to
+change: a future invented abbreviation fails there even if nobody remembers the
+name. It caught `milestone` (a deliberate load-only climax marker) and had to
+be scoped past the `memory` subtree, whose vocabulary is not entity fields.
+
+848 pass; 4 fail without the change.
+
+**Spec updated:** `story_load_redesign_spec.md` still documents `chars, loc` as
+the design. The implementation now diverges from its own spec, deliberately and
+for a measured reason, and the spec is the thing a future keeper reads first —
+so that entry needs updating. Left unedited here to keep this commit to code.
+
+---
+
+## I3. The two vocabularies were never bridged
 
 One sentence per tool description, which is the whole fix:
 

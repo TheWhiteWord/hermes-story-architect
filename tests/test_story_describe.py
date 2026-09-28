@@ -202,33 +202,16 @@ class TestStorageLabelsAreTrue:
             assert not out[et][field].get("is_reference"), f"{et}.{field}"
 
 
-class TestLoadAndWriteVocabulariesAreBridged:
-    """The read and write tools name the same links differently, on purpose.
+class TestOneVocabularyAcrossReadAndWrite:
+    """story_load and story_describe use the SAME field names.
 
-    `story_load` abbreviates (`chars`, `loc`) to keep the payload small — the
-    redesign spec's first principle. `story_describe` uses the names
-    `story_draft` takes, and `edit_entity` rejects unknown keys so a wrong
-    name cannot be silently dropped. So neither side can be renamed, and both
-    descriptions have to say how the vocabularies correspond.
+    `story_load` used to abbreviate to `chars`/`loc`, saving 12 tokens (0.7% of
+    the payload) and costing a second vocabulary every agent had to learn. The
+    abbreviations are gone; these tests fail if they come back, because their
+    return is what caused the confusion in the first place.
     """
 
-    def test_story_load_says_how_its_abbreviations_map_to_write_names(self):
-        from tools.story_load import SCHEMA
-
-        text = SCHEMA["description"]
-        assert "chars" in text and "characters" in text
-        assert "loc" in text and "location" in text
-
-    def test_story_describe_says_id_is_the_op_slug_argument(self):
-        from tools.story_describe import SCHEMA
-
-        text = SCHEMA["description"]
-        assert "`id`" in text and "slug" in text
-        assert "chars" in text and "loc" in text
-
-    def test_the_short_names_are_really_what_story_load_emits(self):
-        """Guards the descriptions above: if the payload ever stops abbreviating,
-        the bridge text is wrong and should fail here rather than mislead."""
+    def _load_payload(self):
         import shutil
         import tempfile
         from pathlib import Path
@@ -239,12 +222,56 @@ class TestLoadAndWriteVocabulariesAreBridged:
         tmp = Path(tempfile.mkdtemp()) / "p"
         shutil.copytree(src, tmp)
         try:
-            blob = json.dumps(get_project_summary(tmp))
+            return get_project_summary(tmp)
         finally:
             shutil.rmtree(tmp.parent)
 
-        assert '"chars"' in blob, "story_load no longer emits `chars`"
-        assert '"loc"' in blob, "story_load no longer emits `loc`"
+    def test_story_load_does_not_emit_the_old_abbreviations(self):
+        blob = json.dumps(self._load_payload())
+        assert '"chars"' not in blob, "story_load abbreviates again"
+        assert '"loc":' not in blob, "story_load abbreviates again"
+
+    def test_story_load_uses_the_write_side_names(self):
+        blob = json.dumps(self._load_payload())
+        assert '"characters"' in blob
+        assert '"location"' in blob
+
+    def test_every_link_key_story_load_emits_is_a_real_field_name(self):
+        """The stronger form: no link key is a name story_describe cannot accept.
+
+        A made-up abbreviation fails here even if nobody remembered its name.
+        Scoped to entity nodes (dicts carrying an `id`); the `memory` subtree
+        has its own vocabulary and is not entity fields.
+        """
+        from core.constants import ENTITY_SCHEMAS
+
+        out = _handler({})["entity_schemas"]
+        known = {f for fields in out.values() for f in fields}
+        # Entity containers, not fields: they hold other entities.
+        known |= {"acts", "sequences", "scenes", "worlds", "locations",
+                  "plots", "characters"}
+        # `milestone` is the load payload's own climax marker, deliberately not
+        # a stored field — the spec derives it from four scene booleans.
+        known |= {"milestone"}
+
+        def walk(node, is_entity=False):
+            if isinstance(node, dict):
+                entity = is_entity or "id" in node
+                for k, v in node.items():
+                    if entity and isinstance(v, (str, list)) and k not in known:
+                        pytest.fail(f"story_load emits unknown entity field {k!r}")
+                    walk(v, entity)
+            elif isinstance(node, list):
+                for x in node:
+                    walk(x, is_entity)
+
+        walk(self._load_payload())
+
+    def test_story_describe_says_id_is_the_op_slug_argument(self):
+        from tools.story_describe import SCHEMA
+
+        text = SCHEMA["description"]
+        assert "`id`" in text and "slug" in text
 
 
 class TestEntityTypeEnumsStayInSync:

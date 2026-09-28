@@ -7,9 +7,7 @@ SCHEMA = {
     "description": "Structural map of a project: what exists and where — acts, sequences, scenes, "
                    "characters, plots, worlds. Call once per session before other story tools. "
                    "Not for reading an entity's content; use story_retrieve for that. Pass `view` "
-                   "when you need one domain in depth — the default view stays small on purpose. "
-                   "Abbreviated keys `chars` and `loc` are the links story_describe "
-                   "calls `characters` and `location`.",
+                   "when you need one domain in depth — the default view stays small on purpose.",
     "type": "object",
     "properties": {
         "project": {

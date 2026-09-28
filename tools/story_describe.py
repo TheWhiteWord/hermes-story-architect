@@ -114,9 +114,8 @@ SCHEMA = {
     "description": "List the fields an entity type expects, with types, defaults and descriptions. "
                    "Call this before creating an entity or asking the user about one, so you know "
                    "which questions are worth asking and which fields are still empty. "
-                   "These are the field names to pass to story_draft: an entity's `id` is the `slug` "
-                   "argument of its op, and `story_load` returns some links under short names "
-                   "(`chars`=characters, `loc`=location).",
+                   "These are the field names to pass to story_draft, and the ones story_load "
+                   "returns — an entity's `id` is the `slug` argument of its op.",
     "type": "object",
     "properties": {
         "entity_type": {
