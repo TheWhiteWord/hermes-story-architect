@@ -136,6 +136,72 @@ class TestStructuredFieldShapesAreVisible:
         assert not missing, f"schema keys dropped by story_describe: {sorted(missing)}"
 
 
+class TestStorageLabelsAreTrue:
+    """B4/B5: the label says where a field lives, and it is never a guess.
+
+    The label used to come from a flattened set of field NAMES across all
+    entity types, so `plot.characters` and `relationship.characters` were
+    called relations because `scene.characters` is one. Both are stored in
+    `extra`. An agent reading that has no way to know the tool was guessing.
+    """
+
+    def test_no_field_is_labelled_with_storage_it_does_not_have(self):
+        from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+
+        out = _handler({})["entity_schemas"]
+        wrong = []
+        for et, fields in out.items():
+            cols = ENTITY_COLUMN_MAP.get(et, {})
+            rels = _RELATION_FIELDS.get(et, {})
+            for field, entry in fields.items():
+                claim = entry.get("stored_as")
+                if not claim:
+                    continue
+                truth = ("relation" if field in rels
+                         else "column" if field in cols else None)
+                if claim != truth:
+                    wrong.append(f"{et}.{field}: says {claim}, is {truth}")
+        assert not wrong, wrong
+
+    def test_every_declared_reference_is_labelled(self):
+        from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+
+        out = _handler({})["entity_schemas"]
+        declared = set()
+        for et, cols in ENTITY_COLUMN_MAP.items():
+            declared |= {(et, f) for f, c in cols.items() if c.endswith("_id")}
+        for et, rels in _RELATION_FIELDS.items():
+            declared |= {(et, f) for f in rels}
+        unlabelled = [f"{et}.{f}" for et, f in declared
+                      if not out[et][f].get("stored_as")]
+        assert not unlabelled, unlabelled
+
+    def test_a_link_in_extra_is_still_marked_as_a_reference(self):
+        """The nine `extra` links have no special storage, but the agent still
+        needs to know the value is another entity's slug, not a display name."""
+        out = _handler({})["entity_schemas"]
+        for et, field in [("scene", "act_id"), ("arc_beat", "scene"),
+                          ("plot", "characters"),
+                          ("project", "story_climax_scene_id")]:
+            assert out[et][field]["is_reference"] is True, f"{et}.{field}"
+
+    def test_an_id_is_not_a_reference(self):
+        """`id` says "slug" because it IS one. Calling it a reference to
+        another entity would be wrong in the other direction."""
+        out = _handler({})["entity_schemas"]
+        for et in ("scene", "act", "arc_beat"):
+            assert not out[et]["id"].get("is_reference"), et
+
+    def test_a_plain_value_is_not_labelled(self):
+        """`name`, `order`, `status` are columns like everything else; saying so
+        for 25 fields is noise that buries the 12 that matter."""
+        out = _handler({})["entity_schemas"]
+        for et, field in [("act", "title"), ("act", "order"),
+                          ("character", "one_sentence"), ("project", "logline")]:
+            assert "stored_as" not in out[et][field], f"{et}.{field}"
+            assert not out[et][field].get("is_reference"), f"{et}.{field}"
+
+
 class TestEntityTypeEnumsStayInSync:
     """Every tool that takes an entity_type must accept every one ENTITY_SCHEMAS defines.
 

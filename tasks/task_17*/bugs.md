@@ -273,7 +273,65 @@ fix belongs in one place in the renderer rather than per-field.
 
 ---
 
-## B4. `stored_as: relation` is advertised for fields that store in `extra`
+## B4 / B5. `stored_as` was a guess from the field's name — **FIXED 2026-09-28**
+
+Both entries had the same root cause and the same fix. `story_describe` built
+its relation label from a flattened set of field *names* across all entity
+types:
+
+```python
+_RELATION_FIELDS_BY_NAME = {field for fields in _RELATION_FIELDS.values() for field in fields}
+...
+if field in _RELATION_FIELDS_BY_NAME:
+    entry["stored_as"] = "relation"
+```
+
+So `scene.characters` matched, and so did `plot.characters` and
+`relationship.characters` — which are stored in `extra`. Measured before the
+fix: **2 fields labelled with storage they do not have**, and nothing
+distinguished a reference column from a plain value.
+
+**The fix labels from the declared maps, not from names**, and only for fields
+that are actually references:
+
+| truth | how it is decided | count |
+|---|---|---|
+| `relation` | field is in `_RELATION_FIELDS[entity_type]` | 7 |
+| `column` | its column name ends `_id` (a real reference) | 5 |
+| unlabelled | everything else — `name`, `order`, `status`, `title` | 25 |
+
+Labelling all 30 columns was the alternative, and it is worse: it buries the 12
+that mean something under 18 that do not. A test asserts the 25 stay unlabelled.
+
+**Also added `is_reference`**, which answers a question `stored_as` cannot: a
+link in `extra` has no special storage, but its value is still another entity's
+slug, and the agent needs to know that before writing one. Nine fields gain
+it (`scene.act_id`, `arc_beat.scene`, `plot.characters`,
+`relationship.characters`, the `*_scene_id` family, `primary_plot`), so all 21
+references are now marked — 12 by declaration, 9 by the description saying
+"slug".
+
+**Two limits recorded rather than hidden:**
+
+- `is_reference` is a **heuristic** for the undeclared nine: it reads the word
+  "slug" out of the description. It therefore **misses `relationship.scenes`**
+  ("Scenes where this relationship is featured"), which stays unlabelled. A real
+  `is_reference` flag in `ENTITY_SCHEMAS` would retire the guess; that is a
+  schema change, not a tool change, and is not made here.
+- The word "slug" also appears in `id`'s own description, so `id` is explicitly
+  excluded — it *is* the slug rather than pointing at one. A test guards it,
+  because the error in that direction is as bad as the original.
+
+**Why this mattered more than a label.** An agent told `plot.characters` is
+relation-backed writes a relation; one told the truth writes frontmatter. Two
+tools disagreeing about where a value goes is the same failure as B8, one layer
+up — and the label was the only place the disagreement was visible.
+
+---
+
+## B4 / B5 (original entries)
+
+### B4. `stored_as: relation` is advertised for fields that store in `extra`
 
 **Severity: medium.** Silent. The data is not lost — it is stored somewhere
 other than the schema says, so anything reading relations misses it.
@@ -334,7 +392,7 @@ pre-existing write path agree, and both predate task 28.
 
 ---
 
-## B5. `arc_beat.scene` creates no relation — confirmed against the fixture
+### B5. `arc_beat.scene` creates no relation — confirmed against the fixture
 
 **Severity: medium.** The link exists only in `extra`, so anything walking the
 `relations` table sees beats with no scene.
