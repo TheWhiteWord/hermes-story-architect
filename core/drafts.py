@@ -566,21 +566,72 @@ def _render_create(op: dict) -> list[str]:
 
     for heading, body in (op.get("sections") or {}).items():
         if body:
-            out += ["", f"**{heading}** — {body}"]
+            out += ["", f"**{heading}**"]
+            out += _fence(body, _fence_lang(entity_type, heading))
     return out
+
+
+def _fence(value, lang: str = "") -> list[str]:
+    """A section body in its own fenced block.
+
+    Whitespace is part of the value — a Fountain cue is defined by its
+    indentation — so a body cannot be rendered as a `before → after` line the
+    way a scalar field can. Markdown collapses the indentation that carries
+    the meaning, and the reader sees prose where the script has structure.
+
+    A fence also stops the client guessing: indented lines were being rendered
+    as code while the surrounding prose did not, so the script appeared to
+    start at the first cue rather than at the slugline. The fence delimits the
+    whole section, so the boundary is the section, not an accident of
+    indentation.
+    """
+    return [f"```{lang}", value.rstrip("\n"), "```"]
+
+
+def _fence_lang(entity_type: str, field: str) -> str:
+    """Language tag for the fence. Only script is labelled; prose is plain."""
+    return "fountain" if (entity_type, field) == ("scene", "Content") else ""
+
+
+def _section_note(entity_type: str, field: str, before, after) -> str:
+    """One line describing a section change. Outside the fence, always.
+
+    The delta has to be readable without scrolling through two full copies of
+    a screenplay, so it is stated rather than shown — but the *body* is the
+    thing being approved and it goes in the block below.
+    """
+    if not before:
+        n = len(after.splitlines())
+        return f"`{field}` — new section, {n} line{'' if n == 1 else 's'}."
+    was, now = len(before.splitlines()), len(after.splitlines())
+    if was == now:
+        return f"`{field}` — rewritten, {now} lines."
+    arrow = f"{was} → {now} lines"
+    if field == "Content":
+        # Only claim cues were added when they were: the count going *down*
+        # means the prose was split into cues, and "added" would be a lie.
+        verb = "cues and transitions added" if now > was else "reformatted as Fountain"
+        return f"`{field}` — rewritten as Fountain; {arrow}, {verb}."
+    return f"`{field}` — {arrow}."
 
 
 def _render_edit(project_path: Path, op: dict) -> list[str]:
     """An edit as one line per field, `before → after` (decision 2).
 
     A table is for a whole entity; an edit is a delta. Two changed fields get
-    two lines, not a five-row table with one populated row.
+    two lines, not a five-row table with one populated row. A *section* is the
+    exception: its body is fenced, because its whitespace is significant.
     """
     out = [f"**✏ EDIT** · `{op['entity_type']}/{op['entity_id']}`"]
     changes = _current_values(project_path, op)
     for field, value in op["data"].items():
         before = changes.get(field, (None, None))[0]
         if before == value:
+            continue
+        if isinstance(value, str) and "\n" in value:
+            out += [_section_note(op["entity_type"], field, before, value), ""]
+            out += _fence(value, _fence_lang(op["entity_type"], field))
+            out.append("")
             continue
         # An unset field is `_not set_`, not an empty gap: a blank before an
         # arrow reads as a rendering fault rather than as "this was empty".

@@ -81,8 +81,45 @@ def test_an_unset_field_reads_as_not_set_not_as_a_blank(fixture_path):
 
 
 def test_the_prose_an_op_carries_is_rendered(fixture_path):
+    """Prose is fenced, one block per section (D), not flattened onto the
+    heading line — a body whose whitespace matters cannot be a `— body` line."""
     md = stage(fixture_path, BATCH, "The Telling")["preview_md"]
-    assert "**Objective** — Mira confesses the reservoir is failing." in md
+    assert "**Objective**" in md
+    assert "Mira confesses the reservoir is failing." in md
+    # The body sits inside a fence, immediately after its heading.
+    assert "**Objective**\n```\nMira confesses the reservoir is failing." in md
+
+
+def test_a_scene_content_section_is_fenced_as_fountain(fixture_path):
+    """Only script is labelled. A generic fence would be fine too, but the tag
+    costs nothing and names the format for whatever renders the block."""
+    op = {"op": "create", "type": "scene", "slug": "probe",
+          "frontmatter": {"title": "Probe", "time_of_day": "NIGHT"},
+          "sections": {"Content": "INT. LAMP ROOM - NIGHT\n\n                ELIAS\n        Still going.\n"},
+          "summary": "probe"}
+    md = stage(fixture_path, [op], "probe")["preview_md"]
+    assert "**Content**\n```fountain\nINT. LAMP ROOM - NIGHT" in md
+
+
+def test_a_multi_line_section_change_is_stated_then_fenced(fixture_path):
+    """C: the one-line delta goes outside the block, the body inside. A
+    screenplay diff line is unreadable, and two full copies is worse."""
+    op = {"op": "edit", "entity_type": "scene", "entity_id": "mira-tells-kael",
+          "data": {"Content": "INT. ROOM - NIGHT\n\nOne.\n\n                MARA\n        Two.\n"},
+          "summary": "reformat as script"}
+    md = stage(fixture_path, [op], "reformat")["preview_md"]
+    assert "`Content` —" in md
+    assert "~~" not in md.split("```fountain")[0]  # no struck-through body
+    assert "```fountain\nINT. ROOM - NIGHT" in md
+
+
+def test_a_scalar_field_still_renders_before_after(fixture_path):
+    """The fence is for bodies, not fields: a one-line value is still a delta."""
+    op = {"op": "edit", "entity_type": "location", "entity_id": "the-central-room",
+          "data": {"mood": "claustrophobic warmth"}, "summary": "set the mood"}
+    md = stage(fixture_path, [op], "set the mood")["preview_md"]
+    assert "`mood`: _not set_ → **claustrophobic warmth**" in md
+    assert "```" not in md
 
 
 def test_the_restage_diff_is_in_the_preview(fixture_path):
