@@ -6,7 +6,7 @@ Target: reduce feature-scale load payload from ~47,000 tokens to ~8,000–8,500 
 
 ## 1. Core Principles
 
-1. **No flat `relations` table.** Every relation is an attribute of one of its two endpoints and gets embedded there (scene carries `characters`, plot carries scene-id arrays, character carries `rel`). This removes ~12.9k tokens with no loss of navigability, since reverse lookups ("what scenes is this character in?") become a scan of the already-present scene list rather than a join. **Abbreviating those keys was part of the original design (`chars`, `loc`) and is no longer: it saved ~12 tokens and cost a second vocabulary. Full field names throughout — see task_17/bugs.md I4.**
+1. **No flat `relations` table.** Every relation is an attribute of one of its two endpoints and gets embedded there (scene carries `characters`, plot carries scene-id arrays, character carries `relationships`). This removes ~12.9k tokens with no loss of navigability, since reverse lookups ("what scenes is this character in?") become a scan of the already-present scene list rather than a join. **Abbreviating those keys was part of the original design (`chars`, `loc`, and `rel`) and is no longer: together they saved ~12 tokens and cost a second vocabulary. Full field names throughout — see task_17/bugs.md I4 and I5.**
 2. **Structure is implied by nesting, not by `parent_id`.** `act → sequences → scenes` is expressed as literal JSON nesting. `sequence_id`, `act_id`, and `parent_id` fields disappear entirely — containment *is* the pointer.
 3. **Order is implied by array position, not an `order` field.** Progression (scene order, arc-beat order) is real signal worth keeping, but position in an array carries it for free.
 4. **Hybrid full/stub representation for scenes and arc beats.** Entities with no creative work done yet collapse to a bare id string inside the same ordered array as fully-detailed entities. Consumers branch on `typeof`. This is the same classifier used for unfilled-field surfacing (§4), so it's one mechanism serving two purposes, not two systems.
@@ -83,8 +83,8 @@ Target: reduce feature-scale load payload from ~47,000 tokens to ~8,000–8,500 
       "story_role": "<Protagonist|Antagonist|Supporting|Minor|Cameo>",
       "arc_type": "<optional>",
       "arc_complete": false,
-      "rel": [
-        {"id": "<char-slug>", "label": "<relationship-label>", "feeling": "<feeling-text>"}
+      "relationships": [
+        {"with": "<other-char-slug>", "label": "<relationship-label>", "type": "<ally|rival|enemy|family|romantic>"}
       ],
       "sections": ["<section-name>"],
       "arc": [
@@ -177,7 +177,7 @@ The section names are derived from the actual headings the user/agent wrote (par
 | name, one_sentence | keep | Identity |
 | story_role | keep | "Who matters at a glance" — explicitly called out in brief |
 | arc_type, arc_complete | keep | Arc-completion signal without arc prose |
-| rel (id + label + feeling) | keep | Relationship *map* is structural. The `relationships` list has sub-fields: `id`, `label`, `feeling`. All three are kept — `feeling` is a short structured sub-field, not prose, and cheap to include. |
+| relationships (with + label + type) | keep | Relationship *map* is structural. **Originally specced as `rel` with `{id, label, feeling}`; the implementation differs on all three counts** — the key is spelled out, `id` became `with` (it names the *other* character, never the holder), and `feeling` was dropped in favour of `type`. The dashboard view adds `strength` (signed, −0.6…0.9 in real data) on top. `feeling` survives on the relationship entity's `perspectives`, reachable via `story_retrieve`. Corrected 2026-09-28 against the payload — see task_17/bugs.md I5. |
 | arc_value, arc_value_at_open/close | **drop** | → `story_retrieve(character, slug, sections=["Arc"])` |
 | goals_short, goals_long | **drop** | → `story_retrieve(character, slug, sections=["Goals"])` |
 | knowledge | **drop** | → `story_retrieve(character, slug, sections=["Background"])` |
