@@ -453,13 +453,12 @@ So: heading first, always. A forced heading (`.SNIPER SCOPE POV`) counts.
 
 ## When Writing New Screenplays
 
-1. Start with Title Page (optional)
-2. Write scenes with proper headings (or a forced `.` heading)
-3. Character cues: ALL CAPS, blank line before
-4. Dialogue: no blank line after character
-5. Parentheticals: wrapped in `()`
-6. Action: full width paragraphs
-7. Transitions: ALL CAPS, ending in `TO:`, at the END of the scene you cut from
+1. Write scenes with proper headings (or a forced `.` heading)
+2. Character cues: ALL CAPS, blank line before
+3. Dialogue: no blank line after character
+4. Parentheticals: wrapped in `()`
+5. Action: full width paragraphs
+6. Transitions: ALL CAPS, ending in `TO:`, at the END of the scene you cut from
 
 ## When Editing Existing Screenplays
 
