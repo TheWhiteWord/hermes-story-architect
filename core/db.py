@@ -65,6 +65,37 @@ CREATE TABLE IF NOT EXISTS drafts (
 );
 """
 
+def ensure_draft_status_column(conn: sqlite3.Connection) -> None:
+    """Add `status` to a drafts table that predates it. Idempotent.
+
+    A commit marks the row rather than deleting it, so a repeated commit
+    replays the same success instead of reporting that nothing was open
+    (drafts.commit). A `drafts` table created before that change has no such
+    column, and `ALTER TABLE ... ADD COLUMN` is the only way to add one to a
+    table that already exists.
+
+    The *table* itself needs no such repair — create_schema makes it, and
+    create_project is the only way a real database comes into being. That
+    reasoning is recorded in tests/test_legacy_db_migration.py and still holds;
+    only the column is new.
+    """
+    if "status" not in {r[1] for r in conn.execute("PRAGMA table_info(drafts)")}:
+        conn.execute("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'open'")
+
+
+def ensure_soft_delete_columns(conn: sqlite3.Connection) -> None:
+    """Add is_deleted / deleted_at to databases created before the soft delete.
+
+    `CREATE TABLE IF NOT EXISTS` silently leaves an existing table alone, so any
+    project created by an earlier build has no such column — and every reader
+    that filters on it would fail with "no such column". Idempotent.
+    """
+    have = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
+    if "is_deleted" not in have:
+        conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
+    if "deleted_at" not in have:
+        conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
+
 
 def get_db(project_path: Path) -> sqlite3.Connection:
     """Open a short-lived connection with WAL mode and busy_timeout.
@@ -73,12 +104,10 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     BEGIN/COMMIT/ROLLBACK for transactions. Avoids nested-transaction errors
     from SQLite's implicit transaction behavior.
 
-    Also repairs a database whose `entities` table predates soft delete, by
-    adding the two columns: every reader filters on `is_deleted`, and a
-    read-only tool never calls create_schema(), so a project created by an
-    earlier build failed with "no such column" on read. A missing *table* needs
-    no such repair — create_schema makes those, and create_project is the only
-    way a real database comes into being.
+    Also repairs a database this build did not create: a project made by an
+    earlier build has no ``drafts`` table and no soft-delete columns, and a
+    read-only tool never calls create_schema(), so it would fail on the first
+    read. Both repairs are idempotent and unconditional.
     """
     db_path = project_path / ".story" / "story.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,24 +115,14 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=3000")
     conn.execute("PRAGMA foreign_keys=ON")
-    # No entities table yet (fresh project) — create_schema() adds it with the
-    # columns already present, so there is nothing to migrate.
     if conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='entities'"
     ).fetchone():
-        have = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
-        if "is_deleted" not in have:
-            conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
-        if "deleted_at" not in have:
-            conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
-    # Same for the drafts table's `status`, which a commit sets instead of
-    # deleting the row (see drafts.commit — a repeated commit must replay, not
-    # report that nothing was open).
+        ensure_soft_delete_columns(conn)
     if conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='drafts'"
     ).fetchone():
-        if "status" not in {r[1] for r in conn.execute("PRAGMA table_info(drafts)")}:
-            conn.execute("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'open'")
+        ensure_draft_status_column(conn)
     return conn
 
 
