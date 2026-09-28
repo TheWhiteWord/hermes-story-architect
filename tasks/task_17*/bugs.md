@@ -778,8 +778,10 @@ writes only the column. **Author a scene with a location and every relation-
 based reader goes blind to it.** That is B8, and it is a missing write, not an
 ambiguous authority.
 
-**3. Nine real links have NO declared storage at all.** They land in `extra`
-JSON because nothing claims them. Confirmed present in the live data:
+**3. Nine real links have NO declared storage — and this turns out to be by
+design, not an oversight.** See the assessment below; the summary here is the
+original (mistaken) reading, kept so the correction is auditable. They land in
+`extra` JSON, and the data model documents that as their storage:
 
 | field | kind |
 |---|---|
@@ -797,6 +799,14 @@ are clean; the problem is that the maps are *incomplete*, so the rule
 `scene.act_id` in `extra` while its own parent is a column is the clearest
 inconsistency: same field, same entity, two mechanisms.
 
+> **CORRECTION — the paragraph above is wrong.** The maps are not incomplete;
+> `extra` is the documented home for these, and the real rule is "columns are
+> for the structural spine, `extra` for everything else, relations for
+> many-to-many and for edges carrying a `note`". The `act_id`/`sequence_id`
+> pairing is a deliberate denormalization, recorded in
+> `task_20/archived/verification_findings.md:45`. **Nothing here needs fixing.**
+> Full assessment in the section that follows.
+
 ## What follows
 
 - **The authority question is already answered by the existing code** — single
@@ -806,10 +816,9 @@ inconsistency: same field, same entity, two mechanisms.
   false positive originally recorded. The orphan check tests the **world**, so
   the real cost is an empty location→scenes view in the dashboard (measured:
   0 scenes without the rows, correct with them). Fixed; see the B8 entry.
-- **The nine undeclared fields are the real scope of D3** and were not in the
-  original note. Fixing them by the existing rule removes the ambiguity rather
-  than resolving it — there is no ambiguity in `arc_beat.scene`, there is an
-  undeclared field.
+- **The nine undeclared fields are NOT a defect.** Assessed: `extra` is their
+  documented storage, and the redundancy is deliberate. Full reasoning in the
+  assessment section below.
 
 ---
 
@@ -819,6 +828,94 @@ Not bugs in a single function. These are the *shape* problems the test
 surfaced — the ones that make an agent slow, wrong, or uncertain, and that
 would do the same to a human writing the same data. They are collected here
 because fixing one symptom at a time leaves the cause in place.
+
+## Are the nine undeclared link fields undeclared BY DESIGN? (assessed 2026-09-28)
+
+**Yes — by design, and documented. This is not an oversight, and "fixing" them
+would be a regression.** The question was worth asking separately, and the
+answer is in the repo rather than in the pattern.
+
+### Evidence 1 — the data model states the storage for each one
+
+`tasks/task_20/archived/data_model.md` has a per-field `Storage` column, and it
+says `extra` for every one:
+
+| field | documented storage | required |
+|---|---|---|
+| `scene.act_id` | **extra** | yes |
+| `arc_beat.scene` | **extra** | yes |
+| `plot.characters` | **extra** | no |
+| `act.climax_scene_id` | **extra** | no |
+| `sequence.climax_scene_id` | **extra** | no |
+| `sequence.primary_plot` | **extra** | no |
+
+Placed directly beside their declared siblings, the contrast is explicit —
+`scene.sequence_id` is `column (parent_id)` on the very next line, and
+`scene.act_id` is `extra`. That is a choice made next to its alternative, not
+an omission.
+
+### Evidence 2 — the reasoning is recorded
+
+`task_20/archived/verification_findings.md:45`, on the redesign that produced
+the current `story_load`:
+
+> The spec drops `act_id` from scenes entirely. Current scenes have both
+> `sequence_id` and `act_id` (denormalized). The spec says scenes nest inside
+> sequences which nest inside acts, so `act_id` is implicit. **Correct** — but
+> note: this means a consumer wanting "what act is this scene in?" walks up
+> the tree. The spec considers this fine (and it is for a tree).
+
+And on `plot.characters` (line 27), explicitly checked and confirmed:
+
+> `plot.characters` comes from `extra JSON` (frontmatter `characters:` list),
+> NOT from a relation. The spec keeps this as frontmatter-sourced.
+> **Consistent.**
+
+### The rule, stated
+
+The codebase's actual rule is **not** "single links in columns, multi in
+relations". It is:
+
+- **`parent_id` and the other real DB columns are for the structural spine** —
+  the tree the load payload and the dashboard assemble (`sequence_id`,
+  `act_id`→parent, `location_id`, `order_key`, `name`, `status`).
+- **Everything else that is a link lives in `extra`**, including links. A
+  slug string in JSON is a perfectly good way to point at an entity; a column
+  is only worth its cost when the value is on the spine.
+- **Relations are for many-to-many, and for edges that carry a `note`** —
+  `character_scene`, `plot_*`, `location_scene`, `*_variant`.
+
+Under that rule all nine are correct as they stand, and my earlier framing —
+"the same field, same entity, two mechanisms", `scene.act_id` in `extra` while
+its parent is a column — described a **deliberate denormalization** as though
+it were an inconsistency. The `act_id`/`sequence_id` pairing is redundant *on
+purpose*: the act is derivable from the tree, and the shortcut is kept because
+it saves a walk.
+
+### What this changes
+
+- **D3's scope shrinks to B8 alone**, which is fixed. There is no
+  columns-vs-relations decision left to make.
+- **B4 and B5 are not "declare these fields" bugs.** B4 (a field advertised as
+  `stored_as: relation` that is not one) and B5 still stand on their own — but
+  as *documentation* defects, not storage ones. `story_describe` says
+  `stored_as: "relation"` for any field whose name appears in
+  `_RELATION_FIELDS_BY_NAME`; the fix is to say what is actually true, whatever
+  that is.
+- **The one genuine question left is consistency of the *label*, not the
+  storage**: does `story_describe` tell the truth about where a link lives? It
+  must not imply a relation where there is none, and it must not imply a
+  column where there is none either. That is the same D1 family — a schema
+  annotation the tool does not report faithfully.
+
+### What would actually justify a change
+
+Only evidence that a reader is *wrong*, not that storage is redundant. If some
+reader treats `act_id` in `extra` as authoritative where it should walk the
+tree — or vice versa — that is a real bug, and the fix is the reader. None has
+been found. The redundancy is load-bearing for the export format (a scene's
+frontmatter round-trips its own `act_id`), so removing the storage would break
+`story_export` for no gain.
 
 ---
 
