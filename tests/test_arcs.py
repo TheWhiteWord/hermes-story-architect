@@ -17,8 +17,8 @@ def _kael(project):
 
 def _beat(project, **overrides):
     """Kael's first beat, as five tests set it up."""
-    create_entity(project, "arc_beat", "1", {
-        "id": "1", "character": "kael",
+    create_entity(project, "arc_beat", "kael-1", {
+        "character": "kael",
         "label": "First Doubt", "action": "a", "gap": "g",
         "choice": "c", "shift": "s", "y": 0.5, "order": 1, **overrides})
 
@@ -129,26 +129,26 @@ import json
 
 class TestArcCreateTool:
     def test_create_arc_beat(self, tmp_path):
-        """An arc beat is created in the DB with a composite ID."""
+        """An arc beat is created with its own id; the character is parent_id."""
         _kael(tmp_path)
 
-        data = create_entity(tmp_path, "arc_beat", "1",
+        data = create_entity(tmp_path, "arc_beat", "kael-first-doubt",
                              {
-                                 "id": "1", "character": "kael",
+                                 "character": "kael",
                                  "label": "First Doubt", "action": "Kael questions",
                                  "gap": "Expected answers", "choice": "Pushes harder",
                                  "shift": "positive → mixed", "y": 0.5, "order": 1,
                              })
         assert data["success"] is True
 
-        # Verify DB state — arc entity with composite ID
+        # Verify DB state — the id is the slug; parent_id carries the character
         conn = get_db(tmp_path)
         try:
             row = conn.execute(
-                "SELECT id, type, name, parent_id FROM entities WHERE id='kael-1'"
+                "SELECT id, type, name, parent_id FROM entities WHERE id='kael-first-doubt'"
             ).fetchone()
             assert row is not None
-            assert row[0] == "kael-1"
+            assert row[0] == "kael-first-doubt"
             assert row[1] == "arc_beat"
             assert row[2] == "First Doubt"
             assert row[3] == "kael"
@@ -158,8 +158,8 @@ class TestArcCreateTool:
     def test_create_arc_standard_sections(self, tmp_path):
         """Arc beat in DB includes Action/Gap/Choice/Shift/Development Log sections."""
         _kael(tmp_path)
-        create_entity(tmp_path, "arc_beat", "1",
-                      {"id": "1", "character": "kael",
+        create_entity(tmp_path, "arc_beat", "kael-1",
+                      {"character": "kael",
                        "label": "First Doubt", "action": "a", "gap": "g",
                        "choice": "c", "shift": "s", "y": 0.5, "order": 1})
 
@@ -202,7 +202,7 @@ class TestArcEditTool:
         _kael(tmp_path)
         _beat(tmp_path)
 
-        assert edit_entity(tmp_path, "arc_beat", "1",
+        assert edit_entity(tmp_path, "arc_beat", "kael-1",
                            {"label": "Updated Label", "y": -0.3},
                            "Update label and y")["success"] is True
 
@@ -223,7 +223,7 @@ class TestArcEditTool:
         _kael(tmp_path)
         _beat(tmp_path)
 
-        assert edit_entity(tmp_path, "arc_beat", "1",
+        assert edit_entity(tmp_path, "arc_beat", "kael-1",
                            {"Action": "New action content here."},
                            "Update action section")["success"] is True
 
@@ -251,14 +251,13 @@ class TestArcRetrieveTool:
         result = retrieve_handler({
             "project": str(tmp_path),
             "entity_type": "arc_beat",
-            "id": ["1"],
+            "id": ["kael-1"],
             "sections": ["all"]
         })
         data = json.loads(result)
         assert data["entity_type"] == "arc_beat"
-        # "1" is the beat part of a `{character}-{beat}` key; it resolves to the real id.
         entity = data["entities"][0]
-        assert entity["id"].endswith("-1")
+        assert entity["id"] == "kael-1"
         assert "Action" in entity["sections"]
         assert "Notes" in entity["sections"]
 

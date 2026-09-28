@@ -1,16 +1,18 @@
 ---
-id: "2"
+action: Elena watches the preserved children through the system. She cannot intervene,
+  cannot speak, cannot look away. Kael grows up in a world she built.
 character: dr-elena-voss
-scene: central-room-night
-label: "The Haunting"
-action: "Elena watches the preserved children through the system. She cannot intervene, cannot speak, cannot look away. Kael grows up in a world she built."
-gap: "She expected to feel pride. She feels like a ghost watching a life she made possible but cannot touch."
-choice: "She does not reveal herself to Kael. She watches."
-shift: "negative → negative"
-y: 0.2
-order: 2
-is_crisis: true
+choice: She does not reveal herself to Kael. She watches.
+gap: She expected to feel pride. She feels like a ghost watching a life she made possible
+  but cannot touch.
+id: dr-elena-voss-2
 is_climax: false
+is_crisis: true
+label: The Haunting
+order: 2
+scene: central-room-night
+shift: negative → negative
+y: 0.2
 ---
 
 ## Action

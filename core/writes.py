@@ -670,34 +670,25 @@ def _get_next_order_db(conn, entity_type: str, parent_id: str) -> int:
 
 
 def _find_entity_id_db(conn, entity_type: str, slug: str) -> str | None:
-    """Map (entity_type, slug) to DB entity_id.
+    """Map (entity_type, id) to the DB entity_id.
 
-    For arcs, entity_id = '{char_slug}-{beat_id}' and slug is the beat_id.
-    Tries exact match first (slug may already be full entity_id), then pattern.
+    An exact match on the primary key, for every type. Arc beats used to be
+    stored as '{character}-{beat}' and looked up by a bare beat number through
+    `id LIKE '%-{slug}'` — which matched every character owning a beat of that
+    name and took the first, so an edit could silently rewrite the wrong beat.
+    A beat's id is now its own slug and its character link is `parent_id`, so
+    there is nothing left to match loosely.
     """
     if entity_type == "project":
         row = conn.execute("SELECT id FROM entities WHERE type='project'").fetchone()
         return row[0] if row else None
-    elif entity_type == "arc_beat":
-        row = conn.execute(
-            "SELECT id FROM entities WHERE type='arc_beat' AND id=? AND is_deleted=0",
-            (slug,)
-        ).fetchone()
-        if row:
-            return row[0]
-        row = conn.execute(
-            "SELECT id FROM entities WHERE type='arc_beat' AND id LIKE ? AND is_deleted=0",
-            (f"%-{slug}",)
-        ).fetchone()
-        return row[0] if row else None
-    else:
-        # is_deleted=0: a deleted entity must not be an editable/restoreable
-        # target. `restore` looks the row up without this filter.
-        row = conn.execute(
-            "SELECT id FROM entities WHERE type=? AND id=? AND is_deleted=0",
-            (entity_type, slug)
-        ).fetchone()
-        return row[0] if row else None
+    # is_deleted=0: a deleted entity must not be an editable/restoreable
+    # target. `restore` looks the row up without this filter.
+    row = conn.execute(
+        "SELECT id FROM entities WHERE type=? AND id=? AND is_deleted=0",
+        (entity_type, slug)
+    ).fetchone()
+    return row[0] if row else None
 
 
 def _default_for(entity_type: str, field: str):

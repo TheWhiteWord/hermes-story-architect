@@ -160,12 +160,12 @@ def _export_all(conn, project_path: Path) -> set:
             _write_note(project_path / ".story" / "memory.md", get_project_memory(project_path), "")
             written.add(project_path / ".story" / "memory.md")
         elif entity_type == "arc_beat":
-            # Derive beat_id from composite entity_id + parent_id
-            beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
-            char_dir = project_path / "arcs" / parent_id
+            # A beat's id is its own slug; the character link is parent_id and
+            # becomes the directory it is filed under.
+            char_dir = project_path / "arcs" / (parent_id or "")
             char_dir.mkdir(parents=True, exist_ok=True)
-            _write_note(char_dir / f"{beat_id}.md", fm, body)
-            written.add(char_dir / f"{beat_id}.md")
+            _write_note(char_dir / f"{entity_id}.md", fm, body)
+            written.add(char_dir / f"{entity_id}.md")
         else:
             folder = _folder_for(entity_type)
             _write_note(project_path / folder / f"{entity_id}.md", fm, body)
@@ -252,9 +252,7 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
         return fm
 
     if entity_type == "arc_beat":
-        # Derive beat_id from composite entity_id + parent_id (no extra storage needed)
-        beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
-        fm["id"] = beat_id
+        fm["id"] = entity_id
         fm["character"] = parent_id
         fm["label"] = name
         fm["order"] = int(order_key) if order_key == int(order_key) else order_key

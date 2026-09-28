@@ -181,11 +181,12 @@ def test_create_load_retrieve(entity_type, project):
     elif entity_type == "act":
         found = any(a.get("id") == slug for a in load_result["acts"])
     elif entity_type == "arc_beat":
-        # Arcs no longer in load output; verify via story_retrieve
+        # Arcs no longer in load output; verify via story_retrieve.
+        # A beat's id is its own slug — the character link is parent_id.
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "arc_beat",
-            "id": [f"parent-char-{slug}"],
+            "id": [slug],
             "sections": ["all"],
         }))
         found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
@@ -203,13 +204,10 @@ def test_create_load_retrieve(entity_type, project):
     assert found, f"Entity {slug} not in load result"
 
     # Retrieve → sections present
-    expected_id = slug
-    if entity_type == "arc_beat":
-        expected_id = f"parent-char-{slug}"
     retrieve_result = json.loads(retrieve_handler({
         "project": str(project),
         "entity_type": entity_type,
-        "id": [expected_id],
+        "id": [slug],
         "sections": ["all"],
     }))
     assert retrieve_result["entities"] and retrieve_result["entities"][0].get("sections"), \
@@ -234,7 +232,7 @@ def test_edit_all_field_types(entity_type, project):
     assert create_entity(project, entity_type, slug, fm).get("success"), \
         f"Create failed for {entity_type}/{slug}"
 
-    entity_id = f"parent-char-{slug}" if entity_type == "arc_beat" else slug
+    entity_id = slug
 
     # Build edit payload covering all field categories
     edit_data = {}

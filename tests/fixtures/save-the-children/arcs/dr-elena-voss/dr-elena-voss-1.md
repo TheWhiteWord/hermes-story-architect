@@ -1,16 +1,17 @@
 ---
-id: "1"
+action: Elena makes the call — save the minds, abandon the bodies. Four hundred people
+  will die so four hundred others can live forever.
 character: dr-elena-voss
-scene: central-room-day
-label: "The Choice"
-action: "Elena makes the call — save the minds, abandon the bodies. Four hundred people will die so four hundred others can live forever."
-gap: "She expects relief. She gets silence."
-choice: "She does not explain herself to Marcus. She signs the order."
-shift: "positive → negative"
-y: 0.8
-order: 1
-is_crisis: false
+choice: She does not explain herself to Marcus. She signs the order.
+gap: She expects relief. She gets silence.
+id: dr-elena-voss-1
 is_climax: false
+is_crisis: false
+label: The Choice
+order: 1
+scene: central-room-day
+shift: positive → negative
+y: 0.8
 ---
 
 ## Action

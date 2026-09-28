@@ -311,11 +311,10 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
         else:
             extra[key] = value
 
-    # Arc: entity_id is composite (character-slug + beat-slug, e.g. "kael-1")
+    # Arc: the character link is the parent_id column, set from the frontmatter
+    # field. It never came from the id, so a beat's id is simply its own slug.
     if entity_type == "arc_beat":
-        char_slug = fm.get("character", "")
-        columns["id"] = f"{char_slug}-{slug}" if char_slug else slug
-        columns["parent_id"] = char_slug or None
+        columns["parent_id"] = fm.get("character") or None
 
     columns["extra"] = json.dumps(extra) if extra else "{}"
     return columns

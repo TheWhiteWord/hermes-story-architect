@@ -72,7 +72,7 @@ class TestIdempotent:
             _export(p, vault)
         assert (p / "characters" / "kael.md").exists()
         assert (p / "project.md").exists()
-        assert (p / "arcs" / "kael" / "1.md").exists()
+        assert (p / "arcs" / "kael" / "kael-1.md").exists()
         assert (p / ".story" / "memory.md").exists()
 
     def test_first_export_never_removes(self, proj):

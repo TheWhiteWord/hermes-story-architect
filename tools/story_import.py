@@ -59,15 +59,16 @@ def _diff(project_path: Path) -> dict:
         if d.exists():
             markdown_ids |= {f.stem for f in d.glob("*.md") if not f.name.startswith("_")}
 
-    # Arc beats live in arcs/{character}/{beat}.md and are keyed `{char}-{beat}`.
-    # They do not appear in the flat folders above, and a database may hold them
-    # typed as 'character', so match them by the note tree as well.
+    # Arc beats live in arcs/{character}/{beat}.md, keyed by their own id — the
+    # directory carries the character, which is not part of the id. They do not
+    # appear in the flat folders above, and a database may hold them typed as
+    # 'character', so match them by the note tree as well.
     arc_beat_ids = set()
     arcs = project_path / "arcs"
     if arcs.exists():
         for char_dir in arcs.iterdir():
             if char_dir.is_dir() and not char_dir.name.startswith(("_", ".")):
-                arc_beat_ids |= {f"{char_dir.name}-{f.stem}" for f in char_dir.glob("*.md")}
+                arc_beat_ids |= {f.stem for f in char_dir.glob("*.md")}
 
     at_risk = sorted(
         entity_id for entity_id, entity_type in rows
@@ -299,9 +300,11 @@ def _import_arcs(conn, project_path: Path) -> None:
             fm = dict(post.metadata)
             body = post.content
             char_slug = char_folder.name
+            # A beat's id is its own slug. The directory gives the character, and
+            # that link belongs in parent_id — it is not part of the id, which
+            # used to be '{character}-{beat}' and had to be reassembled here.
             beat_id = fm.get("id", note.stem)
-            slug = f"{char_slug}-{beat_id}"
-            _insert_entity(conn, "arc_beat", slug, fm, body, char_slug=char_slug)
+            _insert_entity(conn, "arc_beat", beat_id, fm, body, char_slug=char_slug)
 
 
 

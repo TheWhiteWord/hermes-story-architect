@@ -1,16 +1,16 @@
 ---
-id: "2"
+action: Marcus sees Kael leave the Administrator's office, still whole.
 character: marcus-chen
-scene: central-room-night
-label: "The Aftermath"
-action: "Marcus sees Kael leave the Administrator's office, still whole."
-gap: "Relief — then guilt. He did nothing."
-choice: "Vows to act next time."
-shift: "mixed → negative"
-y: -0.4
-order: 2
-is_crisis: false
+choice: Vows to act next time.
+gap: Relief — then guilt. He did nothing.
+id: marcus-chen-2
 is_climax: false
+is_crisis: false
+label: The Aftermath
+order: 2
+scene: central-room-night
+shift: mixed → negative
+y: -0.4
 ---
 
 ## Action

@@ -189,33 +189,49 @@ class TestEditEntity:
             writes.edit_entity(fixture_path, "location", "no-such-place",
                                {"mood": "x"}, "s")
 
-    def test_arc_beat_survives_the_char_slug_convention(self, fixture_path):
-        """A beat is stored as '{character}-{beat}' and looks up by either form.
+    def test_arc_beat_id_is_the_beat_own_slug(self, fixture_path):
+        """A beat's id is its own slug — the character link is parent_id.
 
-        `create` takes the beat number; `edit` must find it again from that
-        number alone, since that is what an op carries.
+        It used to be stored as '{character}-{beat}', which made the id a join
+        of two fields: ambiguous to parse back (a character named `kael-the`
+        with a beat `choice` produced `kael-the-choice`, same as kael/the-choice)
+        and impossible to look up without a pattern match.
         """
         created = writes.create_entity(
-            fixture_path, "arc_beat", "9",
+            fixture_path, "arc_beat", "beat-nine",
             {"label": "Beat Nine", "character": "kael",
              "scene": "central-room-day", "action": "stays silent"})
-        assert created["entity_id"] == "kael-9"
+        assert created["entity_id"] == "beat-nine"
+        # the character link is unaffected — it never came from the id
+        assert _q(fixture_path, "SELECT parent_id FROM entities WHERE id=?",
+                  ("beat-nine",))[0][0] == "kael"
 
-        by_number = writes.edit_entity(fixture_path, "arc_beat", "9",
-                                       {"label": "renamed"}, "s")
-        assert by_number["entity_id"] == "kael-9", "the beat number must resolve"
-        assert _q(fixture_path, "SELECT name FROM entities WHERE id=?", ("kael-9",))[0][0] \
-            == "renamed"
+    def test_arc_beat_edits_the_beat_named_and_no_other(self, fixture_path):
+        """Two characters, same beat label: an edit must touch exactly one.
 
-    def test_arc_beat_full_id_also_resolves(self, fixture_path):
-        """story_load hands back entity_ids, so the full form must also work."""
-        writes.create_entity(
-            fixture_path, "arc_beat", "9",
-            {"label": "Beat Nine", "character": "kael",
-             "scene": "central-room-day", "action": "stays silent"})
-        result = writes.edit_entity(fixture_path, "arc_beat", "kael-9",
-                                    {"label": "renamed"}, "s")
-        assert result["entity_id"] == "kael-9"
+        This is the silent wrong-entity write. The id used to be
+        '{character}-{beat}' and a bare beat label resolved through
+        `id LIKE '%-{slug}'`, which matched both rows and took the first — so
+        editing Mira's beat silently rewrote Kael's and returned success.
+        """
+        for who, char in (("kael", "kael"), ("mira", "mira")):
+            writes.create_entity(
+                fixture_path, "arc_beat", f"{who}-choice",
+                {"label": "The Choice", "character": char,
+                 "scene": "central-room-day", "action": f"{who}'s choice"})
+
+        # A bare label is now simply not an id.
+        with pytest.raises(ValueError, match="not found"):
+            writes.edit_entity(fixture_path, "arc_beat", "the-choice",
+                               {"label": "x"}, "s")
+
+        # Each full id edits its own beat and leaves the other alone.
+        writes.edit_entity(fixture_path, "arc_beat", "mira-choice",
+                           {"label": "Mira's revised choice"}, "s")
+        assert _q(fixture_path, "SELECT name FROM entities WHERE id=?",
+                  ("mira-choice",))[0][0] == "Mira's revised choice"
+        assert _q(fixture_path, "SELECT name FROM entities WHERE id=?",
+                  ("kael-choice",))[0][0] == "The Choice"
 
     def test_computed_field_is_skipped_not_written(self, fixture_path):
         result = writes.edit_entity(fixture_path, "character", "kael",

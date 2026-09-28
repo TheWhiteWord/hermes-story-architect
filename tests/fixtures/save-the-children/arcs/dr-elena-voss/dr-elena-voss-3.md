@@ -1,16 +1,17 @@
 ---
-id: "3"
+action: Elena makes contact with Kael. She tells him what she did. She does not ask
+  for forgiveness.
 character: dr-elena-voss
-scene: the-core-day
-label: "The Truth"
-action: "Elena makes contact with Kael. She tells him what she did. She does not ask for forgiveness."
-gap: "She expected judgment. She gets understanding — and that is worse."
-choice: "She tells the truth. She lets Kael decide what to do with it."
-shift: "negative → mixed"
-y: -0.3
-order: 3
-is_crisis: false
+choice: She tells the truth. She lets Kael decide what to do with it.
+gap: She expected judgment. She gets understanding — and that is worse.
+id: dr-elena-voss-3
 is_climax: true
+is_crisis: false
+label: The Truth
+order: 3
+scene: the-core-day
+shift: negative → mixed
+y: -0.3
 ---
 
 ## Action

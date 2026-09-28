@@ -3,7 +3,7 @@ action: Kael asks Mira about the inconsistency they noticed.
 character: kael
 choice: Kael drops it, but files the moment away.
 gap: Mira deflects — says Kael is imagining things.
-id: '1'
+id: kael-1
 is_climax: false
 is_crisis: false
 label: First Doubt

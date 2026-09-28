@@ -4,7 +4,7 @@ character: kael
 choice: Kael refuses, but still believes the system can be fixed from inside.
 gap: The Administrator offers Kael a place in the system — 'You're too valuable to
   waste.'
-id: '3'
+id: kael-3
 is_climax: true
 is_crisis: false
 label: The Choice

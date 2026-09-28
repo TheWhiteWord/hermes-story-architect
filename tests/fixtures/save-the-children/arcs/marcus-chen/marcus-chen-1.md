@@ -1,16 +1,16 @@
 ---
-id: "1"
+action: Marcus notices Kael's distraction.
 character: marcus-chen
-scene: central-room-day
-label: "The Witness"
-action: "Marcus notices Kael's distraction."
-gap: "He's seen it before — the ones who start asking questions either break or leave."
-choice: "Says nothing. Watches."
-shift: "positive → mixed"
-y: 0.2
-order: 1
-is_crisis: false
+choice: Says nothing. Watches.
+gap: He's seen it before — the ones who start asking questions either break or leave.
+id: marcus-chen-1
 is_climax: false
+is_crisis: false
+label: The Witness
+order: 1
+scene: central-room-day
+shift: positive → mixed
+y: 0.2
 ---
 
 ## Action

@@ -58,7 +58,7 @@ def test_round_trip_preserves_entities(fixture_path):
         # Verify key files exist
         assert (export_path / "project.md").exists()
         assert (export_path / "characters" / "kael.md").exists()
-        assert (export_path / "arcs" / "kael" / "1.md").exists()
+        assert (export_path / "arcs" / "kael" / "kael-1.md").exists()
         assert (export_path / "scenes" / "central-room-day.md").exists()
         # No recycle bin with hard delete — soren.md is simply absent
         assert not (export_path / "_recycle-bin" / "character" / "soren.md").exists()

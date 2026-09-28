@@ -3,7 +3,7 @@ action: Kael accesses the core logs without permission.
 character: kael
 choice: Kael copies the data instead of reporting it.
 gap: The logs show deliberate erasure — someone has been hiding something for years.
-id: '2'
+id: kael-2
 is_climax: false
 is_crisis: false
 label: The Crack

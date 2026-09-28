@@ -1,16 +1,16 @@
 ---
-id: "2"
+action: The Administrator discovers the accessed logs.
 character: the-administrator
-scene: the-core-day
-label: "The Threat"
-action: "The Administrator discovers the accessed logs."
-gap: "Not anger — calculation. A threat to the system is a threat to existence itself."
-choice: "Quietly mark the access. Wait."
-shift: "mixed → negative"
-y: -0.9
-order: 2
-is_crisis: false
+choice: Quietly mark the access. Wait.
+gap: Not anger — calculation. A threat to the system is a threat to existence itself.
+id: the-administrator-2
 is_climax: false
+is_crisis: false
+label: The Threat
+order: 2
+scene: the-core-day
+shift: mixed → negative
+y: -0.9
 ---
 
 ## Action

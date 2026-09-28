@@ -1,16 +1,16 @@
 ---
-id: "1"
+action: The Administrator performs their daily rounds, flawless.
 character: the-administrator
-scene: central-room-day
-label: "The Mask"
-action: "The Administrator performs their daily rounds, flawless."
-gap: "A child asks an innocent question that nearly pierces the facade."
-choice: "Smile. Redirect. Move on."
-shift: "positive → mixed"
-y: -0.7
-order: 1
-is_crisis: false
+choice: Smile. Redirect. Move on.
+gap: A child asks an innocent question that nearly pierces the facade.
+id: the-administrator-1
 is_climax: false
+is_crisis: false
+label: The Mask
+order: 1
+scene: central-room-day
+shift: positive → mixed
+y: -0.7
 ---
 
 ## Action

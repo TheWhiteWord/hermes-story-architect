@@ -1,16 +1,16 @@
 ---
-id: "3"
+action: The Administrator offers Kael a place in the system.
 character: the-administrator
-scene: central-room-night
-label: "The Offer"
-action: "The Administrator offers Kael a place in the system."
-gap: "Kael refuses. The Administrator expected this."
-choice: "Accept the refusal. Begin planning the real solution."
-shift: "negative → negative (deepened)"
-y: -0.8
-order: 3
-is_crisis: false
+choice: Accept the refusal. Begin planning the real solution.
+gap: Kael refuses. The Administrator expected this.
+id: the-administrator-3
 is_climax: true
+is_crisis: false
+label: The Offer
+order: 3
+scene: central-room-night
+shift: negative → negative (deepened)
+y: -0.8
 ---
 
 ## Action
