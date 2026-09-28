@@ -224,8 +224,11 @@ class TestNoteCreation:
             extra = json.loads(row[2])
             assert extra["story_role"] == "Protagonist"
             # relationships are stored in relations table, not extra JSON
-            assert extra["goals_short"] == "Goals not set"
-            assert extra["goals_long"] == "Goals not set"
+            # B12: an unfilled optional field is stored empty. It used to be
+            # stored as the prose "Goals not set", which the enum check then
+            # rejected as a value the user had actually chosen.
+            assert extra["goals_short"] == ""
+            assert extra["goals_long"] == ""
             assert extra["knowledge"] == []
         finally:
             conn.close()
@@ -275,7 +278,7 @@ class TestNoteCreation:
             ).fetchone()
             assert row is not None
             assert row[0] == "Test Plot"
-            assert row[1] == "Summary not set"  # one_sentence is a column
+            assert row[1] == ""  # one_sentence is a column, and unfilled (B12)
             assert row[2] == "active"
             extra = json.loads(row[3])
             assert extra["characters"] == []
@@ -776,14 +779,14 @@ class TestScreenplayStatsFromSceneContent:
 class TestUnfilledFields:
     def test_unfilled_fields_character(self):
         from core.entity import unfilled_fields
-        extra = {"story_role": "Protagonist", "goals_short": "Goals not set", "goals_long": "Goals not set"}
+        extra = {"story_role": "Protagonist", "goals_short": "", "goals_long": ""}
         result = unfilled_fields("character", extra)
         assert "goals_short" in result
         assert "goals_long" in result
 
     def test_unfilled_fields_skips_filled(self):
         from core.entity import unfilled_fields
-        extra = {"story_role": "Protagonist", "goals_short": "Escaped from prison", "goals_long": "Goals not set"}
+        extra = {"story_role": "Protagonist", "goals_short": "Escaped from prison", "goals_long": ""}
         result = unfilled_fields("character", extra)
         assert "goals_short" not in result
         assert "goals_long" in result
@@ -791,14 +794,14 @@ class TestUnfilledFields:
     def test_unfilled_fields_only_optional(self):
         from core.entity import unfilled_fields
         # story_role is required (optional: False), should not appear even if at default
-        extra = {"story_role": "", "goals_short": "Goals not set"}
+        extra = {"story_role": "", "goals_short": ""}
         result = unfilled_fields("character", extra)
         assert "story_role" not in result
         assert "goals_short" in result
 
     def test_unfilled_fields_scene_location(self):
         from core.entity import unfilled_fields
-        extra = {"location": "Location not set", "value_at_open": "", "dramatic_role": ""}
+        extra = {"location": "", "value_at_open": "", "dramatic_role": ""}
         result = unfilled_fields("scene", extra)
         assert "location" in result
         assert "value_at_open" in result
@@ -807,7 +810,7 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_plot_type(self):
         from core.entity import unfilled_fields
-        extra = {"plot_type": "", "value_arc": "Value arc not set", "one_sentence": "Summary not set"}
+        extra = {"plot_type": "", "value_arc": "", "one_sentence": ""}
         result = unfilled_fields("plot", extra)
         assert "plot_type" in result
         assert "value_arc" in result
@@ -815,7 +818,7 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_arc_action(self):
         from core.entity import unfilled_fields
-        extra = {"action": "Action not described", "gap": "Gap not defined"}
+        extra = {"action": "", "gap": ""}
         result = unfilled_fields("arc_beat", extra)
         assert "action" in result
         assert "gap" in result
@@ -832,7 +835,7 @@ class TestUnfilledFields:
     def test_unfilled_fields_skips_booleans(self):
         """Boolean fields (is_crisis, is_climax, arc_complete) are not 'unfilled'."""
         from core.entity import unfilled_fields
-        extra = {"is_crisis": False, "is_climax": False, "action": "Action not described"}
+        extra = {"is_crisis": False, "is_climax": False, "action": ""}
         result = unfilled_fields("arc_beat", extra)
         assert "is_crisis" not in result
         assert "is_climax" not in result
@@ -841,19 +844,21 @@ class TestUnfilledFields:
     def test_unfilled_fields_skips_numbers(self):
         """Numeric fields (y, act_count) are not 'unfilled'."""
         from core.entity import unfilled_fields
-        extra = {"y": 0.0, "action": "Action not described"}
+        extra = {"y": 0.0, "action": ""}
         result = unfilled_fields("arc_beat", extra)
         assert "y" not in result
         assert "action" in result
 
-    def test_unfilled_fields_arc_type_placeholder(self):
-        """arc_type at placeholder default is flagged; at 'absent' is not."""
+    def test_unfilled_fields_arc_type_empty(self):
+        """arc_type unset is flagged; 'absent' is a real choice and is not.
+
+        'absent' is the case that matters: it is a legal member of ARC_TYPES
+        meaning "this character has no arc", so it must not read as unfilled.
+        """
         from core.entity import unfilled_fields
-        extra_placeholder = {"arc_type": "Arc type not set"}
-        result = unfilled_fields("character", extra_placeholder)
+        result = unfilled_fields("character", {"arc_type": ""})
         assert "arc_type" in result
-        extra_absent = {"arc_type": "absent"}
-        result = unfilled_fields("character", extra_absent)
+        result = unfilled_fields("character", {"arc_type": "absent"})
         assert "arc_type" not in result
 
     def test_unfilled_fields_plot_scope_empty(self):
@@ -893,7 +898,7 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_sequence(self):
         from core.entity import unfilled_fields
-        extra = {"value_at_open": "", "purpose": "Purpose not set", "primary_plot": ""}
+        extra = {"value_at_open": "", "purpose": "", "primary_plot": ""}
         result = unfilled_fields("sequence", extra)
         assert "value_at_open" in result
         assert "purpose" in result
@@ -901,7 +906,7 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_act(self):
         from core.entity import unfilled_fields
-        extra = {"value_at_open": "", "act_objective": "Objective not set", "climax_scene_id": ""}
+        extra = {"value_at_open": "", "act_objective": "", "climax_scene_id": ""}
         result = unfilled_fields("act", extra)
         assert "value_at_open" in result
         assert "act_objective" in result
@@ -1010,7 +1015,9 @@ class TestValueSchema:
         for field in ("character_value_at_open", "character_value_at_close"):
             meta = ENTITY_SCHEMAS["arc_beat"][field]
             assert meta["optional"] is True
-            assert meta["default"] == "Not set"
+            # B12: the default was the prose "Not set", which is not in
+            # VALUE_CHARGES, so every arc beat reported a false finding.
+            assert meta["default"] == ""
 
     @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
     def test_y_description_states_the_sign_convention(self, entity_type):

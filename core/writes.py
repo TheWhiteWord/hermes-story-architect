@@ -694,9 +694,10 @@ def _find_entity_id_db(conn, entity_type: str, slug: str) -> str | None:
 def _default_for(entity_type: str, field: str):
     """The schema default for a field — "" or [] when it has none.
 
-    Resetting a reference to this rather than a bare "" means a field whose
-    default is a visible placeholder ("Location not set") keeps the placeholder,
-    so the UI still shows that the field needs filling.
+    Resetting a reference to this rather than a bare "" keeps the two apart: a
+    field whose default is a real value (project.screenplay_title is "Default")
+    resets to that, while an unfilled field resets to empty (B12 — these
+    defaults were once visible placeholders like "Location not set").
     """
     return ENTITY_SCHEMAS.get(entity_type, {}).get(field, {}).get("default", "")
 
@@ -760,8 +761,8 @@ def _purge_references(conn, deleted_ids: set) -> tuple:
                 changed = True
 
         # Single-valued reference: an arc beat's scene. Reset to the schema
-        # default rather than a bare "", so a field that has a visible placeholder
-        # ("Location not set") keeps it — the UI shows the gap instead of a blank.
+        # default rather than a bare "", so a field whose default is a real
+        # value resets to that value and not to nothing.
         if str(extra.get("scene", "")) in deleted_ids:
             was = extra["scene"]
             extra["scene"] = _default_for(entity_type, "scene")

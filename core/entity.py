@@ -181,10 +181,15 @@ def _is_empty(value, default) -> bool:
     """True when a field holds nothing worth showing.
 
     Three cases, all of which really are "not set by the user":
-      * the schema default — which for some fields is a UI placeholder string
-        like "Summary not set" rather than an empty value;
+      * the schema default — which for a few fields is a real value rather than
+        an empty one (project.screenplay_title is "Default"), so a field sitting
+        on it holds nothing the user chose;
       * an empty string, list or dict — a field the user deliberately cleared;
       * None.
+
+    Since B12 an unfilled field is stored empty, so the second case is the one
+    that fires for prose fields; the first is still load-bearing for the
+    defaults that are 0, False, [] or a real value.
     """
     if value is None:
         return True

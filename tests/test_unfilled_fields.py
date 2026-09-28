@@ -43,8 +43,25 @@ class TestRealContent:
     def test_content_is_filled(self):
         assert "one_sentence" not in _unfilled("plot", one_sentence="A courier who questions it.")
 
-    def test_placeholder_default_is_unfilled(self):
-        assert "one_sentence" in _unfilled("plot", one_sentence="Summary not set")
+    def test_stored_default_is_never_prose(self):
+        """B12's regression guard: no `default` may be a placeholder string.
+
+        A prose default is written into the data on create, and the enum check
+        then rejects it as a value the user chose — so a minimal character
+        reported four findings that meant nothing. This is the test that fails
+        if a placeholder is ever added back.
+        """
+        import re
+        from core.constants import ENTITY_SCHEMAS
+
+        prose = re.compile(r"not set|not described|not defined|not recorded", re.I)
+        offenders = [
+            f"{et}.{field}={meta['default']!r}"
+            for et, schema in ENTITY_SCHEMAS.items()
+            for field, meta in schema.items()
+            if isinstance(meta.get("default"), str) and prose.search(meta["default"])
+        ]
+        assert offenders == []
 
     def test_empty_default_still_unfilled(self):
         """Fields whose default is '' were already correct; keep them so."""

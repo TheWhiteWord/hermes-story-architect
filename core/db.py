@@ -393,10 +393,10 @@ def get_project_summary(project_path: Path) -> dict:
                 characters[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
                     "story_role": extra.get("story_role", ""),
-                    "arc_type": extra.get("arc_type", "Arc type not set"),
-                    "character_value": extra.get("character_value", "Arc value not set"),
-                    "character_value_at_open": extra.get("character_value_at_open", "Not set"),
-                    "character_value_at_close": extra.get("character_value_at_close", "Not set"),
+                    "arc_type": extra.get("arc_type", ""),
+                    "character_value": extra.get("character_value", ""),
+                    "character_value_at_open": extra.get("character_value_at_open", ""),
+                    "character_value_at_close": extra.get("character_value_at_close", ""),
                 }
             elif etype == "plot":
                 plots[eid] = {
@@ -546,8 +546,11 @@ def get_project_summary(project_path: Path) -> dict:
                 "character_value_at_close": char["character_value_at_close"],
                 "relationships": char_rel_summary.get(char_id, []),
             }
-            return _omit(result, {"arc_type": "Arc type not set", "character_value": "Arc value not set",
-                                  "character_value_at_open": "Not set", "character_value_at_close": "Not set",
+            # The sentinel values are all "" now (B12): an unset field is empty,
+            # and _omit drops falsy values on its first branch, so a prose
+            # default would never match here anyway.
+            return _omit(result, {"arc_type": "", "character_value": "",
+                                  "character_value_at_open": "", "character_value_at_close": "",
                                   "relationships": []})
 
         # ── Build plot output ──
@@ -567,7 +570,7 @@ def get_project_summary(project_path: Path) -> dict:
             # add_plot carries all four per scene, with the beat's own prose,
             # and story_retrieve returns the plot whole. Repeating the bare
             # scene ids here bought nothing in the view that must stay small.
-            return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "Value arc not set",
+            return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "",
                                   "characters": []},
                          always_keep={"status"})
 

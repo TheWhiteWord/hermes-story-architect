@@ -167,7 +167,7 @@ def _value_fields(extra: dict, entity_type: str, fields: tuple) -> dict:
 
     A field still at its schema default is reported as absent rather than as its
     placeholder — the same rule every payload builder in core/db.py follows via
-    `_omit`. Printing "Shift not recorded" on 40 unfilled scenes is 800 chars of
+    `_omit`. Printing a placeholder on 40 unfilled scenes is 800 chars of
     noise that reads as if the shift had been written down.
 
     A number at its default reports "" too, not 0.0. 0.0 is a charge a writer can

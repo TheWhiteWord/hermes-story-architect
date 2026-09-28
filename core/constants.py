@@ -57,13 +57,13 @@ ENTITY_SCHEMAS = {
                 "strength": {"type": "number", "description": "Signed tension: negative is antagonism (observed -0.6..0.9). Dashboard view only."},
             },
         },
-        "goals_short": {"type": "string", "default": "Goals not set", "optional": True, "description": "Short-term goal (flat form; nested goals.short also accepted)"},
-        "goals_long": {"type": "string", "default": "Goals not set", "optional": True, "description": "Long-term goal (flat form; nested goals.long also accepted)"},
+        "goals_short": {"type": "string", "default": "", "optional": True, "description": "Short-term goal (flat form; nested goals.short also accepted)"},
+        "goals_long": {"type": "string", "default": "", "optional": True, "description": "Long-term goal (flat form; nested goals.long also accepted)"},
         "knowledge": {"type": "list", "default": [], "optional": True, "description": "Facts the character knows. Each entry is a string."},
-        "arc_type": {"type": "string", "default": "Arc type not set", "optional": True, "description": "One of: positive, negative, flat, ironic, absent"},
-        "character_value": {"type": "string", "default": "Arc value not set", "optional": True, "description": "The value this character's arc explores (e.g. 'Freedom'). May differ from the story's."},
-        "character_value_at_open": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value where their arc begins. One of: positive, negative, mixed, ironic."},
-        "character_value_at_close": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value where their arc ends. One of: positive, negative, mixed, ironic."},
+        "arc_type": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, flat, ironic, absent"},
+        "character_value": {"type": "string", "default": "", "optional": True, "description": "The value this character's arc explores (e.g. 'Freedom'). May differ from the story's."},
+        "character_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value where their arc begins. One of: positive, negative, mixed, ironic."},
+        "character_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value where their arc ends. One of: positive, negative, mixed, ironic."},
         "arc_complete": {"type": "boolean", "default": False, "optional": True, "description": "Whether this character's arc is complete"},
         "arc_beats_list": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed list of arc beats for this character (read-only, derived from arc_beat entities)"},
     },
@@ -86,10 +86,10 @@ ENTITY_SCHEMAS = {
     },
     "plot": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
-        "one_sentence": {"type": "string", "default": "Summary not set", "optional": True, "description": "One-sentence summary for index label"},
+        "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
         "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
         "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
-        "value_arc": {"type": "string", "default": "Value arc not set", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
+        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
         "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
@@ -99,24 +99,24 @@ ENTITY_SCHEMAS = {
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
-        "logline": {"type": "string", "default": "logline not set", "optional": True, "description": "One-sentence summary of the story"},
-        "genre": {"type": "string", "default": "genre not set", "optional": True, "description": "Story genre (e.g. Sci-fi thriller)"},
-        "setting": {"type": "string", "default": "not set", "optional": True, "description": "Primary setting (e.g. Near-future city-state)"},
+        "logline": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the story"},
+        "genre": {"type": "string", "default": "", "optional": True, "description": "Story genre (e.g. Sci-fi thriller)"},
+        "setting": {"type": "string", "default": "", "optional": True, "description": "Primary setting (e.g. Near-future city-state)"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, abandoned, archived"},
         "screenplay_title": {"type": "string", "default": "Default", "optional": True, "description": "Title page: screenplay title (center)"},
-        "credit": {"type": "string", "default": "Credit N.A.", "optional": True, "description": "Title page: credit line (e.g. 'Written by')"},
-        "author": {"type": "string", "default": "Author N.A.", "optional": True, "description": "Title page: author name"},
-        "contact": {"type": "string", "default": "Contact N.A.", "optional": True, "description": "Title page: contact info (bottom-right)"},
-        "draft_date": {"type": "string", "default": "Draft Date N.A.", "optional": True, "description": "Title page: draft date (bottom-left)"},
-        "draft": {"type": "string", "default": "N.A.", "optional": True, "description": "Title page: draft label (e.g. 'First Draft')"},
-        "spine": {"type": "string", "default": "Spine not set", "optional": True, "description": "Protagonist's desire (story-level spine)"},
-        "controlling_idea": {"type": "string", "default": "Controlling Idea not set", "optional": True, "description": "The story's controlling idea/argument"},
-        "story_value": {"type": "string", "default": "Value not set", "optional": True, "description": "The story's thematic value (e.g. 'Trust'). Stated once, here; scenes inherit it."},
-        "story_value_at_open": {"type": "string", "default": "Opening Value not set", "optional": True, "description": "Charge on the story value as the story opens. One of: positive, negative, mixed, ironic."},
-        "story_value_at_close": {"type": "string", "default": "Closing Value not set", "optional": True, "description": "Charge on the story value as the story closes. One of: positive, negative, mixed, ironic."},
-        "inciting_incident_scene_id": {"type": "string", "default": "Inciting Incident Scene not set", "optional": True, "description": "Scene slug of the inciting incident"},
-        "story_climax_scene_id": {"type": "string", "default": "Story Climax Scene not set", "optional": True, "description": "Scene slug of the story climax"},
-        "structure_type": {"type": "string", "default": "Structure Type not set", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
+        "credit": {"type": "string", "default": "", "optional": True, "description": "Title page: credit line (e.g. 'Written by')"},
+        "author": {"type": "string", "default": "", "optional": True, "description": "Title page: author name"},
+        "contact": {"type": "string", "default": "", "optional": True, "description": "Title page: contact info (bottom-right)"},
+        "draft_date": {"type": "string", "default": "", "optional": True, "description": "Title page: draft date (bottom-left)"},
+        "draft": {"type": "string", "default": "", "optional": True, "description": "Title page: draft label (e.g. 'First Draft')"},
+        "spine": {"type": "string", "default": "", "optional": True, "description": "Protagonist's desire (story-level spine)"},
+        "controlling_idea": {"type": "string", "default": "", "optional": True, "description": "The story's controlling idea/argument"},
+        "story_value": {"type": "string", "default": "", "optional": True, "description": "The story's thematic value (e.g. 'Trust'). Stated once, here; scenes inherit it."},
+        "story_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value as the story opens. One of: positive, negative, mixed, ironic."},
+        "story_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value as the story closes. One of: positive, negative, mixed, ironic."},
+        "inciting_incident_scene_id": {"type": "string", "default": "", "label": "Inciting Incident", "optional": True, "description": "Scene slug of the inciting incident"},
+        "story_climax_scene_id": {"type": "string", "default": "", "label": "Story Climax", "optional": True, "description": "Scene slug of the story climax"},
+        "structure_type": {"type": "string", "default": "", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
         "act_count": {"type": "number", "default": 3, "optional": True, "description": "Number of acts in story structure (default 3, auto-adjusts upward if more act files exist)"},
     },
     "scene": {
@@ -127,7 +127,7 @@ ENTITY_SCHEMAS = {
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, drafted, written, locked"},
         "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},
-        "location": {"type": "string", "default": "Location not set", "optional": True, "description": "Location slug or free text"},
+        "location": {"type": "string", "default": "", "optional": True, "description": "Location slug or free text"},
         "time_of_day": {"type": "string", "default": "", "optional": True, "description": "One of: DAY, NIGHT, DUSK, DAWN, CONTINUOUS, LATER"},
         "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug (denormalized shortcut)"},
@@ -135,7 +135,7 @@ ENTITY_SCHEMAS = {
         "no_cast": {"type": "boolean", "default": False, "optional": True, "description": "Set true when this scene deliberately has no characters (e.g. an empty room). Clears the 'characters unfilled' gap so a decision is not flagged forever"},
         "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this scene. One of: positive, negative, mixed, ironic."},
         "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this scene. One of: positive, negative, mixed, ironic."},
-        "shift": {"type": "string", "default": "Shift not recorded", "optional": True, "description": "How the story value turns here, in the story's language (e.g. 'trust → suspicion')."},
+        "shift": {"type": "string", "default": "", "optional": True, "description": "How the story value turns here, in the story's language (e.g. 'trust → suspicion')."},
         "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on the story value after this scene's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the story-value curve passes through."},
         "conflict_levels": {"type": "list", "default": [], "optional": True, "description": "Any of: inner, personal, extra-personal"},
         "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "One of: setup, complication, crisis, climax, resolution, transition, non-event"},
@@ -155,7 +155,7 @@ ENTITY_SCHEMAS = {
         "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this sequence. One of: positive, negative, mixed, ironic."},
         "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this sequence's reversal lands"},
         "primary_plot": {"type": "string", "default": "", "optional": True, "description": "Primary plot slug this sequence serves"},
-        "purpose": {"type": "string", "default": "Purpose not set", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
+        "purpose": {"type": "string", "default": "", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
     },
     "act": {
         "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug"},
@@ -166,7 +166,7 @@ ENTITY_SCHEMAS = {
         "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this act. One of: positive, negative, mixed, ironic."},
         "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this act. One of: positive, negative, mixed, ironic."},
         "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this act's major reversal lands"},
-        "act_objective": {"type": "string", "default": "Objective not set", "optional": True, "description": "Protagonist's immediate goal for this act"},
+        "act_objective": {"type": "string", "default": "", "label": "Objective", "optional": True, "description": "Protagonist's immediate goal for this act"},
     },
     "arc_beat": {
         "id": {"type": "string", "default": "", "optional": False, "description": "Beat slug (unique within character)"},
@@ -174,12 +174,12 @@ ENTITY_SCHEMAS = {
         "scene": {"type": "string", "default": "", "optional": False, "description": "Scene slug where this beat occurs"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within character's arc"},
         "label": {"type": "string", "default": "", "optional": False, "description": "Human-readable label (e.g. 'First Doubt')"},
-        "action": {"type": "string", "default": "Action not described", "optional": True, "description": "What the character does"},
-        "gap": {"type": "string", "default": "Gap not defined", "optional": True, "description": "Expectation vs reality gap"},
-        "choice": {"type": "string", "default": "Choice not recorded", "optional": True, "description": "The choice the character makes"},
-        "character_value_at_open": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value entering this beat. One of: positive, negative, mixed, ironic."},
-        "character_value_at_close": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value leaving this beat. One of: positive, negative, mixed, ironic."},
-        "shift": {"type": "string", "default": "Shift not recorded", "optional": True, "description": "How this character's value turns at this beat, in dramatic language (e.g. 'suspicious doubt → active defiance')."},
+        "action": {"type": "string", "default": "", "optional": True, "description": "What the character does"},
+        "gap": {"type": "string", "default": "", "optional": True, "description": "Expectation vs reality gap"},
+        "choice": {"type": "string", "default": "", "optional": True, "description": "The choice the character makes"},
+        "character_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value entering this beat. One of: positive, negative, mixed, ironic."},
+        "character_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value leaving this beat. One of: positive, negative, mixed, ironic."},
+        "shift": {"type": "string", "default": "", "optional": True, "description": "How this character's value turns at this beat, in dramatic language (e.g. 'suspicious doubt → active defiance')."},
         "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on this character's value after this beat's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the arc curve passes through."},
         "is_crisis": {"type": "boolean", "default": False, "optional": True, "description": "Marks a crisis beat"},
         "is_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks a climax beat"},
@@ -200,6 +200,21 @@ ENTITY_SCHEMAS = {
         "history": {"type": "string", "default": "", "optional": True, "description": "How this relationship evolved"},
     },
 }
+
+# The one phrase that means "the user has not set this". It lives here, beside
+# the schema, because it is a *display* concern and the schema is where a field
+# declares what it is — but it is never stored. A field the user has not filled
+# holds `""` (or `0`, `False`, `[]`), and a surface that wants to say so renders
+# `f"{label}: {UNFILLED}"`.
+#
+# It was 34 strings before this, one per field: 'Goals not set', 'Action not
+# described', 'Shift not recorded', 'Credit N.A.'. They were defaults written
+# into the data on create, and the enum check then rejected them as invalid
+# values — 10 false findings on a minimal character, plot, project or arc beat.
+# Nothing was ever stored in them: both real databases hold zero. The prose was
+# never carrying information either, because `story_retrieve` reports unfilled
+# fields *by name* through `unfilled_fields`.
+UNFILLED = "N.A."
 
 # ─── Required fields ───
 # Derived from ENTITY_SCHEMAS rather than maintained beside it. A hand-written
