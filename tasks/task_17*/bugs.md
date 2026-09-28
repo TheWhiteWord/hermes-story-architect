@@ -76,8 +76,33 @@ leaves the trap in place.
 ## Status index
 
 Last reconciled **2026-09-28**, after B8 / B4 / B5 / I3 / I4 / I5 / D1a / B11
-were closed. Entries are not deleted when superseded — a wrong diagnosis that
-vanishes is worth nothing — so the original text stays under its correction.
+/ B6 were closed. Entries are not deleted when superseded — a wrong diagnosis
+that vanishes is worth nothing — so the original text stays under its
+correction.
+
+## Where the bug-fix work stands (2026-09-28)
+
+A sequence of live-test fixes is being landed one at a time, each with its own
+analysis and its own commit, so any of them can be reverted independently.
+**The test suite is the gate: 889 before this round, and no fix may land with
+fewer.**
+
+| # | fix | state |
+|---|---|---|
+| 1 | **B6** — `REQUIRED_FIELDS` derived from the schema | **done, 891 pass** |
+| 2 | **B12** — placeholder defaults out of the data; one voice for "not set" | plan ready, not built (`b12_plan.md`) |
+| 3 | **D5 step 1** — delete three compatibility shims | sequenced, not built |
+| 4 | **D5 step 2** — drop the arc_beat composite id | sequenced, not built — **fixes a reproduced silent wrong-entity write** |
+| 5 | **D5 steps 3–5** — one name for the op, generated ids, title filenames | sequenced, not built |
+
+**B6 and B12 are the same lesson applied twice**: the schema already knew the
+answer and a hand-maintained list beside it had drifted. B6 fixes the
+required-field list; B12 fixes the placeholder defaults the enum check then
+misreads. D5 is the third instance — three names for one value, held together
+by prose bridges.
+
+The D5 investigation, its two overturned positions, and the build order are in
+`entity_identity.md` and `entity_identity_plan.md`.
 
 ### Fixed
 
@@ -90,6 +115,7 @@ vanishes is worth nothing — so the original text stays under its correction.
 | B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. | — |
 | I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
+| B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
 
 ### Resolved by investigation — not bugs
 
@@ -109,10 +135,11 @@ valuable part, and because the next keeper will suspect them again.
 
 | id | what | why it matters |
 |---|---|---|
+| **D5** | One concept, three names: `slug` / `entity_id` / `id` for one value, plus `type` vs `entity_type`. **Position agreed 2026-09-28, not built** — id is generated (`secrets.token_hex(4)`), stored in frontmatter too, filenames become titles. Analysis and sizing in `tasks/task_17*/entity_identity.md`. | Two tools carried a prose bridge explaining `id` ≡ `slug`, which is the tell. Falls out as a fix for the silent wrong-entity arc-beat write. |
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
-| **B6** | `arc_beat` demands a frontmatter `id` the write path ignores. **Verified still present**: `REQUIRED_FIELDS["arc_beat"]` in `core/constants.py:32` still lists `"id"`. A false positive, but it fires on every arc beat, so every arc draft shows three findings that mean nothing. | Noise that trains the agent to ignore findings. |
+| **B12** | The enum check rejects the schema's **own placeholder defaults**. Eleven optional fields default to a prose placeholder (`'Not set'`, `'Arc type not set'`, …) that is not in the valid set, so every `character`, `plot` and `project` create reports 1–3 findings that mean nothing. Found while measuring B6; **not** part of it. **Plan ready, not built** — see `b12_plan.md`. | Same harm as B6, much wider blast radius — it fires on the three most-used entity types. Noise that trains the agent to ignore `validation`, which is the one thing `validation` exists to prevent. |
 | **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
 | **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
 
@@ -497,7 +524,12 @@ decorative and the comment should go.
 
 ---
 
-## B6. `arc_beat` requires an `id` in frontmatter that the write path ignores — **OPEN**
+## B6. `arc_beat` requires an `id` in frontmatter that the write path ignores — **OPEN, PLAN READY**
+
+**Plan: `tasks/task_17*/b6_plan.md`** — one dict becomes a comprehension, the
+hand-written `REQUIRED_FIELDS` is deleted, two tests. Scope is B6 only; B12 is
+a separate plan. **Not built.** Baseline 889 pass, and the plan must leave that
+number at 889 or higher.
 
 **Severity: low, and a false positive** — but it fires on every arc beat, so
 every arc draft shows three findings that mean nothing.
@@ -530,8 +562,35 @@ ops[0] (create arc_beat/first-certainty): Missing required field: id
 `arc_beat` is the last type that was never cleaned up. Dropping `id` from its
 list is the fix, matching what every other type already does.
 
-**Why `id` can never be satisfied anyway.** The op supplies the id as `slug`,
-and `columns_for_insert` (`entity.py:293`) builds the composite id itself:
+**Re-measured 2026-09-28: it is three findings, not one.** Probing
+`validate_shape` with a *minimal valid* beat (`character`, `scene`, `label` —
+everything the schema marks `optional: False`) gives:
+
+```
+Missing required field: id       ← unsatisfiable; columns_for_insert builds the composite id
+Missing required field: y        ← schema says optional, but its default 0.0 is falsy
+Missing required field: order    ← same, default 0
+```
+
+So the original entry's "three findings that mean nothing" was right in
+number and wrong in composition — the other two are not schema drift but the
+**falsy-default** half: `if not merged.get(field)` reads a default of `0` or
+`0.0` as absent. Blanking a genuinely optional field (`action: ""`) fires a
+fourth. A beat where the author filled every field, as the live test did,
+showed only the `id` finding — which is why this was recorded as one.
+
+**The rule that reproduces every type.** Required = `optional: False` in the
+schema, minus the four fields the write path supplies itself (`id`, `type`,
+`order`, `status` — all in `FIELDS_TO_SKIP` or auto-numbered in
+`columns_for_insert`). Checked against all ten types: it reproduces seven
+exactly, and the three it disagrees with are `arc_beat` (this bug), `plot`
+(`status` listed but `optional: True`) and `project` (`logline` likewise).
+The latter two have non-empty defaults so they never actually fired — latent,
+not reported. **Which is the argument for deriving the list from the schema
+instead of hand-maintaining a third copy of it.**
+
+**`id` can never be satisfied anyway.** The op supplies the id as `slug`, and
+`columns_for_insert` (`entity.py:293`) builds the composite id itself:
 
 ```python
 columns["id"] = f"{char_slug}-{slug}" if char_slug else slug
@@ -544,13 +603,168 @@ should not be settable here at all.
 
 **Related, worth checking in the same pass:** `arc_beat.REQUIRED_FIELDS` also
 lists `action`, `gap`, `choice`, `shift`, `y` — all of which the schema marks
-`optional: true` with placeholder defaults. So the same list disagrees with the
-schema about those five as well. They did not fire here only because I filled
-every field. An author leaving `action` at its `"Action not described"`
-placeholder would get a "Missing required field" finding on a field documented
-as optional. **This is the same class as the inert-merge bug task 28 Phase 6
+`optional: true` with placeholder defaults. Confirmed: they do not fire on a
+defaulted beat (the placeholders are non-empty strings), only when explicitly
+blanked. **This is the same class as the inert-merge bug task 28 Phase 6
 fixed** — worth checking whether `REQUIRED_FIELDS` is still trustworthy for
-any type, not just arc_beat.
+any type, not just arc_beat. Done: it is not, for three of ten.
+
+---
+
+## B12. The enum check rejects the schema's own placeholder defaults — **OPEN, PLAN READY**
+
+**Plan: `tasks/task_17*/b12_plan.md`** — the better fix than the one this entry
+originally proposed. Measured: **zero** placeholders are stored in either real
+database, and **zero** are referenced anywhere in `src/dashboard/`. So the
+prose defaults can become type-correct empties, which deletes the cause instead
+of teaching `_validate_enum` to tolerate it. Runs after `b6_plan.md`.
+**Not built.**
+
+**One trap, and it is the "special case" the plan has to get right:** a default
+that is already a *legal enum value* (`project.status` → `'active'`) must not
+become `""`, or a filled field would start reporting as unfilled. Only *prose*
+placeholders convert. And `arc_type`'s legal `'absent'` value needs no
+dashboard change — `statistics.js:225` and `network.js:134` already filter on
+it, so `""` renders as `absent` through code that exists today.
+
+**Severity: high, and wider than B6.** Eleven optional fields default to a
+prose placeholder (`'Not set'`, `'Arc type not set'`, …) that is not in the
+valid set, so every `character`, `plot` and `project` create reports 1–3
+findings that mean nothing. Found while measuring B6; **not** part of it.
+
+**Observed.** `validate_shape` on minimal valid ops — nothing but the fields
+the schema marks `optional: False`:
+
+```
+min character    → Invalid arc_type: Arc type not set
+                   Invalid character_value_at_open: Not set
+                   Invalid character_value_at_close: Not set
+min project      → Invalid story_value_at_open: Opening Value not set
+                   Invalid story_value_at_close: Closing Value not set
+                   Invalid structure_type: Structure Type not set
+min plot         → Invalid value_arc: Value arc not set
+min arc_beat     → the same 2 value findings, on top of B6's 3
+```
+
+**Every `character`, `plot` and `project` create emits 1–3 findings that mean
+nothing.** B6 is 3 false findings on one entity type; this is 1–3 on the three
+most-used ones.
+
+**Cause.** `_validate_enum(..., empty_ok=True)` treats "unset" as the empty
+string:
+
+```python
+if empty_ok and val == "":
+    return
+```
+
+But the guarded fields do not default to `""`. Eleven optional fields default
+to a **prose placeholder** that is not in the valid set, so the schema's own
+default is reported as invalid:
+
+| field | schema default | valid set |
+|---|---|---|
+| `character.arc_type` | `Arc type not set` | `ARC_TYPES` |
+| `character.character_value_at_open` / `_close` | `Not set` | `VALUE_CHARGES` |
+| `arc_beat.character_value_at_open` / `_close` | `Not set` | `VALUE_CHARGES` |
+| `plot.value_arc` | `Value arc not set` | `VALUE_ARCS` |
+| `project.story_value_at_open` / `_close` | `Opening/Closing Value not set` | `VALUE_CHARGES` |
+| `project.structure_type` | `Structure Type not set` | `STRUCTURE_TYPES` |
+
+The other guarded fields (`time_of_day`, `value_at_open/_close`,
+`dramatic_role`, `plot_type`, `plot_scope`) all default to `""` and are
+correctly silent — which is why this survived. The `empty_ok` flag was written
+against a schema where "unset" meant `""`, and the placeholder strings arrived
+later.
+
+**Why nothing caught it.** `validate_shape` merges the op's frontmatter over
+schema defaults *before* validating, so the placeholder is always present at
+check time. No test creates a minimal `character` or `project` through
+`story_draft` and asserts an empty `validation` — the same test gap B7 was
+found through, one layer over.
+
+**The fix, and why it is one line.** `empty_ok` should mean *"this value is
+not set"*, and the schema already says what not-set looks like for each field:
+its own `default`. Comparing against the field's declared default (rather than
+`""`) is the tighter form and needs no new list — the placeholder strings are
+already in `ENTITY_SCHEMAS`, so nothing new has to be kept in sync.
+
+**Also recorded, because it is the same trap next door:** the *required*-field
+check has the mirror-image bug. `if not merged.get(field)` treats a **falsy**
+default as missing, so `y` (default `0.0`) and `order` (default `0`) fire even
+though the schema marks them optional. That is why B6 produces three findings
+rather than one. Same root shape — *the hand-maintained list and the schema
+disagree* — different check, and it is fixed under B6.
+
+**What this is not.** Not a schema problem: the placeholders are the intended
+way to say "unfilled", and they round-trip through export and the dashboard.
+Not a validator-tuning problem either — do **not** widen the valid sets to
+include `'Not set'`. That would make the placeholder a legal value of
+`character_value_at_open`, and anything reading a charge curve would have to
+know that string means "no charge" rather than a charge. The finding is
+right; the value is legitimately not-set. Fix the check, not the vocabulary.
+
+---
+
+## B6. `arc_beat` requires an `id` in frontmatter that the write path ignores — **FIXED 2026-09-28**
+
+**The fix, in one line of intent:** `REQUIRED_FIELDS` is no longer maintained
+by hand. It is derived from `ENTITY_SCHEMAS` in `core/constants.py`:
+
+```python
+WRITE_PATH_SUPPLIED = {"id", "type", "order", "status"}
+
+REQUIRED_FIELDS = {
+    entity_type: [field for field, meta in schema.items()
+                  if not meta.get("optional", True) and field not in WRITE_PATH_SUPPLIED]
+    for entity_type, schema in ENTITY_SCHEMAS.items()
+}
+```
+
+A 12-line hand-written dict — a second copy of the schema with nothing keeping
+it honest — is deleted. Placed after `ENTITY_SCHEMAS` because the derivation
+reads it; `WRITE_PATH_SUPPLIED` is a literal rather than an import of
+`FIELDS_TO_SKIP` because `core/entity.py` imports from `core/constants.py` and
+the reverse would be circular. Verified they agree: `FIELDS_TO_SKIP` is
+`{id, type}` and is fully covered, plus `order` (auto-numbered) and `status`
+(defaults to a valid value).
+
+**Measured, before and after.** A minimal valid beat — `character`, `scene`,
+`label`, the three fields the schema marks non-optional:
+
+| | findings |
+|---|---|
+| before | `Missing required field: id`, `: y`, `: order` |
+| after | **none** |
+
+**Three types were wrong, not one.** Deriving the list fixed `arc_beat` (7
+spurious fields) *and* two latent ones nobody had reported: `plot.status` and
+`project.logline`, which survived only because their defaults happen to be
+truthy. The guard test below fails on all three.
+
+**One existing test asserted the bug.** `test_arcs.py` asserted `order` was
+required — actively defending the behaviour this entry removes. Changed to
+`label`, which genuinely is required.
+
+**Checks.** Two tests added, both verified to fail against the old list:
+
+- `test_minimal_arc_beat_reports_no_missing_field` — a beat carrying only what
+  the schema asks for is silent. (Fails before the fix with `['id','y','order']`.)
+- `test_required_fields_is_derived_from_the_schema` — `REQUIRED_FIELDS` equals
+  the derivation for every type. (Fails before the fix on `plot`, `project`,
+  `arc_beat`.)
+
+The second is the one that matters: it is a guard against the *class*, not the
+instance, so a future field cannot reintroduce the drift.
+
+**Deliberately untouched:** `WRITE_PATH_SUPPLIED` is the write path's
+knowledge, not the schema's. The schema says which fields exist and which are
+optional; only the writer knows what it fills in. Keeping them separate is why
+`entity.py` and `writes.py` already declare the same two skip-lists — that
+duplication is pre-existing and outside this fix.
+
+**The two remaining findings on a minimal arc beat are B12**, not this entry.
+See below.
 
 ---
 
@@ -1395,6 +1609,79 @@ reintroduces it. B4, B5 and B8 are the same question asked three times.
 **The fix direction:** decide, per link type, which storage is authoritative,
 and have the other be derived rather than independent. Then every reader is
 correct by construction instead of by having chosen the right source.
+
+---
+
+## D5. One concept, three names — `slug` / `entity_id` / `id` — **AGREED, not built**
+
+**A position was reached on 2026-09-28. No code written.**
+`tasks/task_17*/entity_identity.md` holds the full investigation, the
+measurements, the two positions that were **wrong and later overturned**, and
+`tasks/task_17*/entity_identity_plan.md` holds the build order — five steps,
+sequenced so the two that fix reproduced bugs land first and the file-layout
+change lands last. **Baseline: 889 tests pass; no step may commit with fewer.**
+
+**The agreed position:**
+
+> The id is **generated** (`secrets.token_hex(4)`, 8 chars), never supplied by
+> the agent, stored in the DB **and** in every note's frontmatter, and never
+> derived from anything. The **title** is the only user-facing name — in the
+> dashboard, in the payload, and in the exported filename. The op argument is
+> `id` everywhere; the word `slug` survives only for a *project directory*.
+
+**What was established by measurement.** One value had four names depending on
+the op: `create` took `slug`, `edit`/`delete` took `entity_id`, `story_retrieve`
+took `id`, and the DB column was `id` — with two tools carrying a prose bridge
+explaining that `id` and `slug` are the same string, which is the tell. The
+filename was the id (`story_export.py:171` writes `{entity_id}.md`,
+`story_import.py:279` reads `note.stem`), and that coupling is what made two
+earlier proposals wrong.
+
+**Two positions were overturned, and both reversals are recorded:**
+
+- *"Generate opaque uuid ids."* Right in principle, but the first cost figure
+  was wrong by ~4× (costed 36 chars against 29 ids, not the 90 appearances in a
+  payload). Corrected to +717 tokens per `story_load` for `uuid4()` against
+  +87 for an 8-char id.
+- *"Name the files after the title"* was **rejected** — correctly, at the time,
+  because the filename *is* the id, so a title-keyed filename made the id
+  derive from a mutable field and a retitle silently orphaned every reference.
+  **That objection is void once the id is generated**, because the id is then
+  derived from nothing. The proposal was right and was only wrong about the
+  thing it depended on.
+
+**Two fixes fall out of it, and are not chores:** dropping the arc_beat
+composite id (a generated id would make it 73 chars, and the character link
+already lives in `parent_id`), and deleting `writes.py:689`'s
+`LIKE '%-{slug}'` fallback — which is *currently causing* a silent
+wrong-entity write, reproduced: two arc beats named "The Choice", an edit on
+one hit the other with `success: true`.
+
+**Still open, and not a measurement:** whether the vault is for reading or only
+a backup. Title-keyed filenames make it browsable again; the cost is that a
+hand-edited filename no longer renames the entity, so the frontmatter `id`
+becomes the authority. The safer direction, but a behaviour change.
+
+**The one decision already safe:** `slug` keeps meaning a *project directory
+name* (`projects/<slug>/`, `story_resolve`). That is a different concept from
+an entity id and should not be renamed as part of this work.
+
+**The deployment constraint, which changes the arithmetic.** The plugin is not
+deployed; every project in existence is a test artefact. So any data change is
+a one-time script rather than a migration inside the plugin. Two consequences,
+both recorded in full in `entity_identity.md`:
+
+- It makes the arc_beat composite fix (making the composite id the value the
+  agent supplies) affordable — that option needs a data change, which is now
+  just a script.
+- It makes three pieces of **compatibility code deletable**, because they exist
+  only to serve a database written by an earlier build and no such database
+  exists. Measured: all three real databases already have the soft-delete
+  columns, none has a `drafts` table, and **zero** number-typed fields are
+  stored as a string anywhere. The candidates are
+  `ensure_soft_delete_columns` (`core/db.py:125`), `ensure_drafts_table`
+  (`core/db.py:149`), and the read half of `_coerce_number` (`core/db.py:302`).
+  **Not deleted — filed as Q7 in the analysis, to be sequenced deliberately.**
 
 ---
 
