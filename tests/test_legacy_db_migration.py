@@ -3,6 +3,17 @@
 Regression: story_load failed with "no such column: is_deleted" on a project
 whose story.db predates the soft-delete commit. The migration lived only in
 create_schema(), which read-only tools never call.
+
+That repair stays: `is_deleted` and `deleted_at` are columns on `entities`, and
+`ALTER TABLE ... ADD COLUMN` is the only way to add one to a table that already
+exists.
+
+The companion case — a `drafts` table missing from an old database — is gone.
+It was the same regression, but a table is created by `create_schema` like
+every other, so there is nothing to migrate: the plugin has never been
+deployed, no project predates draft staging, and `create_project` is the only
+way a real database comes into being. The test that asserted the repair was
+removed with it.
 """
 import sqlite3
 import sys
@@ -39,41 +50,6 @@ def test_get_db_migrates_a_legacy_database(tmp_path):
         assert conn.execute("SELECT name FROM entities WHERE is_deleted=0").fetchall() == [
             ("Old Hero",)
         ]
-    finally:
-        conn.close()
-
-
-def test_get_db_creates_the_drafts_table_on_a_legacy_database(tmp_path):
-    """A DB written before draft staging exists gains the drafts table on open.
-
-    Drafts live in their own table, so a project created by an earlier build
-    has no such table — and read-only tools never call create_schema(). Same
-    regression as the soft-delete columns, same fix: migrate in get_db.
-    """
-    proj = tmp_path / "legacy-drafts"
-    db = proj / ".story" / "story.db"
-    db.parent.mkdir(parents=True)
-
-    legacy = sqlite3.connect(str(db))
-    legacy.executescript(
-        """
-        CREATE TABLE entities (
-            id TEXT PRIMARY KEY,
-            type TEXT NOT NULL,
-            name TEXT
-        );
-        INSERT INTO entities VALUES ('a1', 'character', 'Old Hero');
-        """
-    )
-    legacy.commit()
-    legacy.close()
-
-    conn = get_db(proj)
-    try:
-        tables = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )}
-        assert "drafts" in tables
     finally:
         conn.close()
 

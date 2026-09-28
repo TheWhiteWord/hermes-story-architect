@@ -140,16 +140,27 @@ def test_restage_of_an_unknown_draft_is_refused(fixture_path):
 
 
 # ─── Guard 7: the migration ───
+#
+# Removed. This asserted that opening a database written before draft staging
+# existed would create the `drafts` table — a repair for a database no build
+# has ever produced. The table is created by create_schema like every other,
+# so a project that lacks it was never a project. What replaced it is below:
+# a fresh project has the table, and staging works against it.
 
-def test_a_legacy_db_gains_the_drafts_table_on_open(tmp_path):
-    """Guard 7, alongside the Phase 1 migration test in test_legacy_db_migration."""
-    proj = tmp_path / "legacy"
-    db = proj / ".story" / "story.db"
-    db.parent.mkdir(parents=True)
-    legacy = sqlite3.connect(str(db))
-    legacy.execute("CREATE TABLE entities (id TEXT PRIMARY KEY, type TEXT NOT NULL)")
-    legacy.commit()
-    legacy.close()
+
+def test_drafts_table_exists_on_a_fresh_project(tmp_path):
+    """create_schema makes the drafts table, so no open-time repair is needed.
+
+    The old guard proved the opposite case — that get_db invented a missing
+    table. That is a repair for a database no build has produced, and it cost a
+    function plus a call on every connection. This proves the case that can
+    actually happen: a project created now has the table, without get_db
+    creating anything.
+    """
+    from core.writes import create_project
+
+    create_project("fresh", {"name": "Fresh", "logline": "x"}, tmp_path)
+    proj = tmp_path / "projects" / "fresh"
 
     conn = get_db(proj)
     try:
@@ -159,8 +170,8 @@ def test_a_legacy_db_gains_the_drafts_table_on_open(tmp_path):
     finally:
         conn.close()
 
-    # And it is immediately usable, not merely present.
-    result = drafts.stage(proj, _batch(), "staged against a migrated db")
+    # And usable, not merely present — the old guard's second half.
+    result = drafts.stage(proj, _batch(), "staged against a fresh project")
     assert result["success"] is True
 
 

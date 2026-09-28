@@ -239,19 +239,28 @@ class TestSchema:
         conn.commit()
         conn.close()
 
-        from core.db import SCHEMA_SQL, ensure_soft_delete_columns
-        conn = sq.connect(str(old))
-        conn.executescript(SCHEMA_SQL)
-        ensure_soft_delete_columns(conn)
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
-        conn.close()
+        # get_db is where the repair lives, and the path every caller takes.
+        proj = tmp_path / "legacy"
+        (proj / ".story").mkdir(parents=True)
+        (proj / ".story" / "story.db").write_bytes(old.read_bytes())
+
+        from core.db import get_db
+        conn = get_db(proj)
+        try:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
+        finally:
+            conn.close()
         assert {"is_deleted", "deleted_at"} <= cols
 
     def test_migration_is_idempotent(self, vault):
-        from core.db import get_db, ensure_soft_delete_columns
-        conn = get_db(vault / "projects" / "stc")
+        """Opening twice adds nothing twice — get_db runs on every connection."""
+        from core.db import get_db
+        proj = vault / "projects" / "stc"
+        get_db(proj).close()
+        conn = get_db(proj)
         try:
-            ensure_soft_delete_columns(conn)
-            ensure_soft_delete_columns(conn)
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(entities)")]
         finally:
             conn.close()
+        assert cols.count("is_deleted") == 1
+        assert cols.count("deleted_at") == 1

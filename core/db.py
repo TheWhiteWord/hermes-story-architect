@@ -54,6 +54,14 @@ CREATE TRIGGER IF NOT EXISTS sections_au AFTER UPDATE ON sections BEGIN
     INSERT INTO sections_fts(sections_fts, rowid, body) VALUES ('delete', old.rowid, old.body);
     INSERT INTO sections_fts(rowid, body) VALUES (new.rowid, new.body);
 END;
+
+CREATE TABLE IF NOT EXISTS drafts (
+    id         TEXT PRIMARY KEY,
+    ops        JSON NOT NULL,
+    prev_ops   JSON,
+    summary    TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -64,10 +72,12 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     BEGIN/COMMIT/ROLLBACK for transactions. Avoids nested-transaction errors
     from SQLite's implicit transaction behavior.
 
-    Also migrates soft-delete columns: every reader filters on
-    ``is_deleted``, and a read-only tool never calls create_schema(), so a
-    project created by an earlier build failed with "no such column" on read.
-    The same applies to the ``drafts`` table.
+    Also repairs a database whose `entities` table predates soft delete, by
+    adding the two columns: every reader filters on `is_deleted`, and a
+    read-only tool never calls create_schema(), so a project created by an
+    earlier build failed with "no such column" on read. A missing *table* needs
+    no such repair — create_schema makes those, and create_project is the only
+    way a real database comes into being.
     """
     db_path = project_path / ".story" / "story.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,13 +85,16 @@ def get_db(project_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=3000")
     conn.execute("PRAGMA foreign_keys=ON")
-    ensure_drafts_table(conn)
     # No entities table yet (fresh project) — create_schema() adds it with the
     # columns already present, so there is nothing to migrate.
     if conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='entities'"
     ).fetchone():
-        ensure_soft_delete_columns(conn)
+        have = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
+        if "is_deleted" not in have:
+            conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
+        if "deleted_at" not in have:
+            conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
     return conn
 
 
@@ -121,52 +134,16 @@ def backup_database(project_path: Path) -> str:
     return str(dest)
 
 
-def ensure_soft_delete_columns(conn: sqlite3.Connection) -> None:
-    """Add is_deleted / deleted_at to databases created before the soft delete.
-
-    `CREATE TABLE IF NOT EXISTS` silently leaves an existing table alone, so any
-    project created by an earlier build has no such column — and every reader
-    that filters on it would fail with "no such column". Idempotent.
-    """
-    have = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
-    if "is_deleted" not in have:
-        conn.execute("ALTER TABLE entities ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
-    if "deleted_at" not in have:
-        conn.execute("ALTER TABLE entities ADD COLUMN deleted_at TEXT")
-
-
-DRAFTS_SQL = """
-CREATE TABLE IF NOT EXISTS drafts (
-    id         TEXT PRIMARY KEY,
-    ops        JSON NOT NULL,
-    prev_ops   JSON,
-    summary    TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL
-)
-"""
-
-
-def ensure_drafts_table(conn: sqlite3.Connection) -> None:
-    """Create the staged-change table if it is missing.
-
-    Same reasoning as ensure_soft_delete_columns: a project created by an
-    earlier build has no such table, and read-only tools never call
-    create_schema(). Unlike the column migration this is unconditional — a
-    draft is a proposal, so it belongs to any project, created or not.
-    Idempotent.
-    """
-    # execute, not executescript: this runs on every get_db, and executescript
-    # issues an implicit COMMIT that would close a transaction a caller opened.
-    conn.execute(DRAFTS_SQL)
-
-
 def create_schema(conn: sqlite3.Connection) -> None:
-    """Create all tables, indexes, triggers. Also migrates an existing db."""
+    """Create all tables, indexes, triggers.
+
+    Also migrates an existing db, but only for tables: `CREATE TABLE IF NOT
+    EXISTS` leaves an existing table untouched, so a project created by an
+    earlier build keeps a pre-soft-delete `entities` table. The two columns are
+    added by `get_db` instead, which every caller reaches first — including
+    read-only tools, the ones that never call this.
+    """
     conn.executescript(SCHEMA_SQL)
-    # CREATE TABLE IF NOT EXISTS leaves an existing table untouched, so a
-    # project created by an earlier build would be missing the soft-delete
-    # columns that every reader now filters on.
-    ensure_soft_delete_columns(conn)
 
 
 def has_schema(conn: sqlite3.Connection) -> bool:
