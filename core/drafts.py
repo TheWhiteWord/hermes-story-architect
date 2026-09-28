@@ -739,9 +739,37 @@ def _render_diff(changes: dict) -> list[str]:
     return out
 
 
+def _fmt_scalar(value) -> str:
+    """One value, inline. A nested object becomes `k=v, k=v`."""
+    if isinstance(value, dict):
+        return ", ".join(f"{k}={_fmt_scalar(v)}" for k, v in value.items())
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return str(value)
+
+
 def _fmt(value) -> str:
+    """A field value for the preview.
+
+    A structured field used to fall through to `str()`, which is a Python repr:
+    single quotes, no line breaks, and it wraps mid-sentence. For
+    `relationship.perspectives` that hid the one thing the field is for — two
+    characters side by side — so a dict is one bolded line per entry and a list
+    of objects is one line per item. `<br>` because these live in a table cell,
+    where a newline would end the row.
+    """
+    if isinstance(value, dict):
+        if not value:
+            return "—"
+        return "<br>".join(f"**{k}** — {_fmt_scalar(v)}" for k, v in value.items())
     if isinstance(value, list):
-        return ", ".join(str(v) for v in value) if value else "—"
+        if not value:
+            return "—"
+        if isinstance(value[0], dict):
+            return "<br>".join(
+                ", ".join(f"{k}: {_fmt_scalar(v)}" for k, v in item.items())
+                for item in value)
+        return ", ".join(str(v) for v in value)
     if isinstance(value, bool):
         return "yes" if value else "no"
     return str(value) if value not in (None, "") else "—"

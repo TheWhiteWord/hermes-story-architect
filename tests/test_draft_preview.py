@@ -274,3 +274,49 @@ def test_the_chat_preview_mock_would_not_pass_validation():
         "title": "The Telling", "sequence_id": "seq-discovery", "act_id": "act-1",
         "value_at_open": "hope", "value_at_close": "doubt"})])
     assert any("Invalid value_at_open: hope" in f for f in findings)
+
+
+# ─── I2: a structured field must not render as a Python repr ───
+
+def test_a_dict_field_renders_one_line_per_entry():
+    """`perspectives` is the field a writer most wants to *see* when approving a
+    relationship: two characters, two readings, side by side. A dict repr
+    hides exactly that — single quotes, no breaks, wrapping mid-sentence."""
+    from core.drafts import _fmt
+
+    out = _fmt({"kael": {"label": "Kael", "feeling": "wary", "strength": 0.6,
+                         "secret": False},
+                "mira": {"label": "Mira", "feeling": "guarded", "strength": -0.3,
+                         "secret": True}})
+    assert "'" not in out, f"still a Python repr: {out}"
+    assert "{" not in out and "}" not in out, out
+    # One bolded line per character — the comparison is the point.
+    assert out.count("<br>") == 1
+    assert "**kael**" in out and "**mira**" in out
+    assert "secret=no" in out and "secret=yes" in out
+
+
+def test_a_list_of_objects_renders_one_line_per_item():
+    """The same defect in the other shape, which the entry only suspected:
+    `plot.setups` held a bare `{'scene_id': ...}` for the same reason."""
+    from core.drafts import _fmt
+
+    out = _fmt([{"scene_id": "s1", "description": "The lie is told here."},
+                {"scene_id": "s2", "description": "And here it costs."}])
+    assert "'" not in out, f"still a Python repr: {out}"
+    assert out.count("<br>") == 1
+    assert "scene_id: s1" in out and "description: The lie is told here." in out
+
+
+def test_scalars_are_unchanged_by_the_structured_fix():
+    """The one-line cases must not move: a fix that also reformats the common
+    path is a fix nobody can review."""
+    from core.drafts import _fmt
+
+    assert _fmt("prose") == "prose"
+    assert _fmt(True) == "yes"
+    assert _fmt(False) == "no"
+    assert _fmt([]) == "\u2014"
+    assert _fmt({}) == "\u2014"
+    assert _fmt(["kael", "mira"]) == "kael, mira"
+    assert _fmt("") == "\u2014"
