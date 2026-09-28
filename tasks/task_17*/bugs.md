@@ -28,8 +28,19 @@ rewritten, and the reference is moving under the new
 | concern | belongs in | why |
 |---|---|---|
 | teaching the format | the skill (prose) | an agent learning screenplay needs examples, not an error string |
-| detecting the error | `validate_shape` in `core/drafts.py` | it must run whether or not a skill is loaded |
+| detecting the error | a **new** linter, called from `validate_shape` in `core/drafts.py` | it must run whether or not a skill is loaded |
 | reporting the error | `story_draft`'s `validation` list | the agent is already told to relay this list |
+
+**The new module does not modify `core/fountain_validator.py`.** That module
+was built for script *import* — accepting a real, human-written screenplay —
+and it is correct for that: permissive parsing is the right behaviour when the
+input is someone else's finished work. Our case is the opposite, an agent
+*writing* script from a documented format and needing to be told where it
+departed. Parser vs linter, same input, opposite correct answer. So: a new
+module, inspired by the existing one, and the existing one left intact for if
+script import is ever built. **Two modules that both "validate Fountain" but
+answer different questions is the naming trap of D2 repeating itself** — the
+new one needs its own name, not a variant of the old one.
 
 **The dashboard gets the second half.** Rendering malformed script as prose is
 I1, and it is a separate fix: the dashboard should not assume its input is
@@ -37,10 +48,10 @@ well-formed. A renderer that falls back to `<pre>` when it cannot parse a scene
 is more robust than one that assumes success — same lesson as B1 at a
 different layer: do not trust that data arriving in a view was already checked.
 
-**What this does not settle:** whether the presence checks extend the existing
-`fountain_validator.py` or are written fresh. See the caveat at the end of B11
-— `fountain_lexer.py` is an unfinished port, and reviving half-finished code
-may cost more than the checks are worth. Decide when the fix is scheduled.
+**What this does not settle:** the new linter's name, and whether it reuses
+`fountain_validator._classify_line` (probably — the *classification* of a line
+is reusable, the *verdict* is not) or takes a simpler line of its own. Decide
+when the fix is scheduled.
 
 ---
 
@@ -835,15 +846,15 @@ so they are the same risk waiting for a comparison.
 
 ---
 
-## B11. The Fountain validator passes malformed script, and nothing calls it
+## B11. No format check on the authoring path (the existing validator is not the tool for it)
 
-**Severity: high.** The safeguard for scene formatting does not exist in
-practice, despite existing in the codebase. This is the answer to "should
-there be a safeguard if scene content is not written properly" — the answer
-is that one was written, it works, and it is not wired up and does not detect
-the failure it was meant to catch.
+**Severity: high.** The safeguard for scene formatting does not exist on the
+path that writes scene script. **This is not a defect in
+`core/fountain_validator.py` — that module works, for what it was built for.**
+See "Why the existing validator must not be modified" below; it is a
+load-bearing constraint on the fix.
 
-### The unused half
+### The gap: nothing checks the authoring path
 
 `core/fountain_validator.py` (235 lines) exposes `validate_screenplay`,
 `is_valid_screenplay` and `get_validation_summary`. It is referenced **only**
@@ -853,55 +864,33 @@ by the skill reference doc, never by a tool. Task 18 already noticed:
 > updated docstrings explaining future use" … "`fountain_validator.py` imported
 > nowhere."
 
-So the module is dead code, retained on the expectation of a future
-Fountain→entity import feature. It is not in `validate_shape`, so staging a
-scene performs no format check at all.
+It is not in `validate_shape`, so staging a scene performs no format check at
+all. **That is the defect: the authoring path is unchecked.**
 
-### The broken half — it does not detect the actual failure
+### Why the existing validator must not be modified
 
-Wired in or not, it would not have caught this. Run against the three scenes
-staged in `lighthouse-test`:
+**It was built for a different feature — importing a user's own script — and it
+works there.** That feature was never implemented, but the effort is real and
+the module is correct for its purpose. Recorded 2026-09-28 as a hard
+constraint:
 
-```
-mara-offers-to-help     valid: True   0 issues
-the-lamp-comes-back-on  valid: True   0 issues
-the-last-watch          valid: True   0 issues
-```
+- **Do not modify `fountain_validator.py`.** Its job is to accept a real,
+   human-written screenplay and tell you what is in it. Loose, permissive
+   parsing is *correct* there: a script with no scene heading is still a valid
+   screenplay fragment, and a parser that rejects it would refuse legitimate
+   input.
+- **Our use case is the opposite.** An agent is *writing* script from a
+   documented format, and we need to tell it where it departed. That is a
+   linter, not a parser — a different job with different rules.
+- **So: a new module**, taking inspiration from the existing one, wired into
+  `validate_shape`. The existing file stays intact and available if script
+  import is ever built.
 
-All three are malformed — no scene heading in the body, inline `ELIAS:` cues
-instead of Fountain cues — and the dashboard renders them as prose, which is
-what prompted this. The validator is silent on all of it.
+Bluntly: **the existing validator is not broken, it is the wrong tool.** Two
+modules that both claim to "validate Fountain" but answer different questions
+is the same naming trap as D2, so the new one must not reuse the name.
 
-**Two independent reasons:**
-
-**1. Every rule is local.** The checks are all "does this line agree with its
-neighbour" — a cue needs a blank line before it, a transition needs `TO:` at
-the end. There is no rule of the form "a scene must contain a scene heading",
-because nothing tracks what the scene *contains*, only how each line relates to
-the one above. A scene with no heading and no dialogue has no misbehaving
-line, so there is nothing to flag. Tested and confirmed: a pure-action scene
-scores 0 issues.
-
-**2. Inline cues are misclassified, so the most common error is invisible.**
-`_classify_line` recognises a character cue only when:
-
-```python
-if stripped.isupper() and any(c.isalpha() for c in stripped):
-    return 'character'
-```
-
-`ELIAS: You could have telephoned.` is not `isupper()` — the dialogue after
-the colon is lowercase — so it falls through to `'action'`. **A scene written
-entirely in inline-cue style classifies as 100% action**, and a validator that
-only reasons locally sees a perfectly well-formed action sequence. Tested:
-inline-cue text and mixed-style text both score 0 issues.
-
-**This is the same shape as B10 and B9, one level up.** A validator that
-checks local consistency will always pass globally inconsistent content, for
-exactly the same reason `max('3', 3)` was never reached: nothing asks the
-question that the data actually needs answered.
-
-### What a working safeguard needs
+### What the authoring-side check needs
 
 Two additions, and the second is the one that matters:
 
@@ -911,9 +900,30 @@ Two additions, and the second is the one that matters:
    zero cues but N lines ending in a colon" is the finding.
 2. **Detect the near-miss rather than ignoring it.** A line matching
    `^[A-Z][A-Z0-9 .'-]{1,30}:\s+\S` is almost certainly a character cue
-   written inline. Classifying it as `action` is defensible for a Fountain
-   parser; for a *linter* it is the single most valuable thing to catch,
-   because it is what the agent naturally produces.
+   written inline. Classifying it as `action` is defensible for a *parser*
+   (Fountain genuinely has no inline cues); for a *linter* it is the single
+   most valuable thing to catch, because it is what the agent naturally
+   produces.
+
+**Why the two jobs diverge on this exact line** — the evidence that these are
+not one function. `_classify_line` recognises a cue only when:
+
+```python
+if stripped.isupper() and any(c.isalpha() for c in stripped):
+    return 'character'
+```
+
+`ELIAS: You could have telephoned.` is not `isupper()`, so it falls through to
+`'action'`. **For an importer that is right**: the line genuinely is action in
+Fountain, and reporting "unknown element" would be a false alarm on a valid
+file. **For a linter it is a failure**: the author almost certainly meant a
+cue. Same input, opposite correct answer — which is the cleanest possible
+argument for two modules rather than one configurable one.
+
+**This is the same shape as B10 and B9, one level up.** A validator that
+checks local consistency will always pass globally inconsistent content, for
+exactly the same reason `max('3', 3)` was never reached: nothing asks the
+question that the data actually needs answered.
 
 ### Where it should be called, and the skill-path problem
 
@@ -938,12 +948,9 @@ belong in the skill (prose, for an agent that is learning); the detection
 belongs in the tool (a self-contained message).** The skill teaches, the
 validator enforces, and neither needs to know the other's filename.
 
-**One caveat to check before building it:** `fountain_validator.py` is dead
-code of unknown quality — `_classify_line` is a hand-rolled classifier, and
-`fountain_lexer.py` is an unfinished port (per the task notes). Extending a
-half-finished module is a bigger job than writing the presence checks fresh.
-Worth a look at `fountain_lexer.py`'s state before deciding whether to revive
-or replace.
+**What is still open:** the new module's name and whether it reuses
+`_classify_line` (probably yes — the classification is reusable, the *verdict*
+is not) or takes a simpler line of its own. Decide when the fix is scheduled.
 
 ---
 

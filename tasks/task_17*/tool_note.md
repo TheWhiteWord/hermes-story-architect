@@ -209,12 +209,14 @@ the symptom, and the block is nearly always inline cues or a missing slugline.
 When the validator is wired up these become stage-time findings instead of a
 rendering you have to diagnose visually.
 
-**What is verified about the validator** (so this note is not over-confident):
-no tool calls it, and `validate_screenplay()` returns `valid: True, 0 issues`
-for all three malformed scenes in the live test — also for a pure-action scene,
-and for inline-cue text. It detects line-level disagreement, not global
-structure, and it classifies an inline cue as `action` because the line is not
-`isupper()`. Treat it as unusable until fixed, not as a check that passed.
+**What is verified about the existing validator** (so this note is not
+over-confident): no tool calls it, and it is **not** the check you want. It was
+built for script *import* — accepting a real human-written screenplay — and
+permissive parsing is correct there, so it is not broken. Our case is the
+opposite: an agent writing script that should be told where it departed. That
+is a linter, and it does not exist yet (B11). Do not treat
+`fountain_validator.py` as a passing check, and do not expect the write path
+to catch malformed script — it currently catches nothing.
 
 ---
 
