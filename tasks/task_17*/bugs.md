@@ -977,6 +977,109 @@ frontmatter round-trips its own `act_id`), so removing the storage would break
 
 ---
 
+## D2. `story_load` and `story_describe` use different names for the same links
+
+**Found 2026-09-28, while fixing B4/B5. Raised as a question: should the
+descriptions change so the model's two vocabularies line up? Answer below.**
+
+### The mismatch, measured
+
+`story_load` emits `chars` and `loc`. The write side (`story_describe`,
+`story_draft`, the schema) uses `characters` and `location`:
+
+```
+story_load actually emits:  acts, characters, chars, id, loc, plots, scenes,
+                           sequences, worlds
+write-side names absent from story_load:  location, setups, crisis, climax,
+                           payoffs, variant_of, sequence_id, act_id, world,
+                           act, primary_plot, climax_scene_id, character
+load names with NO write equivalent:  chars, loc
+```
+
+`chars` and `loc` were **deliberately chosen for token cost**, not by accident.
+`story_load_redesign_spec.md:191`:
+
+> `chars, loc` | keep | Structural cross-reference, replaces
+> `character_scene`/`location_scene` relations
+
+And line 9, the spec's first principle, is that the payload's whole purpose is
+to remove ~12.9k tokens. `chars` and `loc` are the compressed form of exactly
+the fields the spec says the relation rows replace.
+
+### So: should the descriptions change, or story_load?
+
+**Neither — and this is the finding.** The two vocabularies are not the same
+concept, so renaming either would be wrong:
+
+- **`story_load` is a read summary.** It nests, abbreviates, and drops fields
+  the agent can get back with `story_retrieve`. `chars` is a compression of
+  `characters`; `loc` of `location`. The spec is explicit that it also drops
+  `heading`, `time_of_day`, `value*` and `conflict_levels` **on purpose**, each
+  with a "retrieve this instead" note.
+- **`story_describe` is the write vocabulary.** Its field names ARE the
+  `story_draft` op keys. An agent that renamed `characters` → `chars` in a
+  `story_draft` op would get a hard error — `edit_entity` rejects unrecognised
+  keys by design, precisely so a wrong name cannot be silently dropped.
+
+Renaming the write side to match the read side would break every op. Renaming
+the read side would undo a deliberate token optimisation that saved ~12.9k on a
+feature-length project. **Both are load-bearing.**
+
+### What is actually missing
+
+Not a name change — a **bridge**. Nothing currently tells the model that
+`loc` in a load payload is the `location` it writes, and nothing in
+`story_describe` says its `location` will come back as `loc`. The model has to
+infer the correspondence, and the inference is asymmetric: `chars` →
+`characters` is guessable, `loc` → `location` is not.
+
+**The fix is documentation, in the two tools' own descriptions** — not a
+rename, and not a new field:
+
+- `story_load`'s description states the abbreviations it uses, so the agent
+  knows `chars`/`loc` are the same links under shorter names.
+- `story_describe`'s description says these are the field names to pass to
+  `story_draft`, and that a field named `X` may come back from `story_load`
+  under a short form.
+
+Cheap, no data-model risk, and it removes the guess that produced both B7-style
+errors and this confusion. **Recorded as an improvement (I3), not a defect** —
+nothing is broken, something is undocumented.
+
+### `id` vs `slug` — settled: both are correct, in different places
+
+Checked rather than assumed, since it was raised as a possible bug:
+
+- **The DB column is `id`.** `ENTITY_COLUMN_MAP` maps schema fields to it, and
+  `FIELDS_TO_SKIP = {'id', 'type'}` deliberately excludes it from writes.
+- **The op argument is `slug`.** `story_draft` ops are
+  `{op, type, slug, data}` — the slug is a top-level op arg, never a field
+  inside `data`.
+- **`story_describe` shows `id` as a field** and it is genuinely write-ignored,
+  but its description already says *"Stable slug reflecting dramatic function
+  (e.g. 'mara-discovers-files')"* — so the value the model sees in `id` is the
+  same string it must pass as the op's `slug`.
+
+**Verdict: not a bug, and renaming `id` → `slug` in the schema would be
+wrong.** `id` is the field's real name in the data model and in every read path;
+`slug` is the op-argument name. The only gap is that the model must notice
+`id`'s value becomes the op's `slug` argument. Same class as `chars`/`loc`: a
+**missing bridge, not a wrong name.** The bridge note in `story_describe`'s
+description covers both at once — worth one line each, no rename.
+
+### What this says about the rest of D2
+
+The original D2 entry claimed `story_describe` shows a section name and a field
+name in the same output "with nothing saying they are different namespaces",
+and that `id` is offered while ops supply `slug`. Both claims survive this
+investigation and are unaffected by the `chars`/`loc` finding — which is
+separate, and larger. The `id`/`slug` question raised alongside it is still
+open: `columns_for_insert` takes `slug` and the DB column is `id`, so the op
+key and the stored column genuinely differ. Worth deciding, but it is a naming
+question about the *write* path, not the read path.
+
+---
+
 ## D1. The tool cannot show the agent the shape of a structured value
 
 **The pattern.** `ENTITY_SCHEMAS` documents shape with `sub_fields` (B9) and
