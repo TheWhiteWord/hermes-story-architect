@@ -524,7 +524,59 @@ map rather than an error. That closes the gap that let this ship.
 
 ---
 
-## B8. `story_load` reports a referenced location as `orphaned`
+## B8. A scene's location is invisible to every relation-based reader
+
+**Severity: medium. FIXED 2026-09-28 — but the symptom originally recorded
+below was wrong, and the correction comes first.**
+
+### Correction: the orphan check was never the symptom
+
+The entry below claims the orphan check reads relations and so misreports a
+referenced location. **It does not.** It tests the **world**:
+
+```python
+orphaned_loc_ids = sorted(
+    [lid for lid, loc in locations.items()
+     if not loc.get("_parent_id") or loc["_parent_id"] not in worlds], ...)
+```
+
+`the-lamp-room` was reported orphaned because **it had no `world`**, which has
+nothing to do with the missing relation. Confirmed directly: in the
+`save-the-children` fixture both locations have `parent_id = None` and both are
+reported orphaned — including ones two scenes are set in. Any fix aimed at the
+orphan check would have fixed nothing.
+
+### The real gap, measured
+
+Deleting the `location_scene` rows and comparing the dashboard:
+
+```
+WITHOUT location_scene   the-central-room -> 0 scenes   the-garden -> 0
+WITH    location_scene   the-central-room -> 2 scenes   the-garden -> 1
+```
+
+The missing writer leaves **the dashboard's location→scenes view empty** for
+any project not built by the importer. A location looks unused, which invites a
+cleanup pass — the same *shape* of harm as described below, by a different
+route. Only `story_import.py` ever wrote these rows; four readers in
+`core/db.py` consume them.
+
+### What was fixed
+
+`entity.location_scene_relations()` builds the rows. `relations_for_insert`
+calls it for scenes; `edit_entity` re-derives them whenever the `location_id`
+column is touched, **deleting the old row first** — the stale row is what keeps
+a location looking used when no scene is there any more. Five tests in
+`tests/test_location_scene_relation.py`; two fail without the fix.
+
+### Direction, for whoever touches this next
+
+`location_scene` is stored `from_id=location, to_id=scene`. `character_scene`
+is the opposite, `from_id=scene, to_id=character`. Both pre-existing, and every
+reader inverts accordingly. Unifying them is a migration with a data fix, not a
+cleanup — deliberately left alone.
+
+### Original entry (superseded in its conclusion)
 
 **Severity: medium.** A false positive in the base structural map — the map
 tells the author a location is unused when three scenes point at it.
@@ -661,6 +713,103 @@ different hat. Decide once, apply to all four plot fields together.
 the same ambiguity — is `characters: ["a", "b"]` a list of slugs, and is that
 documented anywhere the agent can see? `story_describe` says `"type": "list"`
 and stops. B4 is a consequence of exactly this gap.
+
+---
+
+# D3 investigation — columns vs relations (2026-09-28)
+
+Investigated without assuming a conclusion. **The premise turned out to be
+partly wrong, and the real finding is narrower and more actionable.** Recorded
+before any decision, so the reasoning is auditable.
+
+## What I expected to find
+
+Two competing authorities per link type, each with readers that picked one.
+Pick the winner per link, derive the other, done.
+
+## What is actually there
+
+**1. Every declared link is unambiguous — the overlap is one field.**
+`ENTITY_COLUMN_MAP` and `_RELATION_FIELDS` never both claim the same field.
+The declared storage is clean:
+
+| link | storage | why it is there |
+|---|---|---|
+| `location.world` | column `parent_id` | tree |
+| `scene.sequence_id` | column `parent_id` | tree |
+| `sequence.act_id` | column `parent_id` | tree |
+| `arc_beat.character` | column `parent_id` | tree |
+| `scene.location` | column `location_id` | single-valued |
+| `scene.characters` | relation `character_scene` | many-to-many |
+| `plot.setups/crisis/climax/payoffs` | relations | many-to-many, **with a `note`** |
+| `location.variant_of`, `world.variant_of` | relations | graph edge |
+
+The pattern is already consistent and already right: **tree/single links in
+columns, multi-links with metadata in relations.** Every column link is a
+`parent_id`-style tree or a single-valued reference; every relation is
+many-to-many or carries a `note`/`order`. `plot.*` needs relations precisely
+because each edge carries a `description` — which is why losing the description
+(B9) was possible at all.
+
+**2. The one genuine overlap is `scene.location`, and it is not a conflict —
+it is a reverse index, and it is stale.**
+
+`scene.location_id` (scene → location) and the `location_scene` relation
+(location → scene) are **the same fact in opposite directions**, and in the
+reference project they agree on all six scenes once you invert the relation.
+Verified, not assumed:
+
+```
+central-room-day   column='the-central-room'  relation_inverted='the-central-room'  AGREE
+garden-dream       column='the-garden-dream'  relation_inverted='the-garden-dream'  AGREE
+...  6 of 6 agree
+```
+
+**But only the importer writes the relation.** Every reference in the codebase:
+
+- `tools/story_import.py:453` — the **only** writer of `location_scene`.
+- `core/db.py:380, 693, 986, 1069` — **four readers, zero writers**.
+
+So the decision task 20 already made — "switch to relation-based, the column
+has a latent gap" (`task_20/phase_1/task_1_1.md:133`, noting the column "is
+always NULL") — was implemented on the **read** side only. The read side
+trusts the relation; the write side (story_draft, the normal authoring path)
+writes only the column. **Author a scene with a location and every relation-
+based reader goes blind to it.** That is B8, and it is a missing write, not an
+ambiguous authority.
+
+**3. Nine real links have NO declared storage at all.** They land in `extra`
+JSON because nothing claims them. Confirmed present in the live data:
+
+| field | kind |
+|---|---|
+| `scene.act_id` | tree link, in extra — while `scene.sequence_id` (its parent) is a column |
+| `arc_beat.scene` | single link, in extra |
+| `plot.characters` | many-to-many, in extra — while `plot.setups` (also many-to-many) is a relation |
+| `relationship.characters`, `relationship.scenes` | many-to-many, in extra |
+| `act.climax_scene_id`, `sequence.climax_scene_id` | single link, in extra |
+| `sequence.primary_plot` | single link, in extra |
+| `project.inciting_incident_scene_id`, `story_climax_scene_id` | single link, in extra |
+
+**This is the larger half of D3 and the part I had missed.** The declared maps
+are clean; the problem is that the maps are *incomplete*, so the rule
+"columns for single, relations for multi" is real but only half-implemented.
+`scene.act_id` in `extra` while its own parent is a column is the clearest
+inconsistency: same field, same entity, two mechanisms.
+
+## What follows
+
+- **The authority question is already answered by the existing code** — single
+  links in columns, multi-links-with-metadata in relations. Nothing needs
+  deciding; it needs *applying* to the nine undeclared fields.
+- **B8 was a missing write, not a conflict** — but *not* the orphan-check
+  false positive originally recorded. The orphan check tests the **world**, so
+  the real cost is an empty location→scenes view in the dashboard (measured:
+  0 scenes without the rows, correct with them). Fixed; see the B8 entry.
+- **The nine undeclared fields are the real scope of D3** and were not in the
+  original note. Fixing them by the existing rule removes the ambiguity rather
+  than resolving it — there is no ambiguity in `arc_beat.scene`, there is an
+  undeclared field.
 
 ---
 

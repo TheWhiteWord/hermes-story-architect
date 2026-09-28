@@ -355,6 +355,26 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                     )
             applied_relations.append(field)
 
+        # A scene's location lives in the column AND in a reverse-index
+        # relation. Re-derive the relation whenever the column is touched, and
+        # delete the old one first — a scene that moved must not keep claiming
+        # its previous location, which is what makes a location look used when
+        # no scene is there any more. See entity.location_scene_relations.
+        # Keyed by COLUMN name, because column_updates is.
+        if entity_type == "scene" and "location_id" in column_updates:
+            conn.execute(
+                "DELETE FROM relations WHERE to_id=? AND kind='location_scene'",
+                (entity_id,),
+            )
+            new_location = column_updates["location_id"]
+            if new_location:
+                conn.execute(
+                    "INSERT INTO relations (from_id, to_id, kind, note, \"order\") "
+                    "VALUES (?, ?, 'location_scene', '', 1)",
+                    (str(new_location), entity_id),
+                )
+            applied_relations.append("location")
+
         # Upsert sections
         for heading, body in section_updates.items():
             conn.execute(

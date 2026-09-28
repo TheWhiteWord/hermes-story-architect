@@ -297,6 +297,37 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
     return columns
 
 
+def location_scene_relations(scene_id: str, location_id) -> list[dict]:
+    """The `location_scene` rows implied by a scene's location.
+
+    `scene.location` is stored twice: in the `location_id` column (what the
+    schema declares) and in a `location_scene` relation, which is its reverse
+    index — the same fact pointing the other way. Four readers in core/db.py
+    use the relation; the column alone leaves them all blind, so a location
+    looks orphaned while three scenes depend on it (B8).
+
+    Only the importer ever wrote these. Scenes authored through story_draft
+    wrote the column alone, so the relation was stale or absent.
+
+    Direction note: this is `from_id=location, to_id=scene`, the opposite of
+    `character_scene` (from the scene to the character). That inconsistency is
+    pre-existing and every reader inverts accordingly; changing it is a
+    migration, not a fix, so it stays.
+
+    A scene with no location yields nothing — and re-setting the relation to
+    empty is the caller's job, since clearing is different from not setting.
+    """
+    if not location_id:
+        return []
+    return [{
+        "from_id": str(location_id),
+        "to_id": scene_id,
+        "kind": "location_scene",
+        "note": "",
+        "order": 1,
+    }]
+
+
 def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
     """Build relation rows from frontmatter for INSERT.
 
@@ -304,6 +335,11 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
     """
     relation_fields = _RELATION_FIELDS.get(entity_type, {})
     relations = []
+
+    # A scene's location is a column AND a reverse-index relation. See
+    # location_scene_relations for why both exist.
+    if entity_type == "scene":
+        relations += location_scene_relations(slug, fm.get("location"))
 
     for field, (kind, is_list) in relation_fields.items():
         value = fm.get(field, [])
