@@ -94,7 +94,8 @@ fewer.**
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
-| 6 | **D5 steps 3–5** — one name for the op, generated ids, title filenames | sequenced, not built |
+| 5a | **D5 step 3** — one name for the entity id in the op vocabulary | **done, 892 pass** — `slug` now means only a project directory |
+| 6 | **D5 steps 4–5** — generated ids, title filenames | sequenced, not built |
 
 **B6 and B12 are the same lesson applied twice**: the schema already knew the
 answer and a hand-maintained list beside it had drifted. B6 fixes the
@@ -1751,10 +1752,68 @@ own. Six further tests across `test_arcs`, `test_field_coverage`,
 
 ---
 
+## D5 step 3. One name for the entity id — **FIXED 2026-09-28**
+
+**A create op said `slug`; every other op and every other tool said `id`.**
+Same value, two names.
+
+**The bridge between them was written down, twice** — and that is what made
+this a defect rather than a preference:
+
+- `story_describe.py` — *"an entity's `id` is the `slug` argument of its op"*
+- `SKILL.md` — *"Don't use `slug` for retrieve"*
+
+A tool that has to explain that two names are one value is telling you they
+shouldn't both exist. Both sentences are now deleted, and a test asserts the
+word `slug` cannot return to that description.
+
+**`slug` keeps one meaning, and it is a different one:** a project directory,
+`projects/<slug>/`. That is a real concept and it keeps its name — which is why
+the word is still in the codebase. The problem was never the word, it was the
+second *sense* of it.
+
+**A second instance of the same defect, in `story_admin`.** Its schema
+advertised `"slug"` while describing it as *"Entity id, as returned by
+story_load"*, and its query was
+
+```sql
+WHERE id=? OR id=?     -- both parameters bound to the same value
+```
+
+That OR is a leftover from the arc-beat era, where one lookup genuinely tried
+two things (the full composite, and the bare beat part). Step 2 removed the
+reason for it; this removes the query. It is now `WHERE id=?`.
+
+**Verified as the agent sees it**, served from the tool rather than from
+source:
+
+```
+create: {op, type, id, frontmatter, sections?, summary}
+stage with `id`      -> accepted, preview renders `character/kael`
+stage with `slug`    -> "ops[0] (create) is missing: id."
+```
+
+**Scope, measured before editing:** 15 files, 51 insertions, 46 deletions. The
+bulk of it is mechanical (`op["slug"]` → `op["id"]` in 6 places, 17 op-key
+sites in tests). The two judgement calls were the *comments* — two docstrings
+in `drafts.py` said "slug" about a field that is now `id`, and an error message
+(`"{where}.slug must be alphanumeric…"`). A stale error message names a field
+that does not exist, which is worse than a stale comment, so it changed.
+
+**892 pass, unchanged.** Four tests asserted the old vocabulary and were
+updated: two error-message strings, one restore target key, and the describe
+test — which asserted the bridge sentence *existed* and now asserts its
+opposite.
+
+**D5 is now 3 of 5 done.** Steps 4 and 5 remain: generate the id so the agent
+stops supplying one, then id-into-frontmatter and title filenames.
+
+---
+
 ## D5. One concept, three names — `slug` / `entity_id` / `id` — **AGREED, PARTLY BUILT**
 
-**Steps 1 and 2 are done** (see the entries above). Steps 3–5 remain, and the
-position below is unchanged by them.
+**Steps 1, 2 and 3 are done** (see the entries above). Steps 4–5 remain, and
+the position below is unchanged by them.
 
 **A position was reached on 2026-09-28.**
 `tasks/task_17*/entity_identity.md` holds the full investigation, the

@@ -196,7 +196,53 @@ them. The suite at 889.
 
 ---
 
-## Step 4 — generate the id
+## Step 3 — one name for the entity id — **BUILT 2026-09-28**
+
+**The rename, and the sentence that proved it was needed.** A create op said
+`slug`; every other op said `id`. The bridge was written down in two places, and
+a tool that has to explain that two names are one value is telling you they
+shouldn't both exist:
+
+- `story_describe.py` — *"an entity's `id` is the `slug` argument of its op"*
+- `SKILL.md` — *"Don't use `slug` for retrieve"*
+
+Both deleted. `slug` now means a project directory only.
+
+**A second instance of the same defect, which the plan did not predict.**
+`story_admin`'s restore took `target.slug` while its schema described it as
+*"Entity id, as returned by story_load"*, and its query was:
+
+```sql
+WHERE id=? OR id=?     -- both parameters bound to the same value
+```
+
+That OR was a leftover from step 2's era, where one lookup genuinely tried two
+things. Step 2 removed the reason; step 3 removed the query. Worth recording
+because **it means the sweep should look for the *behaviour* the composite
+forced on callers, not just for the word `slug`** — a caller that adapted to
+the ambiguity is not spelled the same way.
+
+**Two things the plan said would be one line, and were not:**
+
+1. **Error messages name fields.** `"{where}.slug must be alphanumeric…"` is
+   worse than a stale comment — it tells the agent a field that does not
+   exist. Changed, and two tests assert the string.
+2. **Comments too.** Two docstrings in `drafts.py` said "slug" about a field
+   that is now `id`. A rename that leaves those behind is half a rename.
+
+**Mechanical, and measured as such: 15 files, +51/−46.** Six places in
+`core/drafts.py`, the ops description, 17 op-key sites in tests.
+
+**The one test worth keeping:** `test_story_describe_uses_one_name_for_the_entity_id`
+asserts `"slug" not in SCHEMA["description"]`. The test it replaced asserted
+the bridge sentence *existed* — so it was a guard for the thing being fixed.
+Inverted, it guards the fix.
+
+**892 pass, unchanged.**
+
+---
+
+## Step 4 — generate the id (not built)
 
 > **The agent's burden and the fixture's readability are separable.** A
 > generated id is decided in step 4; whether the *fixtures and tests* keep
