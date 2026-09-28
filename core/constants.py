@@ -55,7 +55,21 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Character display name"},
         "story_role": {"type": "string", "default": "", "optional": False, "description": "One of: Protagonist, Antagonist, Supporting, Minor, Cameo"},
         "one_sentence": {"type": "string", "default": "", "optional": False, "description": "One-sentence summary for index label"},
-        "relationships": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed summary of relationship entities (read-only, derived from relationships/)"},
+        "relationships": {
+            "type": "list", "default": [], "optional": True, "computed": True,
+            "description": "Computed summary of relationship entities (read-only, derived from relationships/)",
+            # Declared because the load payload emits these objects and nothing
+            # said what was in them. Read-only, so this is for interpretation,
+            # not for writing — the draft validator rejects a write with a
+            # "read-only" finding. `strength` appears only in the dashboard
+            # view, which carries more than the load payload.
+            "sub_fields": {
+                "with": {"type": "string", "description": "Slug of the OTHER character in this relationship — never this one"},
+                "label": {"type": "string", "description": "This character's label for the other (e.g. 'Colleague')"},
+                "type": {"type": "string", "description": "How this character reads the bond. Observed: ally, rival, enemy, family, romantic. Free text — not a closed set."},
+                "strength": {"type": "number", "description": "Signed tension: negative is antagonism (observed -0.6..0.9). Dashboard view only."},
+            },
+        },
         "goals_short": {"type": "string", "default": "Goals not set", "optional": True, "description": "Short-term goal (flat form; nested goals.short also accepted)"},
         "goals_long": {"type": "string", "default": "Goals not set", "optional": True, "description": "Long-term goal (flat form; nested goals.long also accepted)"},
         "knowledge": {"type": "list", "default": [], "optional": True, "description": "Facts the character knows. Each entry is a string."},

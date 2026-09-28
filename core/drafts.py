@@ -137,10 +137,23 @@ def validate_shape(ops: list) -> list[str]:
     findings = []
     for i, op in enumerate(ops):
         where = f"ops[{i}] ({_describe(op)})"
+        entity_type = op.get("type") or op.get("entity_type")
+        schema = ENTITY_SCHEMAS.get(entity_type, {})
+
+        # A computed field is derived at read time. The write path drops it and
+        # says so, but only AFTER the agent has committed a draft and read a
+        # preview promising the change — so the preview is the only place the
+        # agent can still be told. Checked for every op kind, not just create:
+        # a create cannot carry one (the merge drops it), an edit can.
+        payload = op.get("frontmatter") if op["op"] == "create" else op.get("data")
+        for key in (payload or {}):
+            if schema.get(key, {}).get("computed"):
+                findings.append(
+                    f"{where}: '{key}' is read-only (computed from "
+                    f"{entity_type} entities) — it cannot be set")
+
         if op["op"] != "create":
             continue
-        entity_type = op["type"]
-        schema = ENTITY_SCHEMAS.get(entity_type, {})
         merged = {f: op["frontmatter"].get(f, m["default"])
                   for f, m in schema.items() if not m.get("computed")}
         # Unrecognised keys would land in `extra` verbatim, exactly as an

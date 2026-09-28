@@ -977,6 +977,80 @@ frontmatter round-trips its own `act_id`), so removing the storage would break
 
 ---
 
+## D1a. `story_draft` silently swallowed computed-field writes — **FIXED 2026-09-28**
+
+Raised as a question while fixing the `char.relationships` sub_fields: *"if we
+declare these as visible, won't the agent try to fill them?"* Yes — and the
+answer was worse than a corrupted write.
+
+**Measured, before the fix.** Staging an edit that sets `character.relationships`:
+
+```json
+{"success": true, "op_count": 1,
+ "preview_md": "... `relationships`: _not set_ → **{'with': 'marcus-chen', ...}**",
+ "validation": []}
+```
+
+The preview **promises the change** and validation is **empty**. The agent
+commits, and only then does `edit_entity` drop the field and report it.
+
+**Root cause: one line.** `core/drafts.py:140` — the validator opened with
+`if op["op"] != "create": continue`, so **every edit skipped validation
+entirely**. Not just computed fields: an unknown key in an edit reached the
+write path unflagged too.
+
+**Why the write path's guard was not enough.** `edit_entity` already collects
+`computed_skipped` and returns it (`core/writes.py:409-417`):
+
+```json
+{"skipped_read_only": ["relationships"],
+ "warning": "Nothing was written: every key was a read-only computed field."}
+```
+
+Correct, and it protects the data. But it fires **after** the agent has read a
+preview saying the change would happen, and the agent's next decision is
+usually to retry or abandon. The preview is the last place it can be told.
+
+**The fix: the guard moved to the draft validator, for every op kind.** One
+loop over `frontmatter` (create) or `data` (edit), reported as a `validation`
+finding. The write path's guard stays as the backstop.
+
+## I5. `char.relationships` sub_fields declared — **DONE 2026-09-28**
+
+The only undeclared structured read found in a full audit of the load payload
+against the schema. `story_describe` now emits the shape, with `with`
+documented as **the other character** — the one key that inverts if read as the
+holder's own name.
+
+**Two descriptions I wrote were wrong and were corrected against the data
+before committing:**
+
+| key | what I first wrote | actual |
+|---|---|---|
+| `type` | `ally, rival, mentor, family, other` | `ally, rival, enemy, family, romantic` — **no `mentor`, no `other`** |
+| `strength` | "Tension 0-5" | **signed**, observed **−0.6 … 0.9** |
+
+The `strength` one matters: an agent told 0-5 clamps every antagonist
+relationship to zero, and negative tension is how the data encodes
+antagonism. Both descriptions now say what the data shows, and
+`type` is explicitly *not* a closed set — a test asserts that, because an enum
+list here would break on the next project.
+
+**Audit result for the record:** every other key on every entity node in the
+load payload is a real `story_describe` field or a container. **No other
+abbreviations exist.** `rel` was the one to worry about and it is already
+`relationships` in the code — though `story_load_redesign_spec.md:86,180` still
+documents the old `rel: [{id, label, feeling}]`, so the spec needs the same
+correction `chars`/`loc` got.
+
+Three audit hits were false positives worth knowing about: `world.locations`,
+`act.sequences` and `act.scenes` are **containers, not fields**, so there is
+nothing to declare. Only checking against `ENTITY_SCHEMAS` tells them apart.
+
+857 pass; 7 of the new tests fail without the change.
+
+---
+
 ## I4. The `chars`/`loc` abbreviations are gone — **DONE 2026-09-28**
 
 I3 bridged the two vocabularies in prose. That was the wrong fix, and the
