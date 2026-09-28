@@ -92,7 +92,7 @@ land with fewer.**
 | # | fix | state |
 |---|---|---|
 | 1 | **B6** — `REQUIRED_FIELDS` derived from the schema | **done, 891 pass** |
-| 2 | **B12** — placeholder defaults out of the data; one voice for "not set" | plan ready, not built (`b12_plan.md`) |
+| 2 | **B12** — placeholder defaults out of the data; one voice for "not set" | **done, 892 pass** — 10 false findings → 0; B12b (the title-page render) is deliberately separate |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
@@ -122,6 +122,7 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
 | B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
 | B13 | `create_project` never coerced a `number` field — B10's fix was on `edit_entity` only. **One helper, `entity.coerce_number`, now reached from every write path**; `create_entity` had neither fix and gained `order` coercion. The read half stays as defence in depth. | The same value was a string, an int and an int in three readers. The dashboard's `max()` on `act_count` was one string away from raising. |
+| B12 | **34 placeholder strings are gone from the data layer.** They were field defaults written into the row on create, then rejected by the enum check as values the user had chosen — **10 false findings** on a minimal character/plot/project/arc beat. The 11 *real* defaults stayed (`status`, `type`, and `screenplay_title` → `'Default'`), and a test asserts the split. `UNFILLED = "N.A."` replaces the 34 for a surface that wants to say so. | Same harm as B6, wider blast radius — it fired on the three most-used types. Noise that trains the agent to ignore `validation`, which is the one thing `validation` exists to prevent. |
 | **D5 s2** | A beat's id is its own slug, not `{character}-{beat}`. The `id LIKE '%-{slug}'` fallback is gone; the resolver is one exact primary-key match for every type. | **The one reproduced silent wrong-entity write of the round**: two characters each own a beat labelled "The Choice"; `edit(..., 'arc_beat', 'the-choice')` wrote to the first and returned `success: true`. |
 | **D5 s3** | One name for the entity id in the op vocabulary. `create` says `id`, not `slug`; both prose bridges deleted. `slug` now means only a project directory. | A tool that has to explain that two names are one value is telling you they should not both exist. `story_admin` had the same defect in another shape — `WHERE id=? OR id=?`, both parameters bound to the same value. |
 | **D5 s5** | Filenames are the title; the id lives in the frontmatter for all ten types; the arc folder is the character's title too. | The filename *was* the id, so renaming a note silently renamed the entity and every relation pointing at it. Now a hand-renamed note survives a round trip — and export → delete the database → re-import is **identical**, which it was not before. |
@@ -145,10 +146,10 @@ valuable part, and because the next keeper will suspect them again.
 
 | id | what | why it matters |
 |---|---|---|
+| **B12b** | The title page now prints **only the title** for an unfilled project, where it used to print `'Credit N.A.'`, `'Author N.A.'`, `'Draft Date N.A.'` and `'N.A.'` as if they were content. The data is clean (B12); **what an empty slot shows is a display decision, deliberately not bundled.** One voice, decided: `<label>: N.A.`, with `type: "credit_unfilled"` so a reminder is stylistically distinct from typeset content. | A filled page and an empty one are currently structurally identical, so the reader cannot tell which slots are open. Only the title page does this — the other 30 fields each decide separately, and not drawing a row is right for most. |
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
 | **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
-| **B12** | The enum check rejects the schema's **own placeholder defaults**. Eleven optional fields default to a prose placeholder (`'Not set'`, `'Arc type not set'`, …) that is not in the valid set, so every `character`, `plot` and `project` create reports 1–3 findings that mean nothing. Found while measuring B6; **not** part of it. **Plan ready, not built** — see `b12_plan.md`. | Same harm as B6, much wider blast radius — it fires on the three most-used entity types. Noise that trains the agent to ignore `validation`, which is the one thing `validation` exists to prevent. |
 | **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
 | **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
 
@@ -591,6 +592,132 @@ supposed to reference its scene, and check the export path — if `story_export`
 writes beat→scene links from `extra`, the round trip is intact and only
 relation-based readers miss it. If nothing reads `scene` for beats, the link is
 decorative and the comment should go.
+
+---
+
+## B12. The enum check rejects the schema's own placeholder defaults — **FIXED 2026-09-28**
+
+**34 placeholder strings are gone from the data layer.** They were field
+defaults — `'Goals not set'`, `'Action not described'`, `'Shift not recorded'`,
+`'Credit N.A.'` — written into the row on create, and then rejected by the enum
+check as values the user had chosen.
+
+**The bug, measured before the fix.** A minimal create, defaults filled in as
+the write path does:
+
+| type | false findings |
+|---|---|
+| `character` | 4 — `Invalid arc_type: Arc type not set`, `character_value_at_open: Not set`, `character_value_at_close: Not set`, and `story_role` |
+| `project` | 3 |
+| `plot` | 1 |
+| `arc_beat` | 2 |
+
+`scene`, `sequence`, `act` reported none — and that is the evidence the fix
+works: **every enum-guarded field on those three already defaulted to `""`.**
+They are the control group. Same code, same validator, correct behaviour.
+
+**After: 10 → 0**, through the tool the agent calls:
+
+```
+before: 10 false findings on a character + plot + arc beat batch
+after:  validation: ['ops[2] ... Missing required field: scene']
+```
+
+That remaining finding is real — `scene` is required on an arc beat.
+
+**The 11 defaults that stayed, and why the distinction is the whole change.** A
+default that is already a *real value* must not become `""`, or the field would
+report as unfilled while holding something real:
+
+- `status` → `'active'` / `'planned'` — legal enum members
+- `type` → its own type name
+- **`project.screenplay_title` → `'Default'`** — not an enum member, not a
+  placeholder pattern, but a **real value**: a project with no title set should
+  still typeset something, and an empty title page is worse than a generic one.
+  **A test asserts the split**, because converting it would silently change the
+  rendered title page.
+
+**`UNFILLED = "N.A."`** in `core/constants.py` replaces the 34 strings, for a
+surface that wants to say so. It has **no consumer yet** — deliberately, see
+below. Four declared `label`s cover the fields whose name is not the human
+phrase (`Inciting Incident`, not `Inciting Incident Scene Id`), and the
+label-uniqueness check that makes the derived-label shortcut safe: **zero
+collisions across all 31 optional fields.**
+
+**Two live references the plan did not list, found by grepping the codebase:**
+
+1. `db.py:396` built a character node with
+   `extra.get("arc_type", "Arc type not set")` — for a row missing the key it
+   would have **injected** the placeholder this change removes.
+2. `writes.py:_default_for` documented *"reset to the placeholder so the UI shows
+   the gap"* as the reason for reading the schema default. The function is still
+   right — it is what keeps `screenplay_title` resetting to `'Default'` — but
+   **a comment saying a placeholder is deliberate becomes a lie the moment the
+   placeholder is gone.**
+
+**The plan's measurements, re-checked rather than assumed:**
+
+- **0 placeholders stored** in either real database, and 0 in the fixture
+  markdown. They were defaults written on create and never edited, so **there is
+  no data to migrate** — the deployment constraint does the rest.
+- **The dashboard already handles `""`.** `c.arc_type && c.arc_type !==
+  'absent'` and `char.arc_type || 'absent'` — `''` is falsy, so the arc counts
+  and the arc-type badge are unchanged, and `'absent'` still reads as a real
+  choice. **No JS change needed.** That was the plan's central risk and it held.
+- `_omit` drops falsy values on its first branch, so the prose sentinels in
+  `db.py` were already dead. They are `""` now for consistency.
+
+**Tests.** 14 `TestUnfilledFields` cases fed the placeholder *string* as input —
+the mechanism this change removes — so they now feed `""`. The two that assert
+what gets **stored** became the guard instead, and
+`test_placeholder_default_is_unfilled` is replaced by
+`test_stored_default_is_never_prose`, which fails if a placeholder default is
+ever added back. **892 pass, unchanged.**
+
+### B12b — the display side, deliberately NOT bundled
+
+**Decided earlier and left as its own commit: one voice, `<label>: N.A.`**
+
+**What changed visibly, and it is not cosmetic.** `_build_title_page` gates on
+truthiness, so before this commit an unfilled project rendered:
+
+```
+cc: title      'Default'
+cc: credit     'Credit N.A.'
+cc: author     'Author N.A.'
+bl: draft_date 'Draft Date N.A.'
+bl: draft      'N.A.'
+br: contact    'Contact N.A.'
+```
+
+and now renders **only the title**. `tools/story_dashboard.py:210-241` is the
+one place in the plugin where removing the placeholders changed output.
+
+**A placeholder printed as if it were content is a real defect** — a typeset
+title page is the most deliberately-designed surface in the app, and
+`'Credit N.A.'` sitting where the credit line belongs is not typesetting. So the
+*removal* is right; the *replacement* is a display decision and was not made
+here. Bundled, a title-page change would be invisible in a diff about
+placeholder defaults.
+
+**The render, when it happens** — `type` is what the dashboard styles on, so a
+reminder is visually distinct from typeset content; otherwise a filled page and
+an empty one are structurally identical and the reader cannot tell which slots
+are open:
+
+```python
+if credit:
+    cc.append({"text": credit, "type": "credit"})
+else:
+    cc.append({"text": f"Credit: {UNFILLED}", "type": "credit_unfilled"})
+```
+
+**Only the title page.** The other 30 fields each decide separately, and *not
+drawing* a row for an empty field is the right default for most of them.
+
+**Found, not fixed, and out of scope:** `entity.py:79` guards
+`act.structure_type`, a field the `act` schema does not have. A dead check,
+confirmed present before this change.
 
 ---
 

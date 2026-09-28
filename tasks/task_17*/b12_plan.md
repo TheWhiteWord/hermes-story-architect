@@ -1,7 +1,37 @@
 # B12 — placeholder defaults: store nothing, render at the edge
 
-**Plan only. Nothing built.** Bug entry: `bugs.md` → B12. Baseline **889 tests
-pass**; this must leave that number at 889 or higher. Runs after `b6_plan.md`.
+**BUILT 2026-09-28.** 34 prose defaults → `""`, 10 false findings → 0, 892 pass.
+**B12b (the title-page render) is deliberately NOT built** — see the note at the
+foot. What the plan got right, what it missed, and the one measurement that
+turned out to be load-bearing are recorded in `bugs.md` → B12.
+
+**Three things this plan did not list, found by grepping the codebase:**
+
+1. `db.py:396` — `extra.get("arc_type", "Arc type not set")` would have
+   **injected** a placeholder for any row missing the key. Live, not dead.
+2. `writes.py:_default_for` documented the placeholder as *deliberate*
+   ("so the UI shows the gap"). The function is still correct — it is what keeps
+   `screenplay_title` resetting to `'Default'` — but **a comment calling a
+   placeholder intentional becomes a lie the moment the placeholder is gone.**
+3. `plot_scope` is listed here as defaulting to `'main'`. **It does not exist**
+   in the schema. Stale from an earlier revision; harmless, and the guard test
+   now reads the schema instead of a list.
+
+**One pre-existing dead check, found and left alone:** `entity.py:79` guards
+`act.structure_type`, a field the `act` schema does not have. Confirmed present
+before this change.
+
+**On the plan's own prediction that the tests would pass unchanged** — they did
+not, and that was worth knowing. 14 `TestUnfilledFields` cases fed the
+placeholder *string* as input to `unfilled_fields`, which is the exact mechanism
+this change removes. The plan's reasoning about `_is_empty` was right
+(`len(value) == 0` is checked first) but it reasoned about the *default*, not
+about what the tests *pass*. They now pass `""` and test the same property
+through the surviving mechanism.
+
+---
+
+## Original plan (kept; the reasoning is sound)
 
 **This is the better fix, and the measurements are stronger than the bug entry
 assumed.** The entry framed it as "make `empty_ok` mean unset" — a one-line
@@ -365,3 +395,22 @@ members are left alone.**
   strings once defaults are `""`, but it is still load-bearing for `0`, `False`
   and `[]` defaults. **Leave it.**
 - **B6.** Separate plan, runs first.
+
+---
+
+## B12b — not built, and why that is the right call
+
+**The title page is the one place in the plugin where B12 changed output.**
+`_build_title_page` gates on truthiness, so an unfilled project rendered
+`'Credit N.A.'` and `'Author N.A.'` where the credit line belongs, and now
+renders **only the title**.
+
+**Both states are defensible and they are not the same product:** an empty
+title page is correct typesetting and visibly incomplete; a labelled page is a
+reminder. The decision is recorded in `bugs.md` → B12b and belongs in its own
+commit, where it is visible in a diff. Bundled into a data cleanup it would be
+invisible and untestable as a display change.
+
+`UNFILLED` and the four declared `label`s are in place for it. Nothing consumes
+them yet, which is deliberate — an unused constant that a later commit needs is
+cheaper than a display change smuggled into a data fix.
