@@ -96,6 +96,7 @@ land with fewer.**
 | 7 | **B15** — a lost check-then-insert race leaked `IntegrityError` to the user | **done, 897 pass** — found while investigating B1; 40/40 → 0/40 |
 | 8 | **B1** — commit reported failure for a commit that succeeded | **symptom fixed, 901 pass** — commit is idempotent; **the cause is still unknown and upstream** |
 | 9 | **D4** — no shape validation at write time | **done, 907 pass** — a failed commit was leaving 8 garbage relation rows; a string crashed the tool |
+| 10 | **I2** — structured fields rendered as a Python dict repr | **done, 910 pass** — and the same defect hit the five list-of-object fields too |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
@@ -123,6 +124,7 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. **Write side since rewritten** — one `entity.coerce_number` helper on every path; see B13. | — |
 | I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
+| I2 | **A structured field renders as lines, not a Python repr.** `_fmt` fell through to `str()` for dicts, so `perspectives` showed single quotes and no breaks — hiding the two-characters-side-by-side comparison the field exists for. Fixed in `_fmt`, the one place all three call sites go through. | The entry asked whether `perspectives` was the only one; it is, but the same renderer also emitted a bare repr for the five list-of-object fields. An empty dict also rendered as the literal `{}`. |
 | D4 | **A field that declares a shape must hold it at write time.** Six fields declare `sub_fields`; nothing checked. A string where a list belongs was iterated one *character* at a time — eight relation rows pointing at `' '`, `'e'`, `'f'` — and the commit that created them reported failure with `0 committed`. A string where an object belongs made `story_draft` raise `AttributeError`. | A *failed* commit corrupted the project while the response said nothing landed. `_validate_shapes` reports it at stage time from the schema's own declaration; `relations_for_insert` skips a non-list for paths that never stage. |
 | B1 | **`commit` is idempotent.** It marks the draft row `committed` instead of deleting it, so a repeated commit replays the same success instead of reporting `"No open draft"` about changes that are already in the database. Reproduced end to end through the tool, before and after. | The damage was never the error, it was the claim: the agent tells the user *"that did not save"* and the obvious response is to write it again on top. **The cause of the duplicate call is not fixed and is not claimed to be** — it comes from outside this repo. |
 | B15 | **A lost check-then-insert race leaked a raw database error.** `create_entity` checks for a duplicate with a SELECT and inserts separately, so a concurrent writer wins in between and the primary key's `IntegrityError: UNIQUE constraint failed: entities.id` reached the user verbatim. One `try`/`except` at the INSERT raises the message the check would have. | The user was told a constraint name and nothing about what to do. Measured 40/40 raw errors before, 0/40 after. The behaviour is unchanged — only the message. |
@@ -153,7 +155,6 @@ valuable part, and because the next keeper will suspect them again.
 | id | what | why it matters |
 |---|---|---|
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
-| **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
 | **D1** | The tool cannot show the shape of a structured value. **Both halves now fixed** — the read side by B7/B9/I5, the write side by D4. | — |
 
 ### Deliberately not done
@@ -553,7 +554,55 @@ readouts, which strengthens the case for one shared renderer (B11).
 
 ---
 
-## I2. Nested object fields render as a raw Python dict repr — **OPEN**
+## I2. Nested object fields render as a raw Python dict repr — **FIXED 2026-09-28**
+
+**`_fmt` fell through to `str()` for anything that was not a list or a bool**,
+so a dict rendered as its repr.
+
+```
+before:
+| perspectives | {'kael': {'label': 'Kael', 'feeling': 'wary', ...},
+                  'mira': {'label': 'Mira', 'feeling': 'guarded', ...}} |
+
+after:
+| perspectives | **kael** — label=Kael, feeling=wary, strength=0.6, secret=no<br>
+                 **mira** — label=Mira, feeling=guarded, strength=-0.3, secret=yes |
+```
+
+**Two characters, two readings, side by side** — which is the whole reason the
+field is worth looking at when approving a relationship.
+
+### The entry's question, answered: not the only one
+
+> *"is `perspectives` the only object-typed field in any schema? If others exist
+> they all have the same problem, and the fix belongs in one place in the
+> renderer rather than per-field."*
+
+**`perspectives` is the only object-typed field — but that was the wrong
+question, and measuring it found more.** The same renderer also produced a bare
+repr for the **five list-of-object fields**, so `plot.setups` rendered as:
+
+```
+| setups | {'scene_id': 's1', 'description': 'The lie is told here.'} |
+```
+
+**So the fix is in `_fmt`, which is the single place all three call sites go
+through** — the create preview and both halves of the edit diff. A dict is one
+bolded line per entry, a list of objects one line per item.
+
+**`<br>` rather than a newline**, because these values live in a markdown table
+cell where a newline would end the row.
+
+**One incidental fix the tests caught:** `_fmt({})` returned the literal `"{}"`
+rather than the em-dash every other empty value returns, because `{}` is not in
+`(None, "")`. It is `"—"` now.
+
+**The scalars are asserted unchanged** — a fix that also reformats the common
+path is a fix nobody can review.
+
+**910 pass** (was 907). All three new tests fail with the fix stashed.
+
+---
 
 **Found:** 2026-09-28, staging a `relationship`.
 
