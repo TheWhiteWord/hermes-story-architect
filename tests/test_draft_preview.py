@@ -117,7 +117,28 @@ def test_the_prose_an_op_carries_is_rendered(fixture_path):
     assert "**Objective**" in md
     assert "Mira confesses the reservoir is failing." in md
     # The body sits inside a fence, immediately after its heading.
-    assert "**Objective**\n```\nMira confesses the reservoir is failing." in md
+    assert "**Objective**\n```text\nMira confesses the reservoir is failing." in md
+
+
+def test_every_section_body_carries_a_fence_tag(fixture_path):
+    """A bare ``` lets the client infer the block, and a body starting with a
+    markdown list broke the inference — the box came back dropped. One tag for
+    every section, not a per-section exception, so the next list-shaped body
+    cannot fall through it.
+    """
+    op = {"op": "create", "type": "character", "id": "probe",
+          "frontmatter": {"name": "Probe", "story_role": "Supporting",
+                          "one_sentence": "x"},
+          "sections": {"Desires": "- Short: a line.\n- Long: another line.",
+                       "Voice": "Quiet."},
+          "summary": "probe"}
+    md = stage(fixture_path, [op], "probe")["preview_md"]
+    assert "**Desires**\n```text\n- Short:" in md
+    assert "**Voice**\n```text\nQuiet." in md
+    # Every opening fence is tagged. (Counting openers, not occurrences of
+    # "```": the closing fence of a block is an untagged ``` by definition.)
+    openers = [ln for ln in md.split("\n") if ln.startswith("```") and ln != "```"]
+    assert len(openers) == 2, openers
 
 
 def test_a_scene_content_section_is_fenced_as_fountain(fixture_path):
@@ -156,7 +177,7 @@ def test_a_one_line_section_is_still_fenced(fixture_path):
           "summary": "one line of prose"}
     md = stage(fixture_path, [op], "a note")["preview_md"]
     assert "`Notes` —" in md
-    assert "```\nDo not cut the pause before she answers." in md
+    assert "```text\nDo not cut the pause before she answers." in md
     assert "`Notes`: _not set_ →" not in md
 
 

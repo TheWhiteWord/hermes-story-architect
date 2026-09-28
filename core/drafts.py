@@ -657,8 +657,20 @@ def _fence(value, lang: str = "") -> list[str]:
 
 
 def _fence_lang(entity_type: str, field: str) -> str:
-    """Language tag for the fence. Only script is labelled; prose is plain."""
-    return "fountain" if (entity_type, field) == ("scene", "Content") else ""
+    """Language tag for the fence.
+
+    Every section carries one, not just script. A bare ``` is ambiguous to a
+    markdown client: a body beginning with `- ` came back rendered as a list
+    with the box dropped, while an identical neighbouring section that began
+    with a word stayed boxed. Nothing in the emitted markdown differed — the
+    renderer was inferring the block from content, and a list broke the
+    inference. A tag gives it nothing to infer. `text` is the honest label for
+    prose: these are documents, not code, and the tag's job here is to mark
+    the block as verbatim rather than to say what language it is.
+    """
+    if (entity_type, field) == ("scene", "Content"):
+        return "fountain"
+    return "text"
 
 
 def _section_note(entity_type: str, field: str, before, after) -> str:
