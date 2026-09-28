@@ -92,7 +92,8 @@ land with fewer.**
 | # | fix | state |
 |---|---|---|
 | 1 | **B6** — `REQUIRED_FIELDS` derived from the schema | **done, 891 pass** |
-| 2 | **B12 + B12b** — placeholder defaults out of the data, and the title page says which slots are open | **done, 896 pass** — 10 false findings → 0 |
+| 6 | **B12 + B12b** — placeholder defaults out of the data, and the title page says which slots are open | **done, 896 pass** — 10 false findings → 0 |
+| 7 | **B15** — a lost check-then-insert race leaked `IntegrityError` to the user | **done, 897 pass** — found while investigating B1; 40/40 → 0/40 |
 | 3 | **D5 step 1** — delete two compatibility shims | **done, 890 pass** — see the two corrections in the plan |
 | 4 | **B13** — `number` coercion on every write path | **done, 892 pass** |
 | 5 | **D5 step 2** — drop the arc_beat composite id | **done, 892 pass** — **fixed a reproduced silent wrong-entity write** |
@@ -120,6 +121,7 @@ The D5 investigation, its two overturned positions, and the build order are in
 | B10 | A `number` arriving as a string is coerced on write (`core/writes.py:270-274`) **and** on read (`db._coerce_number`), because existing rows are already wrong and a write-side fix alone would not reach them. **Write side since rewritten** — one `entity.coerce_number` helper on every path; see B13. | — |
 | I5 | `character.relationships` `sub_fields` declared — the only undeclared structured read in the payload. | `8ec315c` |
 | B11 | A scene's `Content` must open with a scene heading. One rule, because it is the only format failure that is silent. | `0d4a795` |
+| B15 | **A lost check-then-insert race leaked a raw database error.** `create_entity` checks for a duplicate with a SELECT and inserts separately, so a concurrent writer wins in between and the primary key's `IntegrityError: UNIQUE constraint failed: entities.id` reached the user verbatim. One `try`/`except` at the INSERT raises the message the check would have. | The user was told a constraint name and nothing about what to do. Measured 40/40 raw errors before, 0/40 after. The behaviour is unchanged — only the message. |
 | B6 | `REQUIRED_FIELDS` is now **derived from `ENTITY_SCHEMAS`** instead of hand-maintained. The 12-line dict is deleted. A minimal arc beat went from 3 false findings (`id`, `y`, `order`) to none — and `plot.status` / `project.logline` were wrong too, unreported. One existing test asserted the bug. | A second copy of the schema with nothing keeping it honest. The guard test now fails on any future drift. |
 | B13 | `create_project` never coerced a `number` field — B10's fix was on `edit_entity` only. **One helper, `entity.coerce_number`, now reached from every write path**; `create_entity` had neither fix and gained `order` coercion. The read half stays as defence in depth. | The same value was a string, an int and an int in three readers. The dashboard's `max()` on `act_count` was one string away from raising. |
 | B12 | **34 placeholder strings are gone from the data layer.** They were field defaults written into the row on create, then rejected by the enum check as values the user had chosen — **10 false findings** on a minimal character/plot/project/arc beat. The 11 *real* defaults stayed (`status`, `type`, and `screenplay_title` → `'Default'`), and a test asserts the split. `UNFILLED = "N.A."` replaces the 34 for a surface that wants to say so. | Same harm as B6, wider blast radius — it fired on the three most-used types. Noise that trains the agent to ignore `validation`, which is the one thing `validation` exists to prevent. |
@@ -147,7 +149,7 @@ valuable part, and because the next keeper will suspect them again.
 | id | what | why it matters |
 |---|---|---|
 | **D4** | No shape validation at write time for structured values. Verified: no `sub_fields` reference in `core/writes.py` or `core/drafts.py`; both only check that `data`/`frontmatter` *is* a dict, not what is inside it. | D1/B7/B9 fixed the **read** side — the agent can now see the shape. Nothing stops it writing a wrong one, so a bare string can still land where an object belongs. The remaining half of the same class. |
-| **B1** | `commit` sometimes reports failure for a commit that succeeded, **intermittently and in both directions**. Reproduced clean when `core.drafts.commit` is called directly, so the write lands and the response misreports it. | Silent — the agent may retry a write that landed, or believe a write failed when it did not. |
+| **B1** | `commit` reports failure for a commit that succeeded. **Re-measured: not this plugin** — one call is truthful, a second correctly says "No open draft", the hook never re-commits, and `registry.dispatch` fires no hooks. The symptom needs a *second* call from outside. **Not disproven either** — the bridge is upstream and still uninstrumented. | Silent — the agent may retry a write that landed. Belongs upstream with B2, which is the same layer. |
 | **B2** | Objects nested inside array arguments lose their keys. **Not ours to fix** — the tool-call marshalling drops keys from native arrays; `ops` sent as a JSON string works. Silent data loss on a legitimate op shape. |
 | **I2** | Nested object fields render as a raw Python dict repr in the draft preview (`perspectives` as `{'slug': 'prose'}` — single quotes, wraps mid-sentence). | Cosmetic, but the agent reads the wrong thing, and the reformatting hides content in a long line. |
 | **D1 (partly)** | The tool cannot show the shape of a structured value. The **read** side is fixed; the **write** side is D4 above. | — |
@@ -229,7 +231,97 @@ the same in each case: derive it, or delete it.
 
 ---
 
-## B1. `commit` sometimes reports failure for a commit that succeeded — **OPEN**
+## B15. A lost check-then-insert race leaks a raw database error — **FIXED 2026-09-28**
+
+**Found while investigating B1, not by looking for it.** Two concurrent commits
+on the same draft:
+
+```
+A: success=True  {'committed': True}
+B: success=False {'failed': {'op': 'create character/kael',
+                             'error': 'IntegrityError: UNIQUE constraint failed: entities.id'}}
+```
+
+**The user is told a database constraint name, and nothing about what to do.**
+The message arrives through `drafts._call`'s `f"{type(e).__name__}: {e}"`, so the
+raw `sqlite3` text is the whole report.
+
+**Cause: `create_entity` checks for a duplicate with a SELECT, then inserts with
+a separate statement.** Between them, a second writer can land the same id. The
+primary key is the real guarantee — the SELECT is only there to give a friendlier
+message — and when the race is lost the friendly path is bypassed entirely.
+
+**Measured, not assumed — 40 races, before and after:**
+
+| | raw `IntegrityError` escaping | friendly `ValueError` |
+|---|---|---|
+| before | **40 / 40** | 0 |
+| after | **0 / 40** | **40** |
+
+**The fix is one `try`/`except` around the INSERT**, raising the `ValueError` the
+check would have raised. `core/writes.py` — so *every* caller benefits, not just
+`commit`. Nothing else changed: the row is still refused, the transaction still
+rolls back, the batch still stops and keeps its draft.
+
+**The test is two real threads, and it fails without the fix** (verified by
+stashing the change: `assert 'Entity already exists' in 'IntegrityError: UNIQUE
+constraint failed: entities.id'`).
+
+**One thing worth recording about writing that test.** The first version passed
+*with and without* the fix. It passed `vault` where the helper wants
+`vault/"projects"/"stc"`, so both threads opened a different database and never
+raced — a test that could not fail was worse than no test, because it looked like
+coverage. **The check that a test can fail is part of writing it**, and stashing
+the fix is the only way to know.
+
+**897 pass.**
+
+**Still open in this area:** the *behaviour* under concurrency is unchanged —
+one commit wins, the other is told the entity exists. This fixes the message, not
+the race. Serialising commits is a design decision (a claim-the-draft transaction
+conflicts with the "keep the draft on failure" resume contract) and is not
+justified until something actually needs it.
+
+---
+
+## B1. `commit` sometimes reports failure for a commit that succeeded — **OPEN, not ours**
+
+**Severity: high.** A successful write reported as a failure. **Intermittent.**
+
+### Re-investigated 2026-09-28 — every claim above re-measured, and the plugin is exonerated
+
+**Nothing in this repo produces the reported symptom.** Each claim, checked by
+running it rather than by reading it:
+
+| question | answer | how |
+|---|---|---|
+| can one `commit` call write and then report failure? | **no** | single call → `success: true`, entity on disk |
+| does a second call misreport? | **no** — it says `"No open draft"` because the first consumed the row | ran it |
+| does our `post_tool_call` hook re-commit? | **no** — it only dispatches `story_dashboard` | read `__init__.py:206-233` |
+| does `ctx.dispatch_tool` re-fire hooks or re-invoke a handler? | **no** — `registry.dispatch` calls the handler once and fires no hooks | read `tools/registry.py:893-921` |
+| is a commit slow enough to invite a retry? | **no** — commit 100ms, the hook's dashboard rebuild 6ms | timed 5 runs each |
+
+**So the symptom requires a second `commit` call, and this plugin never makes
+one.** The remaining candidates are all outside it: the agent calling commit
+twice after not seeing a response, or the Hermes bridge dispatching twice.
+
+**Not confirmed, and not assumed either way:** the double-dispatch hypothesis is
+still just a hypothesis. It was not proven, and the investigation did not
+disprove it — it established only that *this repo* is not the source. **The next
+step is still to instrument the bridge, and it is upstream of this repo.**
+
+**A live measurement was set up and did not fire.** The dashboard rebuilds
+`<tmpdir>/<slug>.html` on every build, so watching that file counts builds with no
+production code. The watcher ran and saw no rebuild, so the "the dashboard runs
+twice" report was not reproduced in the window it was live for. **Worth retrying
+with the trigger actually performed** — it is the cheapest remaining test, and
+the file-watch approach works.
+
+**One real bug *was* found on the way, and it is a different one** — see B15. The
+concurrent-commit path leaked `IntegrityError: UNIQUE constraint failed:
+entities.id` to the user, now fixed and measured at 40/40 → 0/40.
+
+**Original entry follows, unchanged.**
 
 **Severity: high.** A successful write reported as a failure. **Intermittent.**
 

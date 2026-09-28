@@ -124,6 +124,43 @@ class TestIdUniqueness:
         assert "already used by a character" in str(exc.value)
         assert "unique across all types" in str(exc.value)
 
+    def test_a_lost_race_says_the_same_thing_as_a_caught_duplicate(self, vault):
+        """A lost check-then-insert race must not leak a raw database error.
+
+        `create_entity` checks for a duplicate with a SELECT and inserts with a
+        separate statement, so a second writer can land the same id in between.
+        The primary key still refuses it — what matters is that the refusal reads
+        as "already exists" rather than as
+        "IntegrityError: UNIQUE constraint failed: entities.id", which tells the
+        user nothing about what to do next.
+
+        Driven by two real threads, because that is the only way to produce the
+        interleaving; a mock would be asserting the mock.
+        """
+        import threading
+
+        results = []
+        barrier = threading.Barrier(2)
+
+        def create():
+            barrier.wait()          # both past the start line together
+            try:
+                _create(vault, "character", "kael", {"name": "K"})
+                results.append("ok")
+            except Exception as e:
+                results.append(f"{type(e).__name__}: {e}")
+
+        threads = [threading.Thread(target=create) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        losers = [r for r in results if r != "ok"]
+        assert len(losers) == 1, f"expected one create to lose, got {results}"
+        assert "Entity already exists: character/kael" in losers[0]
+        assert "IntegrityError" not in losers[0]
+
 
 class TestValidationBeforeInsert:
     def test_bad_parent_creates_nothing(self, vault):

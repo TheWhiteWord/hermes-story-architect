@@ -13,6 +13,7 @@ used to travel in an `error` key is lost, because the key only ever named what
 the sentence now says.
 """
 import json
+import sqlite3
 from pathlib import Path
 
 from .constants import ENTITY_SCHEMAS
@@ -174,13 +175,24 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
         standard = standard_sections(entity_type)
         relations = relations_for_insert(entity_type, slug, merged)
 
-        conn.execute(
-            "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (columns["id"], columns["type"], columns["name"], columns["one_sentence"],
-             columns["order_key"], columns["status"], columns["parent_id"],
-             columns["location_id"], columns["extra"]),
-        )
+        try:
+            conn.execute(
+                "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (columns["id"], columns["type"], columns["name"], columns["one_sentence"],
+                 columns["order_key"], columns["status"], columns["parent_id"],
+                 columns["location_id"], columns["extra"]),
+            )
+        except sqlite3.IntegrityError:
+            # The duplicate check above is a SELECT and this INSERT is a separate
+            # statement, so a second writer can land the same id in between. The
+            # primary key is the real guarantee — this only translates its error
+            # into the message the check would have produced, so a lost race
+            # reads the same as a caught duplicate instead of leaking
+            # "UNIQUE constraint failed: entities.id" to the user.
+            raise ValueError(
+                f"Entity already exists: {entity_type}/{slug}. "
+                f"Edit it instead of creating it.") from None
 
         # Every standard section is created; the caller's prose fills the ones
         # given. A heading that is not standard is added as written — a scene
