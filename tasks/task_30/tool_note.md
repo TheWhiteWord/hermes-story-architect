@@ -83,13 +83,37 @@ field, and those are read-only anyway.
 
 ---
 
-## 5. An empty `purge` result is a real answer, not a failure
+## 5. `purge` is gated three times, and the age floor is only one of them
 
-`purge` on a just-deleted entity returns `success: True` with `purged: []` —
-correct, because the 30-day age floor kept it restorable. Report the empty
-list to the user; do not read `success: True` alone as "purged". (From the
-task 29 plan; to be re-verified when we reach the cleanup step of the live
-test.)
+**Rewritten 2026-09-29 — the original version of this note is wrong.**
+
+It said: *"`purge` on a just-deleted entity returns `success: True` with
+`purged: []` — correct, because the 30-day age floor kept it restorable."*
+
+`purge` no longer returns that. Verified end to end:
+
+1. **It refuses without a confirm string.** `purge_confirm` must contain
+   `DELETE <project slug>`, exactly like `delete_project`. Without it:
+   *"Purge refused. It is irreversible and must be the user's call."*
+2. Given the string, **it only touches entities deleted more than thirty days
+   ago.** With a backdated deletion and a recent one in the same project, it
+   purged the 45-day-old character and left the recent one untouched and still
+   restorable.
+3. **It takes its own backup** first, and reports the path — the same courtesy
+   `delete_project` extends.
+
+So the empty-list case is still real, but it is reached *with* the confirm
+string and past the age floor, not instead of it. The rule stands in a narrower
+form: **`purged: []` means the age floor kept everything, not that the purge
+failed** — and reporting it as "nothing was purged, everything is still
+restorable" is the honest reading.
+
+The practical guidance is stronger than the original: **there is almost never a
+reason to purge.** `restore` covers the case people reach for purge to solve, and
+it is exact.
+
+Recorded in `skill/references/mechanics/project-lifecycle.md`.
+
 
 ---
 
