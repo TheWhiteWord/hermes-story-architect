@@ -35,34 +35,39 @@ ops, where there genuinely is a prior value.
 
 ---
 
-## 2. `ops` must be passed as a JSON string
+## 2. `ops` and the JSON-string non-fix
 
-**What happened.** Every `story_draft` call with `ops` as a native array
-failed with `ops[0].op must be one of [...]; got None`. The same call with
-`ops` as a JSON **string** succeeded first time. The objects inside the array
-arrive with their keys stripped; a list value sent natively also came back
-double-nested (`[["a","b"]]` instead of `["a","b"]`).
+Superseded. The `ops` array declared no per-op shape, so the model was guessing
+and arriving with keys stripped. `story_draft`'s schema now declares all four
+op kinds, built from the tables `validate_ops` enforces — pass `ops` as a native
+array, always.
 
-**Status.** This is a Hermes-layer defect in the tool-call bridge, not a
-plugin bug — `core/drafts.py` receives correct args when called directly, and
-the plugin's own tests pass native arrays. Still, the model will hit it every
-time, so SKILL.md must state the workaround until the bridge is fixed.
-
-**The rule.** Serialise `ops` to a JSON string and pass that. Do not attempt
-a native array first.
+The "serialise to a JSON string" workaround never worked: `validate_ops`
+rejects a string outright. It only appeared to, because the retry changed the
+prompt the model was working from.
 
 ---
 
 ## 3. `Want` is not a standard character section
 
-**What happened.** Prose written to a `Want` section saved correctly, but the
+**What happened.** Prose written to a `Want` section appeared to save. The
 standard set for a character is:
 
 `Identity · Desires · Background · Contradictions · Psychology · Arc · Relationships · Voice · Notes`
 
-**The rule.** Aim prose at the standard headings; `Want` is better placed in
-`Desires`. Custom headings are accepted and are not an error, so a user who
-asks for one is not blocked — just prefer the canonical name.
+**The rule.** Aim prose at the standard headings; `Want` belongs in `Desires`.
+
+**Correction to the note above.** An earlier version of this file said custom
+headings "are accepted and are not an error". That is wrong. Section names are a
+**closed set**: `core/writes.py` rejects any edit key that is not a field, a
+relation, or a standard section, so a custom heading fails the whole edit with
+`Unrecognised character edit key(s): Want`. Verified against the live write
+path, not read off it.
+
+The list is not something to memorise or look up in a reference — `story_describe`
+now reports it per entity type, and says it is closed. The original symptom
+(prose landing where it was not expected) was a guessed section name, which the
+tool surface gave no way to avoid.
 
 ---
 
