@@ -180,17 +180,28 @@ Defects found during testing are tracked separately in `bugs.md`.
 
 ---
 
-## 6. Never pass a `commit` error straight through
+## 6. Read a `commit` result; do not assume it from `success`
 
 **The rule.** After any `{"error": ...}` from `commit`, read the project back
-(`story_load`, or `story_retrieve` on the affected entity) before telling the
-user anything. Do not report the error as given.
+before telling the user anything. Report what the response says landed.
 
-**Why.** A commit has been observed to report `No open draft` for a write that
-had in fact fully landed — see `bugs.md` B1. The error text is not reliable
-evidence that nothing was written, and telling the user "that did not save"
-about changes already in the database invites a retry that writes on top of
-them. Confirm against the project, then report what is actually there.
+**The original reason no longer holds.** A commit reporting `No open draft` for a
+write that had landed was `bugs.md` B1, and it is **fixed**: committing the same
+draft twice now returns `success: true` with `already_committed: true` and writes
+nothing. Verified 2026-09-29.
+
+**The reason it still holds is a different one, and it is worse.** A commit is
+**not all-or-nothing**. Verified with a two-op batch whose second op failed: the
+first op was written, the response was `success: false`, and it named how many
+landed. So `success: false` means "partly or not at all", never "nothing" — and
+telling the user "that did not save" about a change that did land invites a
+retry that writes on top of it.
+
+The response is well-behaved: it reports the count, keeps the draft for a retry,
+and says so. **The recovery is to re-stage the failed op alone, not to re-send
+the batch.**
+
+Recorded in `skill/references/mechanics/staging-changes.md`.
 
 ---
 
