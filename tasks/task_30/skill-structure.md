@@ -7,6 +7,11 @@ Source of truth is the code at the time of writing (`tools/*.py` SCHEMAs,
 `core/constants.py`, `core/entity.py`, `core/scene_content_lint.py`), with
 `task_30/tool_note.md` and `task_30/sections.md` as raw material only.
 
+This structure was **audited against the code**, not only reasoned about:
+`task_30/structure-audit.md` records the checks, the one real hole it found (the
+dashboard was in no file), and the two false alarms it produced. Re-run it
+before adding to the tree.
+
 ---
 
 ## 1. The governing constraint: a tool that knows something wins
@@ -106,6 +111,7 @@ skills/hermes-story-architect/
     │   ├── value-system.md
     │   └── story-memory.md
     ├── craft/                     ← our decisions, in the act of writing
+    │   ├── project-design.md
     │   ├── scene-design.md
     │   ├── character-and-arc.md
     │   ├── plot-and-structure.md
@@ -117,6 +123,7 @@ skills/hermes-story-architect/
         │       └── scene-content-broken.md
         ├── staging-changes.md
         ├── reading-the-project.md
+        ├── dashboard.md
         ├── ids-and-links.md
         └── project-lifecycle.md
 ```
@@ -179,6 +186,17 @@ scene turns and an arc moves. From `values.md` §§1–6, 9–10. *Not in it:* t
 tracks, the charge fields, how `y` is derived — that is
 `model/value-system.md`, and the link from here is how the agent knows the
 difference.
+
+> **This file belongs to no single entity type, and that is deliberate.** The
+> other four theory files each serve named types; this one serves the *value
+> track*, whose fields sit on six of them — `story_value_at_open/_close` on
+> `project`, `value_at_open/_close` on `act` and `sequence`, the same plus
+> `shift` and `y` on `scene`, and the `character_value_*` pair on `character`
+> and `arc_beat`. An audit of the tree will therefore flag it as the one theory
+> file with no owner. It is the shared substrate, not an orphan: split by type
+> it would be duplicated six times, and the whole point of the two-track rule is
+> that the track crosses types. Referenced from `model/value-system.md` and
+> `craft/scene-design.md`.
 
 **`character-and-arc.md`** — true character revealed only through choice under
 pressure; depth as internal plus surface-vs-core contradiction; the three
@@ -269,6 +287,21 @@ power as friction points, mood and image system, and what a `variant_of` variant
 is for. That last one is purely ours — no theory behind it, only a decision.
 Pairs with `theory/world-and-place.md`.
 
+**`project-design.md`** — shaping the story itself, before there are characters
+or scenes to write. The `project` entity is where premise, spine, controlling
+idea, the value arc and the structure choice live, and it is the one type with
+no craft file — the audit caught that `craft/` was organised by task while
+`project` had no task. What this system decided about that work: only `name` is
+required and the other nineteen fields fall back to defaults, so a project can
+be created nearly empty and filled as the thinking happens; nothing on it is
+computed, so every field is a judgement the user makes rather than something
+the system derives. The judgement is in the *order* — a premise that is not yet
+a spine, a spine with no controlling idea, a structure chosen before the value
+is known. **A project cannot be drafted** (see `mechanics/project-lifecycle.md`),
+so this is the one creative step that does not go through the review loop, and
+that makes it the step most worth being careful about. Pairs with
+`theory/structure-and-plot.md`.
+
 ### references/mechanics/
 
 **`screenplay-format.md`** — Fountain syntax for `scene.Content`. The single
@@ -289,8 +322,23 @@ too, the file may not earn its own place. Decide when it is written.
 **`reading-the-project.md`** — which `story_load` view answers which question,
 and how to read what comes back. The routing decision is a judgement the tool
 description cannot make for you: five views, each built for a different question,
-and picking the wrong one costs a second call. *Not in it:* the parameter list,
-the tree shape, or the old index format (that surface is `story_load`'s now).
+and picking the wrong one costs a second call. The base view needs `project` and
+nothing else — the other six parameters are view-scoped and optional — and it
+returns the structure, the project row and the full story memory, so it is both
+the first call of a session and the cheapest way to read what has been decided.
+*Not in it:* the parameter list, the tree shape, or the old index format (that
+surface is `story_load`'s now).
+
+**`dashboard.md`** — the surface the human actually looks at. Eight views
+(story, character web, relationships, scenes, locations, plots, worlds, script)
+and what each one answers, so the agent can tell the user what a change did to
+the shape of their story rather than only what it did to a field. Two things
+the agent cannot guess and this states: the plugin **opens the dashboard by
+itself** after a successful commit (a `post_tool_call` hook dispatches it), so
+calling `story_dashboard` unprompted is noise; and **scene order is the
+screenplay** — `core/screenplay.py` assembles scenes in order into one script,
+which is the whole reason `reorder` exists. *Not in it:* the dashboard's own
+UI, or the statistics it computes.
 
 **`ids-and-links.md`** — slug conventions for new entities, what a
 reference-valued field expects, which fields are computed and must never be
@@ -301,7 +349,18 @@ field-by-field list (`story_describe`).
 `create_project`, `list_projects`, `restore`, `purge`, `backup`, `export`, and
 the destructive `import` with its dry-run-first rule. This exists because these
 are the calls that lose work, and the agent needs the ordering (back up before
-import) more than the parameters. *Not in it:* parameter lists.
+import) more than the parameters.
+
+`create_project` is the one that is not administrative. **A project cannot be
+drafted** — `story_draft` refuses a `project` op outright, because a project
+that does not exist has no database to hold the draft. So the first creative act
+in the plugin bypasses the review loop that protects every other write, and
+there is no preview to show the user before it lands. It is also forgiving in
+the other direction: only `name` is required and the other nineteen fields fall
+back to schema defaults, so a project can be created nearly empty and filled in
+later through ordinary drafts. That combination — the one unprotected step, and
+the one with the most room to start small — is what the file has to make the
+agent think about. *Not in it:* parameter lists.
 
 ### Dropped: `craft/continuity-review.md`
 
