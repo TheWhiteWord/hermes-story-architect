@@ -38,17 +38,44 @@ between them. It is not a minor surface:
   dispatches `story_dashboard` after a successful commit. The agent never asks;
   the dashboard appears as a side effect of writing.
 
-So the agent populates a surface it has no model of. It cannot answer "what does
-the graph look like", cannot tell the user what changed visually, and has no way
-to know that **scene order is what produces the screenplay** — `core/screenplay.py`
-assembles scenes in order into one script, which is the entire reason `reorder`
-exists, and nothing in the tree says so.
+So the agent populates a surface it has no model of, and — the part that
+mattered — nothing in the tree said that **scene order is what produces the
+screenplay**. `core/screenplay.py` assembles scenes in order into one script,
+which is the entire reason `reorder` exists.
 
-Proposed: `mechanics/dashboard.md` — the eight views and what each answers, that
-the plugin opens it automatically after a commit so the agent should not open
-it unprompted, and that scene order is the screenplay.
+Added `mechanics/dashboard.md` — but scoped down hard, and the first draft was
+wrong. See §3.
 
-## 3. A file that looks orphaned but is not: `theory/values.md`
+## 3. The dashboard file is two facts long, not a view guide
+
+The first scope for `dashboard.md` was the eight views and what each one
+answers, on the reasoning that the agent should be able to tell the user what a
+change did to the shape of their story. That is wrong on the same rule the rest
+of the tree is built on: **the views are derived from the entities.** The
+character web is built from relationships, the arc graph from arc beats, the
+statistics from value charges, the view list from what exists. The agent already
+knows all of it from what it has staged — documenting the views would be a
+second source of truth for something computed, and would go stale the moment a
+view changed.
+
+What survives is what is *not* derivable from the data, because it is a property
+of the plumbing rather than of the story:
+
+1. The plugin opens the dashboard by itself after a commit, so an unprompted
+   `story_dashboard` call is noise.
+2. Scene order is the screenplay.
+
+Two facts, and both are needed — the first stops the agent doing something
+useless after every commit, the second is the reason a user moving a scene is
+making a decision about a film. Everything else about the dashboard is the
+user's to look at, and the file says so rather than describing it.
+
+The general form of this, worth keeping: **a derived surface does not need a
+reference file, it needs a note that it is derived.** The same test that removed
+the field names and the section vocabulary removes the view list.
+
+
+## 4. A file that looks orphaned but is not: `theory/values.md`
 
 The audit flagged that `values.md` is the one theory file with no owning entity
 type. It is not orphaned — it is the shared substrate. The value track's fields
@@ -66,7 +93,7 @@ say this**, or a reader auditing the tree later will reach the same conclusion
 and either delete the file or invent a redundant pair. Recorded as a note on
 `theory/values.md` rather than left to be re-derived.
 
-## 4. A second hole: `project` had no craft file
+## 5. A second hole: `project` had no craft file
 
 Found by asking what the *task*-organised folders covered, rather than what the
 entity types covered. The first audit checked that all ten types had a theory
@@ -87,7 +114,7 @@ said how a story gets shaped before there are characters to write.
   rather than something the system derives — so unlike a character, there is no
   part of it the agent can fill in on the user's behalf.
 
-## 5. The finding behind that: one creative step has no review loop
+## 6. The finding behind that: one creative step has no review loop
 
 Verifying the above turned up something the tree had not stated anywhere.
 **A project cannot be drafted:**
@@ -112,7 +139,7 @@ there, and it is the strongest argument for `craft/project-design.md` — the st
 with no preview is the step where the user most needs to be asked rather than
 assumed.
 
-## 6. Two false alarms, and why
+## 7. Two false alarms, and why
 
 Worth recording so the same checks are not re-run.
 

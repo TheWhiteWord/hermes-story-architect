@@ -168,7 +168,7 @@ Each line states what the file owns **and what it must not restate**.
 | Hard rules: every write goes through a draft; never commit unconfirmed; relay `preview_md` verbatim; propose, the human decides | The section vocabulary and the field names (`story_describe` has both) |
 | When a fact belongs in memory, in one line — a decision, a direction, an open question, something that must not be contradicted | The four categories in full, the limits, the mutations |
 | Tool routing: 11 tools, one line each — which question it answers | How a value charge is read |
-| Pointer table to every reference file with its trigger, **paired theory → implementation** | Screenplay syntax; any dramatic theory |
+| Pointer table to every reference file with its trigger, **paired theory → implementation** | Screenplay syntax; any dramatic theory; the dashboard's views |
 | Ask before acting; never invent ids or slugs | |
 
 ### references/theory/
@@ -329,16 +329,21 @@ the first call of a session and the cheapest way to read what has been decided.
 *Not in it:* the parameter list, the tree shape, or the old index format (that
 surface is `story_load`'s now).
 
-**`dashboard.md`** — the surface the human actually looks at. Eight views
-(story, character web, relationships, scenes, locations, plots, worlds, script)
-and what each one answers, so the agent can tell the user what a change did to
-the shape of their story rather than only what it did to a field. Two things
-the agent cannot guess and this states: the plugin **opens the dashboard by
-itself** after a successful commit (a `post_tool_call` hook dispatches it), so
-calling `story_dashboard` unprompted is noise; and **scene order is the
-screenplay** — `core/screenplay.py` assembles scenes in order into one script,
-which is the whole reason `reorder` exists. *Not in it:* the dashboard's own
-UI, or the statistics it computes.
+**`dashboard.md`** — that the user has a dashboard, and the two things about it
+the agent cannot infer from the data it writes. Everything else on that surface
+is derived from the entities — the character web from relationships, the
+statistics from values, the views from what exists — so the agent knows what it
+will show from what it has already staged, and describing the views would be a
+second source of truth for something computed.
+
+The two that are not derivable: the plugin **opens the dashboard by itself**
+after a successful commit (a `post_tool_call` hook dispatches it), so calling
+`story_dashboard` unprompted is noise rather than helpfulness; and **scene order
+is the screenplay** — `core/screenplay.py` assembles scenes in order into one
+script, which is the whole reason `reorder` exists and the reason a user
+sequencing scenes is making a decision about the film, not about a list. Both
+are properties of the plumbing, not of the data. *Not in it:* the view list,
+the UI, or the statistics — all derived, all the user's to look at.
 
 **`ids-and-links.md`** — slug conventions for new entities, what a
 reference-valued field expects, which fields are computed and must never be
