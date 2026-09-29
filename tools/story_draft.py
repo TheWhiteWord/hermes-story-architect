@@ -16,6 +16,104 @@ tasks/task_28/draft-staging-design.md.
 """
 import json
 
+from core.constants import ENTITY_SCHEMAS
+from core.drafts import OP_ORDER, REQUIRED_OP_KEYS
+from core.writes import REORDERABLE_TYPES
+
+
+def _op_schemas() -> list[dict]:
+    """One schema branch per op kind, so the model is told the shape.
+
+    Built from the validator's own tables rather than typed out here: the model
+    has to be handed the same grammar `validate_ops` enforces, and a second
+    hand-written copy of the required-key lists is exactly how the two drift
+    apart. `frontmatter` and `data` stay free-form objects on purpose — their
+    keys are the entity's fields, which `story_describe` reports and a JSON
+    Schema cannot enumerate across ten entity types.
+    """
+    summary = {"type": "string", "description": "One line naming this op, shown in the preview"}
+    entity = {
+        "entity_type": {
+            "type": "string",
+            "enum": list(ENTITY_SCHEMAS),
+            "description": "Type of the entity this op targets",
+        },
+    }
+    branches = {
+        "create": {
+            "op": {"type": "string", "enum": ["create"]},
+            "type": {
+                "type": "string",
+                "enum": list(ENTITY_SCHEMAS),
+                "description": "Entity type to create. Projects cannot be drafted — "
+                               "call story_admin(action=\"create_project\") instead.",
+            },
+            "id": {
+                "type": "string",
+                "description": "The new entity's id — the slug every other op and "
+                               "every link refers to it by. Alphanumeric, hyphens "
+                               "and underscores only.",
+            },
+            "frontmatter": {
+                "type": "object",
+                "description": "Field values for the entity. Relations such as a "
+                               "scene's characters ride IN here, not in a separate "
+                               "key. Call story_describe for the fields this type "
+                               "has; omit the ones the user has not decided yet.",
+            },
+            "sections": {
+                "type": "object",
+                "description": "Optional section prose, as {Section Name: body}. "
+                               "Standard headings per type are in "
+                               "references/model/entity-sections.md.",
+            },
+            "summary": summary,
+        },
+        "edit": {
+            "op": {"type": "string", "enum": ["edit"]},
+            **entity,
+            "entity_id": {"type": "string", "description": "Id of the entity to edit"},
+            "data": {
+                "type": "object",
+                "description": "Flat {field: value} for frontmatter, and/or "
+                               "{Section Name: prose} for body sections. Only the "
+                               "keys that change — this is a patch, not a "
+                               "replacement.",
+            },
+            "summary": summary,
+        },
+        "delete": {
+            "op": {"type": "string", "enum": ["delete"]},
+            **entity,
+            "entity_id": {"type": "string", "description": "Id of the entity to delete"},
+            "summary": summary,
+        },
+        "reorder": {
+            "op": {"type": "string", "enum": ["reorder"]},
+            "entity_type": {
+                "type": "string",
+                "enum": list(REORDERABLE_TYPES),
+                "description": "Only these types can be reordered",
+            },
+            "ordered_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "The COMPLETE new order, every id included. This "
+                               "renumbers; it does not move one item.",
+            },
+            "summary": summary,
+        },
+    }
+    return [
+        {
+            "type": "object",
+            "properties": props,
+            "required": ["op", *REQUIRED_OP_KEYS[kind]],
+        }
+        for kind, props in sorted(branches.items(), key=lambda kv: OP_ORDER[kv[0]])
+    ]
+
+
 SCHEMA = {
     "name": "story_draft",
     "description": "Propose a batch of entity changes, show them to the user, and write them "
@@ -48,17 +146,12 @@ SCHEMA = {
         "ops": {
             "type": "array",
             "description": "For action=\"stage\": the changes to propose, in any order — commit "
-                           "sorts them. Four kinds. create: {op, type, id, frontmatter, "
-                           "sections?, summary} — `id` is the entity's own identifier, and "
-                           "relations such as a scene's characters ride "
-                           "INSIDE frontmatter, there is no separate relations key. edit: {op, "
-                           "entity_type, entity_id, data, summary} where data is flat "
-                           "{field: value} or {Section Name: prose}. delete: {op, entity_type, "
-                           "entity_id, summary} — reversible. reorder: {op, entity_type, "
-                           "ordered_ids, summary} to renumber the order of scenes or sequences. "
-                           "Staging again with the same draft_id REPLACES the proposal, and the "
-                           "response says what was added, dropped or changed.",
-            "items": {"type": "object"},
+                           "sorts them into create, edit, delete, reorder itself. The four "
+                           "kinds and their fields are in `items`. Relations such as a "
+                           "scene's characters ride INSIDE frontmatter, there is no separate "
+                           "relations key. Staging again with the same draft_id REPLACES the "
+                           "proposal, and the response says what was added, dropped or changed.",
+            "items": {"oneOf": _op_schemas()},
         },
         "draft_id": {
             "type": "string",

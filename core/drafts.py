@@ -23,7 +23,11 @@ OP_ORDER = {"create": 0, "edit": 1, "delete": 2, "reorder": 3}
 
 # Per-kind required keys. Mirrors what the replayed handler needs, so a missing
 # key is reported at stage time rather than escaping the commit loop.
-_REQUIRED = {
+#
+# Public because tools/story_draft.py builds its `ops` JSON Schema from it: the
+# model has to be told the same shape the validator enforces, and two hand-typed
+# copies of these key lists is how they drift apart.
+REQUIRED_OP_KEYS = {
     "create": ("type", "id", "frontmatter", "summary"),
     "edit": ("entity_type", "entity_id", "data", "summary"),
     "delete": ("entity_type", "entity_id", "summary"),
@@ -76,7 +80,7 @@ def validate_ops(ops) -> list[dict]:
             raise DraftError(
                 f"{where}.op must be one of {sorted(OP_ORDER)}; got {kind!r}."
             )
-        missing = [k for k in _REQUIRED[kind] if k not in op]
+        missing = [k for k in REQUIRED_OP_KEYS[kind] if k not in op]
         if missing:
             raise DraftError(
                 f"{where} ({kind}) is missing: {', '.join(missing)}."
