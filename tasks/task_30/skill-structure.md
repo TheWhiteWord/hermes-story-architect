@@ -293,10 +293,10 @@ pay for the arc and the relationship work it does not need.
   character's. Thirteen fields and five sections make this a real file rather
   than a paragraph.
 - `relationships.md` — the entity that lives *between* two characters, not
-  inside one. `characters` holds exactly two slugs, and `perspectives` is a
-  dict keyed by character slug, so the two sides are written independently and
-  are meant to disagree: verified on a real write, one side `professional /
-  +0.6 / not secret`, the other `rival / -0.5 / secret`. The craft is writing two
+  inside one. `characters` is meant to hold exactly two slugs — but that is a
+  **warning, not a refusal**: a three-character relationship stages, warns, and
+  commits. And `perspectives` is a dict keyed by character slug, so the two
+  sides are written independently and are meant to disagree. → The craft is writing two
   views that each come from their own holder — a bond one person believes and
   the other does not is the point, and `secret` is how you record that one of
   them knows. Note that the character side is computed and read-only, so a
