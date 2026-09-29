@@ -11,7 +11,12 @@ carries its own `description` instead, which is where the model actually reads i
 import json
 
 from core.constants import ENTITY_SCHEMAS
-from core.entity import FIELDS_TO_SKIP, ENTITY_COLUMN_MAP, _RELATION_FIELDS
+from core.entity import (
+    FIELDS_TO_SKIP,
+    ENTITY_COLUMN_MAP,
+    _RELATION_FIELDS,
+    standard_sections,
+)
 
 
 def _storage_label(entity_type: str, field: str) -> str | None:
@@ -81,7 +86,7 @@ def _is_reference(entity_type: str, field: str) -> bool:
 
 
 def _entity_schemas(entity_types: list) -> dict:
-    """Field metadata per entity type, flagging relation-backed and computed fields.
+    """Field metadata and the section list per entity type.
 
     Every key the schema carries is emitted, not a hand-picked few. The
     hand-picked version silently dropped `sub_fields`, which is how a
@@ -90,6 +95,15 @@ def _entity_schemas(entity_types: list) -> dict:
     the shape and the tool did not say so. A schema key nobody is shown is a
     schema key that does not exist, and the list of missing ones is only
     discoverable by reading this function. Copy the dict; decorate it.
+
+    `sections` is here for the same reason, and it is the harder half: the
+    section names are a CLOSED SET, because `core/writes.py` rejects an edit key
+    that is not a field, a relation, or a standard section. An agent that had to
+    guess a name therefore loses the whole write, not one field — and nothing
+    else in the tool surface reports them (`story_retrieve` only reveals
+    `available_sections` as a side effect of a miss). Emitted from
+    `standard_sections` itself, so this cannot drift from what the write path
+    accepts.
     """
     out = {}
     for entity_type in entity_types:
@@ -105,17 +119,33 @@ def _entity_schemas(entity_types: list) -> dict:
             if _is_reference(entity_type, field):
                 entry["is_reference"] = True
             fields[field] = entry
+        # Sections are merged into the same dict rather than nested under a
+        # "sections" key: every existing reader indexes this by field name, and
+        # a section name can never collide with one (they are validated as a
+        # closed set against a different namespace). Keeping one flat level
+        # means no caller has to change, and the tool still says everything.
+        fields["sections"] = {
+            "type": "list",
+            "description": "The standard body sections for this entity type, in order. "
+                           "A CLOSED SET — story_draft rejects any section name not on "
+                           "this list, so use these names rather than inventing one. "
+                           "Created empty with the entity; write prose into them "
+                           "through a story_draft edit op.",
+            "standard_sections": standard_sections(entity_type),
+        }
         out[entity_type] = fields
     return out
 
 
 SCHEMA = {
     "name": "story_describe",
-    "description": "List the fields an entity type expects, with types, defaults and descriptions. "
+    "description": "List what an entity type expects: its fields, with types, defaults and "
+                   "descriptions, and its standard body sections. "
                    "Call this before creating an entity or asking the user about one, so you know "
                    "which questions are worth asking and which fields are still empty. "
                    "These are the field names to pass to story_draft, and the ones story_load "
-                   "returns.",
+                   "returns. The section names are a CLOSED SET: story_draft rejects a section "
+                   "name that is not on this list, so read it here rather than inventing one.",
     "type": "object",
     "properties": {
         "entity_type": {
