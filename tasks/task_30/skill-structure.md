@@ -285,12 +285,13 @@ expanded in their own files beside this one. A task about a character should not
 pay for the arc and the relationship work it does not need.
 
 - `arc-beats.md` — writing the chain. A beat is not a free-floating note: it
-  requires `character`, `scene`, `order` and `label`, so every beat is anchored
-  to a character, pinned to a scene, and positioned in the arc — the `order`
-  field is what makes it a chain rather than a list. What a beat is (action →
-  gap → choice → shift), the crisis and climax flags, and how a beat's own value
-  charge relates to the character's. Thirteen fields and five sections make this
-  a real file rather than a paragraph.
+  requires `character`, `scene` and `label`, and both parents are checked, so
+  every beat is anchored to a character and pinned to a scene — the `order` is
+  what makes it a chain rather than a list, and it auto-numbers, so only its
+  position needs deciding. What a beat is (action → gap → choice → shift), the
+  crisis and climax flags, and how a beat's own value charge relates to the
+  character's. Thirteen fields and five sections make this a real file rather
+  than a paragraph.
 - `relationships.md` — the entity that lives *between* two characters, not
   inside one. `characters` holds exactly two slugs, and `perspectives` is a
   dict keyed by character slug, so the two sides are written independently and
