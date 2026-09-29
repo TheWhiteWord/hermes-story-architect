@@ -43,6 +43,53 @@ into a tool call. The per-type blocks should not change.
 
 ---
 
+## 2. `goals: {short, long}` is accepted, then silently discarded
+
+**Found while drafting** `skill/references/craft/character-and-arc.md`.
+
+Two character field descriptions promise a second shape:
+
+    "goals_short": "... (flat form; nested goals.short also accepted)"
+    "goals_long":  "... (flat form; nested goals.long also accepted)"
+
+It is not accepted. Verified by creating a character with the nested form:
+
+    create_entity(..., {"name": "Nested", "goals": {"short": "Stay.",
+                                                    "long": "Survive."}})
+    -> success, no error, no warning
+    -> stored extra: {"goals_short": "", "goals_long": "", ...}
+
+The nested key is gone entirely — not stored verbatim, not split into the two
+fields, just dropped. The mechanism is `core/writes.py:123`, which builds the
+row from the schema's own keys and therefore discards anything not declared
+before the insert. `goals` appears nowhere in the codebase except inside those
+two description strings.
+
+This is the worst shape of defect: the call **succeeds**, so the agent and the
+user both see a character created, and the goal is simply not there. Nothing
+downstream reports it, and the character reads as someone without a want.
+
+**Two ways to close it, and they are not equivalent.**
+
+- *Correct the description.* The flat form is what works; there is no nested
+  form. This is a two-word change and it removes a lie. It is also the whole
+  fix if the nested form was never intended.
+- *Implement the mapping.* Accept the nested shape and split it into the two
+  fields on the way in. More work, and it adds a second accepted shape to every
+  future reader of the schema — which is the thing that made this confusing in
+  the first place.
+
+The first is the smaller change and removes the hazard. Not started, and not
+started here: the session is on the skill.
+
+**Skill file to revisit:** none, strictly — the flat form is already what
+`craft/character-and-arc.md` tells the agent to write. But the file should carry
+the trap until the description is fixed, because an agent that reads the schema
+will try the nested form it is told is accepted.
+
+
+---
+
 ## Status
 
 Neither is started. Listed here so the skill design can proceed without them and
