@@ -11,49 +11,71 @@ path, so there is nothing to look up and nothing to guess.
 
 ---
 
+## What a section is for
+
+*The frame the whole file sits in.*
+
+- A section is where **thinking, decisions and extended detail are kept.** It is
+  the roomier half of an entity: the field holds the fact, the section holds
+  everything around the fact that the author does not want to lose.
+- **Neither half requires the other.** You do not have to write the `Desires`
+  section to set `goals_short`, and setting the field does not oblige you to
+  write the section. Nothing in the code couples them and nothing here should
+  make them a pair of obligations.
+- They work together **naturally**, the way a person works: you think in prose
+  and the decision that survives is the one worth putting in a field. Which of
+  the two you reach for first is not a rule, and the order is not the point.
+- The practical consequence: a fact worth querying belongs in a field, and prose
+  that makes the fact meaningful belongs in a section. Writing a good `Desires`
+  section does not fill `goals_short` — and that is fine, because they are
+  answering different questions.
+- *Why the field is the one to reach for first when it comes to a choice:*
+  every reader that is not a person uses fields — the dashboard, the graphs,
+  `story_load`'s views. A section has exactly one reader, and is looking at it.
+- The old sections design doc has a "which section informs which field" table.
+  **It is a prompt, not a rule.** If a section has been written and the
+  corresponding field is empty, that is a natural moment to notice — not an
+  error, not a requirement, and not something to state as automatic.
+
 ## The empty-section problem
 
-*Why this file exists at all.*
+*Why deciding what to leave blank is the work.*
 
 - A new entity returns every section as `""` — nine empty strings for a
   character. **Nothing reports a section as unfilled.** `unfilled_fields` counts
-  fields only, and an empty section is indistinguishable from a section holding
-  a space.
-- So an empty section is invisible. Nobody is told it is blank, and no dashboard
-  flags it. **Deciding which sections to leave empty is the work**, and it is
-  invisible work.
+  fields only, so an empty section is indistinguishable from one holding a space.
+- So a blank section is invisible: nobody is told, and nothing flags it. Which
+  sections are worth writing *now* is a judgement about what the user is
+  currently deciding, and most entities are mid-thought most of the time.
 - A section that does not exist at all is different: requesting a name off the
   list returns `null` and `sections_not_found`. Blank is not the same as absent,
   and the agent can tell them apart.
-- *Note:* is there a case for a tool that reports blank sections, the way
-  `unfilled_fields` reports blank fields? If so it is a tool fix, not a
-  reference file. Flagged, not assumed.
+- *Known gap:* a tool that reported blank sections the way `unfilled_fields`
+  reports blank fields would settle this. It does not exist — recorded in
+  `deferred-code-work.md`, with a note that this file has to be revisited if it
+  is built. Designed around the absence for now.
 
-## Sections and fields are separate things
+## `Notes` — the same on all ten types
 
-*The rule that stops the same fact being written twice.*
+*Stated once here rather than repeated in every block above.*
 
-- **Prose in a section never sets a field.** Nothing derives one from the other —
-  there is no code path from a section body to frontmatter.
-- So a fact that matters structurally has to be written *twice*: once as prose
-  that reads well, once as a field the system can query. Writing a good `Desires`
-  section does not fill `goals_short`.
-- *Which is authoritative?* **The field.** Every reader that is not a human uses
-  fields — the dashboard, the graphs, `story_load`'s views. A section has exactly
-  one reader: the person looking at it.
-- *Exception, and it needs a line of its own:* on `arc_beat` the section names
-  and the field names collide — `action` and `choice` are both, and `gap` /
-  `shift` are the same idea as `The Gap` / `Value Shift`. Same trap, different
-  spelling.
-- The old sections design doc has a "which section informs which field" table.
-  That is a **design note about a human's workflow, not a mechanism.** Worth
-  keeping as a prompt ("you wrote about desires — does `goals_short` say it?"),
-  never worth stating as automatic.
+The section set is **fixed and not customisable**: a section name off the list
+is rejected by the write path, and there is no way to add one of your own. So
+when something genuinely belongs to this entity but fits none of the sections
+above, `Notes` is where it goes rather than being lost or forced into a section
+that is about something else.
+
+That is its whole job. It is not a scratchpad, not a to-do list, and not a place
+to put a fact that has a field — a fact with a field belongs in the field. It is
+the overflow for content the author wants to keep and that the fixed set has no
+home for.
+
+---
 
 ## How to read a type block
 
 - Each block is one entity type, in the order a story gets built.
-- One line per section: what it is for, and when leaving it empty is right.
+- One line per section: what it is for, and when leaving it blank is right.
 - Nothing here restates the field list — `story_describe` has it.
 
 ---
@@ -165,16 +187,18 @@ path, so there is nothing to look up and nothing to guess.
 
 ## Arc beat
 
-*Five sections — and the one place sections and fields collide.*
+*Five sections. The clearest case of a field and a section working side by side.*
 
-- **Action** — what the character does. **Also a field.** → `arc-beats.md`
+- **Action** — what the character does. The field holds the short version; this
+  section holds the thinking behind it. → `arc-beats.md`
 - **The Gap** — the disconfirming reaction. Also a field, named `gap`.
-- **Choice** — what they do next. **Also a field.**
+- **Choice** — what they do next. Also a field.
 - **Value Shift** — the resulting change. Also a field, named `shift`.
-- **Notes**
-- *Open question:* with four of five sections shadowing a field, is the prose
-  redundant, or is the field the short version and the section the thinking?
-  Needs a decision, and `arc-beats.md` is where it belongs.
+- **Notes** — see below.
+- *No ruling needed here, and that is the point:* four of the five shadow a
+  field, and that is not a duplication to be resolved. The field is the fact
+  every other reader uses; the section is why the character did it. A beat can
+  be written either way round, and often only one of them is worth writing yet.
 
 ## Relationship
 
@@ -191,13 +215,25 @@ path, so there is nothing to look up and nothing to guess.
 
 ---
 
-## Open questions
+## Rulings applied
 
-- [ ] Should a tool report blank sections the way `unfilled_fields` reports blank
-      fields? If yes, that is a tool fix and this file gets smaller.
-- [ ] The `arc_beat` field/section collision needs a ruling: which is
-      authoritative, and does the prose earn its place?
-- [ ] Is "which section informs which field" worth keeping as a prompt, or is it
-      the kind of thing that rots? A design note, not a mechanism.
-- [ ] `Notes` exists on all ten types and nothing says what belongs in one.
-      Worth a line, or is it self-evident?
+Answers to the four open questions, kept so the reasoning is not re-derived.
+
+- **Fields and sections.** A section is where thinking, decisions and extended
+  detail are kept; the field holds the fact. Neither requires the other — no
+  obligation to write one before the other, and nothing in the code couples
+  them. They work together naturally. On `arc_beat`, where four of five section
+  names shadow a field, that is the arrangement working, not a duplication to
+  resolve.
+- **The "which section informs which field" mapping.** Useful as a prompt, and
+  deliberately **not** a rule. If a section has been written and its field is
+  empty, that is a natural moment to notice — not an error and not a
+  requirement.
+- **`Notes`.** The section set is fixed and not customisable, so `Notes` is
+  where content that belongs to the entity but fits nowhere else goes, instead
+  of being lost or forced into a section about something else. Not a scratchpad
+  and not a home for facts that have fields.
+- **Reporting blank sections.** Deferred to `deferred-code-work.md`. This file
+  is designed around the absence and must be revisited if the tool change is
+  built.
+
