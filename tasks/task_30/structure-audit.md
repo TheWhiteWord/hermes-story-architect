@@ -114,7 +114,43 @@ said how a story gets shaped before there are characters to write.
   rather than something the system derives — so unlike a character, there is no
   part of it the agent can fill in on the user's behalf.
 
-## 6. The finding behind that: one creative step has no review loop
+## 6. A third hole: arc beats and relationships were inside a character file
+
+`craft/character-and-arc.md` had been carrying both. They are separate entity
+types and the split is not a matter of size — it is what they are:
+
+| | `character` | `arc_beat` | `relationship` |
+|---|---|---|---|
+| fields | 13 | 13 | 7 |
+| sections | 9 | 5 | 6 |
+| required | name, story_role, one_sentence | character, scene, order, label | name, characters |
+| parent | — | one character (`parent_id`) | **two** character slugs |
+| own `story_load` view | no | yes (`view="arc"`) | yes (`view="relationship"`) |
+
+Two findings from running the code rather than reading it:
+
+**An arc beat requires `order`.** Every beat is anchored to a character, pinned
+to a scene, and positioned — which is what makes an arc a chain rather than a
+list, and what makes ordering a real decision rather than an afterthought. That
+is the substance of the arc file, and it was a clause inside the character one.
+
+**A relationship belongs to two characters, not one.** `perspectives` is a dict
+keyed by character slug, so the two sides are written independently and are
+*meant* to disagree. Verified on a real write: one side `professional / +0.6 /
+not secret`, the other `rival / -0.5 / secret`. The character-side
+`relationships` field is computed and read-only, so a relationship is never
+edited through a character — which means a character file is the wrong home for
+it twice over.
+
+Nesting, not top level: `craft/character-and-arc/` with the parent naming both
+children. That inverts the usual reason to nest — a hidden chain buries files
+that matter, whereas these are files that belong together, and a task about a
+character should not pay for arc and relationship depth it does not need. SKILL.md
+still names all three, so nothing depends on finding the children by traversal.
+Recorded as an explicit exception to the one-hop rule rather than left as an
+unnoticed contradiction.
+
+## 7. The finding behind the project gap: one step has no review loop
 
 Verifying the above turned up something the tree had not stated anywhere.
 **A project cannot be drafted:**
@@ -139,7 +175,7 @@ there, and it is the strongest argument for `craft/project-design.md` — the st
 with no preview is the step where the user most needs to be asked rather than
 assumed.
 
-## 7. Two false alarms, and why
+## 8. Two false alarms, and why
 
 Worth recording so the same checks are not re-run.
 

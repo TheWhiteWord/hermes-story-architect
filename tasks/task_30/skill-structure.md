@@ -114,6 +114,8 @@ skills/hermes-story-architect/
     │   ├── project-design.md
     │   ├── scene-design.md
     │   ├── character-and-arc.md
+    │   │   ├── arc-beats.md
+    │   │   └── relationships.md
     │   ├── plot-and-structure.md
     │   └── world-and-place.md
     └── mechanics/                 ← how to read and write without losing data
@@ -274,9 +276,32 @@ role in the larger structure is expressed. Pairs with `theory/scene-and-beat.md`
 
 **`character-and-arc.md`** — building a character: identity, desire,
 contradiction, the gap; and how a character arc differs from the story's value
-arc, which is the second track and never a mismatch. Where a beat's four
-elements go when the author has given three of them. Pairs with
-`theory/character-and-arc.md`.
+arc, which is the second track and never a mismatch. Enough to know that an arc
+is a chain of beats and a relationship is its own entity, and enough to know when
+one of them needs writing. **It does not contain either.** Arc beats and
+relationships are separate entities with their own required fields, their own
+sections and their own `story_load` view — verified, not assumed — so both are
+expanded in their own files beside this one. A task about a character should not
+pay for the arc and the relationship work it does not need.
+
+- `arc-beats.md` — writing the chain. A beat is not a free-floating note: it
+  requires `character`, `scene`, `order` and `label`, so every beat is anchored
+  to a character, pinned to a scene, and positioned in the arc — the `order`
+  field is what makes it a chain rather than a list. What a beat is (action →
+  gap → choice → shift), the crisis and climax flags, and how a beat's own value
+  charge relates to the character's. Thirteen fields and five sections make this
+  a real file rather than a paragraph.
+- `relationships.md` — the entity that lives *between* two characters, not
+  inside one. `characters` holds exactly two slugs, and `perspectives` is a
+  dict keyed by character slug, so the two sides are written independently and
+  are meant to disagree: verified on a real write, one side `professional /
+  +0.6 / not secret`, the other `rival / -0.5 / secret`. The craft is writing two
+  views that each come from their own holder — a bond one person believes and
+  the other does not is the point, and `secret` is how you record that one of
+  them knows. Note that the character side is computed and read-only, so a
+  relationship is never edited through the character. Pairs with
+  `theory/character-and-arc.md`, which is where the subtext and dramatic
+  irony material lives.
 
 **`plot-and-structure.md`** — the act/sequence/scene hierarchy in practice, main
 vs sub, where a climax belongs at each level, and what a plot's setups, crisis,
@@ -392,6 +417,13 @@ audit back when a tool can run one.
    partial-read warning is the reason: a file two links deep may never be
    opened. The theory↔implementation pair is not a chain — both files hang off
    SKILL.md, side by side.
+   **One exception, and it is deliberate:** `craft/character-and-arc.md` and its
+   two children. The parent names them and says what they are for, and SKILL.md
+   names all three. The nesting is a statement that arc beats and relationships
+   are *part of character work* — a reader who opens the parent is one click
+   from the depth and never has to know the children exist in advance. That is
+   the opposite failure to a hidden chain: the chain hides files that matter,
+   this groups files that belong together. Everything else stays flat.
 3. **No code blocks in SKILL.md or in references.** Worked examples live in a
    `samples/` folder, read when the agent needs the shape rather than the rule.
 4. **A fact lives in exactly one file.** When a rule is needed in two places,
