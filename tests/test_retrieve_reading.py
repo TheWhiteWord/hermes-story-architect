@@ -100,8 +100,8 @@ class TestRelationBackedFields:
 class TestSelection:
     def test_sections_subset(self, db):
         proj, vault = db
-        r = _get(proj, vault, entity_type="character", id=["kael"], sections=["Personality"])
-        assert list(r["entities"][0]["sections"]) == ["Personality"]
+        r = _get(proj, vault, entity_type="character", id=["kael"], sections=["Identity"])
+        assert list(r["entities"][0]["sections"]) == ["Identity"]
 
     def test_missing_section_is_reported_not_silent(self, db):
         proj, vault = db
@@ -109,7 +109,7 @@ class TestSelection:
         entity = r["entities"][0]
         assert entity["sections"]["Nowhere"] is None
         assert entity["sections_not_found"] == ["Nowhere"]
-        assert "Personality" in entity["available_sections"]
+        assert "Identity" in entity["available_sections"]
 
     def test_fields_only(self, db):
         proj, vault = db
@@ -120,10 +120,10 @@ class TestSelection:
     def test_sections_and_fields_together(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="character", id=["kael"],
-                  fields=["story_role"], sections=["Personality"])
+                  fields=["story_role"], sections=["Identity"])
         entity = r["entities"][0]
         assert entity["fields"]["story_role"]
-        assert entity["sections"]["Personality"] is not None
+        assert entity["sections"]["Identity"] is not None
 
     def test_asking_for_nothing_is_an_error(self, db):
         """Otherwise a call returns an empty entity and the agent assumes it is empty."""
@@ -141,12 +141,12 @@ class TestBatchAndIds:
     def test_several_ids_in_one_call(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="character", id=["kael", "mira"],
-                  sections=["Personality"])
+                  sections=["Identity"])
         assert [e["id"] for e in r["entities"]] == ["kael", "mira"]
 
     def test_bare_string_is_tolerated(self, db):
         proj, vault = db
-        r = _get(proj, vault, entity_type="character", id="kael", sections=["Personality"])
+        r = _get(proj, vault, entity_type="character", id="kael", sections=["Identity"])
         assert r["entities"][0]["id"] == "kael"
 
     def test_arc_beat_suffix_resolves(self, db):

@@ -1,18 +1,14 @@
 ---
 act_id: act-1
-characters:
-- kael
-- mira
-conflict_levels:
-- inner
-- personal
+characters: ['kael', 'mira']
+conflict_levels: ['inner', 'personal']
 dramatic_role: setup
 heading: INT. THE CENTRAL ROOM - DAY
 id: central-room-day
-is_act_climax: false
-is_inciting_incident: false
-is_sequence_climax: false
-is_story_climax: false
+is_act_climax: False
+is_inciting_incident: False
+is_sequence_climax: False
+is_story_climax: False
 location: the-central-room
 order: 1
 sequence_id: seq-discovery
@@ -26,7 +22,7 @@ value_at_open: positive
 y: -0.3
 ---
 
-## Description
+## Objective
 
 Kael discovers the door isn't locked — it was never locked.
 

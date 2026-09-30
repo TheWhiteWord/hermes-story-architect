@@ -1,12 +1,11 @@
 ---
-action: Elena makes the call — save the minds, abandon the bodies. Four hundred people
-  will die so four hundred others can live forever.
+action: Elena makes the call — save the minds, abandon the bodies. Four hundred people will die so four hundred others can live forever.
 character: dr-elena-voss
 choice: She does not explain herself to Marcus. She signs the order.
 gap: She expects relief. She gets silence.
 id: dr-elena-voss-1
-is_climax: false
-is_crisis: false
+is_climax: False
+is_crisis: False
 label: The Choice
 order: 1
 scene: central-room-day
@@ -18,7 +17,7 @@ y: 0.8
 
 Elena stands before the console. The outsiders are at the gates. She has minutes, not hours. Her finger hovers over the dual-save option — it would overload the system, risk corruption. She chooses the safe path: save the four hundred inside, let the four hundred outside die.
 
-## Gap
+## The Gap
 
 She expected the choice to feel like salvation. It feels like murder. The math was simple; the aftermath is not.
 
@@ -26,10 +25,10 @@ She expected the choice to feel like salvation. It feels like murder. The math w
 
 She does not call Marcus for support. She does not ask for a second opinion. She signs the order alone, in silence, and watches the system engage. The outsiders' vitals flatline on her screen. She does not look away.
 
-## Shift
+## Value Shift
 
 From "I saved them" to "I chose who dies." The certainty that felt like strength now feels like a wall she built between herself and everyone who wasn't in the room.
 
-## Development Log
+## Notes
 
 Beat designed during arc planning. Elena's arc is negative — she begins certain and ends haunted. This is the inciting beat.

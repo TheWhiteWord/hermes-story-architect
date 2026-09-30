@@ -16,7 +16,7 @@ value_at_open: positive
 
 A sequence about doubt becoming certainty, and certainty becoming action.
 
-## Scene Order
+## Progression
 
 1. central-room-day
 2. central-room-night

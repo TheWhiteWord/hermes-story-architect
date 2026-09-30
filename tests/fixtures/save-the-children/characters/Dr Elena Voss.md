@@ -1,17 +1,16 @@
 ---
-arc_complete: true
+arc_complete: True
 arc_type: negative
 character_value: Redemption
 character_value_at_close: negative
 character_value_at_open: positive
 id: dr-elena-voss
 name: Dr. Elena Voss
-one_sentence: Lead scientist on Project Save the Children — chose to preserve the
-  minds even knowing the bodies would never come.
+one_sentence: Lead scientist on Project Save the Children — chose to preserve the minds even knowing the bodies would never come.
 story_role: Supporting
 ---
 
-## Personality
+## Identity
 
 Controlled intensity. Elena carries the weight of impossible choices with a calm that reads as coldness but is actually exhaustion. She does not explain herself — not from arrogance, but from the knowledge that explanations won't change the math.
 
@@ -23,11 +22,9 @@ Became the youngest director of the Institute's consciousness preservation progr
 
 Measured, precise, clipped. Elena speaks like someone who has said the hard thing so many times it has lost its edges. She uses technical language as emotional armor. When the armor cracks, she goes silent.
 
-## Greatest Fear
+## Psychology
 
 That the children she saved will learn what she did to save them — and that they will not forgive her.
-
-## Secrets
 
 Elena knew the outsiders could be saved too. She chose not to — the system couldn't hold them all. She has never told Marcus.
 
@@ -40,7 +37,7 @@ From certain architect to haunted ghost. Elena begins believing she saved humani
 - **Marcus Chen** — colleague, friend, the one who questioned the choice. She respects him more for disagreeing than she ever said.
 - **Kael** — the child she saved. She watches from the system, unable to intervene, unable to look away.
 
-## Goals
+## Desires
 
 - Short: Keep the system stable long enough for the children to develop fully.
 - Long: Find a way to tell them the truth before they discover it themselves.

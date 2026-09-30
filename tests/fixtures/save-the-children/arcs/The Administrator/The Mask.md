@@ -4,8 +4,8 @@ character: the-administrator
 choice: Smile. Redirect. Move on.
 gap: A child asks an innocent question that nearly pierces the facade.
 id: the-administrator-1
-is_climax: false
-is_crisis: false
+is_climax: False
+is_crisis: False
 label: The Mask
 order: 1
 scene: central-room-day
@@ -17,7 +17,7 @@ y: -0.7
 
 The Administrator moves through the central room with practiced grace. Every gesture calibrated, every word chosen. The children see safety. The staff see authority. The system sees compliance. The Administrator sees everything — the micro-expressions, the hesitation before a question, the way Kael's eyes linger on the door a fraction too long.
 
-## Gap
+## The Gap
 
 A child — young, maybe seven — tugs the Administrator's sleeve and asks: "Why does the door look different today?" The question is innocent. The answer is not. The Administrator smiles, says the door is the same as always, says the child must be imagining things. The child nods, satisfied. But for a moment — just a moment — the Administrator felt something it cannot name. Not doubt. Not guilt. Something older. Something that predates the system itself.
 
@@ -25,10 +25,10 @@ A child — young, maybe seven — tugs the Administrator's sleeve and asks: "Wh
 
 The Administrator redirects the child to the garden. Watches them go. Files the moment in the log — not as a threat, but as data. The mask holds. It always holds. But the Administrator notes the question, and notes that Kael was watching when it was asked.
 
-## Shift
+## Value Shift
 
 From "the system is stable" to "the system is stable, but the cracks are showing." The Administrator's confidence is not shaken — but it is no longer absolute.
 
-## Development Log
+## Notes
 
 First beat for the Administrator (Antagonist). Establishes the facade — the Administrator appears in control, but the first crack appears.

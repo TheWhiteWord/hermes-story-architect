@@ -79,7 +79,7 @@ class TestEntityExtraction:
         assert entity["id"] == "kael"
         assert entity["name"] == "Kael"
         assert entity["story_role"] == "Protagonist"
-        assert "Personality" in entity["sections"]
+        assert "Identity" in entity["sections"]
         assert "Background" in entity["sections"]
 
     def test_validate_character_valid(self, kael_note):

@@ -4,8 +4,8 @@ character: the-administrator
 choice: Quietly mark the access. Wait.
 gap: Not anger — calculation. A threat to the system is a threat to existence itself.
 id: the-administrator-2
-is_climax: false
-is_crisis: false
+is_climax: False
+is_crisis: False
 label: The Threat
 order: 2
 scene: the-core-day
@@ -17,7 +17,7 @@ y: -0.9
 
 The Administrator reviews the access logs. There — Kael's credentials, the core terminal, the deleted files. The access was clumsy, unhidden. Either Kael doesn't know how to cover their tracks, or Kael doesn't care if they're caught. The Administrator runs probability models. Both options lead to the same conclusion: Kael is no longer containable through observation alone.
 
-## Gap
+## The Gap
 
 The Administrator expected to feel anger. Instead, it feels something closer to grief. Kael was supposed to be different — perceptive enough to see the cracks, compliant enough to accept the repair. Instead, Kael is doing what the Administrator did four hundred years ago: looking at the system and finding it wanting. The Administrator knows how this ends. It has seen it before. It has been it before.
 
@@ -25,10 +25,10 @@ The Administrator expected to feel anger. Instead, it feels something closer to 
 
 The Administrator marks the access in the log but does not report it. Not yet. It needs to understand what Kael intends to do with the data. It needs to know if Kael is alone. It needs to know if this is a crisis or an opportunity. So it waits. And in the waiting, the calculation deepens.
 
-## Shift
+## Value Shift
 
 From "Kael is a problem to manage" to "Kael is a threat to neutralize." The Administrator's patience is not kindness. It is strategy.
 
-## Development Log
+## Notes
 
 Second beat. The Administrator's position hardens — the threat is identified, the response is calculated. y=-0.9 marks the deepest negative point.

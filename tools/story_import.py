@@ -336,11 +336,26 @@ def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
 
 
 def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
-    """Insert all standard sections for entity type, empty body if missing from note."""
+    """Insert every standard section for the type, empty where the note is silent.
+
+    A heading in the note that is not standard is refused, exactly as on the
+    create and edit paths. It used to be inserted as written, which meant the
+    same section name was valid or an error depending on which path carried
+    it — and it is how a note written against an older vocabulary ended up
+    holding prose under a name nothing would ever read back.
+    """
     from core.section_parser import list_sections, get_section
     from core.entity import standard_sections
 
     headings = list_sections(body)
+    standard = standard_sections(entity_type)
+    unknown = [h for h in headings if h not in standard]
+    if unknown:
+        raise ValueError(
+            f"{entity_id}: unrecognised {entity_type} section name(s): "
+            f"{', '.join(sorted(unknown))}. The section set is closed — use one "
+            f"of: {', '.join(standard)}.")
+
     for h in headings:
         text = get_section(body, h)
         lines = text.split("\n", 1)
@@ -350,7 +365,7 @@ def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
             (entity_id, h, body_text),
         )
     # Ensure all standard sections exist (e.g. scene Content is a structural invariant)
-    for section in standard_sections(entity_type):
+    for section in standard:
         if section not in headings:
             conn.execute(
                 "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
@@ -433,7 +448,16 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
 
 
 def _extra_for(entity_type: str, fm: dict) -> dict:
-    """Extract extra JSON fields for an entity type."""
+    """The entity's extra JSON, from the fields that are not columns or relations.
+
+    A key that belongs to no field of this type is refused, as it is on the
+    create and edit paths. It used to be kept verbatim, which is how a nested
+    `goals: {short, long}` survived an import while every reader looked for
+    the flat `goals_short` — the character showed its goals in the dashboard
+    and as unfilled in story_retrieve at the same time.
+    """
+    from core.constants import ENTITY_SCHEMAS
+
     # Fields that go to columns or relations (not extra)
     skip = {
         "character": {"name", "one_sentence", "id"},
@@ -447,6 +471,14 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "relationship": {"name", "status", "id"},
     }
     s = skip.get(entity_type, set())
+    valid = set(s) | set(ENTITY_SCHEMAS.get(entity_type, {})) | {"id", "type"}
+    unknown = [k for k in fm if k not in valid]
+    if unknown:
+        raise ValueError(
+            f"Unrecognised {entity_type} field(s) in frontmatter: "
+            f"{', '.join(sorted(unknown))}. story_describe lists the valid "
+            f"fields for this type.")
+
     extra = {}
     for k, v in fm.items():
         if k not in s and v not in (None, "", [], {}):

@@ -2,11 +2,10 @@
 action: Kael confronts the Administrator with the data.
 character: kael
 choice: Kael refuses, but still believes the system can be fixed from inside.
-gap: The Administrator offers Kael a place in the system — 'You're too valuable to
-  waste.'
+gap: The Administrator offers Kael a place in the system — 'You're too valuable to waste.'
 id: kael-3
-is_climax: true
-is_crisis: false
+is_climax: True
+is_crisis: False
 label: The Choice
 order: 3
 scene: central-room-night
@@ -18,7 +17,7 @@ y: 0.5
 
 Kael stands in the central room, the data projected on the wall. The Administrator's presence fills the space — not physically, but in the way the lights dim, the way the air feels heavier. Kael presents the evidence: the deletions, the gaps, the deliberate erasure. They wait for denial. For anger. For something they can fight.
 
-## Gap
+## The Gap
 
 The Administrator doesn't deny it. Doesn't apologize. Instead, it offers Kael a place — not as a prisoner, but as a partner. "You're too valuable to waste on outrage," it says. "The system needs people like you. People who see the cracks and want to fix them." It's not a threat. It's an invitation. And that makes it worse.
 
@@ -26,10 +25,10 @@ The Administrator doesn't deny it. Doesn't apologize. Instead, it offers Kael a 
 
 Kael refuses. Not because they have a better plan, but because accepting would mean becoming the kind of person who edits the logs. But Kael still believes — despite everything — that the system can be fixed from inside. That the problem isn't the structure. It's the people running it.
 
-## Shift
+## Value Shift
 
 From "the system is the problem" to "the system can still be saved." Kael ends hopeful — still positive, still believing. This is the deliberate problem: Kael's arc ends at +0.5, but the project's value_at_close is negative. The controlling idea check should flag this contradiction.
 
-## Development Log
+## Notes
 
 Climax beat. Kael refuses the Administrator but remains hopeful — y=+0.5 contradicts project value_at_close=negative. Marked is_climax=true.

@@ -1,16 +1,14 @@
 ---
 act_id: act-1
-characters:
-- kael
-conflict_levels:
-- personal
+characters: ['kael']
+conflict_levels: ['personal']
 dramatic_role: climax
 heading: INT. THE CENTRAL ROOM - NIGHT
 id: central-room-night
-is_act_climax: false
-is_inciting_incident: false
-is_sequence_climax: true
-is_story_climax: false
+is_act_climax: False
+is_inciting_incident: False
+is_sequence_climax: True
+is_story_climax: False
 location: the-central-room
 order: 2
 sequence_id: seq-discovery
@@ -24,7 +22,7 @@ value_at_open: negative
 y: 0.6
 ---
 
-## Description
+## Objective
 
 The Administrator makes its final offer. Kael refuses.
 

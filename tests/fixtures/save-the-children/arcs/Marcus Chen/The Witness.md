@@ -4,8 +4,8 @@ character: marcus-chen
 choice: Says nothing. Watches.
 gap: He's seen it before — the ones who start asking questions either break or leave.
 id: marcus-chen-1
-is_climax: false
-is_crisis: false
+is_climax: False
+is_crisis: False
 label: The Witness
 order: 1
 scene: central-room-day
@@ -17,7 +17,7 @@ y: 0.2
 
 Marcus Chen sits in the corner of the central room, the way he always does — present but not intrusive, available but not demanding. He watches Kael across the room. The way Kael's fingers tap against their thigh. The way their eyes track the door. The way they flinch when the Administrator's voice comes through the intercom. Marcus has seen this before. Forty years ago, he saw it in Elena. A hundred years before that, he saw it in himself.
 
-## Gap
+## The Gap
 
 He wants to say something. Wants to tell Kael: I see you. I know what you're feeling. I felt it too. But he doesn't. Because the last time he said those words, the person he said them to broke. And the time before that, they left. And Marcus is tired of watching people shatter against the same wall. So he stays quiet. And the quiet is its own kind of violence.
 
@@ -25,10 +25,10 @@ He wants to say something. Wants to tell Kael: I see you. I know what you're fee
 
 Marcus says nothing. He watches. He files the moment away — Kael's name, the date, the look in their eyes. He adds it to the list he keeps in his head. The list of people who noticed. The list of people who paid for noticing. He tells himself he'll act next time. He always tells himself that.
 
-## Shift
+## Value Shift
 
 From "I can help" to "I'll watch and wait." Marcus begins positive — he sees Kael, he cares — but the choice to do nothing shifts him toward guilt.
 
-## Development Log
+## Notes
 
 First beat for Marcus Chen (Supporting). Establishes his role — the witness who doesn't act. y=+0.2, slightly positive, the guilt hasn't landed yet.

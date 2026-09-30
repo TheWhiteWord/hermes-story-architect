@@ -1,17 +1,14 @@
 ---
 act_id: act-1
-characters:
-- kael
-- mira
-conflict_levels:
-- extra-personal
+characters: ['kael', 'mira']
+conflict_levels: ['extra-personal']
 dramatic_role: resolution
 heading: EXT. THE CORE - DAY
 id: the-core-day
-is_act_climax: false
-is_inciting_incident: false
-is_sequence_climax: false
-is_story_climax: false
+is_act_climax: False
+is_inciting_incident: False
+is_sequence_climax: False
+is_story_climax: False
 location: the-garden
 order: 3
 sequence_id: seq-discovery
@@ -25,7 +22,7 @@ value_at_open: positive
 y: 0.4
 ---
 
-## Description
+## Objective
 
 The children emerge into the real world for the first time.
 

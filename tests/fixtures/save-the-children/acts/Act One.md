@@ -14,7 +14,7 @@ value_at_open: positive
 
 The act of discovery. From private doubt to public choice.
 
-## Thematic Function
+## Objective
 
 Freedom requires the courage to leave what you know.
 

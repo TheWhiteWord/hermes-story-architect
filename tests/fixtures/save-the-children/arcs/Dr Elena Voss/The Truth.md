@@ -1,12 +1,11 @@
 ---
-action: Elena makes contact with Kael. She tells him what she did. She does not ask
-  for forgiveness.
+action: Elena makes contact with Kael. She tells him what she did. She does not ask for forgiveness.
 character: dr-elena-voss
 choice: She tells the truth. She lets Kael decide what to do with it.
 gap: She expected judgment. She gets understanding — and that is worse.
 id: dr-elena-voss-3
-is_climax: true
-is_crisis: false
+is_climax: True
+is_crisis: False
 label: The Truth
 order: 3
 scene: the-core-day
@@ -18,7 +17,7 @@ y: -0.3
 
 The system is destabilizing. Elena has a choice: remain silent and let the truth die with her, or speak and risk destroying what the children have built. She chooses to speak. She contacts Kael and tells him everything.
 
-## Gap
+## The Gap
 
 She expected anger, rejection, hatred. Instead, Kael listens. He asks questions. He does not forgive her, but he does not condemn her either. The absence of judgment is harder to bear than rage.
 
@@ -26,10 +25,10 @@ She expected anger, rejection, hatred. Instead, Kael listens. He asks questions.
 
 She gives Kael the full record — the choice, the outsiders, the four hundred who died. She does not explain herself. She does not justify. She hands him the truth and lets him carry it.
 
-## Shift
+## Value Shift
 
 From "I am the architect of this world" to "I was one person who made one choice." The weight does not disappear, but it shifts. She is no longer alone with it.
 
-## Development Log
+## Notes
 
 Climax beat. Elena's arc completes — she moves from haunted to honest. The value charge shifts from negative to mixed because she finally shares the burden.

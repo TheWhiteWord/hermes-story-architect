@@ -120,9 +120,8 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
     # documented only the stricter half. A heading outside the set is prose
     # nothing will ever read back as a section of this type.
     #
-    # story_import is deliberately not routed through here: it has its own
-    # insert that keeps whatever headings a note already carries, so notes
-    # written before the set was fixed still import with their prose intact.
+    # Same rule, same place, on all three write paths: story_import, create
+    # and edit all refuse a name outside the set, so a section means one thing.
     standard = standard_sections(entity_type)
     unknown = [h for h in sections if h not in standard]
     if unknown:
@@ -136,10 +135,9 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
     # unrecognised key and create silently dropped it. The visible symptom was
     # `{"goals": {"short": ..., "long": ...}}` — a shape the schema's own
     # description used to advertise — reporting a character created with no
-    # goals at all. A field is flat, always; there is no nested form.
-    #
-    # Not routed through for story_import, which keeps a note's own frontmatter
-    # so nothing an author wrote is lost on the way in.
+    # goals at all. A field is flat, always; there is no nested form. The
+    # import path refuses the same key, so a note carrying one fails to import
+    # rather than importing as something no reader will ever show.
     from .entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
     valid = (set(ENTITY_SCHEMAS[entity_type])
              | set(standard) | set(_RELATION_FIELDS.get(entity_type, {}))

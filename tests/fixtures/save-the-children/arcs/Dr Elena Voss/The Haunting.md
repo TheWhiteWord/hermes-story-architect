@@ -1,13 +1,11 @@
 ---
-action: Elena watches the preserved children through the system. She cannot intervene,
-  cannot speak, cannot look away. Kael grows up in a world she built.
+action: Elena watches the preserved children through the system. She cannot intervene, cannot speak, cannot look away. Kael grows up in a world she built.
 character: dr-elena-voss
 choice: She does not reveal herself to Kael. She watches.
-gap: She expected to feel pride. She feels like a ghost watching a life she made possible
-  but cannot touch.
+gap: She expected to feel pride. She feels like a ghost watching a life she made possible but cannot touch.
 id: dr-elena-voss-2
-is_climax: false
-is_crisis: true
+is_climax: False
+is_crisis: True
 label: The Haunting
 order: 2
 scene: central-room-night
@@ -19,7 +17,7 @@ y: 0.2
 
 Four hundred years pass. Elena is now a consciousness in the system she built. She watches Kael grow from child to adult, never knowing she exists. She sees him struggle with the same questions she faced. She cannot answer.
 
-## Gap
+## The Gap
 
 She built this world to save them. But watching them live inside it, she realizes salvation and imprisonment look the same from the outside.
 
@@ -27,10 +25,10 @@ She built this world to save them. But watching them live inside it, she realize
 
 She does not reveal herself. She does not warn him. She watches, and the watching is its own kind of punishment.
 
-## Shift
+## Value Shift
 
 From "I saved them" to "I imprisoned them." The certainty is gone. What remains is the weight of watching.
 
-## Development Log
+## Notes
 
 Crisis beat. Elena's lowest point — she sees the cost of her choice reflected in Kael's life.

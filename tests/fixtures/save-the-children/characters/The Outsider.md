@@ -1,37 +1,34 @@
 ---
 id: the-outsider
 name: The Outsider
-one_sentence: A dying human outside the Institute walls — represents what the children
-  could become if they breach the door.
+one_sentence: A dying human outside the Institute walls — represents what the children could become if they breach the door.
 story_role: Supporting
 ---
 
-## Personality
+## Identity
 
-
+[character placeholder — Identity]
 
 ## Background
 
-
+[character placeholder — Background]
 
 ## Voice
 
+[character placeholder — Voice]
 
+## Psychology
 
-## Greatest Fear
-
-
-
-## Secrets
-
-
+[character placeholder — Psychology]
 
 ## Arc
 
-
+[character placeholder — Arc]
 
 ## Relationships
 
+[character placeholder — Relationships]
 
+## Desires
 
-## Goals
+[character placeholder — Desires]

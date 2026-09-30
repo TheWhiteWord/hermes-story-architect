@@ -4,8 +4,8 @@ character: kael
 choice: Kael copies the data instead of reporting it.
 gap: The logs show deliberate erasure — someone has been hiding something for years.
 id: kael-2
-is_climax: false
-is_crisis: false
+is_climax: False
+is_crisis: False
 label: The Crack
 order: 2
 scene: the-core-day
@@ -17,7 +17,7 @@ y: 0.3
 
 Kael sits at a terminal in the core, the hum of the system vibrating through the chair. They shouldn't be here. They access the logs anyway — the ones that track system changes, the ones that are supposed to be complete. The cursor blinks. The files load. And there, in the record: gaps. Whole weeks missing. Not corrupted — deleted. Cleanly. Deliberately.
 
-## Gap
+## The Gap
 
 Kael expected to find an error, a bug, a glitch that could be reported and fixed. Instead, they find intention. Someone chose to remove this data. Someone with access. Someone who knew exactly what they were erasing. The system isn't broken. It's been edited.
 
@@ -25,10 +25,10 @@ Kael expected to find an error, a bug, a glitch that could be reported and fixed
 
 Kael copies the data to a personal drive instead of filing a report. Not because they have a plan — because they don't trust the system to investigate itself. The moment the copy completes, they close the terminal and leave. Their hands are shaking.
 
-## Shift
+## Value Shift
 
 From "the system has a problem" to "the system is the problem." The doubt is no longer abstract. It has teeth.
 
-## Development Log
+## Notes
 
 Second beat. Kael's trust erodes — they take action outside the system, marking the turn from observer to actor.

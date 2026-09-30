@@ -1,37 +1,34 @@
 ---
 id: the-administrator
 name: The Administrator
-one_sentence: The face of the Institute's control — theatrical, precise, almost too
-  perfect an opponent.
+one_sentence: The face of the Institute's control — theatrical, precise, almost too perfect an opponent.
 story_role: Antagonist
 ---
 
-## Personality
+## Identity
 
-
+[character placeholder — Identity]
 
 ## Background
 
-
+[character placeholder — Background]
 
 ## Voice
 
+[character placeholder — Voice]
 
+## Psychology
 
-## Greatest Fear
-
-
-
-## Secrets
-
-
+[character placeholder — Psychology]
 
 ## Arc
 
-
+[character placeholder — Arc]
 
 ## Relationships
 
+[character placeholder — Relationships]
 
+## Desires
 
-## Goals
+[character placeholder — Desires]

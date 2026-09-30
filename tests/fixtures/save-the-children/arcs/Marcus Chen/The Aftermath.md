@@ -4,8 +4,8 @@ character: marcus-chen
 choice: Vows to act next time.
 gap: Relief — then guilt. He did nothing.
 id: marcus-chen-2
-is_climax: false
-is_crisis: false
+is_climax: False
+is_crisis: False
 label: The Aftermath
 order: 2
 scene: central-room-night
@@ -17,7 +17,7 @@ y: -0.4
 
 The central room is quiet. The Administrator's office door opens. Kael walks out — shaken, but whole. Alive. Themself. Marcus, watching from the corner, feels something loosen in his chest. Relief. Pure, stupid relief. Kael survived. Kael is okay. For now.
 
-## Gap
+## The Gap
 
 The relief lasts exactly three seconds. Then the guilt arrives — heavy, familiar, suffocating. Because Marcus did nothing. He saw Kael walking toward the Administrator's office. He knew what was happening in there — the offer, the pressure, the choice. And he said nothing. Did nothing. Let Kael walk in alone because it was easier than admitting he was afraid. Afraid of the Administrator. Afraid of becoming the next name on his list.
 
@@ -25,10 +25,10 @@ The relief lasts exactly three seconds. Then the guilt arrives — heavy, famili
 
 Marcus vows — again — that next time will be different. Next time, he'll speak. Next time, he'll act. Next time, he'll be the person he pretends to be when he watches from the corner. He's been making this vow for four hundred years. He's never kept it. But he makes it again. Because the alternative is admitting who he really is.
 
-## Shift
+## Value Shift
 
 From "I'll watch and wait" to "I'm complicit." Marcus ends negative — the guilt has landed, the vow is empty. y=-0.4 reflects his quiet self-condemnation.
 
-## Development Log
+## Notes
 
 Second beat. Marcus's arc completes — he remains a witness, but the cost of witnessing is now clear. He doesn't act, and the inaction defines him.
