@@ -19,7 +19,7 @@ Kael stands with Mira in the central room, the light arriving a fraction too per
 
 ## The Gap
 
-Kael expected Mira to feel it too — the wrongness, the door, the lie. Instead, Mira looks at them with concern, with pity, with the expression of someone watching a friend unravel. The lonelier feeling isn't being wrong. It's being the only one who notices.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ Kael drops it. Says Mira is right, they're just tired. But later, alone, they wr
 
 ## Value Shift
 
-From "something is wrong" to "something is wrong, and no one else can see it." The doubt doesn't resolve. It deepens.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-First beat for Kael (Protagonist). Establishes the inciting doubt — Kael begins positive but the first crack appears.
+[placeholder — arc_beat/Notes]

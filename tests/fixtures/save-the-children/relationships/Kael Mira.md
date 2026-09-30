@@ -9,20 +9,23 @@ status: active
 
 ## Nature
 
-Kael and Mira's bond is the emotional core of the story. Kael trusts Mira's intuition more than their own logic; Mira understands Kael's silences better than their words. Mira harbors a secret romantic love that Kael hasn't noticed.
+[placeholder — relationship/Nature]
+
+## Perspectives
+
+[placeholder — relationship/Perspectives]
+
+## Tension
+
+[placeholder — relationship/Tension]
 
 ## History
 
 Born inside the I, they grew up together. Their friendship deepened as they both began noticing the system's inconsistencies — Kael cataloguing, Mira feeling.
 
-## Tension
-
-Asymmetric: Mira's romantic feelings are secret. Kael treats Mira as an anchor and closest friend, unaware of the depth of her feelings. Both are loyal, but Mira's loyalty carries an unspoken weight.
-
 ## Scenes to Write
 
-- central-room-day
-- central-room-night
+[placeholder — relationship/Scenes to Write]
 
 ## Notes
 

@@ -2,10 +2,7 @@
 controlling_idea: Freedom requires sacrifice
 genre: Sci-fi drama
 inciting_incident_scene_id: central-room-day
-logline: In a world where humanity survives only as consciousness inside a machine,
-  a young person fights to escape an oppressive system — unaware that the rebellion
-  itself, the system, and every feeling of purpose they have ever known are the inherited
-  memories of the last scientists who built the world that imprisoned them.
+logline: In a world where humanity survives only as consciousness inside a machine, a young person fights to escape an oppressive system — unaware that the rebellion itself, the system, and every feeling of purpose they have ever known are the inherited memories of the last scientists who built the world that imprisoned them.
 name: Save the Children
 setting: The Institute — a decaying research facility, 400 years apart
 spine: A young person discovers the truth about their world and chooses to escape
@@ -16,3 +13,31 @@ story_value_at_close: negative
 story_value_at_open: positive
 structure_type: Classical
 ---
+
+## Premise
+
+[placeholder — project/Premise]
+
+## Spine
+
+[placeholder — project/Spine]
+
+## Controlling Idea
+
+[placeholder — project/Controlling Idea]
+
+## Value Arc
+
+[placeholder — project/Value Arc]
+
+## Structure
+
+[placeholder — project/Structure]
+
+## Genre
+
+[placeholder — project/Genre]
+
+## Notes
+
+[placeholder — project/Notes]

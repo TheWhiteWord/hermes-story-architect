@@ -22,18 +22,34 @@ value_at_open: positive
 y: 0.4
 ---
 
+## Content
+
+The children step through the door. Blinking. Silent. The sky is impossibly large.
+
 ## Objective
 
-The children emerge into the real world for the first time.
+[placeholder — scene/Objective]
+
+## Conflict
+
+[placeholder — scene/Conflict]
+
+## Beats
+
+[placeholder — scene/Beats]
+
+## Value Turn
+
+[placeholder — scene/Value Turn]
 
 ## Dramatic Function
 
 Resolution. The world is real, and it is vast.
 
+## Production
+
+[placeholder — scene/Production]
+
 ## Notes
 
 Silence. No music. Just wind.
-
-## Content
-
-The children step through the door. Blinking. Silent. The sky is impossibly large.

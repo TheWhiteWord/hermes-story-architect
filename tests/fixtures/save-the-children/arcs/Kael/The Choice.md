@@ -19,7 +19,7 @@ Kael stands in the central room, the data projected on the wall. The Administrat
 
 ## The Gap
 
-The Administrator doesn't deny it. Doesn't apologize. Instead, it offers Kael a place — not as a prisoner, but as a partner. "You're too valuable to waste on outrage," it says. "The system needs people like you. People who see the cracks and want to fix them." It's not a threat. It's an invitation. And that makes it worse.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ Kael refuses. Not because they have a better plan, but because accepting would m
 
 ## Value Shift
 
-From "the system is the problem" to "the system can still be saved." Kael ends hopeful — still positive, still believing. This is the deliberate problem: Kael's arc ends at +0.5, but the project's value_at_close is negative. The controlling idea check should flag this contradiction.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Climax beat. Kael refuses the Administrator but remains hopeful — y=+0.5 contradicts project value_at_close=negative. Marked is_climax=true.
+[placeholder — arc_beat/Notes]

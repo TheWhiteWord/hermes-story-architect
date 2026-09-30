@@ -19,7 +19,7 @@ Kael sits at a terminal in the core, the hum of the system vibrating through the
 
 ## The Gap
 
-Kael expected to find an error, a bug, a glitch that could be reported and fixed. Instead, they find intention. Someone chose to remove this data. Someone with access. Someone who knew exactly what they were erasing. The system isn't broken. It's been edited.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ Kael copies the data to a personal drive instead of filing a report. Not because
 
 ## Value Shift
 
-From "the system has a problem" to "the system is the problem." The doubt is no longer abstract. It has teeth.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Second beat. Kael's trust erodes — they take action outside the system, marking the turn from observer to actor.
+[placeholder — arc_beat/Notes]

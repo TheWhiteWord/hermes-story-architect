@@ -16,11 +16,25 @@ value_at_open: positive
 
 A sequence about doubt becoming certainty, and certainty becoming action.
 
+## Purpose
+
+[placeholder — sequence/Purpose]
+
+## Value Arc
+
+[placeholder — sequence/Value Arc]
+
 ## Progression
 
-1. central-room-day
-2. central-room-night
-3. the-core-day
+[placeholder — sequence/Progression]
+
+## Sequence Climax
+
+[placeholder — sequence/Sequence Climax]
+
+## Plots
+
+[placeholder — sequence/Plots]
 
 ## Notes
 

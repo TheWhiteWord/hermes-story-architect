@@ -16,7 +16,15 @@ The act of discovery. From private doubt to public choice.
 
 ## Objective
 
-Freedom requires the courage to leave what you know.
+[placeholder — act/Objective]
+
+## Value Arc
+
+[placeholder — act/Value Arc]
+
+## Reversal
+
+[placeholder — act/Reversal]
 
 ## Notes
 

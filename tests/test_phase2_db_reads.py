@@ -451,9 +451,11 @@ class TestStorySearchDB:
     def test_search_arc_beat_content(self, db_project):
         """Conflict 3: FTS5 finds content in arc beats (old glob missed them)."""
         proj, vault = db_project
+        # A phrase from a kept section body, not a dropped heading: the fixture
+        # is now conformant, so a search target has to be one that still exists.
         result = json.loads(search_handler({
             "project": str(proj),
-            "query": "First Doubt",
+            "query": "Mira laughs",
             "root_path": vault
         }))
         assert result["total"] > 0

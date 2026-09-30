@@ -3,8 +3,7 @@ dramatic_function: Kael's emotional anchor
 id: the-garden
 mood: fragile peace
 name: The Garden
-one_sentence: A simulated outdoor space where Kael dreams — the only place that feels
-  real.
+one_sentence: A simulated outdoor space where Kael dreams — the only place that feels real.
 world: the-i
 ---
 
@@ -27,3 +26,7 @@ The Garden was originally a calibration environment — a test space for renderi
 ## Dramatic Function
 
 The Garden is Kael's escape — the one place where she lets herself feel. Every critical emotional beat in her arc returns here. It's where she confronts her memories, where she questions the system, where she makes her choices. The garden's fragility mirrors Kael's: it's beautiful because it's temporary, real because it's a lie.
+
+## Notes
+
+[placeholder — location/Notes]

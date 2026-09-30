@@ -3,8 +3,7 @@ dramatic_function: where the children's hope is tested
 id: the-central-room
 mood: oppressive stillness
 name: The Central Room
-one_sentence: The heart of the Institute — where children believe freedom waits beyond
-  the door.
+one_sentence: The heart of the Institute — where children believe freedom waits beyond the door.
 world: the-i
 ---
 
@@ -27,3 +26,7 @@ The Central Room was the original control hub of the Institute, where scientists
 ## Dramatic Function
 
 The Central Room is the testing ground. Every major revelation, every moment of doubt, every choice the children make happens here. It's where hope is given and taken away. The locked doors are the promise: there's something beyond. The single open door is the lie: only one path is permitted.
+
+## Notes
+
+[placeholder — location/Notes]

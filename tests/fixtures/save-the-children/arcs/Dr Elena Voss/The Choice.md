@@ -19,7 +19,7 @@ Elena stands before the console. The outsiders are at the gates. She has minutes
 
 ## The Gap
 
-She expected the choice to feel like salvation. It feels like murder. The math was simple; the aftermath is not.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ She does not call Marcus for support. She does not ask for a second opinion. She
 
 ## Value Shift
 
-From "I saved them" to "I chose who dies." The certainty that felt like strength now feels like a wall she built between herself and everyone who wasn't in the room.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Beat designed during arc planning. Elena's arc is negative — she begins certain and ends haunted. This is the inciting beat.
+[placeholder — arc_beat/Notes]

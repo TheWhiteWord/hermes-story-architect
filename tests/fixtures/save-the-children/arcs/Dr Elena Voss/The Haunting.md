@@ -19,7 +19,7 @@ Four hundred years pass. Elena is now a consciousness in the system she built. S
 
 ## The Gap
 
-She built this world to save them. But watching them live inside it, she realizes salvation and imprisonment look the same from the outside.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ She does not reveal herself. She does not warn him. She watches, and the watchin
 
 ## Value Shift
 
-From "I saved them" to "I imprisoned them." The certainty is gone. What remains is the weight of watching.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Crisis beat. Elena's lowest point — she sees the cost of her choice reflected in Kael's life.
+[placeholder — arc_beat/Notes]

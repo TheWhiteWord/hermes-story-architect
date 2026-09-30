@@ -8,12 +8,24 @@ status: active
 
 ## Summary
 
-[plot placeholder — Summary]
+[placeholder — plot/Summary]
+
+## Role
+
+[placeholder — plot/Role]
 
 ## Threads
 
-[plot placeholder — Threads]
+[placeholder — plot/Threads]
 
 ## Value
 
-[plot placeholder — Value]
+[placeholder — plot/Value]
+
+## Characters
+
+[placeholder — plot/Characters]
+
+## Notes
+
+[placeholder — plot/Notes]

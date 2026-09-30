@@ -19,7 +19,7 @@ The system is destabilizing. Elena has a choice: remain silent and let the truth
 
 ## The Gap
 
-She expected anger, rejection, hatred. Instead, Kael listens. He asks questions. He does not forgive her, but he does not condemn her either. The absence of judgment is harder to bear than rage.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ She gives Kael the full record — the choice, the outsiders, the four hundred w
 
 ## Value Shift
 
-From "I am the architect of this world" to "I was one person who made one choice." The weight does not disappear, but it shifts. She is no longer alone with it.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Climax beat. Elena's arc completes — she moves from haunted to honest. The value charge shifts from negative to mixed because she finally shares the burden.
+[placeholder — arc_beat/Notes]

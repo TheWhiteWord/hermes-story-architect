@@ -22,18 +22,34 @@ value_at_open: negative
 y: 0.6
 ---
 
+## Content
+
+The ADMINISTRATOR speaks from everywhere and nowhere. Kael listens. Then shakes their head.
+
 ## Objective
 
-The Administrator makes its final offer. Kael refuses.
+[placeholder — scene/Objective]
+
+## Conflict
+
+[placeholder — scene/Conflict]
+
+## Beats
+
+[placeholder — scene/Beats]
+
+## Value Turn
+
+[placeholder — scene/Value Turn]
 
 ## Dramatic Function
 
 The sequence climax. Kael chooses the unknown over the known.
 
+## Production
+
+[placeholder — scene/Production]
+
 ## Notes
 
 The Administrator's voice is calm, reasonable, and utterly alien.
-
-## Content
-
-The ADMINISTRATOR speaks from everywhere and nowhere. Kael listens. Then shakes their head.

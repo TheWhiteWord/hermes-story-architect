@@ -3,15 +3,9 @@ id: the-real-world
 name: The Real World
 one_sentence: 400 years after the Institute went silent — green, vast, indifferent.
 period: +405y after the collapse
-power:
-- Nature is the only authority
-- Survival belongs to those who learn
-rules:
-- Nothing is provided — you must find or make what you need
-- The world does not care if you survive
-values:
-- Resilience over comfort
-- Adaptation is sacred
+power: ['Nature is the only authority', 'Survival belongs to those who learn']
+rules: ['Nothing is provided — you must find or make what you need', 'The world does not care if you survive']
+values: ['Resilience over comfort', 'Adaptation is sacred']
 variant_of: the-i
 ---
 
@@ -42,3 +36,7 @@ What the real world holds sacred: life. Not human life specifically, but the con
 ## Conflict
 
 The real world is not hostile, but it is indifferent. It will not welcome the children, nor will it reject them. They will have to learn to live in a world that was never designed for them — a world where nothing appears when hunger strikes, where the light is not always correct, where survival is not guaranteed.
+
+## Notes
+
+[placeholder — world/Notes]

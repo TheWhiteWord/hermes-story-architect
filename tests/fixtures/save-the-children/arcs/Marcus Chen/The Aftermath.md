@@ -19,7 +19,7 @@ The central room is quiet. The Administrator's office door opens. Kael walks out
 
 ## The Gap
 
-The relief lasts exactly three seconds. Then the guilt arrives — heavy, familiar, suffocating. Because Marcus did nothing. He saw Kael walking toward the Administrator's office. He knew what was happening in there — the offer, the pressure, the choice. And he said nothing. Did nothing. Let Kael walk in alone because it was easier than admitting he was afraid. Afraid of the Administrator. Afraid of becoming the next name on his list.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ Marcus vows — again — that next time will be different. Next time, he'll spe
 
 ## Value Shift
 
-From "I'll watch and wait" to "I'm complicit." Marcus ends negative — the guilt has landed, the vow is empty. y=-0.4 reflects his quiet self-condemnation.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Second beat. Marcus's arc completes — he remains a witness, but the cost of witnessing is now clear. He doesn't act, and the inaction defines him.
+[placeholder — arc_beat/Notes]

@@ -19,7 +19,7 @@ The Administrator reviews the access logs. There — Kael's credentials, the cor
 
 ## The Gap
 
-The Administrator expected to feel anger. Instead, it feels something closer to grief. Kael was supposed to be different — perceptive enough to see the cracks, compliant enough to accept the repair. Instead, Kael is doing what the Administrator did four hundred years ago: looking at the system and finding it wanting. The Administrator knows how this ends. It has seen it before. It has been it before.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ The Administrator marks the access in the log but does not report it. Not yet. I
 
 ## Value Shift
 
-From "Kael is a problem to manage" to "Kael is a threat to neutralize." The Administrator's patience is not kindness. It is strategy.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Second beat. The Administrator's position hardens — the threat is identified, the response is calculated. y=-0.9 marks the deepest negative point.
+[placeholder — arc_beat/Notes]

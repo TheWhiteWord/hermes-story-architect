@@ -3,15 +3,9 @@ id: the-i
 name: The I
 one_sentence: A simulation environment where developing consciousness forms.
 period: +400y after the collapse
-power:
-- The Administrator sanctions all decisions
-- The system enforces compliance automatically
-rules:
-- The children cannot leave
-- The Administrator controls all systems
-values:
-- Preservation over freedom
-- Stability is sacred
+power: ['The Administrator sanctions all decisions', 'The system enforces compliance automatically']
+rules: ['The children cannot leave', 'The Administrator controls all systems']
+values: ['Preservation over freedom', 'Stability is sacred']
 ---
 
 ## Description
@@ -41,3 +35,7 @@ What the Institute holds sacred above all: preservation. Not individual preserva
 ## Conflict
 
 The I is stable but stagnant. Nothing truly changes — the same meals, the same lessons, the same rooms. The children are safe but not free. And the system that sustains them is beginning to fail in ways the Administrator cannot hide. The central tension: is survival without growth still survival?
+
+## Notes
+
+[placeholder — world/Notes]

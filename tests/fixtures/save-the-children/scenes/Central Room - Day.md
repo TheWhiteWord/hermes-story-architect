@@ -22,18 +22,34 @@ value_at_open: positive
 y: -0.3
 ---
 
+## Content
+
+KAEL stands before the door, hand on the handle. It turns. The lock was never engaged.
+
 ## Objective
 
-Kael discovers the door isn't locked — it was never locked.
+[placeholder — scene/Objective]
+
+## Conflict
+
+[placeholder — scene/Conflict]
+
+## Beats
+
+[placeholder — scene/Beats]
+
+## Value Turn
+
+[placeholder — scene/Value Turn]
 
 ## Dramatic Function
 
 The inciting incident. Kael's private doubt becomes public action.
 
+## Production
+
+[placeholder — scene/Production]
+
 ## Notes
 
 This scene establishes the central metaphor: the door that was always open.
-
-## Content
-
-KAEL stands before the door, hand on the handle. It turns. The lock was never engaged.

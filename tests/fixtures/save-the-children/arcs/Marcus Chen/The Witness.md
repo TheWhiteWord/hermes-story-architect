@@ -19,7 +19,7 @@ Marcus Chen sits in the corner of the central room, the way he always does — p
 
 ## The Gap
 
-He wants to say something. Wants to tell Kael: I see you. I know what you're feeling. I felt it too. But he doesn't. Because the last time he said those words, the person he said them to broke. And the time before that, they left. And Marcus is tired of watching people shatter against the same wall. So he stays quiet. And the quiet is its own kind of violence.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ Marcus says nothing. He watches. He files the moment away — Kael's name, the d
 
 ## Value Shift
 
-From "I can help" to "I'll watch and wait." Marcus begins positive — he sees Kael, he cares — but the choice to do nothing shifts him toward guilt.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-First beat for Marcus Chen (Supporting). Establishes his role — the witness who doesn't act. y=+0.2, slightly positive, the guilt hasn't landed yet.
+[placeholder — arc_beat/Notes]

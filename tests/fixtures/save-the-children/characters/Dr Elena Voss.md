@@ -12,21 +12,23 @@ story_role: Supporting
 
 ## Identity
 
-Controlled intensity. Elena carries the weight of impossible choices with a calm that reads as coldness but is actually exhaustion. She does not explain herself — not from arrogance, but from the knowledge that explanations won't change the math.
+[placeholder — character/Identity]
+
+## Desires
+
+[placeholder — character/Desires]
 
 ## Background
 
 Became the youngest director of the Institute's consciousness preservation program. When the outsiders breached the gates, she made the call: save the minds, abandon the bodies. Four hundred years later, she is still living with that choice — or rather, her preserved consciousness is.
 
-## Voice
+## Contradictions
 
-Measured, precise, clipped. Elena speaks like someone who has said the hard thing so many times it has lost its edges. She uses technical language as emotional armor. When the armor cracks, she goes silent.
+[placeholder — character/Contradictions]
 
 ## Psychology
 
-That the children she saved will learn what she did to save them — and that they will not forgive her.
-
-Elena knew the outsiders could be saved too. She chose not to — the system couldn't hold them all. She has never told Marcus.
+[placeholder — character/Psychology]
 
 ## Arc
 
@@ -37,7 +39,10 @@ From certain architect to haunted ghost. Elena begins believing she saved humani
 - **Marcus Chen** — colleague, friend, the one who questioned the choice. She respects him more for disagreeing than she ever said.
 - **Kael** — the child she saved. She watches from the system, unable to intervene, unable to look away.
 
-## Desires
+## Voice
 
-- Short: Keep the system stable long enough for the children to develop fully.
-- Long: Find a way to tell them the truth before they discover it themselves.
+Measured, precise, clipped. Elena speaks like someone who has said the hard thing so many times it has lost its edges. She uses technical language as emotional armor. When the armor cracks, she goes silent.
+
+## Notes
+
+[placeholder — character/Notes]

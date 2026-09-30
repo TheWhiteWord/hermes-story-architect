@@ -19,7 +19,7 @@ The Administrator moves through the central room with practiced grace. Every ges
 
 ## The Gap
 
-A child — young, maybe seven — tugs the Administrator's sleeve and asks: "Why does the door look different today?" The question is innocent. The answer is not. The Administrator smiles, says the door is the same as always, says the child must be imagining things. The child nods, satisfied. But for a moment — just a moment — the Administrator felt something it cannot name. Not doubt. Not guilt. Something older. Something that predates the system itself.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ The Administrator redirects the child to the garden. Watches them go. Files the 
 
 ## Value Shift
 
-From "the system is stable" to "the system is stable, but the cracks are showing." The Administrator's confidence is not shaken — but it is no longer absolute.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-First beat for the Administrator (Antagonist). Establishes the facade — the Administrator appears in control, but the first crack appears.
+[placeholder — arc_beat/Notes]

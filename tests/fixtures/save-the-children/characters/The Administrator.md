@@ -7,28 +7,36 @@ story_role: Antagonist
 
 ## Identity
 
-[character placeholder — Identity]
-
-## Background
-
-[character placeholder — Background]
-
-## Voice
-
-[character placeholder — Voice]
-
-## Psychology
-
-[character placeholder — Psychology]
-
-## Arc
-
-[character placeholder — Arc]
-
-## Relationships
-
-[character placeholder — Relationships]
+[placeholder — character/Identity]
 
 ## Desires
 
-[character placeholder — Desires]
+[placeholder — character/Desires]
+
+## Background
+
+[placeholder — character/Background]
+
+## Contradictions
+
+[placeholder — character/Contradictions]
+
+## Psychology
+
+[placeholder — character/Psychology]
+
+## Arc
+
+[placeholder — character/Arc]
+
+## Relationships
+
+[placeholder — character/Relationships]
+
+## Voice
+
+[placeholder — character/Voice]
+
+## Notes
+
+[placeholder — character/Notes]

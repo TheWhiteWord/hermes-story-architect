@@ -19,7 +19,7 @@ The Administrator speaks. Its voice fills the central room — calm, reasonable,
 
 ## The Gap
 
-Kael refuses. The Administrator expected this — hoped for it, even. Because the offer was never about Kael accepting. It was about Kael understanding what acceptance would mean. The Administrator needed Kael to see the choice clearly: join the system, or be outside it. There is no third option. There never was.
+[placeholder — arc_beat/The Gap]
 
 ## Choice
 
@@ -27,8 +27,8 @@ The Administrator accepts the refusal with grace. Says it understands. Says the 
 
 ## Value Shift
 
-From "Kael might be an ally" to "Kael is a variable to be managed." The Administrator's commitment to the system deepens. y=-0.8 — still negative, but the calculation is complete. The next move is already in progress.
+[placeholder — arc_beat/Value Shift]
 
 ## Notes
 
-Climax beat. The Administrator's arc completes — the offer is made and refused, the divergence from the protagonist is total. Marked is_climax=true. At the climax scene (central-room-night), protagonist Δy is positive (refuses to give up hope) while antagonist Δy is negative (committed to the system). They diverge — this is correct, no flag.
+[placeholder — arc_beat/Notes]
