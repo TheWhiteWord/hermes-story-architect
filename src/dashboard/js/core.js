@@ -30,11 +30,8 @@ DASH.normalise = function(data) {
   (d.characters || []).forEach(c => {
     // story_role → role
     if (c.story_role && !c.role) c.role = c.story_role;
-    // goals object → flat
-    if (c.goals && typeof c.goals === 'object') {
-      if (!c.goals_short) c.goals_short = c.goals.short;
-      if (!c.goals_long)  c.goals_long  = c.goals.long;
-    }
+    // goals_short / goals_long arrive flat, from the DB and from the sample
+    // alike. There is no nested `goals` object anywhere in the system.
     // knowledge: string[] → join for display (keep array for panel)
     if (Array.isArray(c.knowledge)) {
       c._knowledge_arr = c.knowledge;

@@ -111,6 +111,69 @@ class TestUnknownType:
                            {"name": "N"})["success"] is True
 
 
+class TestUnknownField:
+    """An unrecognised key was dropped by create and refused by edit.
+
+    The visible symptom: `{"goals": {"short": ..., "long": ...}}` created a
+    character and reported success, with the goal simply not there — and the
+    schema's own description used to advertise that shape. Fields are flat.
+    """
+
+    def test_nested_goals_is_rejected(self, vault):
+        with pytest.raises(ValueError, match="flat"):
+            _create(vault, "character", "nested",
+                    {"name": "N", "one_sentence": "X",
+                     "goals": {"short": "Stay.", "long": "Survive."}})
+        assert not _exists(vault, "nested"), "a rejected call must not leave a half-made entity"
+
+    def test_error_names_the_offending_key_and_the_flat_ones(self, vault):
+        with pytest.raises(ValueError) as exc:
+            _create(vault, "character", "n2", {"name": "N", "goals": {"short": "a"}})
+        message = str(exc.value)
+        assert "goals" in message
+        assert "goals_short" in message and "goals_long" in message
+
+    def test_flat_goals_are_stored(self, vault):
+        _create(vault, "character", "flat",
+                {"name": "F", "one_sentence": "X",
+                 "goals_short": "Stay.", "goals_long": "Survive."})
+        sections = _sections(vault, "character", "flat")
+        assert sections  # the entity exists and reads back
+        r = json.loads(retrieve_handler(
+            {"project": "stc", "entity_type": "character", "id": ["flat"],
+             "fields": ["goals_short", "goals_long"]}, root_path=str(vault)))
+        fields = r["entities"][0]["fields"]
+        assert fields["goals_short"] == "Stay."
+        assert fields["goals_long"] == "Survive."
+
+    def test_the_schema_does_not_advertise_a_nested_form(self, vault):
+        """The description is what an agent reads before writing. It once said
+        "nested goals.short also accepted", which nothing implemented."""
+        from core.constants import ENTITY_SCHEMAS
+        for field in ("goals_short", "goals_long"):
+            assert "nested" not in ENTITY_SCHEMAS["character"][field]["description"]
+
+    def test_every_valid_field_of_every_type_is_accepted(self, vault):
+        """A guard that rejects real fields is worse than no guard."""
+        from core.constants import ENTITY_SCHEMAS
+        from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+        rejected = []
+        for entity_type, schema in ENTITY_SCHEMAS.items():
+            if entity_type == "project":
+                continue
+            keys = [k for k, m in schema.items() if not m.get("computed")]
+            keys += list(_RELATION_FIELDS.get(entity_type, {}))
+            keys += list(ENTITY_COLUMN_MAP.get(entity_type, {}))
+            for key in keys:
+                slug = f"probe-{entity_type}-{key}"
+                try:
+                    _create(vault, entity_type, slug, {key: "PROBE"})
+                except ValueError as e:
+                    if "Unrecognised" in str(e):
+                        rejected.append(f"{entity_type}.{key}: {e}")
+        assert not rejected, f"valid fields wrongly rejected: {rejected}"
+
+
 class TestIdUniqueness:
     """Ids are global across types, so the two failure cases need different advice."""
 

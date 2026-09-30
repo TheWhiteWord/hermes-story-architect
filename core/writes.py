@@ -132,6 +132,27 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             f"of: {', '.join(standard)}. story_describe lists them per type."
         )
 
+    # Same for field names, and for the same reason: edit_entity refused an
+    # unrecognised key and create silently dropped it. The visible symptom was
+    # `{"goals": {"short": ..., "long": ...}}` — a shape the schema's own
+    # description used to advertise — reporting a character created with no
+    # goals at all. A field is flat, always; there is no nested form.
+    #
+    # Not routed through for story_import, which keeps a note's own frontmatter
+    # so nothing an author wrote is lost on the way in.
+    from .entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+    valid = (set(ENTITY_SCHEMAS[entity_type])
+             | set(standard) | set(_RELATION_FIELDS.get(entity_type, {}))
+             | set(ENTITY_COLUMN_MAP.get(entity_type, {})) | _FIELDS_TO_SKIP)
+    unknown_fields = [k for k in frontmatter_data if k not in valid]
+    if unknown_fields:
+        raise ValueError(
+            f"Unrecognised {entity_type} field(s): "
+            f"{', '.join(sorted(unknown_fields))}. Fields are flat — pass each "
+            f"by its own name (e.g. goals_short, goals_long), never nested "
+            f"inside another key. story_describe lists the valid fields."
+        )
+
     conn = get_db(project_path)
     try:
         if not has_schema(conn):

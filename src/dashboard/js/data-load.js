@@ -32,7 +32,8 @@ DASH.loadSampleData = function() {
         sections: ["Personality","Background","Voice","Arc","Relationships"],
         relationships: [{ with: "mara", label: "Partner", type: "ally", strength: 0.5 }],
         scenes: [{ number: 2, heading: "INT. POLICE STATION - DAY" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
-        goals: { short: "Bring down the cartel's leadership.", long: "Redeem his failure to protect his last partner." }
+        goals_short: "Bring down the cartel's leadership.",
+        goals_long: "Redeem his failure to protect his last partner."
       },
       {
         id: "mara", name: "Mara Chen", story_role: "Protagonist", age: 34,
@@ -43,7 +44,8 @@ DASH.loadSampleData = function() {
           { with: "victor-hale", label: "Boss", type: "enemy", strength: -0.6 }
         ],
         scenes: [{ number: 1, heading: "INT. MARA'S APARTMENT - NIGHT" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
-        goals: { short: "Find the account number her brother left behind.", long: "Burn the cartel's financial DASH.network to the ground." },
+        goals_short: "Find the account number her brother left behind.",
+        goals_long: "Burn the cartel's financial DASH.network to the ground.",
         knowledge: ["Her brother Daniel was murdered", "Victor Hale is the cartel's CFO"]
       }
     ],
