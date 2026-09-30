@@ -37,23 +37,25 @@ path, so there is nothing to look up and nothing to guess.
   corresponding field is empty, that is a natural moment to notice — not an
   error, not a requirement, and not something to state as automatic.
 
-## The empty-section problem
+## Seeing which sections are blank
 
-*Why deciding what to leave blank is the work.*
+*How to look. There is nothing to switch on.*
 
-- A new entity returns every section as `""` — nine empty strings for a
-  character. **Nothing reports a section as unfilled.** `unfilled_fields` counts
-  fields only, so an empty section is indistinguishable from one holding a space.
-- So a blank section is invisible: nobody is told, and nothing flags it. Which
-  sections are worth writing *now* is a judgement about what the user is
-  currently deciding, and most entities are mid-thought most of the time.
-- A section that does not exist at all is different: requesting a name off the
-  list returns `null` and `sections_not_found`. Blank is not the same as absent,
-  and the agent can tell them apart.
-- *Known gap:* a tool that reported blank sections the way `unfilled_fields`
-  reports blank fields would settle this. It does not exist — recorded in
-  `deferred-code-work.md`, with a note that this file has to be revisited if it
-  is built. Designed around the absence for now.
+- `story_retrieve` with `sections: ["all"]` returns every section the entity
+  holds, keyed by name, and **a blank one comes back as `""`**. An empty string
+  in that payload *is* the report — it says the section exists and nothing has
+  been written into it yet.
+- `sections: ["all"]` also returns the headings the note actually uses, not
+  only the standard names. Where an author has written under a name of their
+  own, that heading is in the payload with its prose in it, and there is nothing
+  to reconcile. Read what is there before concluding a section is unfilled.
+- Asking for one name by hand is different: a name with no section behind it
+  comes back `null`, with `sections_not_found` and `available_sections`
+  alongside. Absent and blank are told apart by `null` versus `""`.
+- Blank is a normal state, not a finding. A new entity has every section blank,
+  and most entities are mid-thought most of the time. Which blanks are worth
+  writing *now* is a judgement about what the user is currently deciding — the
+  payload shows the state, it does not make the call.
 
 ## `Notes` — the same on all ten types
 
@@ -233,7 +235,10 @@ Answers to the four open questions, kept so the reasoning is not re-derived.
   where content that belongs to the entity but fits nowhere else goes, instead
   of being lost or forced into a section about something else. Not a scratchpad
   and not a home for facts that have fields.
-- **Reporting blank sections.** Deferred to `deferred-code-work.md`. This file
-  is designed around the absence and must be revisited if the tool change is
-  built.
+- **Reporting blank sections.** Not a separate report. `story_retrieve` with
+  `sections: ["all"]` returns each section's body, and a blank one is `""` —
+  read it there. It also returns the headings the note uses under names of its
+  own, so what is written is visible next to what is not. Deciding which blank
+  sections matter is left to the reader, because most entities are mid-thought
+  most of the time and a permanent gap report would be noise on every entity.
 
