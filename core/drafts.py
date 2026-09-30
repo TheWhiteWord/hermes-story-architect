@@ -191,6 +191,15 @@ def validate_shape(ops: list) -> list[str]:
         # unrecognised edit key used to — reported rather than written.
         for key in [k for k in op["frontmatter"] if k not in schema]:
             findings.append(f"{where}: unknown {entity_type} field '{key}'")
+        # Same for a section name: the set is closed, so a heading off the list
+        # is refused at commit. Said here, where the agent is still reading the
+        # preview, rather than as a commit failure.
+        from .entity import standard_sections
+        for heading in [h for h in (op.get("sections") or {}) if h not in standard_sections(entity_type)]:
+            findings.append(
+                f"{where}: unknown {entity_type} section '{heading}' — the "
+                f"section set is closed; use one of: "
+                f"{', '.join(standard_sections(entity_type))}")
         for field in REQUIRED_FIELDS.get(entity_type, []):
             if not merged.get(field):
                 findings.append(f"{where}: Missing required field: {field}")

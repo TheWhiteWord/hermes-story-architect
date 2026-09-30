@@ -70,12 +70,16 @@ class TestSectionsAtCreate:
         assert got["Desires"] == ""
         assert got["Background"] == ""
 
-    def test_nonstandard_heading_is_added(self, vault):
+    def test_nonstandard_heading_is_rejected(self, vault):
+        """The section set is closed on the create path as well as the edit
+        path. It was not: a create accepted a heading the edit then refused, so
+        the same name was valid or invalid depending on which call carried it."""
         _create(vault, "act", "act-1", {"title": "Act One"})
         _create(vault, "sequence", "seq-1", {"title": "Seq One", "act_id": "act-1"})
-        _create(vault, "scene", "s1", {"title": "S1", "sequence_id": "seq-1"},
-                {"Cold Open": "Went straight to it."})
-        assert _sections(vault, "scene", "s1")["Cold Open"] == "Went straight to it."
+        with pytest.raises(ValueError, match="closed"):
+            _create(vault, "scene", "s1", {"title": "S1", "sequence_id": "seq-1"},
+                    {"Cold Open": "Went straight to it."})
+        assert not _exists(vault, "s1"), "a rejected call must not leave a half-made entity"
 
     def test_no_sections_argument_still_works(self, vault):
         assert _create(vault, "character", "nova", {"name": "Nova"})["success"] is True

@@ -74,13 +74,28 @@ class TestCreateEntity:
         from core.entity import standard_sections
         assert set(standard_sections("scene")) <= headings
 
-    def test_nonstandard_heading_is_added_as_written(self, fixture_path):
-        writes.create_entity(fixture_path, "scene", "odd-scene", {"title": "Odd"},
-                             {"Beat Sheet": "something bespoke"})
-        body = _q(fixture_path,
-                  "SELECT body FROM sections WHERE entity_id=? AND heading=?",
-                  ("odd-scene", "Beat Sheet"))
-        assert body and body[0][0] == "something bespoke"
+    def test_nonstandard_heading_is_rejected(self, fixture_path):
+        """The section set is closed. edit_entity already refused one; create
+        accepted it, so the same key was valid on one path and an error on the
+        other. A rejected create writes nothing."""
+        before = len(_q(fixture_path, "SELECT 1 FROM entities"))
+        with pytest.raises(ValueError, match="closed"):
+            writes.create_entity(fixture_path, "scene", "odd-scene", {"title": "Odd"},
+                                 {"Beat Sheet": "something bespoke"})
+        assert len(_q(fixture_path, "SELECT 1 FROM entities")) == before
+        assert not _q(fixture_path,
+                      "SELECT 1 FROM sections WHERE entity_id=?", ("odd-scene",))
+
+    def test_rejection_names_the_valid_sections(self, fixture_path):
+        """An error naming nothing actionable gets retried the same wrong way."""
+        from core.entity import standard_sections
+        with pytest.raises(ValueError) as exc:
+            writes.create_entity(fixture_path, "scene", "odd2", {"title": "Odd"},
+                                 {"Beat Sheet": "x"})
+        message = str(exc.value)
+        assert "Beat Sheet" in message
+        for name in standard_sections("scene")[:3]:
+            assert name in message
 
     def test_duplicate_slug_raises_and_writes_nothing(self, fixture_path):
         before = len(_q(fixture_path, "SELECT 1 FROM entities"))

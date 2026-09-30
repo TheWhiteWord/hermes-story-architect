@@ -89,9 +89,9 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                   frontmatter_data: dict, sections: dict | None = None) -> dict:
     """Insert an entity, its standard sections, and its relation rows.
 
-    `sections` fills the standard section bodies; a heading that is not
-    standard for this entity type is added as written. Every standard section
-    is created regardless.
+    `sections` fills the standard section bodies. The section set is closed: a
+    heading that is not standard for this entity type is an error, the same as
+    on the edit path.
     """
     _check_slug(slug)
 
@@ -113,6 +113,24 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
     from .db import create_schema, get_db, has_schema
     from .entity import (columns_for_insert, relations_for_insert,
                          standard_sections)
+
+    # The section set is closed, and this is where it is enforced. edit_entity
+    # already refused an unrecognised heading; create accepted one, so the same
+    # key was valid on one path and an error on the other, and story_describe
+    # documented only the stricter half. A heading outside the set is prose
+    # nothing will ever read back as a section of this type.
+    #
+    # story_import is deliberately not routed through here: it has its own
+    # insert that keeps whatever headings a note already carries, so notes
+    # written before the set was fixed still import with their prose intact.
+    standard = standard_sections(entity_type)
+    unknown = [h for h in sections if h not in standard]
+    if unknown:
+        raise ValueError(
+            f"Unrecognised {entity_type} section name(s): "
+            f"{', '.join(sorted(unknown))}. The section set is closed — use one "
+            f"of: {', '.join(standard)}. story_describe lists them per type."
+        )
 
     conn = get_db(project_path)
     try:
@@ -195,12 +213,10 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                 f"Edit it instead of creating it.") from None
 
         # Every standard section is created; the caller's prose fills the ones
-        # given. A heading that is not standard is added as written — a scene
-        # may need a heading this schema has never heard of.
+        # given. Headings outside the set were rejected above, so these rows
+        # and `sections` are the same closed set.
         section_rows = [(entity_id, heading, str(sections.get(heading, "")))
                         for heading in standard]
-        section_rows += [(entity_id, heading, str(body))
-                         for heading, body in sections.items() if heading not in standard]
         if section_rows:
             conn.executemany(
                 "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
