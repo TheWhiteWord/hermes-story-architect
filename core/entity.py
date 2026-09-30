@@ -490,6 +490,35 @@ def validate_scene_act_id(project_path, sequence_id: str, act_id: str) -> None:
         conn.close()
 
 
+def validate_scene_location(project_path, location: str) -> None:
+    """Raise ValueError if a scene names a location that doesn't exist.
+
+    A scene may carry free text in `location` while the story is still being
+    shaped, but the value has to resolve to a location record: a place that is
+    only ever named in scenes holds no mood, image system or history, and the
+    scenes cannot reach anything it has. An empty location is a scene
+    deliberately placed nowhere, and is left alone.
+
+    Ordering note: this runs on write, reading the DB, so a location created
+    in the SAME draft as the scene will not be visible here. Create the
+    location and commit it first — the same constraint an arc beat has on its
+    character and scene.
+    """
+    if not location:
+        return
+    from core.db import get_db
+    conn = get_db(project_path)
+    try:
+        row = conn.execute(
+            "SELECT id FROM entities WHERE id=? AND type='location'",
+            (location,),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Location not found: {location}")
+    finally:
+        conn.close()
+
+
 def validate_arc_parents(project_path, character: str, scene: str) -> None:
     """Raise ValueError if character or scene doesn't exist in DB."""
     from core.db import get_db

@@ -186,15 +186,16 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             validate_arc_parents(
                 project_path, merged.get("character", ""), merged.get("scene", ""))
 
-        # Parent validation for scene (act_id consistency)
+        # Parent validation for scene (act_id consistency, location exists)
         if entity_type == "scene":
-            from .entity import validate_scene_act_id
+            from .entity import validate_scene_act_id, validate_scene_location
             sequence_id = merged.get("sequence_id", "")
             act_id = merged.get("act_id", "")
             if sequence_id:
                 _validate_sequence_exists(conn, sequence_id)
                 if act_id:
                     validate_scene_act_id(project_path, sequence_id, act_id)
+            validate_scene_location(project_path, merged.get("location", ""))
 
         # Validate plot characters reference existing entities
         if entity_type == "plot":

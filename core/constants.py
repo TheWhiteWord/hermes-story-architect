@@ -126,7 +126,7 @@ ENTITY_SCHEMAS = {
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, drafted, written, locked"},
         "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},
-        "location": {"type": "string", "default": "", "optional": True, "description": "Location slug or free text"},
+        "location": {"type": "string", "default": "", "optional": True, "description": "Slug of an existing location"},
         "time_of_day": {"type": "string", "default": "", "optional": True, "description": "One of: DAY, NIGHT, DUSK, DAWN, CONTINUOUS, LATER"},
         "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug (denormalized shortcut)"},

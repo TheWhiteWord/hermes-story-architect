@@ -38,6 +38,11 @@ def _sample_value(field, meta):
             return 0.5
         if field == "status":
             return "active"
+        if field == "location":
+            # Slugs hold no spaces or capitals, and a scene's location must
+            # resolve to a location record. The parent location is created
+            # under this slug in _create_parents.
+            return "sample-location"
         return f"Sample {field}"
     if ftype == "number":
         if field == "y":
@@ -101,6 +106,13 @@ def _create_parents(project, entity_type):
         create_entity(project, "act", "act-1", {"title": "Act I"})
     if entity_type in ("scene", "plot"):
         create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
+    if entity_type == "scene":
+        # A scene's `location` is refused unless it resolves to a location
+        # record, and a slug may hold neither spaces nor capitals. The
+        # placeholder below is therefore a slug, and the location it names has
+        # to exist.
+        create_entity(project, "location", "sample-location",
+                      {"name": "Sample location", "one_sentence": "Sample"})
     if entity_type == "plot":
         for slug in ("kael", "mira"):
             create_entity(project, "character", slug,
