@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from core.entity import relation_entry
+
 SCHEMA = {
     "description": "DESTRUCTIVE. Rebuilds the database from the Markdown vault: deletes every row "
                    "and re-imports, discarding all work done since the last story_export. The "
@@ -504,8 +506,7 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
         # All 4 plot beat types — setups, crisis, climax, payoffs
         for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"), ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
             for beat in fm.get(field, []):
-                sid = beat.get("scene_id", "") if isinstance(beat, dict) else beat
-                desc = beat.get("description", "") if isinstance(beat, dict) else ""
+                sid, desc = relation_entry(beat)
                 if sid:
                     conn.execute(
                         "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",

@@ -322,7 +322,7 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 ) else value
 
         from .entity import (REVERSED_RELATION_KINDS, _RELATION_FIELDS,
-                             relation_endpoints)
+                             relation_endpoints, relation_entry)
         rel_fields = _RELATION_FIELDS.get(entity_type, {})
 
         # ── Reject what cannot be applied, BEFORE writing anything ──
@@ -386,12 +386,7 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 if not isinstance(value, list):
                     continue
                 for i, beat in enumerate(value):
-                    if isinstance(beat, dict):
-                        target = beat.get("scene_id", str(beat))
-                        note = beat.get("description", "")
-                    else:
-                        target = str(beat)
-                        note = ""
+                    target, note = relation_entry(beat)
                     if target:
                         from_id, to_id = relation_endpoints(entity_id, kind, target)
                         conn.execute(

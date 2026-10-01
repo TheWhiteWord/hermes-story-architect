@@ -216,6 +216,23 @@ def relation_endpoints(owner_id: str, kind: str, to_id: str) -> tuple[str, str]:
     return owner_id, to_id
 
 
+def relation_entry(item) -> tuple[str, str]:
+    """(to_id, note) from one relation field entry — a dict or a bare slug.
+
+    Two shapes serve the same fields: `character_scene` holds plain slugs,
+    the plot beat lists hold `{scene_id, description}`. Both reach the same
+    loop, so the unwrap lives here once. Role-agnostic on purpose — no kind
+    gets its own rule, which is what made a plot create write the dict repr
+    into to_id for two of the four roles.
+
+    A dict without a usable `scene_id` yields `("", "")` and the caller drops
+    the row: a relation naming a scene that was never identified is not a fact.
+    """
+    if isinstance(item, dict):
+        return str(item.get("scene_id") or ""), str(item.get("description") or "")
+    return str(item), ""
+
+
 # Fields that become relations rows (not extra JSON or columns)
 # Maps field name → (kind, is_list)
 _RELATION_FIELDS = {
@@ -438,16 +455,7 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
             if not isinstance(value, list):
                 continue
             for i, item in enumerate(value):
-                if isinstance(item, dict):
-                    if kind in ("plot_setup", "plot_payoff"):
-                        to_id = item.get("scene_id", "")
-                        note = item.get("description", "")
-                    else:
-                        to_id = str(item)
-                        note = ""
-                else:
-                    to_id = str(item)
-                    note = ""
+                to_id, note = relation_entry(item)
                 if to_id:
                     from_id, to_id = relation_endpoints(slug, kind, to_id)
                     relations.append({
