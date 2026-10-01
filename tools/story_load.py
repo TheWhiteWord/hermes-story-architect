@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from core.db import SCENE_MILESTONE_FLAGS, milestone_label
+
 
 SCHEMA = {
     "description": "Structural map of a project: what exists and where — acts, sequences, scenes, "
@@ -34,11 +36,6 @@ SCHEMA = {
             "type": "string",
             "description": "For view='dramatic_elements' and 'story_value': limit to one act id. "
                            "Defaults to all."
-        },
-        "add_plot": {
-            "type": "boolean",
-            "description": "For view='dramatic_elements': include which plots reference each "
-                           "scene, and in what role. Off by default — it roughly doubles the view."
         },
         "field": {
             "type": "string",
@@ -251,37 +248,58 @@ def _view_story_value(conn, args: dict) -> dict:
 
 
 def _view_dramatic_elements(conn, args: dict) -> dict:
-    """Per-scene dramatic role and milestone, nested by act and sequence."""
-    act_filter = args.get("act")
-    add_plot = bool(args.get("add_plot"))
+    """Every dramatic fact in one view, so two kinds can be checked against
+    each other: the STRUCTURAL milestones (inciting incident, the three
+    climaxes) and the PLOT dramatic roles.
 
-    # Which plots point at which scene, in which role. Built once, only if asked.
-    # The role comes from the relation kind ("plot_setup" -> "setup") so this
-    # needs no hardcoded list to drift out of sync with the schemas.
+    Those are recorded independently — a scene's milestone flags live on the
+    scene, its plot roles are relations reaching at it from each plot — so
+    nothing in the system checks that they agree. A scene can be the story
+    climax and a non-event; a plot can have no climax at all. Putting both in
+    one payload is what lets a reader see that, which is why the plot data is
+    no longer behind a flag.
+    """
+    act_filter = args.get("act")
+
+    # Which plots point at which scene, in which role. Built unconditionally:
+    # the view exists to cross-check the plot roles against the structural
+    # ones, so withholding half of them defeats it. The role comes from the
+    # relation kind ("plot_setup" -> "setup") so this needs no hardcoded list
+    # to drift out of sync with the schemas.
     plot_refs = {}
-    if add_plot:
-        for plot_id, in conn.execute(
-                "SELECT id FROM entities WHERE type='plot' AND is_deleted=0 ORDER BY id"):
-            for to_id, note, kind in conn.execute(
-                    "SELECT to_id, note, kind FROM relations "
-                    "WHERE from_id=:f AND kind LIKE 'plot_%'",
-                    {"f": plot_id}):
-                plot_refs.setdefault(to_id, []).append(
-                    {"plot": plot_id,
-                     "role": kind[len("plot_"):],
-                     "description": note})
+    for plot_id, in conn.execute(
+            "SELECT id FROM entities WHERE type='plot' AND is_deleted=0 ORDER BY id"):
+        for to_id, kind in conn.execute(
+                "SELECT to_id, kind FROM relations "
+                "WHERE from_id=:f AND kind LIKE 'plot\\_%' ESCAPE '\\'",
+                {"f": plot_id}):
+            # No description. It is the same prose the plot note already
+            # carries, this view is for checking structure, and the payload
+            # roughly doubles if every role brings its paragraph.
+            plot_refs.setdefault(to_id, []).append(
+                {"plot": plot_id, "role": kind[len("plot_"):]})
 
     acts_out = []
-    for act_id, act_title, act_order in conn.execute(
-            "SELECT id, name, order_key FROM entities WHERE type='act' AND is_deleted=0 "
-            "ORDER BY order_key, id").fetchall():
+    for act_id, act_title, act_order, act_extra_json in conn.execute(
+            "SELECT id, name, order_key, extra FROM entities "
+            "WHERE type='act' AND is_deleted=0 ORDER BY order_key, id").fetchall():
         if act_filter and act_id != act_filter:
             continue
+        act_extra = json.loads(act_extra_json or "{}")
+        act = {"id": act_id, "title": act_title}
+        if act_extra.get("act_climax_scene_id"):
+            act["act_climax_scene_id"] = act_extra["act_climax_scene_id"]
         seqs_out = []
-        for seq_id, seq_title, seq_order in conn.execute(
-                "SELECT id, name, order_key FROM entities "
+        for seq_id, seq_title, seq_order, seq_extra_json in conn.execute(
+                "SELECT id, name, order_key, extra FROM entities "
                 "WHERE type='sequence' AND parent_id=:p ORDER BY order_key, id",
                 {"p": act_id}).fetchall():
+            seq_extra = json.loads(seq_extra_json or "{}")
+            seq = {"id": seq_id, "title": seq_title}
+            if seq_extra.get("seq_climax_scene_id"):
+                seq["seq_climax_scene_id"] = seq_extra["seq_climax_scene_id"]
+            if seq_extra.get("primary_plot"):
+                seq["primary_plot"] = seq_extra["primary_plot"]
             scenes_out = []
             for scene_id, scene_title, order_key, status, extra_json in conn.execute(
                     "SELECT id, name, order_key, status, extra FROM entities "
@@ -294,29 +312,77 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                     "title": scene_title,
                     "status": status,
                 }
-                # Only the plot-less case is emitted. `dramatic_role` used to
-                # carry the scene's single dramatic role, which is why this
-                # view could name one; now the role is per plot and arrives in
-                # `plots[]` below. What is left here is the scene that serves NO
-                # plot, and that is worth saying out loud — it is the reason a
-                # reader looking for a missing role does not find one.
-                if extra.get("dramatic_role") in ("transition", "non-event"):
-                    scene["no_plot_function"] = extra["dramatic_role"]
-                for marker in ("is_setup", "is_turning_point", "is_crisis",
-                               "is_climax", "is_resolution"):
-                    if extra.get(marker):
-                        scene[marker] = True
-                if extra.get("milestone"):
-                    scene["milestone"] = extra["milestone"]
-                if add_plot and scene_id in plot_refs:
+                # `dramatic_role` is emitted whenever it is set, INCLUDING
+                # "plot_role". That is the point of the view: "plot_role"
+                # beside a `plots[]` entry is the agreement, and a reader
+                # checking the two halves can see when the scene says it
+                # serves a plot and no plot agrees. An empty value is omitted
+                # — it asserts nothing, and this view is not the unfilled map.
+                if extra.get("dramatic_role"):
+                    scene["dramatic_role"] = extra["dramatic_role"]
+                # The four milestone flags, and only the ones that are True.
+                # This replaces a loop over is_setup / is_turning_point /
+                # is_crisis / is_climax / is_resolution / milestone, none of
+                # which is a scene field: the first two of those belong to
+                # arc_beat, three are defined nowhere, and `milestone` is not
+                # stored at all — it is DERIVED from these same four flags by
+                # db._milestone_marker. So the old loop could not fire, and
+                # because `extra` is an untyped blob it would have fired on a
+                # hand-written key rather than on a real one.
+                for flag in SCENE_MILESTONE_FLAGS:
+                    if extra.get(flag):
+                        scene[flag] = True
+                # The derived label, alongside the raw flags: the flags say
+                # which milestone, this says what it is called, and the base
+                # map already reports it this way.
+                marker = milestone_label(extra)
+                if marker:
+                    scene["milestone"] = marker
+                if scene_id in plot_refs:
                     scene["plots"] = plot_refs[scene_id]
                 scenes_out.append(scene)
-            seqs_out.append({"id": seq_id, "title": seq_title, "scenes": scenes_out})
-        acts_out.append({"id": act_id, "title": act_title, "sequences": seqs_out})
+            seq["scenes"] = scenes_out
+            seqs_out.append(seq)
+        act["sequences"] = seqs_out
+        acts_out.append(act)
 
-    out = {"view": "dramatic_elements", "act": act_filter or "all", "acts": acts_out}
-    if add_plot:
-        out["add_plot"] = True
+    # The project is the top container even when `act` narrows to one act: the
+    # story's climax and inciting incident are global facts, and a reader who
+    # filtered down to a single act still needs them to judge what the act is
+    # part of. Emitted unconditionally, whether or not it is set, so the shape
+    # does not change with the data.
+    proj_row = conn.execute(
+        "SELECT extra FROM entities WHERE type='project' AND is_deleted=0 LIMIT 1"
+    ).fetchone()
+    pro = json.loads(proj_row[0]) if proj_row and proj_row[0] else {}
+    # The plot index, at the top, under the project. This view's scenes carry
+    # plot SLUGS, and a slug is meaningless without knowing which plot it is
+    # and how it sits against the others — main or sub, and which of the four
+    # types. Listing them once here is what makes a scene's `plots[]` entries
+    # readable, and it is the only place the two sets can be compared: a plot
+    # in this index with no scene below it is a plot serving nothing.
+    plot_index = []
+    for plot_id, plot_name, plot_extra_json in conn.execute(
+            "SELECT id, name, extra FROM entities "
+            "WHERE type='plot' AND is_deleted=0 ORDER BY id").fetchall():
+        pe = json.loads(plot_extra_json or "{}")
+        plot_index.append({
+            "id": plot_id,
+            "name": plot_name,
+            "plot_scope": pe.get("plot_scope", ""),
+            "plot_type": pe.get("plot_type", ""),
+        })
+    out = {
+        "view": "dramatic_elements",
+        "act": act_filter or "all",
+        "project": {
+            "structure_type": pro.get("structure_type", ""),
+            "story_climax_scene_id": pro.get("story_climax_scene_id", ""),
+            "inciting_incident_scene_id": pro.get("inciting_incident_scene_id", ""),
+            "plots": plot_index,
+        },
+        "acts": acts_out,
+    }
     return out
 
 

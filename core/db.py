@@ -213,6 +213,34 @@ def empty_memory() -> dict:
     return {category: [] for category in MEMORY_CATEGORIES}
 
 
+# The four milestone flags a scene can carry, DERIVED from the schema rather
+# than restated: adding a fifth milestone flag to the scene schema puts it in
+# this list, and there is no second list to forget.
+SCENE_MILESTONE_FLAGS = [f for f in ENTITY_SCHEMAS["scene"]
+                          if f.startswith("is_") and f.endswith("_climax")] \
+    + ["is_inciting_incident"]
+
+
+def milestone_label(extra: dict):
+    """The milestone name for a scene's `extra`, or None if it carries none.
+
+    Lives at module level because two readers need it — the base map and
+    `story_load(view='dramatic_elements')` — and a closure inside one of them
+    is how the two drift into disagreeing about the same scene. The order is
+    the precedence: a scene that is both the inciting incident and the story
+    climax reports as the story climax, the larger claim.
+    """
+    if extra.get("is_inciting_incident"):
+        return "inciting incident"
+    if extra.get("is_story_climax"):
+        return "story climax"
+    if extra.get("is_act_climax"):
+        return "act climax"
+    if extra.get("is_sequence_climax"):
+        return "sequence climax"
+    return None
+
+
 def validate_memory(memory: dict) -> dict:
     """Validate and return a copy of the canonical memory shape."""
     if not isinstance(memory, dict):
@@ -479,16 +507,7 @@ def get_project_summary(project_path: Path) -> dict:
         def _is_scene_stub(s):
             return s["status"] == "planned"
 
-        def _milestone_marker(extra):
-            if extra.get("is_inciting_incident"):
-                return "inciting incident"
-            if extra.get("is_story_climax"):
-                return "story climax"
-            if extra.get("is_act_climax"):
-                return "act climax"
-            if extra.get("is_sequence_climax"):
-                return "sequence climax"
-            return None
+        _milestone_marker = milestone_label
 
         def _omit(d, defaults, always_keep=None):
             always_keep = always_keep or set()

@@ -2,7 +2,7 @@
 act_id: act-1
 characters: ['kael', 'mira']
 conflict_levels: ['inner', 'personal']
-dramatic_role: setup
+dramatic_role: plot_role
 heading: INT. THE CENTRAL ROOM - DAY
 id: central-room-day
 is_act_climax: False

@@ -181,7 +181,7 @@ ENTITY_SCHEMAS = {
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug"},
         "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this sequence. One of: positive, negative, mixed, ironic."},
         "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this sequence. One of: positive, negative, mixed, ironic."},
-        "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this sequence's reversal lands"},
+        "seq_climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this sequence's reversal lands"},
         "primary_plot": {"type": "string", "default": "", "optional": True, "description": "Primary plot slug this sequence serves"},
         "purpose": {"type": "string", "default": "", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
     },
@@ -192,7 +192,7 @@ ENTITY_SCHEMAS = {
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this act. One of: positive, negative, mixed, ironic."},
         "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this act. One of: positive, negative, mixed, ironic."},
-        "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this act's major reversal lands"},
+        "act_climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this act's major reversal lands"},
         "act_objective": {"type": "string", "default": "", "label": "Objective", "optional": True, "description": "Protagonist's immediate goal for this act"},
     },
     "arc_beat": {

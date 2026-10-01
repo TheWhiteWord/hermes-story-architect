@@ -2,7 +2,7 @@
 act_id: act-1
 characters: ['kael']
 conflict_levels: ['personal']
-dramatic_role: climax
+dramatic_role: plot_role
 heading: INT. THE CENTRAL ROOM - NIGHT
 id: central-room-night
 is_act_climax: False

@@ -916,11 +916,11 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_act(self):
         from core.entity import unfilled_fields
-        extra = {"value_at_open": "", "act_objective": "", "climax_scene_id": ""}
+        extra = {"value_at_open": "", "act_objective": "", "act_climax_scene_id": ""}
         result = unfilled_fields("act", extra)
         assert "value_at_open" in result
         assert "act_objective" in result
-        assert "climax_scene_id" in result
+        assert "act_climax_scene_id" in result
 
     def test_unfilled_fields_curve_fields(self):
         """`y` is a number, so it is never a gap row; `shift` is a

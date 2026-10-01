@@ -43,7 +43,7 @@ class TestPlotBeatsLiveInTheirOwnView:
     """The base map names plots; it does not enumerate their beats.
 
     setups/complications/crisis/climax/resolutions are per-scene in
-    view='dramatic_elements' with add_plot, and story_retrieve returns the plot
+    view='dramatic_elements', and story_retrieve returns the plot
     whole. Repeating bare scene ids in the map cost tokens and told you nothing
     the other two surfaces don't say better.
     """
@@ -55,13 +55,49 @@ class TestPlotBeatsLiveInTheirOwnView:
             assert not {"setups", "complications", "crisis", "climax",
                         "resolutions"} & plot.keys()
 
-    def test_dramatic_elements_with_add_plot_still_has_every_beat_kind(self, project):
-        result = load(project, view="dramatic_elements", add_plot=True)
+    def test_dramatic_elements_carries_every_beat_kind(self, project):
+        """No flag: the view's job is cross-checking plot roles against the
+        structural milestones, and half of that was withheld behind add_plot."""
+        result = load(project, view="dramatic_elements")
         roles = {p["role"]
                  for act in result["acts"] for seq in act.get("sequences", [])
                  for scene in seq.get("scenes", []) for p in scene.get("plots", [])}
-        assert roles, "add_plot returned no plot references at all"
+        assert roles, "dramatic_elements returned no plot references at all"
         assert roles <= {"setup", "complication", "crisis", "climax", "resolution"}
+
+    def test_the_plot_index_sits_under_the_project(self, project):
+        """A scene's `plots[]` entry is a bare slug; the index is what says
+        which plot it is, how it sits against the others, and — by omission —
+        which plots exist but touch no scene at all."""
+        plots = load(project, view="dramatic_elements")["project"]["plots"]
+        by_id = {p["id"]: p for p in plots}
+        assert set(by_id) == {"the-resistance", "the-scientists-last-stand"}
+        entry = by_id["the-resistance"]
+        assert entry["name"] == "The Resistance"
+        assert entry["plot_type"] == "Setup"
+        # The fixture leaves plot_scope unset on both plots; the key is present
+        # and empty so the shape does not change with the data.
+        assert entry["plot_scope"] == ""
+
+    def test_every_scene_plot_slug_resolves_against_the_index(self, project):
+        """The cross-check the index exists for: a role naming a plot absent
+        from the index has nothing to be checked against."""
+        out = load(project, view="dramatic_elements")
+        known = {p["id"] for p in out["project"]["plots"]}
+        named = {p["plot"]
+                 for act in out["acts"] for seq in act.get("sequences", [])
+                 for scene in seq.get("scenes", []) for p in scene.get("plots", [])}
+        assert named <= known, f"unresolvable plot slugs: {named - known}"
+
+    def test_scene_plot_entries_carry_no_description(self, project):
+        """Dropped on purpose — it is the plot note's prose and it roughly
+        doubles the payload. `story_retrieve` is where a description is read."""
+        out = load(project, view="dramatic_elements")
+        entries = [p
+                   for act in out["acts"] for seq in act.get("sequences", [])
+                   for scene in seq.get("scenes", []) for p in scene.get("plots", [])]
+        assert entries
+        assert all(set(p) == {"plot", "role"} for p in entries)
 
     def test_retrieve_returns_the_plot_beats(self, project):
         """The five fields are computed, so `["all"]` skips them — name them.
@@ -180,35 +216,132 @@ class TestDramaticElementsView:
         assert [s["id"] for s in scenes] == [
             "central-room-day", "central-room-night", "the-core-day"]
 
-    def test_carries_the_plot_role_per_plot(self, project):
-        """The role is per plot now, so the flat `dramatic_role` is gone from
-        this view and the roles arrive in `plots[]` (see the add_plot tests).
-        What is left on the scene is the plot-LESS case, which must not be
-        reported for an ordinary scene — "plot_role" restates the storage and
-        would read as if the scene had exactly one role."""
+    def test_carries_dramatic_role_and_the_plot_roles(self, project):
+        """Both halves, because the view exists to check them against each
+        other. `dramatic_role` says the scene serves a plot; `plots[]` says
+        which and in what role. "plot_role" with no `plots[]` is exactly the
+        disagreement worth spotting, so it must be reported, not hidden."""
+        scenes = {s["id"]: s for s in
+                  (load(project, view="dramatic_elements")["acts"][0]
+                   ["sequences"][0]["scenes"])}
+        day = scenes["central-room-day"]
+        assert day["dramatic_role"] == "plot_role"
+        assert day["plots"], "the plot roles must be visible alongside it"
+
+    def test_plots_are_always_present_not_behind_a_flag(self, project):
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
-        assert all("dramatic_role" not in s for s in scenes)
-        assert all("no_plot_function" not in s for s in scenes)
+        assert any("plots" in s for s in scenes), \
+            "plot roles must be in the view unconditionally"
 
-    def test_plots_are_absent_unless_asked_for(self, project):
+    def test_project_is_the_top_container(self, project):
+        """The story's climax and inciting incident are global facts, so they
+        are reported whether or not `act` narrows the tree to one act."""
+        out = load(project, view="dramatic_elements")
+        project = out["project"]
+        assert project["structure_type"] == "Classical"
+        assert project["story_climax_scene_id"] == "central-room-night"
+        assert project["inciting_incident_scene_id"] == "central-room-day"
+        # The plot index lives here too, so the scene slugs below resolve.
+        assert {p["id"] for p in project["plots"]}
+
+    def test_project_survives_the_act_filter(self, project):
+        """The whole reason it is in this view: filtering to one act must not
+        remove the context that says what the act is part of."""
+        out = load(project, view="dramatic_elements", act="act-1")
+        assert out["project"]["story_climax_scene_id"] == "central-room-night"
+        assert [a["id"] for a in out["acts"]] == ["act-1"]
+
+    def test_act_carries_its_own_climax_scene(self, project):
+        act = load(project, view="dramatic_elements")["acts"][0]
+        assert act["act_climax_scene_id"] == "central-room-night"
+
+    def test_sequence_carries_its_climax_and_primary_plot(self, project):
+        seq = (load(project, view="dramatic_elements")["acts"][0]
+               ["sequences"][0])
+        assert seq["seq_climax_scene_id"] == "central-room-night"
+        assert seq["primary_plot"] == "the-resistance"
+
+    def test_the_two_climax_keys_do_not_collide(self, project):
+        """They were ONE key on two types, so a reader could not tell an act's
+        climax from a sequence's. Same value in the fixture, which is exactly
+        the case that hid the collision."""
+        out = load(project, view="dramatic_elements")
+        act = out["acts"][0]
+        seq = act["sequences"][0]
+        assert "climax_scene_id" not in act and "climax_scene_id" not in seq
+        assert act["act_climax_scene_id"] == seq["seq_climax_scene_id"]
+
+    def test_scene_reports_the_milestone_flags_that_are_true(self, project):
+        """Only the True ones. The fixture's flags are explicit False on every
+        scene except central-room-night, which is the sequence climax — so a
+        view that emitted them unconditionally would look identical here and
+        only differ on real data."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
-        assert all("plots" not in s for s in scenes)
+        night = scenes[1]
+        assert night["is_sequence_climax"] is True
+        for absent in ("is_inciting_incident", "is_act_climax",
+                       "is_story_climax"):
+            assert absent not in night
 
-    def test_add_plot_attaches_the_role_and_description(self, project):
-        """The role must be derived from the relation kind, not guessed."""
-        scenes = (load(project, view="dramatic_elements", add_plot=True)
+    def test_scene_reports_the_derived_milestone_label(self, project):
+        """The flags say which milestone; the label says what it is called.
+        Both, because the base map reports the label and this view the flags,
+        and a reader comparing the two needs to see they agree."""
+        scenes = (load(project, view="dramatic_elements")["acts"][0]
+                  ["sequences"][0]["scenes"])
+        assert scenes[1]["milestone"] == "sequence climax"
+        # A scene with no flag carries no label either.
+        assert "milestone" not in scenes[0]
+
+    def test_no_dead_markers_are_emitted(self, project):
+        """The loop this replaced read is_setup / is_turning_point /
+        is_crisis / is_climax / is_resolution — none a scene field, and two of
+        them arc_beat's. If any reappear, the view is reading a key that
+        belongs to another entity type."""
+        scenes = (load(project, view="dramatic_elements")["acts"][0]
+                  ["sequences"][0]["scenes"])
+        dead = {"is_setup", "is_turning_point", "is_crisis", "is_climax",
+                "is_resolution"}
+        assert not [k for s in scenes for k in s if k in dead]
+
+    def test_both_halbes_are_reported_so_they_can_be_cross_checked(self, project):
+        """The reason the view carries plot roles unconditionally: a scene that
+        says it serves a plot, beside the plots that agree.
+
+        The fixture stores no `dramatic_role` on any scene, so the two states
+        this test compares cannot both be produced from it — the agreement case
+        has to be written. That is the fixture's gap, not a defect in the view.
+        """
+        from core.writes import edit_entity
+
+        # 1. the scene says plot_role and a plot agrees -> both reported.
+        edit_entity(project, "scene", "central-room-day",
+                    {"dramatic_role": "plot_role"}, "r")
+        scenes = {s["id"]: s for s in
+                  (load(project, view="dramatic_elements")["acts"][0]
+                   ["sequences"][0]["scenes"])}
+        day = scenes["central-room-day"]
+        assert day["dramatic_role"] == "plot_role"
+        assert day["plots"], "the plot roles must be visible alongside it"
+
+        # 2. the scene says non-event -> reported, and it serves no plot.
+        edit_entity(project, "scene", "central-room-day",
+                    {"dramatic_role": "non-event", "plot_roles": []}, "r")
+        day = {s["id"]: s for s in
+               (load(project, view="dramatic_elements")["acts"][0]
+                ["sequences"][0]["scenes"])}["central-room-day"]
+        assert day["dramatic_role"] == "non-event"
+        assert "plots" not in day
+
+    def test_the_role_is_derived_from_the_relation_kind(self, project):
+        """Not guessed from the plot's fields — read off the `plot_<role>` row."""
+        scenes = (load(project, view="dramatic_elements")
                   ["acts"][0]["sequences"][0]["scenes"])
-        setup = scenes[0]["plots"][0]
-        assert setup == {"plot": "the-resistance", "role": "setup",
-                         "description": "Kael discovers the door isn't locked "
-                                        "— it was never locked."}
+        assert scenes[0]["plots"][0] == {"plot": "the-resistance",
+                                         "role": "setup"}
         assert scenes[2]["plots"][0]["role"] == "resolution"
-
-    def test_add_plot_is_echoed_so_the_agent_knows(self, project):
-        assert load(project, view="dramatic_elements",
-                    add_plot=True)["add_plot"] is True
 
 
 class TestRelationshipView:

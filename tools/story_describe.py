@@ -53,7 +53,7 @@ def _is_reference(entity_type: str, field: str) -> bool:
     says string or list; this says what the string is.
 
     The nine `extra` links (scene.act_id, arc_beat.scene, plot.characters,
-    relationship.characters/scenes, act/sequence climax_scene_id,
+    relationship.characters/scenes, act/sequence *_climax_scene_id,
     sequence.primary_plot, project.*_scene_id) are the ones this catches that
     `stored_as` cannot: they have no special storage, and every one of them
     says "slug" in its description. Making that machine-readable rather than

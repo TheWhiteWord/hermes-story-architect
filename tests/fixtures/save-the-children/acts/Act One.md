@@ -1,6 +1,6 @@
 ---
 act_objective: Kael discovers the truth about the door.
-climax_scene_id: central-room-night
+act_climax_scene_id: central-room-night
 id: act-1
 order: 1
 status: in-progress

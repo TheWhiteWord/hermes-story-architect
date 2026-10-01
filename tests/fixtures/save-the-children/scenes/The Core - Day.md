@@ -2,7 +2,7 @@
 act_id: act-1
 characters: ['kael', 'mira']
 conflict_levels: ['extra-personal']
-dramatic_role: resolution
+dramatic_role: plot_role
 heading: EXT. THE CORE - DAY
 id: the-core-day
 is_act_climax: False
