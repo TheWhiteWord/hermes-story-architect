@@ -59,18 +59,21 @@ DASH.loadSampleData = function() {
       {
         id: "brother-investigation", name: "Brother Investigation", status: "active",
         one_sentence: "Mara follows her brother's account number into the cartel's DASH.network.",
-        setups: [{ heading: "INT. MARA'S APARTMENT - NIGHT", description: "" }, { heading: "INT. POLICE STATION - DAY", description: "" }],
-        complications: [{ heading: "INT. POLICE STATION - DAY", description: "" }],
-        climax: [{ heading: "INT. KITCHEN - NIGHT", description: "" }],
-        resolutions: [{ heading: "INT. KITCHEN - NIGHT", description: "" }],
+        // Backend shape: {scene_id, description} pointing at scene slugs. A
+        // `heading` here renders an empty panel — the one silent dashboard bug.
+        setups: [{ scene_id: "mara-apartment", description: "" }, { scene_id: "police-station", description: "" }],
+        complications: [{ scene_id: "police-station", description: "" }],
+        crisis: [{ scene_id: "kitchen-night", description: "" }],
+        climax: [{ scene_id: "kitchen-night", description: "" }],
+        resolutions: [{ scene_id: "kitchen-night", description: "" }],
         characters: ["mara", "detective-oak"],
         sections: ["Summary","Obstacles","Stakes"]
       }
     ],
     scenes: [
-      { heading: "INT. MARA'S APARTMENT - NIGHT", scene_number: null, characters: ["mara"], id: 1, locations: [] },
-      { heading: "INT. POLICE STATION - DAY", scene_number: null, characters: ["detective-oak"], id: 2, locations: [] },
-      { heading: "INT. KITCHEN - NIGHT", scene_number: null, characters: ["detective-oak","mara"], id: 3, locations: ["kitchen"] }
+      { heading: "INT. MARA'S APARTMENT - NIGHT", scene_number: null, characters: ["mara"], id: "mara-apartment", title: "Mara's Apartment", locations: [] },
+      { heading: "INT. POLICE STATION - DAY", scene_number: null, characters: ["detective-oak"], id: "police-station", title: "Police Station", locations: [] },
+      { heading: "INT. KITCHEN - NIGHT", scene_number: null, characters: ["detective-oak","mara"], id: "kitchen-night", title: "Kitchen", locations: ["kitchen"] }
     ],
     story_memory: {
       last_updated: "2026-09-06T14:30:00",

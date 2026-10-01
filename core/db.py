@@ -966,7 +966,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                 "extra": json.loads(r[8]) if r[8] else {},
             }
 
-        # Load all relations for denormalization (include note for plot beat descriptions)
+        # Load all relations for denormalization (note carries the plot role's prose)
         rel_rows = conn.execute(
             "SELECT from_id, to_id, kind, note FROM relations"
             " WHERE from_id NOT IN (SELECT id FROM entities WHERE is_deleted=1)"
@@ -997,8 +997,10 @@ def get_dashboard_data(project_path: Path) -> dict:
             elif kind == "location_scene":
                 scene_locs.setdefault(to_id, []).append(from_id)
             elif kind in PLOT_FIELD_BY_KIND:
-                beat = kind.replace("plot_", "")
-                scene_plots.setdefault(to_id, []).append({"id": from_id, "beat": beat})
+                # `role`, not `beat` — the name story_load already emits for the
+                # same fact, so the two readers of a scene's plot roles agree.
+                role = kind.replace("plot_", "")
+                scene_plots.setdefault(to_id, []).append({"id": from_id, "role": role})
             elif kind in ("location_variant", "world_variant"):
                 variant_map[from_id] = to_id
 
@@ -1250,7 +1252,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             )
             seq["scenes_list"] = [s["id"] for s in scenes_in_seq]
             seq["scene_count"] = len(seq["scenes_list"])
-            # Aggregate plots from scenes (beat info populated by Task 7)
+            # Aggregate plots from scenes, with the role each one plays there
             seq_plots = {}
             for scene in scenes_in_seq:
                 for p in scene.get("plots", []):
@@ -1264,9 +1266,9 @@ def get_dashboard_data(project_path: Path) -> dict:
                             "plot_type": meta.get("plot_type", ""),
                             "value_arc": meta.get("value_arc", ""),
                         }
-                    beat = p.get("beat", "") if isinstance(p, dict) else ""
-                    if beat in PLOT_ROLES:
-                        seq_plots[pid][f"has_{beat}"] = True
+                    role = p.get("role", "") if isinstance(p, dict) else ""
+                    if role in PLOT_ROLES:
+                        seq_plots[pid][f"has_{role}"] = True
             seq["plots"] = sorted(seq_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
         # Act enrichment: sequences_list, scenes_list (via sequences), counts, plots
@@ -1300,9 +1302,9 @@ def get_dashboard_data(project_path: Path) -> dict:
                             "plot_type": meta.get("plot_type", ""),
                             "value_arc": meta.get("value_arc", ""),
                         }
-                    beat = p.get("beat", "") if isinstance(p, dict) else ""
-                    if beat in PLOT_ROLES:
-                        act_plots[pid][f"has_{beat}"] = True
+                    role = p.get("role", "") if isinstance(p, dict) else ""
+                    if role in PLOT_ROLES:
+                        act_plots[pid][f"has_{role}"] = True
             act["plots"] = sorted(act_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
         story_memory = get_memory_block(project_path)

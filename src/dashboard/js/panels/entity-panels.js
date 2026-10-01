@@ -410,14 +410,14 @@ DASH.showScenePanel = function(sceneId) {
   const plotRefs = (scene.plots || []);
   const plots = plotRefs.map(pref => {
     const pid = (typeof pref === 'object' && pref !== null) ? pref.id : pref;
-    const beat = (typeof pref === 'object' && pref !== null) ? (pref.beat || '') : '';
+    const role = (typeof pref === 'object' && pref !== null) ? (pref.role || '') : '';
     const pl = (DASH.story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
     const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    const beatLabel = beat ? ` · ${beat.toUpperCase()}` : '';
+    const roleLabel = role ? ` · ${role.toUpperCase()}` : '';
     const scopeLabel = scope ? ` · ${scope}` : '';
-    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${beatLabel}</span></button>`;
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${roleLabel}</span></button>`;
   }).filter(Boolean).join('');
 
   // Content from __SECTIONS__.scenes[slug]["Content"]

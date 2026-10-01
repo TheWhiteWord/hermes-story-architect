@@ -77,14 +77,78 @@ this environment. If it ever *does* skip, the phase is unverified, not green —
 
 ## Checklist
 
-- [ ] Phases 1–6 complete
-- [ ] Payload shape confirmed unchanged (not assumed) before editing JS
-- [ ] `entity-panels.js` — role rename + `complications` block + `has_complication`
-- [ ] `scene.plots[].beat` → `.role` in `db.py` and `entity-panels.js`, matching `story_load`
-- [ ] `data-load.js` mock updated to five roles
-- [ ] Comments updated (`core.js:67`, `entity-panels.js:253,427`)
-- [ ] CSS `.beat-*` classes confirmed untouched
-- [ ] Headless-Chrome render test **ran** (not skipped) with a plot-role assertion
-- [ ] Chrome presence confirmed; a skip is not a pass
-- [ ] No compatibility alias for the old key
-- [ ] Full suite green
+- [x] Phases 1–6 complete
+- [x] Payload shape confirmed unchanged (not assumed) before editing JS
+- [x] `entity-panels.js` — role rename + `complications` block + `has_complication`
+- [x] `scene.plots[].beat` → `.role` in `db.py` and `entity-panels.js`, matching `story_load`
+- [x] `data-load.js` mock updated to five roles
+- [x] Comments updated (`core.js:67`, `entity-panels.js:253,427`)
+- [x] CSS `.beat-*` classes confirmed untouched
+- [x] Headless-Chrome render test **ran** (not skipped) with a plot-role assertion
+- [x] Chrome presence confirmed; a skip is not a pass
+- [x] No compatibility alias for the old key
+- [x] Full suite green
+
+---
+
+## Final brief
+
+**Most of this phase was already done by phase 3.** Verified before editing, not
+assumed: commit `4f46a12` had already landed the role rename in the act/sequence
+badges, the `complications` section, the `has_*` flags, the mock data and both
+comments — all of it derived from `DASH.PLOT_ROLES` in `colors.js`, pinned to
+Python by `test_plot_roles.py:36`. Two of the three checklist items were therefore
+already green before this session started.
+
+**What was actually left, and what it turned out to be:**
+
+1. **`scene.plots[].beat` → `.role`** — the one live inconsistency the task named.
+   `core/db.py:1001` emitted `{"id", "beat"}`, `story_load.py:271` emitted `role`,
+   and `entity-panels.js:413` read `beat`. Renamed all three. The two `has_*`
+   aggregation sites in `db.py` read the same key and were renamed with it — they
+   are readers of the producer, so leaving them would have silently blanked every
+   role badge.
+
+2. **The sample data never rendered the plot panel at all.** Not on the checklist,
+   found by the new render test: `data-load.js` mock plot roles used
+   `{heading: ...}` where the backend emits `{scene_id: ...}`, so
+   `renderBeats` found no scene and every role section came back empty. Fixed the
+   mock to the real shape, gave the scenes slugs and titles, and added the missing
+   `crisis` role. Scene slugs are `kitchen-night` etc. rather than `kitchen` —
+   the location already owns that id and `DASH.findLocation` matches on it.
+
+3. **The render test needed to drive a click.** `--dump-dom` gives the initial
+   view; the scene and plot panels are built on click, so a role label inside one
+   is unreachable by a plain dump. Added a `_dom(html, tmp, name, drive_js)`
+   helper that injects one `<script>` calling the dashboard's own
+   `DASH.showScenePanel(...)` / `DASH.loadSampleData()` before dumping. The page
+   is still the shipped bundle; only the entry point is scripted.
+
+**Verification.** Chrome present at `/usr/bin/google-chrome`; the render class ran,
+did not skip. Mutation-checked: reverting the JS reader to `pref.beat` fails
+`test_a_scenes_plot_role_reaches_the_dom` with the role label absent from the
+DOM, and passes again on restore — so the test really does catch the mismatch it
+was written for. Full suite **1000 passed** — and clean, so the three failures phase 3
+recorded as pre-existing no longer reproduce on this tree.
+
+`.beat-*` CSS left alone as instructed — `statistics.js` and the sequence/act
+panels still use them as generic row styling. `docs/html_ui_dashboard/*.html` left
+alone: design mockups, not shipped code, and not worth churning for accuracy
+nobody renders. No compatibility alias for `beat` anywhere.
+
+### NITE — carried forward
+
+- **Sample data has never been exercised by a test.** The `{heading}` vs
+  `{scene_id}` mismatch sat in `data-load.js` through at least two renames because
+  the sample path is manual-only. The new five-roles render test now covers the
+  plot panel; the rest of the sample (worlds, relationships, perspectives) is
+  still unrendered by anything. Cheap to extend, not done here.
+- **`core/db.py:386` and `:1098` still say "plot beat"** in comments, and
+  `PLOT_BEAT_FIELDS` in `entity.py:256` is still named for the old word. Cosmetic;
+  the constant is imported in four places, so the rename is churn with no reader
+  benefit. Left deliberately.
+- **`docs/research/starc-data-model.md:230`** still names a
+  `setups/payoffs` analysis category. Research doc, not code, and the category
+  belongs to whatever consumes it — not this task's to change.
+- **Skill docs remain stale by decision** (see above). `story_describe` is the
+  source of truth. Unchanged from the plan.

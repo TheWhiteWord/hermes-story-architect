@@ -295,3 +295,58 @@ class TestActuallyRenders:
         assert "Screenplay Title: N.A." in dom, "the title slot vanished"
         assert '<span class="tp-unfilled">Credit: N.A.</span>' in dom, (
             "the credit reminder is in the title position")
+
+    def _dom(self, html, tmp_path, name, drive_js):
+        """Serve the assembled page, run `drive_js` in it, return the built DOM.
+
+        The panels are built on click, so a role that only renders inside one
+        is invisible to a plain --dump-dom. Driving the dashboard's own JS is
+        the point: it is the reader that could be reading a key the backend no
+        longer emits, and that mismatch is silent everywhere else.
+        """
+        served = tmp_path / name
+        served.mkdir()
+        page = html.replace("</body>", f"<script>{drive_js}</script></body>")
+        (served / "index.html").write_text(page)
+        out = subprocess.run(
+            ["google-chrome", "--headless=new", "--disable-gpu", "--no-sandbox",
+             "--virtual-time-budget=6000", "--dump-dom",
+             f"file://{served / 'index.html'}"],
+            capture_output=True, text=True, timeout=120)
+        assert "Uncaught" not in out.stderr, out.stderr[-800:]
+        return out.stdout
+
+    def test_a_scenes_plot_role_reaches_the_dom(self, vault, tmp_path):
+        """Phase 7, end to end: `scene.plots[].role` must survive Python -> JS.
+
+        The key was `beat` while story_load already said `role`. Both names
+        produced valid HTML; only the render shows which one the panel read.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        dom = self._dom(html, tmp_path, "site_role",
+                        "DASH.showScenePanel('central-room-night')")
+        # The fixture gives that scene the-resistance in the `setup` role.
+        assert "The Resistance" in dom, "the scene's plot never rendered"
+        assert "· SETUP" in dom, (
+            "the plot role did not render — the panel is reading a key the "
+            "backend no longer emits")
+        assert "· BEAT" not in dom, "the old key is still being read"
+
+    def test_all_five_roles_render_in_the_plot_panel(self, vault, tmp_path):
+        """One section per role, from the same list Python pins.
+
+        Four roles render and the fifth is missing when a role is added in
+        Python and forgotten in the JS list — an empty panel, no error.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        dom = self._dom(html, tmp_path, "site_roles",
+                        "DASH.loadSampleData();"
+                        "DASH.showPlotPanel('brother-investigation')")
+        for role in ("Setup", "Complication", "Crisis", "Climax", "Resolution"):
+            assert f">{role}<" in dom, f"the {role} section is missing"
