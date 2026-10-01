@@ -58,7 +58,7 @@ class TestEntityFields:
 
     def test_relation_backed_fields_are_flagged(self):
         fields = _handler({"entity_type": "plot"})["entity_schemas"]["plot"]
-        for name in ("setups", "crisis", "climax", "payoffs"):
+        for name in ("setups", "complications", "crisis", "climax", "resolutions"):
             assert fields[name]["stored_as"] == "relation"
 
     def test_computed_fields_say_do_not_set(self):

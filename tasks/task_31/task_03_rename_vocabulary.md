@@ -107,17 +107,99 @@ rename plus one added role — reviewable on its own.
 
 ## Checklist
 
-- [ ] Decisions taken on fixture markdown + `index.yaml`
-- [ ] `constants.py` — `resolutions`, `complications`; `PLOT_ROLES` has 5 entries
-- [ ] `entity.py:227` — field/kind map carries all five
-- [ ] All 12 Python sites renamed
-- [ ] `story_import.py:466` skip-set updated (missed by grep-for-`plot_` searches)
-- [ ] JS: `entity-panels.js` (5), `data-load.js`, `core.js` comment
-- [ ] 9 test files updated or replaced; obsolete assertions deleted, not just reworded
-- [ ] Five-role round-trip test added
-- [ ] `complications` round-trip test added
-- [ ] Fixture markdown renamed and its DB regenerated via `story_import`
-- [ ] `tests/fixtures/save-the-children/.story/index.yaml` deleted
-- [ ] `grep -rn payoff` returns nothing outside `archieved/` and `tasks/`
-- [ ] Full suite green
-- [ ] No alias, shim, or dual-name support
+- [x] Decisions taken on fixture markdown + `index.yaml`
+- [x] `constants.py` — `resolutions`, `complications`; `PLOT_ROLES` has 5 entries
+- [x] `entity.py:227` — field/kind map carries all five
+- [x] All 12 Python sites renamed
+- [x] `story_import.py:466` skip-set updated (missed by grep-for-`plot_` searches)
+- [x] JS: `entity-panels.js` (5), `data-load.js`, `core.js` comment
+- [x] 9 test files updated or replaced; obsolete assertions deleted, not just reworded
+- [x] Five-role round-trip test added
+- [x] `complications` round-trip test added
+- [x] Fixture markdown renamed and its DB regenerated via `story_import`
+- [x] `tests/fixtures/save-the-children/.story/index.yaml` deleted
+- [x] `grep -rn payoff` returns nothing outside `archieved/` and `tasks/`
+- [x] Full suite green
+- [x] No alias, shim, or dual-name support
+
+## Final brief
+
+### What the code actually needed
+
+Phase 2 had already collapsed the eight restated role lists, so this phase touched
+**three** Python files, not the twelve sites the plan listed:
+
+| file | edit |
+|---|---|
+| `core/constants.py:21` | `PLOT_ROLES` → 5 roles |
+| `core/constants.py:102-106` | `payoffs` → `resolutions`, added `complications` in `ENTITY_SCHEMAS["plot"]` |
+| `core/entity.py:240-245` | `_RELATION_FIELDS["plot"]` → 5 fields |
+| `core/db.py:605` | one stale comment |
+
+`story_import.py:466` (the skip-set) and `story_export.py:171` needed **no edit** —
+phase 2 rewrote both to iterate `PLOT_BEAT_FIELDS`, so the skip-set now derives the
+renamed field automatically. The warning in the plan was correct about the site being
+easy to miss and is now moot. `db.py`'s `has_*` flags and the kind→field lookups derive
+too, so `:996`, `:1112`, `:1262`, `:1271`, `:1301`, `:1310` were already generic.
+
+### JS — two duplications removed, not just renamed
+
+`entity-panels.js` had the four `has_*` badges **written out twice** (act panel and
+sequence panel, byte-identical) and four beat sections written out individually. Both
+now iterate one list:
+
+- `DASH.PLOT_ROLES` + `DASH.plotRoleBadges()` in `colors.js` (loaded before
+  `entity-panels.js` per `story_dashboard.py:10`).
+- The plot panel's role sections become one `roleSections` map.
+
+Verified by driving `showPlotPanel` under node with a stub DOM: sections render
+`Setup, Complication, Crisis, Climax, Resolution`, five rows, and a stale `has_payoff`
+badge renders nothing.
+
+`DASH.PLOT_ROLES` is a hand-written copy of `PLOT_ROLES`, so
+`test_plot_roles.py::test_the_dashboard_role_list_is_the_same_list` pins it. Without it,
+a sixth role added in Python renders a silent gap in the dashboard — the exact failure
+mode this task exists to prevent.
+
+### Fixture
+
+Markdown edited, then `story_import` run against a copy at `/tmp/stcregen` and the
+resulting `story.db` copied back. Row check before/after: `plot_payoff` 1 → `plot_resolution` 1,
+`plot_setup` 2 unchanged. The import also picked up 3 `relationship` rows and 1
+`world_variant` row that the previously committed DB was missing — the fixture DB had
+drifted from its own markdown. Regenerating is what fixed that.
+
+`index.yaml` deleted via `git rm`.
+
+### Tests
+
+The nine listed files updated. `test_plot_roles.py::test_four_roles_at_this_phase`
+became `test_the_five_dramatic_roles` with an exact list, not a count; the fixture
+`four_role_project` → `full_role_project`. Added to that file:
+all-five-roles-readable, `complications` through create → export → import, and the JS
+drift pin. `test_field_coverage.py:446` now asserts `plot_resolution`;
+`test_write_shape.py` gained `complications`/`resolutions` rows.
+
+**Suite:** 964 passed, 3 failed. The 3 (`test_draft_preview.py` ×2,
+`test_story_describe.py::test_every_link_key_story_load_emits_is_a_real_field_name`)
+fail identically on the unmodified tree — verified by stashing. Not this phase's.
+
+### NOTE — observations, not objectives
+
+1. **Pre-existing failures, unrelated but live.** `test_draft_preview.py` (2) and
+   `test_story_describe.py:272` fail on `dev` before this phase. The describe one looks
+   real: the test walks `story_load` output and rejects relationship field `with` as
+   unknown, which suggests `with` is missing from the relationship schema's known set.
+2. **`_RELATION_FIELDS["plot"]` field names are still not derivable from roles.**
+   `PLOT_ROLES` → fields needs a lookup table anyway (`setup`→`setups`,
+   `crisis`→`crisis`). The JS side solves this with `plot[r+'s'] || plot[r]` — correct,
+   but a second hand-written mapping. If a sixth role with an irregular plural appears,
+   that one-liner becomes a bug site.
+3. **The fixture DB had drifted from its markdown** (missing `relationship` and
+   `world_variant` rows) and nobody noticed for however long it had been. A test that
+   regenerates and diffs row counts would catch that class of staleness.
+4. **`plan/plan.md`, `vault-conventions.md`, `docs/research/starc-data-model.md` still
+   say `payoffs`.** Left alone — historical planning docs and prose, not code. The
+   `grep -rn payoff` checklist item is satisfied for `core/ tools/ src/ tests/`.
+5. `docs/html_ui_dashboard/*.html` mockups still hold old field names. Out of scope per
+   INTEGRATION.md.

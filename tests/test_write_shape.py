@@ -99,7 +99,7 @@ def test_a_string_writes_no_relation_rows(vault):
 # ─── One dict→row rule, on all three write paths ─────────────────────────────
 #
 # relations_for_insert used to unwrap {scene_id, description} for plot_setup and
-# plot_payoff only; every other kind got str(dict) as to_id. So a plot CREATE
+# plot_resolution only; every other kind got str(dict) as to_id. So a plot CREATE
 # wrote corrupt rows for crisis and climax — the row pointed at a scene slug
 # that did not exist and the prose was dropped. Edit and import were already
 # correct, which is why it went unnoticed: the only coverage was through edit.
@@ -108,7 +108,8 @@ PLOT_BEATS = {
     "setups": ("plot_setup", "s1", "setup prose"),
     "crisis": ("plot_crisis", "s2", "crisis prose"),
     "climax": ("plot_climax", "s3", "climax prose"),
-    "payoffs": ("plot_payoff", "s4", "payoff prose"),
+    "complications": ("plot_complication", "s4", "complication prose"),
+    "resolutions": ("plot_resolution", "s5", "resolution prose"),
 }
 
 
@@ -139,7 +140,8 @@ def test_create_does_not_stringify_a_dict_into_to_id(vault):
         "setups": [{"scene_id": "s1", "description": "d"}],
         "crisis": [{"scene_id": "s2", "description": "d"}],
         "climax": [{"scene_id": "s3", "description": "d"}],
-        "payoffs": [{"scene_id": "s4", "description": "d"}]})
+        "complications": [{"scene_id": "s4", "description": "d"}],
+        "resolutions": [{"scene_id": "s5", "description": "d"}]})
     bad = [r for r in _notes(vault) if "{" in r[1] or "'scene_id'" in r[1]]
     assert not bad, f"dict repr written into to_id: {bad}"
 

@@ -59,7 +59,7 @@ def _sample_value(field, meta):
             return ["knows the truth"]
         if field == "rules":
             return ["no violence"]
-        if field in ("setups", "crisis", "climax", "payoffs"):
+        if field in ("setups", "complications", "crisis", "climax", "resolutions"):
             return _make_beats()
         if field in ("conflict_levels",):
             return ["inner", "personal"]
@@ -275,14 +275,15 @@ def test_edit_all_field_types(entity_type, project):
         edit_data[section_name] = f"Updated {section_name} content via edit."
 
     if entity_type == "plot":
-        # All 4 beat types — setups, crisis, climax, payoffs
+        # All 5 role fields
         edit_data["setups"] = [
             {"scene_id": "scene-1", "description": "New setup"},
             {"scene_id": "scene-2", "description": "Added setup"},
         ]
         edit_data["crisis"] = [{"scene_id": "scene-1", "description": "Crisis beat"}]
         edit_data["climax"] = [{"scene_id": "scene-2", "description": "Climax beat"}]
-        edit_data["payoffs"] = [{"scene_id": "scene-3", "description": "New payoff"}]
+        edit_data["complications"] = [{"scene_id": "scene-3", "description": "Complication beat"}]
+        edit_data["resolutions"] = [{"scene_id": "scene-3", "description": "New resolution"}]
 
     assert edit_entity(project, entity_type, slug, edit_data,
                        f"Test edit for {entity_type}").get("success"), \
@@ -368,8 +369,9 @@ def test_edit_all_field_types(entity_type, project):
             "id": [entity_id],
             "fields": ["all"],
         }))["entities"][0]["fields"]  # field values are nested under "fields"
-        all_scenes = (plot_after.get("setups", []) + plot_after.get("crisis", [])
-                      + plot_after.get("climax", []) + plot_after.get("payoffs", []))
+        all_scenes = (plot_after.get("setups", []) + plot_after.get("complications", [])
+                      + plot_after.get("crisis", []) + plot_after.get("climax", [])
+                      + plot_after.get("resolutions", []))
         assert len(all_scenes) > 0, "Plot has no scene references after edit"
 
 
@@ -443,7 +445,7 @@ def test_import_preserves_all_plot_beats(tmp_path):
         kinds = {r[0] for r in rows}
 
         assert "plot_setup" in kinds, f"plot_setup missing: {kinds}"
-        assert "plot_payoff" in kinds, f"plot_payoff missing: {kinds}"
+        assert "plot_resolution" in kinds, f"plot_resolution missing: {kinds}"
 
         has_crisis_climax = False
         for plot_file in (proj / "plots").glob("*.md"):

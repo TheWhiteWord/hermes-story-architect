@@ -44,7 +44,7 @@ def load(project, **args):
 class TestPlotBeatsLiveInTheirOwnView:
     """The base map names plots; it does not enumerate their beats.
 
-    setups/crisis/climax/payoffs are per-scene in
+    setups/complications/crisis/climax/resolutions are per-scene in
     view='dramatic_elements' with add_plot, and story_retrieve returns the plot
     whole. Repeating bare scene ids in the map cost tokens and told you nothing
     the other two surfaces don't say better.
@@ -54,7 +54,8 @@ class TestPlotBeatsLiveInTheirOwnView:
         result = load(project)
         assert result["plots"], "fixture should have plots"
         for plot in result["plots"]:
-            assert not {"setups", "crisis", "climax", "payoffs"} & plot.keys()
+            assert not {"setups", "complications", "crisis", "climax",
+                        "resolutions"} & plot.keys()
 
     def test_dramatic_elements_with_add_plot_still_has_every_beat_kind(self, project):
         result = load(project, view="dramatic_elements", add_plot=True)
@@ -62,7 +63,7 @@ class TestPlotBeatsLiveInTheirOwnView:
                  for act in result["acts"] for seq in act.get("sequences", [])
                  for scene in seq.get("scenes", []) for p in scene.get("plots", [])}
         assert roles, "add_plot returned no plot references at all"
-        assert roles <= {"setup", "crisis", "climax", "payoff"}
+        assert roles <= {"setup", "complication", "crisis", "climax", "resolution"}
 
     def test_retrieve_returns_the_plot_beats(self, project):
         from tools.story_retrieve import handler as retrieve_handler
@@ -72,8 +73,9 @@ class TestPlotBeatsLiveInTheirOwnView:
             "project": "save-the-children", "entity_type": "plot",
             "id": [plot_id], "fields": ["all"], "root_path": str(project.parent.parent),
         }))["entities"][0]["fields"]
-        beats = got.get("setups", []) + got.get("crisis", []) \
-            + got.get("climax", []) + got.get("payoffs", [])
+        beats = got.get("setups", []) + got.get("complications", []) \
+            + got.get("crisis", []) + got.get("climax", []) \
+            + got.get("resolutions", [])
         assert beats, f"{plot_id} lost its beats — they are readable nowhere"
 
 
@@ -175,7 +177,7 @@ class TestDramaticElementsView:
         assert setup == {"plot": "the-resistance", "role": "setup",
                          "description": "Kael discovers the door isn't locked "
                                         "— it was never locked."}
-        assert scenes[2]["plots"][0]["role"] == "payoff"
+        assert scenes[2]["plots"][0]["role"] == "resolution"
 
     def test_add_plot_is_echoed_so_the_agent_knows(self, project):
         assert load(project, view="dramatic_elements",

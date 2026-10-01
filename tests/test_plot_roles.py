@@ -8,6 +8,7 @@ them. The first test is what keeps those two from drifting — a comment would
 not, which is why it is a test.
 """
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -28,9 +29,22 @@ class TestVocabulary:
         roles_from_map = {kind.replace("plot_", "") for kind in PLOT_BEAT_FIELDS.values()}
         assert set(PLOT_ROLES) == roles_from_map
 
-    def test_four_roles_at_this_phase(self):
-        """Four until the rename adds complication and resolution. Then five."""
-        assert len(PLOT_ROLES) == 4
+    def test_the_five_dramatic_roles(self):
+        """The dramatic roles. `transition`/`non-event` are scene beats, not plot roles."""
+        assert PLOT_ROLES == ["setup", "complication", "crisis", "climax", "resolution"]
+
+    def test_the_dashboard_role_list_is_the_same_list(self):
+        """The JS copy is hand-written like PLOT_ROLES was — so pin it.
+
+        The dashboard's role badges and role sections iterate this list; a role
+        added in Python and forgotten here renders a plot with a silent gap,
+        not an error.
+        """
+        from pathlib import Path
+        js = (REPO / "src/dashboard/js/colors.js").read_text()
+        found = re.search(r"DASH\.PLOT_ROLES = \[([^\]]*)\]", js)
+        assert found, "colors.js no longer declares DASH.PLOT_ROLES"
+        assert [r.strip().strip("'\"") for r in found.group(1).split(",") if r.strip()] == PLOT_ROLES
 
     def test_field_names_are_not_role_names_pluralised(self):
         """`crisis` and `climax` stay singular — so the map cannot be derived
@@ -40,7 +54,7 @@ class TestVocabulary:
 
 
 @pytest.fixture
-def four_role_project(tmp_path):
+def full_role_project(tmp_path):
     """A project where one plot fills every role, in one sequence inside one act."""
     from core.writes import create_entity, create_project
 
@@ -74,15 +88,15 @@ def four_role_project(tmp_path):
 
 
 class TestHasRoleFlags:
-    """All four flags, on both the sequence row and the act row. Written before
+    """Every role's flag, on both the sequence row and the act row. Written before
     the refactor, it fails on the hardcoded four-flag version — a new role
     would have needed four more edits in two places to show up here."""
 
     @pytest.mark.parametrize("owner", ["sequence", "act"])
-    def test_every_role_raises_its_flag(self, four_role_project, owner):
+    def test_every_role_raises_its_flag(self, full_role_project, owner):
         from core.db import get_dashboard_data
 
-        data = get_dashboard_data(four_role_project)["story_data"]
+        data = get_dashboard_data(full_role_project)["story_data"]
         rows = (data["sequences"] if owner == "sequence" else data["acts"])
         plots = [p for row in rows for p in row.get("plots", [])]
         assert plots, f"no plot row on the {owner}"
@@ -91,11 +105,11 @@ class TestHasRoleFlags:
                 assert plot.get(f"has_{role}") is True, \
                     f"{owner} row missing has_{role}: {sorted(plot)}"
 
-    def test_flag_set_is_exactly_the_roles(self, four_role_project):
+    def test_flag_set_is_exactly_the_roles(self, full_role_project):
         """No stale hardcoded flag survives, and none is missing."""
         from core.db import get_dashboard_data
 
-        data = get_dashboard_data(four_role_project)["story_data"]
+        data = get_dashboard_data(full_role_project)["story_data"]
         plot = next(p for p in data["sequences"][0]["plots"])
         flags = {k for k in plot if k.startswith("has_")}
         assert flags == {f"has_{role}" for role in PLOT_ROLES}

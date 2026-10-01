@@ -349,9 +349,10 @@ class TestNavigationalQueries:
         plot = result["entities"][0]["fields"]  # field values are nested under "fields"
         scenes = (
             plot.get("setups", [])
+            + plot.get("complications", [])
             + plot.get("crisis", [])
             + plot.get("climax", [])
-            + plot.get("payoffs", [])
+            + plot.get("resolutions", [])
         )
         assert len(scenes) > 0
 

@@ -239,9 +239,10 @@ _RELATION_FIELDS = {
     "scene": {"characters": ("character_scene", True)},
     "plot": {
         "setups": ("plot_setup", True),
+        "complications": ("plot_complication", True),
         "crisis": ("plot_crisis", True),
         "climax": ("plot_climax", True),
-        "payoffs": ("plot_payoff", True),
+        "resolutions": ("plot_resolution", True),
     },
     "location": {"variant_of": ("location_variant", False)},
     "world": {"variant_of": ("world_variant", False)},

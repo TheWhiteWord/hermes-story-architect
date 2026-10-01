@@ -18,7 +18,7 @@ PLOT_SCOPES = ["main", "sub"]
 # cannot import `entity` (entity imports constants); the authoritative
 # field↔kind map is `_RELATION_FIELDS["plot"]`, and tests/test_plot_roles.py
 # pins the two together so they cannot drift.
-PLOT_ROLES = ["setup", "crisis", "climax", "payoff"]
+PLOT_ROLES = ["setup", "complication", "crisis", "climax", "resolution"]
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
 ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
@@ -102,7 +102,8 @@ ENTITY_SCHEMAS = {
         "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "crisis": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches crisis point", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "climax": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches climax", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "payoffs": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "complications": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is complicated or obstructed", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "resolutions": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},

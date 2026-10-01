@@ -60,7 +60,9 @@ DASH.loadSampleData = function() {
         id: "brother-investigation", name: "Brother Investigation", status: "active",
         one_sentence: "Mara follows her brother's account number into the cartel's DASH.network.",
         setups: [{ heading: "INT. MARA'S APARTMENT - NIGHT", description: "" }, { heading: "INT. POLICE STATION - DAY", description: "" }],
-        payoffs: [{ heading: "INT. KITCHEN - NIGHT", description: "" }],
+        complications: [{ heading: "INT. POLICE STATION - DAY", description: "" }],
+        climax: [{ heading: "INT. KITCHEN - NIGHT", description: "" }],
+        resolutions: [{ heading: "INT. KITCHEN - NIGHT", description: "" }],
         characters: ["mara", "detective-oak"],
         sections: ["Summary","Obstacles","Stakes"]
       }

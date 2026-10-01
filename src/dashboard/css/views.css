@@ -225,7 +225,7 @@
 .knowledge-item::before { content: '→'; opacity: 0.5; flex-shrink: 0; }
 .knowledge-item:last-child { border-bottom: none; }
 
-/* Setup/payoff rows in plot panel */
+/* Scene rows in the plot panel's role sections */
 .beat-row {
   padding: 5px 0;
   border-bottom: 1px solid var(--border);

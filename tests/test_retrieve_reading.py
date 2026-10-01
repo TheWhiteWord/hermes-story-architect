@@ -76,7 +76,7 @@ class TestRelationBackedFields:
     def test_plot_beats_are_readable(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
-                  fields=["setups", "crisis", "climax", "payoffs"])
+                  fields=["setups", "complications", "crisis", "climax", "resolutions"])
         f = r["entities"][0]["fields"]
         assert f["setups"], "plot setups are stored as relations and were unreachable"
         assert f["setups"][0]["scene_id"]

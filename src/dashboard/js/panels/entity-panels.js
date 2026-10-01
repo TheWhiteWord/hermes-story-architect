@@ -24,10 +24,7 @@ DASH.showActPanel = function(actId) {
     return `<div class="beat-row" onclick="DASH.showPlotPanel('${pl.id}')">
       <span class="beat-scene" style="color:${col}">${pl.name}</span>
       ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
-      ${p.has_setup ? '<span class="beat-desc">setup</span>' : ''}
-      ${p.has_crisis ? '<span class="beat-desc">crisis</span>' : ''}
-      ${p.has_climax ? '<span class="beat-desc">climax</span>' : ''}
-      ${p.has_payoff ? '<span class="beat-desc">payoff</span>' : ''}
+      ${DASH.plotRoleBadges(p)}
     </div>`;
   }).join('');
 
@@ -250,7 +247,7 @@ DASH.showPlotPanel = function(plotId) {
       : '';
   }).filter(Boolean).join('');
 
-  // Setups/payoffs: [{scene_id, description}] (backend-normalized)
+  // Role fields: [{scene_id, description}] (backend-normalized)
   function renderBeats(arr) {
     if (!arr || !arr.length) return '';
     return arr.map(item => {
@@ -269,14 +266,14 @@ DASH.showPlotPanel = function(plotId) {
     }).join('');
   }
 
-  const setupObjs = plot.setups || [];
-  const crisisObjs = plot.crisis || [];
-  const climaxObjs = plot.climax || [];
-  const payoffObjs = plot.payoffs || [];
-  const setupsHtml = renderBeats(setupObjs);
-  const crisisHtml = renderBeats(crisisObjs);
-  const climaxHtml = renderBeats(climaxObjs);
-  const payoffsHtml = renderBeats(payoffObjs);
+  // Plot role sections, one per role — must match PLOT_ROLES in core/constants.py.
+  const roleSections = DASH.PLOT_ROLES.map(r => {
+    const html = renderBeats(plot[r + 's'] || plot[r] || []);
+    return html ? `<div>
+      <div class="panel-section-title">${r[0].toUpperCase() + r.slice(1)}</div>
+      ${html}
+    </div>` : '';
+  }).join('');
 
   document.getElementById('panel-body').innerHTML = `
     <div>
@@ -292,22 +289,7 @@ DASH.showPlotPanel = function(plotId) {
       <div class="panel-section-title">Characters involved</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
     </div>` : ''}
-    ${setupsHtml ? `<div>
-      <div class="panel-section-title">Setups</div>
-      ${setupsHtml}
-    </div>` : ''}
-    ${crisisHtml ? `<div>
-      <div class="panel-section-title">Crisis</div>
-      ${crisisHtml}
-    </div>` : ''}
-    ${climaxHtml ? `<div>
-      <div class="panel-section-title">Climax</div>
-      ${climaxHtml}
-    </div>` : ''}
-    ${payoffsHtml ? `<div>
-      <div class="panel-section-title">Payoffs</div>
-      ${payoffsHtml}
-    </div>` : ''}
+    ${roleSections}
     ${DASH.renderSectionsHtml('plot', plot.id)}
   `;
 
@@ -424,7 +406,7 @@ DASH.showScenePanel = function(sceneId) {
     return l ? `<button class="entity-link" onclick="DASH.showLocationPanel('${l.id}')">${l.name}</button>` : '';
   }).filter(Boolean).join('');
 
-  // Plots: backend populates scene.plots from plot setups/payoffs
+  // Plots: backend populates scene.plots from the plot's role rows
   const plotRefs = (scene.plots || []);
   const plots = plotRefs.map(pref => {
     const pid = (typeof pref === 'object' && pref !== null) ? pref.id : pref;
@@ -526,10 +508,7 @@ DASH.showSequencePanel = function(seqId) {
     return `<div class="beat-row" onclick="DASH.showPlotPanel('${pl.id}')">
       <span class="beat-scene" style="color:${col}">${pl.name}</span>
       ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
-      ${p.has_setup ? '<span class="beat-desc">setup</span>' : ''}
-      ${p.has_crisis ? '<span class="beat-desc">crisis</span>' : ''}
-      ${p.has_climax ? '<span class="beat-desc">climax</span>' : ''}
-      ${p.has_payoff ? '<span class="beat-desc">payoff</span>' : ''}
+      ${DASH.plotRoleBadges(p)}
     </div>`;
   }).join('');
 

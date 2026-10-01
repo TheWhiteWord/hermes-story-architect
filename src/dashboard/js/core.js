@@ -64,7 +64,7 @@ DASH.normalise = function(data) {
     s.plots = (s.plots || []);
   });
 
-  // Plots: setups/payoffs already normalized by backend to [{heading, number, description}]
+  // Plots: role fields already normalized by backend to [{heading, number, description}]
   (d.plots || []).forEach(pl => {
     pl.characters = (pl.characters || []).map(String);
   });

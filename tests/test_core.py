@@ -282,7 +282,7 @@ class TestNoteCreation:
             assert row[2] == "active"
             extra = json.loads(row[3])
             assert extra["characters"] == []
-            # setups/payoffs are relation fields, not extra JSON
+            # role fields are relation fields, not extra JSON
         finally:
             conn.close()
 
@@ -892,7 +892,7 @@ class TestUnfilledFields:
         assert "setups" not in result
         assert "climax" not in result
         assert "crisis" in result
-        assert "payoffs" in result
+        assert "resolutions" in result
         bare = {"name": "X", "status": "active"}
         assert "setups" in unfilled_fields("plot", bare)
 

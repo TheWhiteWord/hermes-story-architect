@@ -602,7 +602,7 @@ def get_project_summary(project_path: Path) -> dict:
                 "value_arc": plot["value_arc"],
                 "characters": plot["characters"],
             }
-            # No setups/crisis/climax/payoffs: view='dramatic_elements' with
+            # No setups/complications/crisis/climax/resolutions: view='dramatic_elements' with
             # add_plot carries all four per scene, with the beat's own prose,
             # and story_retrieve returns the plot whole. Repeating the bare
             # scene ids here bought nothing in the view that must stay small.
