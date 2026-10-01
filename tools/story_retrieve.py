@@ -162,7 +162,10 @@ def _unfilled(conn, data: dict, entity_type: str) -> list:
             "SELECT 1 FROM relations WHERE to_id=? AND kind LIKE 'plot_%' LIMIT 1",
             (data["id"],)).fetchone():
         extra["plot_roles"] = [1]
-    return unfilled_fields(entity_type, extra)
+    # `data` IS the row (see _row_data), so the column-backed fields —
+    # scene.location, plot.one_sentence, project.logline, location.world —
+    # are visible here instead of being reported as gaps.
+    return unfilled_fields(entity_type, extra, data)
 
 
 def _sections(conn, entity_id: str, wanted) -> dict:

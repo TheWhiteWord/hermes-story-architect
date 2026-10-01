@@ -722,7 +722,8 @@ def get_unfilled_map(project_path: Path) -> dict:
     try:
         conn = sqlite3.connect(str(db_path))
         ent_rows = conn.execute(
-            "SELECT id, type, name, one_sentence, status, extra FROM entities WHERE type != 'project' AND is_deleted=0"
+            "SELECT id, type, name, one_sentence, status, extra, location_id, parent_id "
+            "FROM entities WHERE type != 'project' AND is_deleted=0"
         ).fetchall()
         # Relation-sourced fields (scene chars/loc, plot beats) for accurate unfilled detection
         scene_chars = {}
@@ -743,8 +744,15 @@ def get_unfilled_map(project_path: Path) -> dict:
 
         from .entity import unfilled_fields
         unfilled_inv = {}
-        for eid, etype, name, one_sentence, status, extra_json in ent_rows:
+        for eid, etype, name, one_sentence, status, extra_json, loc_id, parent_id in ent_rows:
             extra = json.loads(extra_json) if extra_json else {}
+            # The row, so `unfilled_fields` can see the fields that live in
+            # columns. It used to be handed `extra` alone and each column was
+            # merged in by hand, one type at a time — which is how four of them
+            # went missing and were reported as gaps on filled data.
+            row = {"id": eid, "type": etype, "name": name,
+                   "one_sentence": one_sentence, "status": status,
+                   "location_id": loc_id, "parent_id": parent_id}
 
             if etype == "scene":
                 # `status == planned` only, matching `_is_scene_stub` above.
@@ -752,10 +760,6 @@ def get_unfilled_map(project_path: Path) -> dict:
                 # defect and the same fix; see the comment on that helper.
                 if status == "planned":
                     continue  # stub
-                if status:
-                    extra = {**extra, "status": status}
-                if one_sentence:
-                    extra = {**extra, "one_sentence": one_sentence}
                 # A scene that records no cast is a decision (no_cast), not a gap.
                 # Without this it is flagged forever, which trains the author to
                 # ignore the characters gap — the opposite of what it is for.
@@ -763,23 +767,24 @@ def get_unfilled_map(project_path: Path) -> dict:
                     extra = {**extra, "characters": ["__none__"]}
                 if scene_chars.get(eid):
                     extra = {**extra, "characters": scene_chars[eid]}
+                # The relation is kept alongside the column on purpose. They
+                # agree today and the same write path sets both, but they are
+                # two stores and `location_id` is what unfilled_fields now
+                # reads — so if a location ever moved by relation alone, this
+                # view would report a gap on a scene that has one. One line to
+                # not have to reason about that.
                 if scene_loc.get(eid):
                     extra = {**extra, "location": scene_loc[eid]}
             elif etype == "arc_beat":
                 if not name:
                     continue  # stub — label stored in name column
-            elif etype in ("sequence", "plot", "act"):
-                if status:
-                    extra = {**extra, "status": status}
-                if etype == "plot":
-                    if one_sentence:
-                        extra = {**extra, "one_sentence": one_sentence}
-                    # Plot beats live in relations, not extra — merge for unfilled check
-                    for beat_field, ids in plot_beats.get(eid, {}).items():
-                        if ids:
-                            extra = {**extra, beat_field: ids}
+            elif etype == "plot":
+                # Plot beats live in relations, not extra — merge for unfilled check
+                for beat_field, ids in plot_beats.get(eid, {}).items():
+                    if ids:
+                        extra = {**extra, beat_field: ids}
 
-            for field in unfilled_fields(etype, extra):
+            for field in unfilled_fields(etype, extra, row):
                 unfilled_inv.setdefault(field, []).append(eid)
         return unfilled_inv
     except Exception:

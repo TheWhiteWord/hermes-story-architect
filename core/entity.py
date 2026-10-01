@@ -322,8 +322,21 @@ def _is_empty(value, default) -> bool:
     return value == default
 
 
-def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
+def unfilled_fields(entity_type: str, extra: dict, row: dict | None = None) -> list[str]:
     """Return list of optional field names that hold no user-supplied value.
+
+    `row` is the entity's DB row. It is optional so the many callers that only
+    have the `extra` blob keep working, but every caller that HAS the row
+    should pass it: four fields live in columns rather than in `extra`, and
+    without the row this function cannot see them and reports them as gaps
+    while the same field is returned with a real value one call earlier.
+
+    That is not a cosmetic disagreement. `project.logline`, `plot.one_sentence`,
+    `location.world` and `scene.location` were all reported unfilled on live
+    data that had them filled — an author reading the unfilled view is told to
+    write something they already wrote.
+
+    `extra` is not mutated; the columns are layered on a copy.
 
     Sub-field rule (generalized, driven by `sub_fields` in ENTITY_SCHEMAS):
     - Parent empty → report parent name (e.g. `perspectives`, `setups`)
@@ -334,6 +347,13 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
       = filled; entry notes are optional prose)
     """
     from .constants import ENTITY_SCHEMAS
+    if row:
+        # Layer the column-backed fields over `extra`. `extra` wins on a
+        # collision: it is the newer value if a field ever moves out of a
+        # column, and a stale column must not shadow what was just written.
+        extra = {**{f: row.get(col) for f, col in
+                    ENTITY_COLUMN_MAP.get(entity_type, {}).items()},
+                **extra}
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     unfilled = []
     for field, meta in schema.items():
