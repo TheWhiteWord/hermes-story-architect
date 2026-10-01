@@ -1,0 +1,159 @@
+{
+  "note": "Live capture: story_load(project='browser-verification-test', view='dramatic_elements', add_plot=true) — THE plot-role surface. Captured 2026-10-01 against the installed plugin after task 31.",
+  "findings": [
+    "There is no view='plots'. The only story_load surface carrying plot roles is dramatic_elements with add_plot=true, which hangs them off each SCENE as plots[][{plot, role, description}].",
+    "Roles are per (scene, plot) entry, so the multi-scene-per-role case is representable and confirmed: the-resistance/setup appears on TWO scenes (central-room-day AND garden-dream).",
+    "the-core-day carries THREE entries at once — resolution for the-resistance, and climax + resolution for the-scientists-last-stand — so one scene serving two plots in two different roles works.",
+    "dramatic_role (the scene's own function) and plots[].role (the scene's function FOR A GIVEN PLOT) are independent and can disagree, which is correct: central-room-night is dramatic_role=climax but serves crisis for both plots; the-door-closes is dramatic_role=resolution but serves climax.",
+    "add_plot defaults to OFF and roughly doubles the view when on, so an agent asking 'what does this plot need' pays for every scene's plot data to find one plot's."
+  ],
+  "role_coverage": {
+    "the-resistance": {
+      "setup": ["central-room-day", "garden-dream"],
+      "complication": ["garden-day"],
+      "crisis": ["central-room-night"],
+      "climax": ["the-door-closes"],
+      "resolution": ["the-core-day"],
+      "all_five_roles_present": true,
+      "roles_split_across_multiple_scenes": ["setup"]
+    },
+    "the-scientists-last-stand": {
+      "setup": ["central-room-day"],
+      "complication": [],
+      "crisis": ["central-room-night"],
+      "climax": ["the-core-day"],
+      "resolution": ["the-core-day"],
+      "all_five_roles_present": false,
+      "note": "complications deliberately left empty — this is live data exercising the unfilled case."
+    }
+  },
+  "payload": {
+    "view": "dramatic_elements",
+    "act": "all",
+    "acts": [
+      {
+        "id": "act-1",
+        "title": "Act One",
+        "sequences": [
+          {
+            "id": "seq-discovery",
+            "title": "The Discovery",
+            "scenes": [
+              {
+                "id": "central-room-day",
+                "title": "Central Room - Day",
+                "status": "drafted",
+                "dramatic_role": "setup",
+                "plots": [
+                  {
+                    "plot": "the-resistance",
+                    "role": "setup",
+                    "description": "Kael discovers the door isn't locked — it was never locked."
+                  },
+                  {
+                    "plot": "the-scientists-last-stand",
+                    "role": "setup",
+                    "description": "The scientists first realize the Institute is failing — and the children are the only survivors."
+                  }
+                ]
+              },
+              {
+                "id": "central-room-night",
+                "title": "Central Room - Night",
+                "status": "drafted",
+                "dramatic_role": "climax",
+                "plots": [
+                  {
+                    "plot": "the-resistance",
+                    "role": "crisis",
+                    "description": "The Administrator makes its final offer. Kael refuses."
+                  },
+                  {
+                    "plot": "the-scientists-last-stand",
+                    "role": "crisis",
+                    "description": "Dr. Voss argues with Marcus about whether to wake the children or let them sleep forever."
+                  }
+                ]
+              },
+              {
+                "id": "the-core-day",
+                "title": "The Core - Day",
+                "status": "written",
+                "dramatic_role": "resolution",
+                "plots": [
+                  {
+                    "plot": "the-resistance",
+                    "role": "resolution",
+                    "description": "The children emerge into the real world for the first time."
+                  },
+                  {
+                    "plot": "the-scientists-last-stand",
+                    "role": "climax",
+                    "description": "The last scientist seals the door from the inside — the ultimate sacrifice that becomes the children's prison."
+                  },
+                  {
+                    "plot": "the-scientists-last-stand",
+                    "role": "resolution",
+                    "description": "The door is sealed. The children will wake 400 years later with no idea what was done to save them."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "act-2",
+        "title": "Act II",
+        "sequences": [
+          {
+            "id": "seq-confrontation",
+            "title": "The Confrontation",
+            "scenes": [
+              {
+                "id": "garden-day",
+                "title": "Garden - Day",
+                "status": "drafted",
+                "dramatic_role": "setup",
+                "plots": [
+                  {
+                    "plot": "the-resistance",
+                    "role": "complication",
+                    "description": "Kael returns to the Garden, but something has changed."
+                  }
+                ]
+              },
+              {
+                "id": "garden-dream",
+                "title": "Garden Dream",
+                "status": "drafted",
+                "dramatic_role": "setup",
+                "plots": [
+                  {
+                    "plot": "the-resistance",
+                    "role": "setup",
+                    "description": "The spirals in the Garden dream are wrong. Kael cannot say why."
+                  }
+                ]
+              },
+              {
+                "id": "the-door-closes",
+                "title": "The Door Closes",
+                "status": "written",
+                "dramatic_role": "resolution",
+                "plots": [
+                  {
+                    "plot": "the-resistance",
+                    "role": "climax",
+                    "description": "Kael chooses to leave — not because the system is wrong, but because staying is."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "add_plot": true
+  }
+}

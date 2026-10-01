@@ -17,8 +17,7 @@ BATCH = [
     {"op": "create", "type": "scene", "id": "mira-tells-kael",
      "frontmatter": {"title": "The Telling", "sequence_id": "seq-discovery",
                      "act_id": "act-1", "status": "drafted", "time_of_day": "DUSK",
-                     "location": "the-central-room", "characters": ["mira", "kael"],
-                     "dramatic_role": "crisis"},
+                     "location": "the-central-room", "characters": ["mira", "kael"]},
      "sections": {"Objective": "Mira confesses the reservoir is failing."},
      "summary": "New scene: The Telling"},
     {"op": "edit", "entity_type": "location", "entity_id": "the-central-room",
@@ -59,7 +58,9 @@ def test_the_block_carries_the_field_count(fixture_path):
     md = stage(fixture_path, BATCH, "The Telling")["preview_md"]
     offered = len([f for f, m in ENTITY_SCHEMAS["scene"].items()
                    if not m.get("computed")])
-    assert f"8 of {offered} fields set" in md, md
+    # 7 set. `dramatic_role` no longer names a role, so BATCH drops it; the
+    # count tracks the fields the batch actually sets, not a remembered total.
+    assert f"7 of {offered} fields set" in md, md
 
 
 def test_the_count_never_enumerates_the_empty_fields(fixture_path):

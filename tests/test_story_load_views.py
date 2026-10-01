@@ -180,11 +180,16 @@ class TestDramaticElementsView:
         assert [s["id"] for s in scenes] == [
             "central-room-day", "central-room-night", "the-core-day"]
 
-    def test_carries_the_dramatic_role(self, project):
+    def test_carries_the_plot_role_per_plot(self, project):
+        """The role is per plot now, so the flat `dramatic_role` is gone from
+        this view and the roles arrive in `plots[]` (see the add_plot tests).
+        What is left on the scene is the plot-LESS case, which must not be
+        reported for an ordinary scene — "plot_role" restates the storage and
+        would read as if the scene had exactly one role."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
-        assert scenes[0]["dramatic_role"] == "setup"
-        assert scenes[1]["dramatic_role"] == "climax"
+        assert all("dramatic_role" not in s for s in scenes)
+        assert all("no_plot_function" not in s for s in scenes)
 
     def test_plots_are_absent_unless_asked_for(self, project):
         scenes = (load(project, view="dramatic_elements")["acts"][0]

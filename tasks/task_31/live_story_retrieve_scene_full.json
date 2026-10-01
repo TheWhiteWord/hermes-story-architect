@@ -1,0 +1,127 @@
+{
+  "note": "Live capture: story_retrieve(project='browser-verification-test', entity_type='scene', fields=['all'], sections=['all']) for the two scenes that carry plot roles. Captured 2026-10-01 against the installed plugin after task 31.",
+  "why_these_two": {
+    "the-core-day": "3 role entries across 2 plots — the multi-plot, multi-role shape",
+    "garden-dream": "the SECOND setup entry on the-resistance, proving one role split across two scenes"
+  },
+  "findings": [
+    "plot_roles IS included in fields=['all'] for a scene, unlike the plot's own five role fields which are computed and therefore excluded. Asymmetric but correct: on the scene the roles are real stored data, on the plot they are derived.",
+    "the-core-day proves the hard case: three entries, two distinct plots, and the-scientists-last-stand appears TWICE with different roles (climax AND resolution). One scene, one plot, two roles — legal and correctly stored. The relations PK is (from_id, to_id, kind) so this could not collide.",
+    "garden-dream proves the split case: it holds the-resistance/setup, and central-room-day holds the-resistance/setup too. Two scenes, one role, one plot. The plot side reads them back as a 2-element list.",
+    "location IS returned correctly ('the-garden', 'the-garden-dream') yet BOTH scenes list location in unfilled_fields. Confirms the false gap: location is a column plus a relation, never an extra key, so unfilled_fields cannot see it. Two scenes, two confirmations.",
+    "unfilled_fields also lists 'characters' for garden-dream, which is genuinely empty ([]) — that one is a true gap. So the list mixes true and false entries with nothing to tell them apart.",
+    "'type': 'scene' is returned as a field, echoing the id back at the caller. Harmless but it is not a field a caller sets.",
+    "Prose sections survive fully: Content (the screenplay), Objective, Dramatic Function and Notes all round-tripped through the MD import. the-core-day's Objective ('The children emerge into the real world for the first time.') is character-for-character the same sentence as its plot_roles description for the-resistance/resolution — the prose and the structured role agree, which is the consistency worth checking.",
+    "garden-dream has a written screenplay (Content, with dialogue) but empty Objective/Conflict/Beats/Value Turn/Dramatic Function/Notes. Not a defect — those sections are simply not written yet — but it means a scene can be substantially authored and still report six unfilled prose sections."
+  ],
+  "role_entry_shape": {
+    "plot": "slug of an existing plot",
+    "role": "one of: setup, complication, crisis, climax, resolution",
+    "description": "what this scene does for that plot (free text, per-entry)"
+  },
+  "payload": {
+    "entity_type": "scene",
+    "entities": [
+      {
+        "id": "the-core-day",
+        "fields": {
+          "y": 0.7,
+          "value_at_open": "positive",
+          "sequence_id": "seq-discovery",
+          "status": "written",
+          "is_act_climax": false,
+          "title": "The Core - Day",
+          "characters": ["kael", "mira"],
+          "dramatic_role": "resolution",
+          "is_story_climax": false,
+          "heading": "EXT. THE CORE - DAY",
+          "is_sequence_climax": false,
+          "order": 3.0,
+          "plot_roles": [
+            {
+              "plot": "the-resistance",
+              "role": "resolution",
+              "description": "The children emerge into the real world for the first time."
+            },
+            {
+              "plot": "the-scientists-last-stand",
+              "role": "climax",
+              "description": "The last scientist seals the door from the inside — the ultimate sacrifice that becomes the children's prison."
+            },
+            {
+              "plot": "the-scientists-last-stand",
+              "role": "resolution",
+              "description": "The door is sealed. The children will wake 400 years later with no idea what was done to save them."
+            }
+          ],
+          "value_at_close": "positive",
+          "location": "the-garden",
+          "act_id": "act-1",
+          "one_sentence": "",
+          "is_inciting_incident": false,
+          "type": "scene",
+          "time_of_day": "DAY",
+          "shift": "self-trust → earned trust in each other",
+          "conflict_levels": ["extra-personal"],
+          "no_cast": false
+        },
+        "unfilled_fields": ["one_sentence", "location"],
+        "sections": {
+          "Content": "EXT. THE CORE - DAY\n\nThe children step through the door. Blinking. Silent. The sky is impossibly large.\n\nMIRA\nIt's real. It's all real.\n\nKAEL\nWe're free.\n\nMIRA\nWhat do we do now?\n\nKAEL\nWe live.\n\nThey stand together, facing the horizon. The door closes behind them for the last time.",
+          "Objective": "The children emerge into the real world for the first time.",
+          "Conflict": "",
+          "Beats": "",
+          "Value Turn": "",
+          "Dramatic Function": "Resolution. The world is real, and it is vast.",
+          "Production": "",
+          "Notes": "Silence. No music. Just wind."
+        }
+      },
+      {
+        "id": "garden-dream",
+        "fields": {
+          "y": 0.0,
+          "value_at_open": "positive",
+          "sequence_id": "seq-confrontation",
+          "status": "drafted",
+          "is_act_climax": false,
+          "title": "Garden Dream",
+          "characters": [],
+          "dramatic_role": "setup",
+          "is_story_climax": false,
+          "heading": "EXT. THE GARDEN - DAY",
+          "is_sequence_climax": false,
+          "order": 2.0,
+          "plot_roles": [
+            {
+              "plot": "the-resistance",
+              "role": "setup",
+              "description": "The spirals in the Garden dream are wrong. Kael cannot say why."
+            }
+          ],
+          "value_at_close": "negative",
+          "location": "the-garden-dream",
+          "act_id": "act-2",
+          "one_sentence": "Kael dreams of the Garden — but the spirals are wrong.",
+          "is_inciting_incident": false,
+          "type": "scene",
+          "time_of_day": "DAY",
+          "shift": "",
+          "conflict_levels": ["inner"],
+          "no_cast": false
+        },
+        "unfilled_fields": ["location", "characters", "shift"],
+        "sections": {
+          "Content": "EXT. THE GARDEN - DAY\n\nKael walks through the grass. But the grass is wrong — spiraling inward, following a geometry that has no name. The flowers still open and close, but not with the sun. With Kael's breathing.\n\nThe sky is the perfect blue. Too perfect. The blue of something that has never seen weather. But the clouds move — slow, deliberate, thinking.\n\nMIRA (V.O.)\nYou're not really here.\n\nKAEL\nI know.\n\nMIRA (V.O.)\nThen why stay?\n\nKael kneels. The grass bends — but it bends in the wrong direction, toward the hand instead of away. The spiral tightens.\n\nKAEL\nBecause here, the seams show. And I can see what's behind them.\n\nThe dream tightens around Kael. Not threatening. Waiting. The garden — this garden — is not the real one. But it is honest in a way the real one never was.\n\nKAEL\nI'll come back.\n\nMIRA (V.O.)\nYou always do.",
+          "Objective": "",
+          "Conflict": "",
+          "Beats": "",
+          "Value Turn": "",
+          "Dramatic Function": "",
+          "Production": "",
+          "Notes": ""
+        }
+      }
+    ]
+  }
+}

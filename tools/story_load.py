@@ -293,8 +293,15 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                     "id": scene_id,
                     "title": scene_title,
                     "status": status,
-                    "dramatic_role": extra.get("dramatic_role", ""),
                 }
+                # Only the plot-less case is emitted. `dramatic_role` used to
+                # carry the scene's single dramatic role, which is why this
+                # view could name one; now the role is per plot and arrives in
+                # `plots[]` below. What is left here is the scene that serves NO
+                # plot, and that is worth saying out loud — it is the reason a
+                # reader looking for a missing role does not find one.
+                if extra.get("dramatic_role") in ("transition", "non-event"):
+                    scene["no_plot_function"] = extra["dramatic_role"]
                 for marker in ("is_setup", "is_turning_point", "is_crisis",
                                "is_climax", "is_resolution"):
                     if extra.get(marker):

@@ -171,7 +171,10 @@ DASH.populateStructuralStats = function() {
   // Dramatic role bars
   const roleContainer = document.getElementById('structStats-role-bars');
   if (roleContainer) {
-    const roleColors = { setup: '#7b9cf0', complication: '#e0c96b', crisis: '#e07070', climax: '#b07be0', resolution: '#6bbfb0', transition: '#888', unset: '#444' };
+    // Keys are the five plot roles (from the `plot_<role>` relation kinds) plus
+    // the two plot-less markers. `unset` is gone: a scene with no role row is
+    // simply absent from the count, which is what "not assigned" should mean.
+    const roleColors = { setup: '#7b9cf0', complication: '#e0c96b', crisis: '#e07070', climax: '#b07be0', resolution: '#6bbfb0', transition: '#888', 'non-event': '#5a5a5a' };
     const roles = ss.sceneRoles || {};
     const total = Object.values(roles).reduce((a, b) => a + b, 0);
     roleContainer.innerHTML = Object.entries(roles).map(([key, count]) => {

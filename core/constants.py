@@ -7,7 +7,11 @@ SCENE_STATUSES = ["planned", "drafted", "written", "locked"]
 SEQUENCE_STATUSES = ["planned", "in-progress", "complete"]
 ACT_STATUSES = ["planned", "in-progress", "complete"]
 SCENE_TIMES_OF_DAY = ["DAY", "NIGHT", "DUSK", "DAWN", "CONTINUOUS", "LATER"]
-SCENE_DRAMATIC_ROLES = ["setup", "complication", "crisis", "climax", "resolution", "transition", "non-event"]
+# A scene's dramatic function. `plot_role` is the ordinary case: the role is
+# defined per plot in the scene's `plot_roles`, never here. The other two are
+# the only reasons a scene can serve NO plot — a bridge between beats, or a
+# beat that moves nothing. They are mutually exclusive with `plot_roles`.
+SCENE_DRAMATIC_ROLES = ["plot_role", "transition", "non-event"]
 VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
@@ -150,7 +154,7 @@ ENTITY_SCHEMAS = {
         "shift": {"type": "string", "default": "", "optional": True, "description": "How the story value turns here, in the story's language (e.g. 'trust → suspicion')."},
         "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on the story value after this scene's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the story-value curve passes through."},
         "conflict_levels": {"type": "list", "default": [], "optional": True, "description": "Any of: inner, personal, extra-personal"},
-        "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "One of: setup, complication, crisis, climax, resolution, transition, non-event"},
+        "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "How this scene functions dramatically. One of: plot_role, transition, non-event. 'plot_role' (or empty) means the role is defined per plot in plot_roles — do NOT repeat it here. 'transition' and 'non-event' are the only values that serve no plot, and they are mutually exclusive with plot_roles: setting one requires plot_roles to be empty."},
         # The write side of a plot role. Every entry names its own plot, so one
         # scene can hold different roles in different plots — which is why the
         # role cannot live on the scene alone. Stored as `plot_<role>` rows

@@ -633,6 +633,47 @@ def validate_scene_plot_roles(project_path, entries) -> None:
         conn.close()
 
 
+def validate_scene_dramatic_role(dramatic_role, plot_roles) -> None:
+    """Raise ValueError when `dramatic_role` and `plot_roles` contradict each other.
+
+    A scene's role belongs to a plot, so it lives in `plot_roles` — one entry
+    per plot, because one scene can be a climax for one plot and a
+    complication for another. `dramatic_role` therefore carries no role at
+    all; it only distinguishes the scenes that serve NO plot from those that
+    do. There are exactly two ways to serve no plot, and they are mutually
+    exclusive with carrying roles:
+
+        transition / non-event  ->  plot_roles must be empty
+        plot_role / empty        ->  plot_roles may be set
+
+    The two rules are both needed. Without the first, an agent can mark a
+    scene a non-event and still give it a climax, and the scene then claims
+    to move nothing while demonstrably moving something — with no reader able
+    to reconcile them, since one is on the scene and the other is reached
+    through the plot. Without the second, `plot_role` would be a word that
+    asserts nothing.
+
+    The error names the fix rather than the rule, because the agent hitting
+    it is holding both halves of a contradiction and needs to be told which
+    one to drop.
+    """
+    if not dramatic_role:
+        return
+    if dramatic_role in ("transition", "non-event"):
+        if plot_roles:
+            raise ValueError(
+                f"dramatic_role is '{dramatic_role}', which means this scene "
+                f"serves no plot — but plot_roles has "
+                f"{len(plot_roles)} entr{'y' if len(plot_roles) == 1 else 'ies'}. "
+                f"A scene cannot be both. Either clear plot_roles, or set "
+                f"dramatic_role to 'plot_role' and keep the roles."
+            )
+        return
+    # `plot_role`: the roles themselves carry the meaning, so an empty list
+    # is not an error — the scene may simply not be placed against a plot yet.
+    return
+
+
 def validate_arc_parents(project_path, character: str, scene: str) -> None:
     """Raise ValueError if character or scene doesn't exist in DB."""
     from core.db import get_db

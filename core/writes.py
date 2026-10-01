@@ -196,8 +196,11 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                 if act_id:
                     validate_scene_act_id(project_path, sequence_id, act_id)
             validate_scene_location(project_path, merged.get("location", ""))
-            from .entity import validate_scene_plot_roles
+            from core.entity import (validate_scene_dramatic_role,
+                                     validate_scene_plot_roles)
             validate_scene_plot_roles(project_path, merged.get("plot_roles", []))
+            validate_scene_dramatic_role(merged.get("dramatic_role", ""),
+                                         merged.get("plot_roles", []))
 
         # Validate plot characters reference existing entities
         if entity_type == "plot":
@@ -353,6 +356,34 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 f"Valid field examples: {', '.join(examples)}. "
                 f"Valid section examples: {', '.join(sorted(standard_sections)[:5])}."
             )
+
+        # ── Reject a self-contradicting scene BEFORE writing anything ──
+        # Checked against the MERGED state, not just `data`: an edit that sets
+        # only `dramatic_role: transition` must be caught against the roles
+        # already stored, and an edit that sets only `plot_roles` must be
+        # caught against the `dramatic_role` already stored. Validating `data`
+        # alone would let each half pass and land the contradiction on disk.
+        if entity_type == "scene" and ("dramatic_role" in data
+                                        or "plot_roles" in data):
+            from .entity import validate_scene_dramatic_role
+            stored = conn.execute(
+                "SELECT extra FROM entities WHERE id=?", (entity_id,)
+            ).fetchone()
+            stored_extra = json.loads(stored[0]) if stored and stored[0] else {}
+            merged_role = data.get("dramatic_role",
+                                   stored_extra.get("dramatic_role", ""))
+            if "plot_roles" in data:
+                merged_roles = data["plot_roles"]
+            else:
+                merged_roles = [
+                    {"plot": pid, "role": kind[len("plot_"):], "description": note}
+                    for pid, kind, note in conn.execute(
+                        "SELECT from_id, kind, note FROM relations "
+                        "WHERE to_id=? AND kind LIKE 'plot_%' ORDER BY \"order\"",
+                        (entity_id,),
+                    ).fetchall()
+                ]
+            validate_scene_dramatic_role(merged_role, merged_roles)
 
         applied_fields = []
         applied_sections = []

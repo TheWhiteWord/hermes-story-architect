@@ -470,8 +470,14 @@ def get_project_summary(project_path: Path) -> dict:
 
 
         # ── Helpers ──
+        # A stub is a scene that does not exist yet, and `status` is the only
+        # thing that says so. It USED to be `status == planned OR no
+        # dramatic_role`, back when an empty dramatic_role meant "not shaped
+        # yet". Now the role lives in `plot_roles` and this field only says
+        # transition/non-event, so keying a stub on it would collapse every
+        # ordinary scene — which has no dramatic_role — to a bare id.
         def _is_scene_stub(s):
-            return s["status"] == "planned" or not s["dramatic_role"]
+            return s["status"] == "planned"
 
         def _milestone_marker(extra):
             if extra.get("is_inciting_incident"):
@@ -722,7 +728,10 @@ def get_unfilled_map(project_path: Path) -> dict:
             extra = json.loads(extra_json) if extra_json else {}
 
             if etype == "scene":
-                if status == "planned" or not extra.get("dramatic_role", ""):
+                # `status == planned` only, matching `_is_scene_stub` above.
+                # The dramatic_role clause that used to sit here had the same
+                # defect and the same fix; see the comment on that helper.
+                if status == "planned":
                     continue  # stub
                 if status:
                     extra = {**extra, "status": status}
@@ -1376,12 +1385,32 @@ def get_dashboard_data(project_path: Path) -> dict:
         ).fetchall()
         scene_status = dict(status_rows)
 
+        # Dramatic roles are counted from the `plot_<role>` RELATIONS, not from
+        # the scene's `dramatic_role`. That field no longer holds a role — it
+        # only says plot_role / transition / non-event — so grouping on it
+        # produced a chart of "plot_role: 6", which reports the storage
+        # decision rather than the shape of the story. The relations are where
+        # the roles actually live, and this is the same fact the plot's five
+        # computed fields report per plot.
         role_rows = conn.execute(
-            "SELECT json_extract(extra, '$.dramatic_role'), COUNT(*) "
-            "FROM entities WHERE type='scene' AND is_deleted=0 "
-            "GROUP BY json_extract(extra, '$.dramatic_role')"
+            "SELECT kind, COUNT(*) FROM relations "
+            "WHERE kind LIKE 'plot\\_%' ESCAPE '\\' "
+            "AND to_id IN (SELECT id FROM entities WHERE type='scene' AND is_deleted=0) "
+            "AND from_id NOT IN (SELECT id FROM entities WHERE is_deleted=1) "
+            "GROUP BY kind"
         ).fetchall()
-        scene_roles = {r[0] or "unset": r[1] for r in role_rows}
+        scene_roles = {r[0][len("plot_"):]: r[1] for r in role_rows}
+        # transition / non-event are counted too, or the chart silently omits
+        # every scene that serves no plot — the very ones a reader is looking
+        # for when a role looks thin.
+        special = conn.execute(
+            "SELECT json_extract(extra, '$.dramatic_role') AS dr, COUNT(*) "
+            "FROM entities WHERE type='scene' AND is_deleted=0 "
+            "AND json_extract(extra, '$.dramatic_role') IN ('transition','non-event') "
+            "GROUP BY dr"
+        ).fetchall()
+        for dr, count in special:
+            scene_roles[dr] = scene_roles.get(dr, 0) + count
 
         seq_count = conn.execute(
             "SELECT COUNT(*) FROM entities WHERE type='sequence' AND is_deleted=0 "

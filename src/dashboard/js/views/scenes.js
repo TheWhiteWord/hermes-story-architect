@@ -36,14 +36,26 @@ DASH.renderSceneItem = function(s) {
     const l = DASH.findLocation(lref);
     return l ? `<span class="tag tag-location">${DASH.escapeHtml(l.name)}</span>` : '';
   }).join('');
-  // Structural tags: dramatic_role + climax flags (orange)
+  // Structural tags: per-plot roles + climax flags (orange).
+  // The role is per plot, so it is read from `plots[]` (each entry's `role`)
+  // and labelled with the plot it belongs to. A scene serving no plot carries
+  // no entry there, and says so via its `dramatic_role` transition/non-event.
+  const roleTags = (s.plots || []).map(p => {
+    const plot = (DASH.story.plots || []).find(x => x.id === p.id);
+    const label = plot ? `${plot.name}: ${p.role}` : p.role;
+    return `<span class="tag tag-struct">${DASH.escapeHtml(label)}</span>`;
+  }).join('');
   const structTags = [];
-  if (s.dramatic_role) structTags.push(s.dramatic_role);
+  if ((s.plots || []).length === 0
+      && (s.dramatic_role === 'transition' || s.dramatic_role === 'non-event')) {
+    structTags.push(s.dramatic_role);
+  }
   if (s.is_inciting_incident) structTags.push('inciting');
   if (s.is_sequence_climax) structTags.push('seq-climax');
   if (s.is_act_climax) structTags.push('act-climax');
-  if (s.is_story_climax) structTags.push('DASH.story-climax');
-  const structHtml = structTags.map(t => `<span class="tag tag-struct">${t}</span>`).join('');
+  if (s.is_story_climax) structTags.push('story-climax');
+  const structHtml = roleTags
+    + structTags.map(t => `<span class="tag tag-struct">${DASH.escapeHtml(t)}</span>`).join('');
   // Arc beat indicator dots
   const arcBeatDots = (s.arc_beats || []).map(ab => {
     const c = (DASH.story.characters || []).find(x => x.id === ab.character || String(x.id) === String(ab.character));

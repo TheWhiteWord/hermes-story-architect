@@ -497,6 +497,13 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
                 f"plot_roles, or on the arc beat / relationship that derives it.")
         if k not in s and v not in (None, "", [], {}):
             extra[k] = v
+    # The one cross-field rule a scene has. The importer is a write path like
+    # any other, so it enforces the same invariant — otherwise a hand-edited
+    # note could import a contradiction the write tools would have refused.
+    if entity_type == "scene":
+        from core.entity import validate_scene_dramatic_role
+        validate_scene_dramatic_role(extra.get("dramatic_role", ""),
+                                     fm.get("plot_roles", []))
     return extra
 
 

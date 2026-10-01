@@ -430,13 +430,28 @@ DASH.showScenePanel = function(sceneId) {
     contentHtml = '<div class="panel-muted">No content yet.</div>';
   }
 
-  // Dramatic metadata — only show positive values
+  // Dramatic metadata — only show positive values.
+  // The role is per plot, so each `plots[]` entry becomes its own tag naming
+  // the plot and the role it plays there. `dramatic_role` is only surfaced
+  // when the scene serves no plot at all — otherwise it says "plot_role",
+  // which restates the storage and tells a reader nothing.
   const dramaTags = [];
-  if (scene.dramatic_role) dramaTags.push({ l: 'role', v: scene.dramatic_role });
+  (scene.plots || []).forEach(p => {
+    const plot = (DASH.story.plots || []).find(x => x.id === p.id);
+    dramaTags.push({
+      l: 'role',
+      v: plot ? `${plot.name}: ${p.role}` : p.role,
+      title: p.description || '',
+    });
+  });
+  if ((scene.plots || []).length === 0
+      && (scene.dramatic_role === 'transition' || scene.dramatic_role === 'non-event')) {
+    dramaTags.push({ l: 'role', v: scene.dramatic_role });
+  }
   if (scene.is_inciting_incident) dramaTags.push({ l: 'inciting', v: 'Inciting Incident' });
   if (scene.is_sequence_climax) dramaTags.push({ l: 'seq-climax', v: 'Sequence Climax' });
   if (scene.is_act_climax) dramaTags.push({ l: 'act-climax', v: 'Act Climax' });
-  if (scene.is_story_climax) dramaTags.push({ l: 'DASH.story-climax', v: 'Story Climax' });
+  if (scene.is_story_climax) dramaTags.push({ l: 'story-climax', v: 'Story Climax' });
 
   const valueArc = [scene.value_at_open, scene.value_at_close].filter(Boolean);
   const conflicts = (scene.conflict_levels || []).filter(Boolean);
