@@ -225,27 +225,30 @@
 .knowledge-item::before { content: '→'; opacity: 0.5; flex-shrink: 0; }
 .knowledge-item:last-child { border-bottom: none; }
 
-/* Scene rows in the plot panel's role sections */
-.beat-row {
+/* A two-line reference row: name, then the small print under it.
+   Used wherever a panel lists entities compactly — acts, sequences, plots,
+   scenes, plot role sections, the stats panel. Named for the structure, not
+   for any one caller, so a new caller doesn't have to invent a class. */
+.entity-row {
   padding: 5px 0;
   border-bottom: 1px solid var(--border);
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
   line-height: 1.5;
 }
-.beat-row .beat-scene {
+.entity-row .entity-row-name {
   display: block;
   font-size: var(--font-size-xs);
   color: var(--accent);
   margin-bottom: 2px;
 }
-.beat-row .beat-desc {
+.entity-row .entity-row-sub {
   display: block;
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
   font-style: italic;
 }
-.beat-row:last-child { border-bottom: none; }
+.entity-row:last-child { border-bottom: none; }
 
 /* Narrow layout */
 @media (max-width: 520px) {

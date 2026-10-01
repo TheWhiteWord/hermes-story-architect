@@ -335,6 +335,37 @@ class TestActuallyRenders:
             "backend no longer emits")
         assert "· BEAT" not in dom, "the old key is still being read"
 
+    def test_every_class_the_panels_use_exists_in_the_css(self, vault):
+        """A renamed class that misses the CSS un-styles a panel, silently.
+
+        Same failure shape as the key rename this phase fixed: the HTML is
+        valid, the DOM builds, the row just loses its padding and italics.
+        Nothing else in the suite can see it, so check the two lists meet.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        css = " ".join(re.findall(r"<style[^>]*>(.*?)</style>", html, re.S))
+        js = " ".join((FIXTURE.parents[2] / "src/dashboard/js" / p).read_text()
+                      for p in ["panels/entity-panels.js", "colors.js",
+                                "statistics/statistics.js"])
+        # Capture the whole attribute, then keep only plain class tokens —
+        # skip anything holding a template hole or a space-separated group we
+        # can't resolve. A regex too narrow here would skip the very class
+        # names this test exists to catch.
+        raw = re.findall(r'class="([^"]*)"', js)
+        used = set()
+        for group in raw:
+            if "${" in group or "(" in group:
+                continue
+            used.update(c for c in group.split()
+                        if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", c))
+        missing = sorted(c for c in used if f".{c}" not in css)
+        assert used, "no class names parsed — the extractor is broken, not the CSS"
+        assert not missing, f"classes used in JS but absent from the CSS: {missing}"
+
+
     def test_all_five_roles_render_in_the_plot_panel(self, vault, tmp_path):
         """One section per role, from the same list Python pins.
 

@@ -29,7 +29,7 @@ DASH.PLOT_ROLES = ['setup', 'complication', 'crisis', 'climax', 'resolution'];
 DASH.plotRoleBadges = function(p) {
   return DASH.PLOT_ROLES
     .filter(r => p['has_' + r])
-    .map(r => `<span class="beat-desc">${r}</span>`)
+    .map(r => `<span class="entity-row-sub">${r}</span>`)
     .join('');
 }
 

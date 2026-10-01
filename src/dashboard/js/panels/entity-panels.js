@@ -9,9 +9,9 @@ DASH.showActPanel = function(actId) {
 
   const seqRows = (act.sequences_list || []).map(sid => {
     const seq = (DASH.story.sequences || []).find(s => s.id === sid);
-    return seq ? `<div class="beat-row" onclick="DASH.showSequencePanel('${sid}')">
-      <span class="beat-scene">${seq.title || sid}</span>
-      <span class="beat-desc">${seq.scene_count || 0} scenes</span>
+    return seq ? `<div class="entity-row" onclick="DASH.showSequencePanel('${sid}')">
+      <span class="entity-row-name">${seq.title || sid}</span>
+      <span class="entity-row-sub">${seq.scene_count || 0} scenes</span>
     </div>` : '';
   }).join('');
 
@@ -21,9 +21,9 @@ DASH.showActPanel = function(actId) {
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
     const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    return `<div class="beat-row" onclick="DASH.showPlotPanel('${pl.id}')">
-      <span class="beat-scene" style="color:${col}">${pl.name}</span>
-      ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
+    return `<div class="entity-row" onclick="DASH.showPlotPanel('${pl.id}')">
+      <span class="entity-row-name" style="color:${col}">${pl.name}</span>
+      ${scope ? `<span class="entity-row-sub" style="color:${col}">${scope}</span>` : ''}
       ${DASH.plotRoleBadges(p)}
     </div>`;
   }).join('');
@@ -252,7 +252,7 @@ DASH.showPlotPanel = function(plotId) {
     if (!arr || !arr.length) return '';
     return arr.map(item => {
       if (typeof item === 'string') {
-        return `<div class="beat-row">${item}</div>`;
+        return `<div class="entity-row">${item}</div>`;
       }
       // Backend normalizes to {scene_id, description}
       const sceneObj = (DASH.story.scenes || []).find(s => String(s.id) === String(item.scene_id));
@@ -260,9 +260,9 @@ DASH.showPlotPanel = function(plotId) {
       const sceneName = sceneObj ? (sceneObj.title || sceneObj.id) : (item.scene_id || '');
       if (!sceneName) return '';
       const sceneLink = sceneObj
-        ? `<span class="beat-scene" onclick="DASH.showScenePanel('${sceneObj.id}')" style="cursor:pointer">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`
-        : `<span class="beat-scene">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`;
-      return `<div class="beat-row">${sceneLink}${item.description ? `<span class="beat-desc">${item.description}</span>` : ''}</div>`;
+        ? `<span class="entity-row-name" onclick="DASH.showScenePanel('${sceneObj.id}')" style="cursor:pointer">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`
+        : `<span class="entity-row-name">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`;
+      return `<div class="entity-row">${sceneLink}${item.description ? `<span class="entity-row-sub">${item.description}</span>` : ''}</div>`;
     }).join('');
   }
 
@@ -493,9 +493,9 @@ DASH.showSequencePanel = function(seqId) {
   const sceneRows = (seq.scenes_list || []).map((sid, i) => {
     const scene = (DASH.story.scenes || []).find(s => s.id === sid);
     if (!scene) return '';
-    return `<div class="beat-row" onclick="DASH.showScenePanel('${sid}')">
-      <span class="beat-scene">${i + 1}. ${scene.title || sid}</span>
-      ${scene.heading ? `<span class="beat-desc">${DASH.escapeHtml(scene.heading)}</span>` : ''}
+    return `<div class="entity-row" onclick="DASH.showScenePanel('${sid}')">
+      <span class="entity-row-name">${i + 1}. ${scene.title || sid}</span>
+      ${scene.heading ? `<span class="entity-row-sub">${DASH.escapeHtml(scene.heading)}</span>` : ''}
     </div>`;
   }).join('');
 
@@ -505,9 +505,9 @@ DASH.showSequencePanel = function(seqId) {
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
     const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    return `<div class="beat-row" onclick="DASH.showPlotPanel('${pl.id}')">
-      <span class="beat-scene" style="color:${col}">${pl.name}</span>
-      ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
+    return `<div class="entity-row" onclick="DASH.showPlotPanel('${pl.id}')">
+      <span class="entity-row-name" style="color:${col}">${pl.name}</span>
+      ${scope ? `<span class="entity-row-sub" style="color:${col}">${scope}</span>` : ''}
       ${DASH.plotRoleBadges(p)}
     </div>`;
   }).join('');

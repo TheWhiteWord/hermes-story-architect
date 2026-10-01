@@ -211,9 +211,9 @@ DASH.populateStructuralStats = function() {
   if (actContainer) {
     const acts = ss.acts || [];
     actContainer.innerHTML = acts.map(a =>
-      `<div class="beat-row">
-        <span class="beat-scene">${DASH.escapeHtml(a.title || a.id)}</span>
-        <span class="beat-desc">${a.sceneCount || 0} scenes · ${a.sequenceCount || 0} sequences</span>
+      `<div class="entity-row">
+        <span class="entity-row-name">${DASH.escapeHtml(a.title || a.id)}</span>
+        <span class="entity-row-sub">${a.sceneCount || 0} scenes · ${a.sequenceCount || 0} sequences</span>
       </div>`
     ).join('') || '<div class="panel-muted" style="font-size:var(--font-size-xs);">No acts.</div>';
   }
