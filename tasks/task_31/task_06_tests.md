@@ -209,12 +209,36 @@ names. The test was calling a correct payload wrong. Now includes declared
 
 ### NOTE — observations, not objectives
 
-1. **The fixture DB being gitignored is the real lesson.** A build artefact that
-   tests depend on but git does not track means every "verified by stashing" claim
-   about a fixture-dependent test is unverifiable. Either commit it (`!` rule in
-   `.gitignore`) or add it in `conftest.py` from the markdown on every run — the
-   second removes the whole class. Until then, *any* future fixture edit can break a
-   test on a premise, as these three did.
+1. **The fixture DB was gitignored — the root cause of all three failures, now fixed.**
+   `.gitignore:5` is `*.db`, so `tests/fixtures/save-the-children/.story/story.db`
+   was **never tracked**. It sat in the working tree looking like a committed
+   artefact. Two consequences, both measured:
+
+   - **A fresh clone had no fixture DB, and `119 tests failed`.** The suite only
+     ever passed on a machine that happened to have a stale DB lying around.
+   - `git checkout` never restored it, which is why every "verified by stashing"
+     in phases 3–6 was evidence of nothing: the same stale DB ran regardless of
+     the commit under test. The bisect in this phase confirmed it — the failures
+     reach back to `6a8db71` because the DB never changed, not because the code
+     did.
+
+   **Fix: the DB is built from the markdown, in `conftest.build_fixture_db`,**
+   never committed. Markdown is the source of truth and is tracked; the DB is a
+   build artefact of it. Session-scoped `_built_fixture` builds it once; four test
+   files that reached past `fixture_path` for the raw fixture dir now take it, so
+   the build lives in one place. **`save-the-characters/`** is untracked, referenced
+   by no test, and its DB has been deleted with it.
+
+   Verified, not assumed:
+   - **0 fixture DBs on disk → `998 passed`.** That is the clean-clone case.
+   - **Breaking the fixture markdown → 90 tests fail.** The fixture is now
+     genuinely load-bearing; previously the stale DB masked it completely.
+
+   Session-scoped needed one thing: `_isolate_root` is function-scoped and has not
+   run yet, so `build_fixture_db` patches `load_plugin_config` around its own call.
+   Without that, 306 tests error on `No module named 'hermes_constants'` — the
+   resolver reaching for the real Hermes home mid-suite.
+
 2. **`kind LIKE 'plot_%'` uses `_` as a wildcard** (carried from phase 4) — three
    sites, no reachable defect today, `IN (SELECT …)` would be exact.
 3. **`tasks/task_31/rename_plot_roles.py` is still in the tree** after its successful

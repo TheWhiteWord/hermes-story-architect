@@ -219,32 +219,21 @@ class TestOneVocabularyAcrossReadAndWrite:
     return is what caused the confusion in the first place.
     """
 
-    def _load_payload(self):
-        import shutil
-        import tempfile
-        from pathlib import Path
-
+    def _load_payload(self, project):
         from core.db import get_project_summary
+        return get_project_summary(project)
 
-        src = Path(__file__).parent / "fixtures" / "save-the-children"
-        tmp = Path(tempfile.mkdtemp()) / "p"
-        shutil.copytree(src, tmp)
-        try:
-            return get_project_summary(tmp)
-        finally:
-            shutil.rmtree(tmp.parent)
-
-    def test_story_load_does_not_emit_the_old_abbreviations(self):
-        blob = json.dumps(self._load_payload())
+    def test_story_load_does_not_emit_the_old_abbreviations(self, fixture_db):
+        blob = json.dumps(self._load_payload(fixture_db))
         assert '"chars"' not in blob, "story_load abbreviates again"
         assert '"loc":' not in blob, "story_load abbreviates again"
 
-    def test_story_load_uses_the_write_side_names(self):
-        blob = json.dumps(self._load_payload())
+    def test_story_load_uses_the_write_side_names(self, fixture_db):
+        blob = json.dumps(self._load_payload(fixture_db))
         assert '"characters"' in blob
         assert '"location"' in blob
 
-    def test_every_link_key_story_load_emits_is_a_real_field_name(self):
+    def test_every_link_key_story_load_emits_is_a_real_field_name(self, fixture_db):
         """The stronger form: no link key is a name story_describe cannot accept.
 
         A made-up abbreviation fails here even if nobody remembered its name.
@@ -282,7 +271,7 @@ class TestOneVocabularyAcrossReadAndWrite:
                 for x in node:
                     walk(x, is_entity)
 
-        walk(self._load_payload())
+        walk(self._load_payload(fixture_db))
 
     def test_story_describe_uses_one_name_for_the_entity_id(self):
         """The op argument is `id` and the field is `id`, so no bridging note.

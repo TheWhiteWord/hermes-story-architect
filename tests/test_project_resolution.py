@@ -21,15 +21,17 @@ from tools.story_resolve import PROJECT_THRESHOLD, resolve_project
 
 
 @pytest.fixture
-def vault(tmp_path):
-    """Two projects, so a fuzzy match has somewhere wrong to land."""
+def vault(tmp_path, _built_fixture):
+    """Two projects, so a fuzzy match has somewhere wrong to land.
+
+    Copied from the built fixture, not the repo fixture: the repo no longer
+    carries a DB (see `conftest.build_fixture_db`).
+    """
     v = tmp_path / "v"
     for slug in ("stc", "save-the-children"):
         dest = v / "projects" / slug
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(
-            str(__import__("pathlib").Path(__file__).parent / "fixtures"
-                / "save-the-children"), str(dest))
+        shutil.copytree(str(_built_fixture), str(dest))
     import core.config
     import pytest as _p
     _monkey = _p.MonkeyPatch()

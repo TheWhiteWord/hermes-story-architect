@@ -22,10 +22,10 @@ FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 
 
 @pytest.fixture
-def project_with_string_act_count(tmp_path):
+def project_with_string_act_count(tmp_path, _built_fixture):
     """A real fixture project whose act_count has been corrupted to '3'."""
     dest = tmp_path / "corrupt"
-    shutil.copytree(str(FIXTURE), str(dest))
+    shutil.copytree(str(_built_fixture), str(dest))
     db = sqlite3.connect(str(dest / ".story" / "story.db"))
     row = db.execute("SELECT id, extra FROM entities WHERE type='project'").fetchone()
     extra = json.loads(row[1] or "{}")

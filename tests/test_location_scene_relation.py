@@ -48,9 +48,9 @@ def _location_scenes(proj):
 
 
 @pytest.fixture
-def proj(tmp_path):
+def proj(tmp_path, _built_fixture):
     dest = tmp_path / "b8"
-    shutil.copytree(str(FIXTURE), str(dest))
+    shutil.copytree(str(_built_fixture), str(dest))
     return dest
 
 
