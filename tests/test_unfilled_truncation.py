@@ -42,7 +42,7 @@ def unfilled_by(project, **kw):
                 root_path=str(project.parent.parent)))
 
 
-def test_a_filtered_answer_is_complete_and_points_both_ways(project):
+def test_a_filtered_answer_is_complete_and_points_both_ways(project, monkeypatch):
     """Asking about one field or entity is what makes the long list readable.
 
     The cap exists because ~20 field types do not fit. A filtered answer has
@@ -52,8 +52,14 @@ def test_a_filtered_answer_is_complete_and_points_both_ways(project):
     The two filters are the two directions of one question and compose:
     `entities` is who has the gap, `fields` is what one entity lacks.
     """
+    import tools.story_load as sl
     from core.db import get_unfilled_map
     known = get_unfilled_map(project)
+    # The cap is set here rather than left to the fixture's gap count: the
+    # plot's five role fields stopped being gaps when they became computed, so
+    # the fixture sits exactly on the cap and truncation stopped firing for a
+    # reason that has nothing to do with truncation.
+    monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)
     dropped = unfilled(project)["other_fields"][0]
     assert dropped in known, "the omitted field must still be a real gap"
 
@@ -105,8 +111,13 @@ def test_a_field_that_is_filled_by_hand_is_still_not_a_gap():
     assert "variant_of" not in unfilled_fields("location", {"variant_of": "the-i"})
 
 
-def test_omitted_fields_are_named(project):
+def test_omitted_fields_are_named(project, monkeypatch):
     """When the view truncates, it must say which fields it dropped."""
+    import tools.story_load as sl
+    # See test_a_filtered_answer_is_complete_and_points_both_ways: the cap is
+    # set here so truncation is exercised by the test rather than by whatever
+    # the fixture happens to hold.
+    monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)
     data = unfilled(project)
     assert data["truncated"] is True
     assert data["other_fields"], "truncated view must name the fields it omitted"

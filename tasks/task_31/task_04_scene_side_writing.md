@@ -149,18 +149,172 @@ working. That is phase 7's file, and phase 7 should find it needs less than expe
 
 ## Checklist
 
-- [ ] `plot_roles` in the scene schema; `computed: True` on the plot's five role fields
-- [ ] `role` validated against `PLOT_ROLES`
-- [ ] `plot_role_relations()` helper exists in `entity.py`, used by scene create
-- [ ] Scene edit deletes `WHERE to_id=? AND kind LIKE 'plot_%'` then re-inserts
-- [ ] Delete sweep removes a soft-deleted plot's `plot_*` rows (with the restore caveat commented)
-- [ ] Missing plot / invalid role refused, message names the offender
-- [ ] `story_export` rebuilds `plot_roles` onto the **scene** note; plot note no longer emits the 5 computed fields
-- [ ] Export→import round-trip test added (silent-loss failure mode)
-- [ ] Plot-side write path for the five fields gone; grep confirms
-- [ ] 5 new tests written; two of them fail without the fix
-- [ ] Existing tests that write the five fields updated to expect a read-only refusal
-- [ ] Dashboard untouched and still correct
-- [ ] `story_retrieve` can still read a plot's roles (verified, not assumed)
-- [ ] Full suite green
-- [ ] No compat shim, alias, or dual write path
+- [x] `plot_roles` in the scene schema; `computed: True` on the plot's five role fields
+- [x] `role` validated against `PLOT_ROLES`
+- [x] `plot_role_relations()` helper exists in `entity.py`, used by scene create
+- [x] Scene edit deletes `WHERE to_id=? AND kind LIKE 'plot_%'` then re-inserts
+- [x] Delete sweep removes a soft-deleted plot's `plot_*` rows (with the restore caveat commented)
+- [x] Missing plot / invalid role refused, message names the offender
+- [x] `story_export` rebuilds `plot_roles` onto the **scene** note; plot note no longer emits the 5 computed fields
+- [x] Export→import round-trip test added (silent-loss failure mode)
+- [x] Plot-side write path for the five fields gone; grep confirms
+- [x] 5 new tests written; two of them fail without the fix
+- [x] Existing tests that write the five fields updated to expect a read-only refusal
+- [x] Dashboard untouched and still correct
+- [x] `story_retrieve` can still read a plot's roles (verified, not assumed)
+- [x] Full suite green
+- [x] No compat shim, alias, or dual write path
+
+## Final brief
+
+### What the code actually needed
+
+`core/`, `tools/` — and the diff is smaller than the plan implied because
+phases 1–3 had already done the structural work:
+
+| file | edit |
+|---|---|
+| `core/constants.py:102-116` | `computed: True` on the five plot role fields |
+| `core/constants.py:154-166` | `plot_roles` on the scene schema |
+| `core/entity.py` | `plot_role_relations()`, `validate_scene_plot_roles()`, `relation_fields()` |
+| `core/writes.py:333` | computed relation fields dropped from `rel_fields` (one filter, both write paths) |
+| `core/writes.py:441-462` | the scene edit block |
+| `core/writes.py:643-655` | the delete sweep |
+| `tools/story_export.py` | scene branch rebuilds `plot_roles`; plot branch stops emitting the five |
+| `tools/story_import.py` | scene branch writes roles; plot branch deleted; a computed field is refused |
+| `tools/story_retrieve.py` | scene `plot_roles` readable + filled-means-a-row |
+| `tools/story_describe.py` | three `_RELATION_FIELDS` → `relation_fields()` |
+
+**`computed` needed no new machinery**, exactly as the plan said — the check was
+already honoured at four sites. The one place it did *not* reach was the generic
+relation loop in `edit_entity`, which iterates `_RELATION_FIELDS` independently
+of the field-routing loop above it. One filter on `rel_fields` closed it for both
+the edit and (via the existing merge) the create.
+
+### `relation_fields()` — the one addition the plan didn't call for
+
+`plot_roles` is relation-stored but cannot live in `_RELATION_FIELDS`: that map
+is field→(kind, is_list), and this field is one→five. Putting it there would make
+the generic loop write rows of a kind that does not exist.
+
+But it still has to be excluded from `extra`, accepted by create and edit,
+reported as a relation by `story_describe`, and excluded from extra by the
+importer — six sites that each had to learn about it. `relation_fields()` is the
+one place to ask, and it returns the union. `BESPOKE_RELATION_FIELDS` carries the
+set; the map stays authoritative for everything with a single kind.
+
+### Correction 1 — the reattach premise is unreachable
+
+The plan's delete rationale was: a dead plot's rows survive, and **silently
+reattach if a plot is recreated with the same slug**. Measured — not reachable.
+`delete_entity` soft-deletes, so the slug stays taken and `create_entity` refuses
+it:
+
+```
+AFTER DELETE rows: []
+entities: [('the-resistance', 1)]
+RECREATE REFUSED: Entity already exists: plot/the-resistance.
+```
+
+The rows *are* still unreachable while the plot is dead (every reader filters on
+`to_id`; `db.py:972` filters `from_id` on `is_deleted`), so **the sweep is still
+right and stays**. What is wrong is where its cost lands.
+
+**The real cost is `restore`, not reattachment.** `story_admin._restore_entity` is
+documented as "Exact inverse of the delete. Sections and relations were never
+removed" — and that is now false for a plot's role rows. Pinned by
+`test_restore_brings_the_plot_back_without_its_roles`, which asserts the plot comes
+back with `setups == []` and says what to do if it ever passes the other way.
+
+This is worth stating plainly because it is a *documented lie* otherwise: the
+restore docstring is now wrong, and the phase-4 comment at `writes.py:643` is the
+correction. Fixing the docstring belongs with this change and was left out only
+because it is prose in a different file — see NOTE 1.
+
+### Correction 2 — `fields: ["all"]` no longer returns a plot's roles
+
+Checklist item 8, verified rather than assumed. `_entity_fields` excludes computed
+fields from the `["all"]` set, so a plot retrieved with `["all"]` returns no roles.
+Naming them works (`fields: ["setups", ...]`), and the scene's `plot_roles` — which
+*is* in `["all"]` — returns the same rows. So the agent can still read a plot's
+roles; it just cannot get them for free alongside everything else.
+
+This is the intended consequence of `computed`, not a bug to route around, and it
+is the same mechanism that already governs `character.relationships`. But it is a
+real reduction in what one call returns, so three tests that used `["all"]` on a
+plot were changed to name the fields, and the change is commented at each.
+
+### Tests
+
+New `tests/test_scene_plot_roles.py`, 26 tests: create/edit rows, all five kinds,
+one scene × two plots × different roles, wholesale replacement, clearing, the
+read-only refusal on both write paths, the plot reading back what the scene wrote,
+missing-plot and bad-role refusals, a refused edit leaving the original row intact,
+the delete sweep, the restore cost, the export round-trip, and schema assertions.
+
+**Both "fails without the fix" claims verified by reverting each fix:**
+- removing the export rebuild → 2 round-trip tests fail (silent loss, as predicted)
+- removing the delete sweep → 3 delete tests fail
+
+`test_write_shape.py`'s phase-1 coverage **moved** to the scene side rather than
+being deleted — the dict→row corruption was real and the regression test should
+outlive the field it was written on. `test_plot_roles.py`'s fixture now writes roles
+via `plot_roles`; `test_field_coverage.py` asserts the read-only refusal instead of
+the rows.
+
+**Fixture:** the three roles moved from `plots/The Resistance.md` to the three
+scene notes, exactly as phase 3 moved them between fields. The plot note is now
+three lines shorter and the DB rebuilds identically.
+
+**Suite: 991 passed, 3 failed.** The 3 (`test_draft_preview.py` ×2,
+`test_story_describe.py::test_every_link_key_story_load_emits_is_a_real_field_name`)
+fail identically on the unmodified tree — verified by stashing in phase 3, and
+unchanged here.
+
+### Four truncation tests were passing by accident
+
+`UNFILLED_LIMIT` is 15 and the fixture produced 15 gap types after this change —
+so `truncated` stopped firing, and four tests that assert truncation broke. The
+cause is not truncation: the plot's five role fields used to be five of those gap
+types, and they are computed now.
+
+They were asserting *"the fixture happens to exceed the cap"*, which is a fact
+about the fixture, not about the code. Each now sets the cap explicitly by
+monkeypatch — which `test_untruncated_view_has_no_other_fields` in the same file
+already did. Four tests that cannot fail for the reason they claim to test are
+worse than no test, and the fixture was about to change again in a later phase.
+
+### Naming sweep
+
+`grep -rn "payoff"` over `core/ tools/ src/ tests/` returns nothing. Every
+`_RELATION_FIELDS` use outside `entity.py` is now either deliberate and commented
+(`writes.py:333` filters computed; `story_retrieve.py:103,143` iterate the
+one-kind map that the plot's fields still occupy as *readers*; `entity.py:498` is
+the one-kind writer and must not see `plot_roles`) or has moved to
+`relation_fields()`. One dead import removed (`_RELATION_FIELDS` in
+`test_plot_roles.py`, unused since phase 2).
+
+### NOTE — observations, not objectives
+
+1. **`story_admin._restore_entity`'s docstring said "Exact inverse"** — corrected
+   in this phase rather than logged. It now names the plot-role exception, so the
+   two comments (`writes.py` sweep and `story_admin` restore) agree.
+2. **`kind LIKE 'plot_%'` uses `_` as a LIKE wildcard**, so it also matches
+   `plotX…`. No such kind exists and none can (roles come from `PLOT_ROLES`), but
+   the pattern is looser than it reads. Three sites use it: the edit block, the
+   delete sweep, and the two read blocks. An `IN (SELECT kind …)` would be exact
+   and no longer.
+3. **The unfilled gap moved, and shrank.** A plot no longer reports five phantom
+   gaps; a scene reports `plot_roles` when it serves no plot. Net −4 gap types on
+   the fixture. Every scene in a project now carries a `plot_roles` gap until it
+   is placed in a plot, which is the intended trade but is a visible change to the
+   unfilled view.
+4. **`story_load` view `dramatic_elements` with `add_plot` was untouched and needs
+   no change** — it already reads `kind LIKE 'plot_%'` and derives the role from
+   the kind. Phase 7's dashboard work should confirm this rather than assume it.
+5. **The pre-existing `with` failure looks real.** `test_story_describe.py:272`
+   walks `story_load` output and rejects relationship field `with` as unknown,
+   which suggests `with` is missing from the relationship schema's known set. Not
+   this phase's; carried from phase 3.
+6. **`docs/html_ui_dashboard/*.html` mockups** now differ from the model in a
+   second way (they show plot-side roles). Out of scope per INTEGRATION.md.

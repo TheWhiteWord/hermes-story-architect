@@ -291,6 +291,12 @@ def _restore_entity(args: dict, project_path: Path) -> dict:
 
     Sections and relations were never removed, so there is nothing to rebuild —
     which is the whole reason the delete is a flag and not a DELETE.
+
+    One exception: a PLOT's `plot_<role>` rows. The plot owns those rows, so the
+    `to_id` sweep in delete_entity cannot reach them and a second sweep takes
+    them; restore therefore brings back the plot without its roles. The
+    alternative is a dead plot's rows silently reattaching, which is worse.
+    See the delete sweep in core/writes.py.
     """
     from core.db import get_db
 

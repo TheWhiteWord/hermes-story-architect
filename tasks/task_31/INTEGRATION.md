@@ -205,7 +205,7 @@ names; update only if meant to stay accurate, and never let them drive the imple
 - [ ] Phase 2 — `PLOT_ROLES` exists; `has_*` derived in a loop in both `db.py` sites
 - [ ] Phase 3 — `plot_resolution`/`plot_complication` live everywhere; `plot_payoff`/`payoffs` gone from code
 - [ ] Phase 4 — scene-side write works; plot role fields computed; plot never reopened
-- [ ] Phase 5 — script run against the live project (2 rows); no migration code in the plugin
+- [x] Phase 5 — script run against the live project (2 rows); no migration code in the plugin
 - [ ] Phase 6 — full suite green; obsolete tests removed, not merely skipped
 - [ ] Phase 7 — dashboard renders 5 roles, verified by headless-Chrome render
 - [ ] No backward-compat shim, alias, or `if old then` anywhere in the diff

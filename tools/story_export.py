@@ -157,6 +157,21 @@ def _export_all(conn, project_path: Path) -> set:
             ).fetchall()
             if chars:
                 extra["characters"] = [r[0] for r in chars]
+            # `plot_roles` is a RELATION field, so it never lands in `extra` and
+            # `fm.update(extra)` below would silently drop every plot role from
+            # the scene note — and re-import would then lose them with nothing
+            # to complain about. Rebuilt from the rows, which is the same fact
+            # the plot note used to carry.
+            role_rows = conn.execute(
+                "SELECT from_id, kind, note FROM relations "
+                "WHERE to_id=? AND kind LIKE 'plot_%' ORDER BY \"order\"",
+                (entity_id,)
+            ).fetchall()
+            if role_rows:
+                extra["plot_roles"] = [
+                    {"plot": f, "role": k[len("plot_"):], "description": n or ""}
+                    for f, k, n in role_rows
+                ]
 
         if entity_type == "location" or entity_type == "world":
             kind = "location_variant" if entity_type == "location" else "world_variant"
@@ -168,13 +183,11 @@ def _export_all(conn, project_path: Path) -> set:
                 extra["variant_of"] = var[0]
 
         if entity_type == "plot":
-            for field, kind in PLOT_BEAT_FIELDS.items():
-                beat_rows = conn.execute(
-                    f"SELECT to_id, note FROM relations WHERE from_id=? AND kind='{kind}' "
-                    f'ORDER BY "order"', (entity_id,)
-                ).fetchall()
-                if beat_rows:
-                    extra[field] = [{"scene_id": r[0], "description": r[1]} for r in beat_rows]
+            # The five role fields are computed and are NOT emitted: they are the
+            # scene's `plot_roles` read back from this side, so writing them here
+            # would put the same fact on both notes and let the two disagree.
+            for field in list(PLOT_BEAT_FIELDS):
+                extra.pop(field, None)
 
         fm = _frontmatter_for(entity_type, entity_id, name, one_sentence, order_key, status, parent_id, location_id, extra)
         # The filename is the title, so `id` is the only thing that survives a

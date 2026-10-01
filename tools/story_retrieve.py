@@ -121,6 +121,18 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
             values[field] = [{"scene_id": to_id, "description": note} for to_id, note in rows]
         else:
             values[field] = [to_id for to_id, _ in rows]
+    # A scene's plot_roles are the same rows read from the other side, and the
+    # only place they are WRITTEN. Not in `_RELATION_FIELDS` because it is one
+    # field to five kinds — see entity.plot_role_relations.
+    if entity_type == "scene" and "plot_roles" in wanted:
+        values["plot_roles"] = [
+            {"plot": plot, "role": kind[len("plot_"):], "description": note or ""}
+            for plot, kind, note in conn.execute(
+                'SELECT from_id, kind, note FROM relations '
+                "WHERE to_id=? AND kind LIKE 'plot_%' ORDER BY \"order\"",
+                (data["id"],),
+            ).fetchall()
+        ]
     return values
 
 
@@ -134,6 +146,12 @@ def _unfilled(conn, data: dict, entity_type: str) -> list:
                else "SELECT 1 FROM relations WHERE from_id=? AND kind=? LIMIT 1")
         if conn.execute(sql, (data["id"], kind)).fetchone():
             extra[field] = [1]
+    # The same for a scene's plot_roles — filled means a row exists, not an
+    # extra key, and plot_roles is never in extra.
+    if entity_type == "scene" and conn.execute(
+            "SELECT 1 FROM relations WHERE to_id=? AND kind LIKE 'plot_%' LIMIT 1",
+            (data["id"],)).fetchone():
+        extra["plot_roles"] = [1]
     return unfilled_fields(entity_type, extra)
 
 

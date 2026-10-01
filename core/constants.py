@@ -99,11 +99,16 @@ ENTITY_SCHEMAS = {
         "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
-        "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "crisis": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches crisis point", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "climax": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches climax", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "complications": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is complicated or obstructed", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "resolutions": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        # The five role fields are READ-ONLY: they are the same `plot_<role>`
+        # rows the scene writes as `plot_roles`, read back from the plot side.
+        # The agent records a role where it is writing the scene, and never has
+        # to reopen a plot to add one. `computed` is what makes every write
+        # path refuse them — draft preview, create, edit, describe.
+        "setups": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is established (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
@@ -146,6 +151,19 @@ ENTITY_SCHEMAS = {
         "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on the story value after this scene's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the story-value curve passes through."},
         "conflict_levels": {"type": "list", "default": [], "optional": True, "description": "Any of: inner, personal, extra-personal"},
         "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "One of: setup, complication, crisis, climax, resolution, transition, non-event"},
+        # The write side of a plot role. Every entry names its own plot, so one
+        # scene can hold different roles in different plots — which is why the
+        # role cannot live on the scene alone. Stored as `plot_<role>` rows
+        # pointing AT this scene; the plot's five fields read them back.
+        "plot_roles": {
+            "type": "list", "default": [], "optional": True,
+            "description": "Which plots run through this scene, and in what role. One entry per plot. This is where a plot role is written — never on the plot itself.",
+            "sub_fields": {
+                "plot": {"type": "string", "description": "Slug of an existing plot"},
+                "role": {"type": "string", "description": "One of: setup, complication, crisis, climax, resolution"},
+                "description": {"type": "string", "description": "What this scene does for that plot"},
+            },
+        },
         "is_inciting_incident": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as the story's inciting incident"},
         "is_sequence_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as its sequence's climax"},
         "is_act_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as its act's climax"},

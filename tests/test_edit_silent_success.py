@@ -161,7 +161,7 @@ class TestValidKeysStillWork:
     def test_every_valid_key_of_every_entity_type_is_accepted(self, vault):
         """Sweeps the whole surface, so a schema addition cannot be locked out."""
         from core.constants import ENTITY_SCHEMAS
-        from core.entity import (_RELATION_FIELDS, ENTITY_COLUMN_MAP,
+        from core.entity import (ENTITY_COLUMN_MAP, relation_fields,
                                  standard_sections)
         from core.writes import _FIELDS_TO_SKIP
 
@@ -178,7 +178,7 @@ class TestValidKeysStillWork:
             schema = ENTITY_SCHEMAS.get(etype, {})
             keys = ([k for k in schema if not schema[k].get("computed")]
                     + list(standard_sections(etype))
-                    + list(_RELATION_FIELDS.get(etype, {}))
+                    + list(relation_fields(etype))
                     + list(ENTITY_COLUMN_MAP.get(etype, {})))
             for key in keys:
                 if key in _FIELDS_TO_SKIP:

@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from core.entity import PLOT_BEAT_FIELDS, relation_entry
+from core.entity import plot_role_relations
 
 SCHEMA = {
     "description": "DESTRUCTIVE. Rebuilds the database from the Markdown vault: deletes every row "
@@ -465,8 +465,10 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "character": {"name", "one_sentence", "id"},
         "location": {"name", "one_sentence", "id", "world", "variant_of"},
         "world": {"name", "one_sentence", "id", "variant_of"},
-        "plot": {"name", "one_sentence", "status", "id"} | set(PLOT_BEAT_FIELDS),
-        "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters"},
+        "plot": {"name", "one_sentence", "status", "id"},
+        # `plot_roles` is relation-stored, so it must not land in extra.
+        "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters",
+                  "plot_roles"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
         "arc_beat": {"id", "label", "order", "character"},
@@ -483,6 +485,16 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
 
     extra = {}
     for k, v in fm.items():
+        # A computed field is derived at read time and has no row to write. It
+        # is refused rather than kept: an old note carrying `plot.setups` would
+        # otherwise import as a plot with a dead `setups` key in extra that no
+        # reader looks at, and the roles it described would be silently gone.
+        # The write paths already refuse these (drafts, create, edit).
+        if ENTITY_SCHEMAS.get(entity_type, {}).get(k, {}).get("computed"):
+            raise ValueError(
+                f"Unrecognised {entity_type} field(s) in frontmatter: {k}. "
+                f"It is read-only (computed) — set it on the scene as "
+                f"plot_roles, or on the arc beat / relationship that derives it.")
         if k not in s and v not in (None, "", [], {}):
             extra[k] = v
     return extra
@@ -502,15 +514,14 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                 "INSERT OR IGNORE INTO relations (from_id, to_id, kind) VALUES (?, ?, ?)",
                 (loc_id, slug, "location_scene"),
             )
-    elif entity_type == "plot":
-        for field, kind in PLOT_BEAT_FIELDS.items():
-            for beat in fm.get(field, []):
-                sid, desc = relation_entry(beat)
-                if sid:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
-                        (slug, sid, kind, desc),
-                    )
+        # A plot role is written on the scene. The rows are the plot's to own
+        # (from_id=plot), which is the direction every reader expects.
+        for row in plot_role_relations(slug, fm.get("plot_roles")):
+            conn.execute(
+                "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note, \"order\") "
+                "VALUES (?, ?, ?, ?, ?)",
+                (row["from_id"], row["to_id"], row["kind"], row["note"], row["order"]),
+            )
     elif entity_type == "location":
         target = fm.get("variant_of")
         if target:

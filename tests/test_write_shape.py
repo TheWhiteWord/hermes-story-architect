@@ -88,8 +88,9 @@ def test_a_string_writes_no_relation_rows(vault):
     """
     before = len(_relations(vault))
     create_entity(vault, "plot", "the-resistance",
-                  {"name": "The Resistance", "one_sentence": "x",
-                   "setups": "the first scene"})
+                  {"name": "The Resistance", "one_sentence": "x"})
+    create_entity(vault, "scene", "s1", {
+        "title": "S1", "plot_roles": "the first scene"})
     rows = _relations(vault)
     assert len(rows) == before, f"a string wrote relation rows: {rows}"
     assert all(len(to_id) > 1 for _, to_id, _ in rows), \
@@ -103,14 +104,20 @@ def test_a_string_writes_no_relation_rows(vault):
 # wrote corrupt rows for crisis and climax — the row pointed at a scene slug
 # that did not exist and the prose was dropped. Edit and import were already
 # correct, which is why it went unnoticed: the only coverage was through edit.
+#
+# These ran through the plot's five fields. Those are computed now — a role is
+# written on the SCENE as `plot_roles` — so the coverage moved with the write
+# path rather than being deleted. See test_scene_plot_roles.py for the
+# scene-side contract.
 
-PLOT_BEATS = {
-    "setups": ("plot_setup", "s1", "setup prose"),
-    "crisis": ("plot_crisis", "s2", "crisis prose"),
-    "climax": ("plot_climax", "s3", "climax prose"),
-    "complications": ("plot_complication", "s4", "complication prose"),
-    "resolutions": ("plot_resolution", "s5", "resolution prose"),
-}
+PLOT_ROLES = ["setup", "complication", "crisis", "climax", "resolution"]
+
+
+def _with_plot(vault):
+    """A project holding one plot, so `plot_roles` has something to name."""
+    create_entity(vault, "plot", "the-resistance",
+                  {"name": "The Resistance", "one_sentence": "x"})
+    return vault
 
 
 def _notes(project):
@@ -121,63 +128,49 @@ def _notes(project):
     return rows
 
 
-@pytest.mark.parametrize("field,kind,scene_id,note", [
-    pytest.param(f, k, s, n, id=f) for f, (k, s, n) in PLOT_BEATS.items()])
-def test_create_writes_the_scene_slug_and_the_description(vault, field, kind,
-                                                          scene_id, note):
-    """The regression test. Every role, on the path that used to corrupt two."""
+@pytest.mark.parametrize("role", PLOT_ROLES)
+def test_create_writes_the_scene_slug_and_the_description(vault, role):
+    """The regression test, on the field a role is written on now. Every role,
+    including the two the old unwrap used to corrupt."""
+    _with_plot(vault)
     from core.writes import create_entity as _create
-    _create(vault, "plot", "the-resistance",
-            {"name": "The Resistance", "one_sentence": "x",
-             field: [{"scene_id": scene_id, "description": note}]})
-    assert (kind, scene_id, note) in _notes(vault)
+    _create(vault, "scene", "s1", {
+        "title": "S1",
+        "plot_roles": [{"plot": "the-resistance", "role": role,
+                        "description": f"{role} prose"}]})
+    assert (f"plot_{role}", "s1", f"{role} prose") in _notes(vault)
 
 
 def test_create_does_not_stringify_a_dict_into_to_id(vault):
     """The symptom, stated directly: no to_id may contain a `{`."""
-    create_entity(vault, "plot", "the-resistance", {
-        "name": "The Resistance", "one_sentence": "x",
-        "setups": [{"scene_id": "s1", "description": "d"}],
-        "crisis": [{"scene_id": "s2", "description": "d"}],
-        "climax": [{"scene_id": "s3", "description": "d"}],
-        "complications": [{"scene_id": "s4", "description": "d"}],
-        "resolutions": [{"scene_id": "s5", "description": "d"}]})
-    bad = [r for r in _notes(vault) if "{" in r[1] or "'scene_id'" in r[1]]
+    _with_plot(vault)
+    create_entity(vault, "scene", "s1", {
+        "title": "S1",
+        "plot_roles": [{"plot": "the-resistance", "role": role,
+                        "description": "d"} for role in PLOT_ROLES]})
+    bad = [r for r in _notes(vault) if "{" in r[1] or "'plot'" in r[1]]
     assert not bad, f"dict repr written into to_id: {bad}"
 
 
-MALFORMED = {"setups": [{"description": "no scene named"}]}
+MALFORMED = [{"role": "setup", "description": "no plot named"}]
 
 
-def test_malformed_entry_is_skipped_on_create(vault):
-    create_entity(vault, "plot", "the-resistance",
-                  {"name": "The Resistance", "one_sentence": "x", **MALFORMED})
-    assert _notes(vault) == [], _notes(vault)
+def test_malformed_entry_is_refused_on_create(vault):
+    """An entry naming no plot is not a row — it is a reference that resolves
+    to nothing, refused by name."""
+    _with_plot(vault)
+    with pytest.raises(ValueError, match="plot_roles entry needs a plot slug"):
+        create_entity(vault, "scene", "s1", {"title": "S1", "plot_roles": MALFORMED})
+    assert [r for r in _notes(vault) if r[0].startswith("plot_")] == []
 
 
-def test_malformed_entry_is_skipped_on_edit(vault):
+def test_malformed_entry_is_refused_on_edit(vault):
     from core.writes import edit_entity
-    create_entity(vault, "plot", "the-resistance",
-                  {"name": "The Resistance", "one_sentence": "x"})
-    edit_entity(vault, "plot", "the-resistance", MALFORMED, "set a bad beat")
-    assert _notes(vault) == [], _notes(vault)
-
-
-def test_malformed_entry_is_skipped_on_import(tmp_path):
-    """Three paths, three copies of the unwrap, and they disagreed on the
-    missing-key default — two skipped the row, one wrote the dict repr as
-    to_id. One function, one behaviour."""
-    from tools.story_import import handler as import_handler
-    root = tmp_path / "v"
-    proj = root / "projects" / "stc"
-    (proj / "plots").mkdir(parents=True)
-    (proj / "project.md").write_text("---\nname: STC\nlogline: L\n---\n")
-    (proj / "plots" / "P.md").write_text(
-        "---\nid: the-resistance\nname: The Resistance\n"
-        "one_sentence: x\n"
-        "setups: [{'description': 'no scene named'}]\n---\n")
-    import_handler({"project": str(proj), "root_path": root})
-    assert _notes(proj) == [], _notes(proj)
+    _with_plot(vault)
+    create_entity(vault, "scene", "s1", {"title": "S1"})
+    with pytest.raises(ValueError, match="plot_roles entry needs a plot slug"):
+        edit_entity(vault, "scene", "s1", {"plot_roles": MALFORMED}, "set a bad role")
+    assert [r for r in _notes(vault) if r[0].startswith("plot_")] == []
 
 
 def test_a_bare_slug_still_writes_as_is(vault):

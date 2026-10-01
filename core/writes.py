@@ -138,9 +138,9 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
     # goals at all. A field is flat, always; there is no nested form. The
     # import path refuses the same key, so a note carrying one fails to import
     # rather than importing as something no reader will ever show.
-    from .entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+    from .entity import ENTITY_COLUMN_MAP, relation_fields
     valid = (set(ENTITY_SCHEMAS[entity_type])
-             | set(standard) | set(_RELATION_FIELDS.get(entity_type, {}))
+             | set(standard) | set(relation_fields(entity_type))
              | set(ENTITY_COLUMN_MAP.get(entity_type, {})) | _FIELDS_TO_SKIP)
     unknown_fields = [k for k in frontmatter_data if k not in valid]
     if unknown_fields:
@@ -196,6 +196,8 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                 if act_id:
                     validate_scene_act_id(project_path, sequence_id, act_id)
             validate_scene_location(project_path, merged.get("location", ""))
+            from .entity import validate_scene_plot_roles
+            validate_scene_plot_roles(project_path, merged.get("plot_roles", []))
 
         # Validate plot characters reference existing entities
         if entity_type == "plot":
@@ -322,8 +324,18 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 ) else value
 
         from .entity import (REVERSED_RELATION_KINDS, _RELATION_FIELDS,
-                             relation_endpoints, relation_entry)
-        rel_fields = _RELATION_FIELDS.get(entity_type, {})
+                             relation_endpoints, relation_entry, relation_fields)
+        # Computed relation fields are read-only, so they are not writable
+        # either — the plot's five role fields are the case today. Dropped here
+        # rather than in each write path: they are still listed in
+        # `_RELATION_FIELDS` because that map is the authoritative field↔kind
+        # pair every READER iterates.
+        rel_fields = {f: v for f, v in _RELATION_FIELDS.get(entity_type, {}).items()
+                      if not schema.get(f, {}).get("computed")}
+        # A bespoke relation field is valid to name; the block below writes it.
+        valid = (set(schema) | standard_sections | set(rel_fields)
+                 | set(relation_fields(entity_type))
+                 | set(column_map) | _FIELDS_TO_SKIP)
 
         # ── Reject what cannot be applied, BEFORE writing anything ──
         # `data` is flat: {"<field>": value} or {"<Section name>": body}. A
@@ -331,8 +343,6 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
         # `extra` — the write "succeeded", nothing changed, and the edit was
         # silently lost. An unrecognised key is a hard error naming the valid
         # ones, so the caller can correct itself.
-        valid = (set(schema) | standard_sections | set(rel_fields)
-                 | set(column_map) | _FIELDS_TO_SKIP)
         unknown = [k for k in data if k not in valid]
         if unknown:
             examples = sorted(f for f in schema if not schema[f].get("computed"))[:8]
@@ -422,6 +432,28 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                     (str(new_location), entity_id),
                 )
             applied_relations.append("location")
+
+        # A scene's plot roles are one field to FIVE kinds (the entry's role
+        # picks the kind), so the generic loop above cannot express them —
+        # and keyed on `from_id` it would not fire at all, since the PLOT owns
+        # the row. Delete-then-reinsert on `to_id`, which is the
+        # delete-then-reinsert contract: an entry removed from `plot_roles`
+        # leaves no row behind. See entity.plot_role_relations.
+        if entity_type == "scene" and "plot_roles" in data:
+            from .entity import plot_role_relations, validate_scene_plot_roles
+            validate_scene_plot_roles(project_path, data["plot_roles"])
+            conn.execute(
+                "DELETE FROM relations WHERE to_id=? AND kind LIKE 'plot_%'",
+                (entity_id,),
+            )
+            for rel in plot_role_relations(entity_id, data["plot_roles"]):
+                conn.execute(
+                    "INSERT INTO relations (from_id, to_id, kind, note, \"order\") "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (rel["from_id"], rel["to_id"], rel["kind"], rel["note"],
+                     rel["order"]),
+                )
+            applied_relations.append("plot_roles")
 
         # Upsert sections
         for heading, body in section_updates.items():
@@ -608,6 +640,21 @@ def delete_entity(project_path: Path, entity_type: str, slug: str,
             conn.execute(
                 "DELETE FROM relations WHERE from_id NOT IN "
                 "(SELECT id FROM entities WHERE is_deleted=1) AND to_id=?",
+                (dead_id,))
+
+        # Plot roles are the one case the sweep above cannot reach: the PLOT
+        # owns the row, so deleting a plot leaves it behind. Every reader
+        # filters on `to_id` only, so the row becomes unreachable while the
+        # plot is dead — and silently reattaches if a plot is recreated with
+        # the same slug.
+        #
+        # Cost, accepted: restore puts the plot entity back but not its role
+        # rows, so restore is no longer an exact inverse for these. A lost role
+        # row is recoverable by rewriting the scene; a role that reattaches to
+        # the wrong plot is not, and nothing reports it.
+        for dead_id in deleted_ids:
+            conn.execute(
+                "DELETE FROM relations WHERE from_id=? AND kind LIKE 'plot_%'",
                 (dead_id,))
 
         # References held in other entities' extra must still be scrubbed, or a

@@ -50,14 +50,20 @@ def test_the_block_carries_a_marker_for_every_op_kind(fixture_path):
 
 def test_the_block_carries_the_field_count(fixture_path):
     """Decision 1: a count, not a list. The batch's create sets 8 fields, so
-    8 of 22 — counting only the non-computed fields the model was offered.
+    8 of 23 — counting only the non-computed fields the model was offered.
 
     Was 23 until `id` left the scene schema: it was being counted as a field
     the model could fill, when the write path discards it. See
     tests/test_id_is_not_a_field.py.
+
+    Back to 23 when `plot_roles` joined the scene schema — the field a plot
+    role is written on. The count is derived from the schema, so it tracks the
+    schema rather than a number someone has to remember to bump.
     """
     md = stage(fixture_path, BATCH, "The Telling")["preview_md"]
-    assert "8 of 22 fields set" in md
+    offered = len([f for f, m in ENTITY_SCHEMAS["scene"].items()
+                   if not m.get("computed")])
+    assert f"8 of {offered} fields set" in md, md
 
 
 def test_the_count_never_enumerates_the_empty_fields(fixture_path):

@@ -14,7 +14,7 @@ from core.constants import ENTITY_SCHEMAS
 from core.entity import (
     FIELDS_TO_SKIP,
     ENTITY_COLUMN_MAP,
-    _RELATION_FIELDS,
+    relation_fields,
     standard_sections,
 )
 
@@ -36,7 +36,7 @@ def _storage_label(entity_type: str, field: str) -> str | None:
     denormalized link like `scene.act_id` is redundant on purpose, and telling
     the agent it is `extra` stops it looking for a column that is not there.
     """
-    if field in _RELATION_FIELDS.get(entity_type, {}):
+    if field in relation_fields(entity_type):
         return "relation"
     column = ENTITY_COLUMN_MAP.get(entity_type, {}).get(field)
     if column and column.endswith("_id"):
@@ -62,7 +62,7 @@ def _is_reference(entity_type: str, field: str) -> bool:
     # A relation field describes its target in prose ("Scenes where plot is
     # established") without saying "slug", so the word is not the test for
     # these. Anything the maps declare is a reference by definition.
-    if field in _RELATION_FIELDS.get(entity_type, {}):
+    if field in relation_fields(entity_type):
         return True
     # A reference column is declared, so it does not need the word either.
     column = ENTITY_COLUMN_MAP.get(entity_type, {}).get(field)

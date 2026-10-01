@@ -11,6 +11,7 @@ is_sequence_climax: True
 is_story_climax: False
 location: the-central-room
 order: 2
+plot_roles: [{'description': 'The Administrator makes its final offer. Kael refuses.', 'plot': 'the-resistance', 'role': 'setup'}]
 sequence_id: seq-discovery
 shift: doubt → chosen trust
 status: drafted

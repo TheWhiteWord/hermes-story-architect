@@ -885,16 +885,26 @@ class TestUnfilledFields:
         assert "perspectives.mira" not in unfilled_fields("relationship", full)
 
     def test_unfilled_fields_subfields_plot_beats(self):
-        """Plot beat lists: present → filled (no per-entry tracking); absent → flagged."""
+        """The plot-role gap moved to the scene, which is where a role is written.
+
+        It used to be `plot.setups` / `plot.crisis` — five gaps on every plot,
+        reported whether or not the story had anything to say in those slots. The
+        plot's fields are computed now, so the one writable field is the scene's
+        `plot_roles`, and it follows the sub_fields rule: an entry present = filled.
+        """
         from core.entity import unfilled_fields
-        with_beats = {"name": "X", "status": "active", "setups": ["s1"], "climax": ["s2"]}
-        result = unfilled_fields("plot", with_beats)
-        assert "setups" not in result
-        assert "climax" not in result
-        assert "crisis" in result
-        assert "resolutions" in result
+        # The plot side reports none of it — the fields are computed, and a
+        # computed field is derived at read time so it is never a gap.
         bare = {"name": "X", "status": "active"}
-        assert "setups" in unfilled_fields("plot", bare)
+        result = unfilled_fields("plot", bare)
+        for field in ("setups", "crisis", "resolutions"):
+            assert field not in result, f"{field} is computed, not a gap"
+
+        # The scene side: no roles written is a real gap, one entry is filled.
+        assert "plot_roles" in unfilled_fields("scene", {"title": "S"})
+        with_role = {"title": "S", "plot_roles": [
+            {"plot": "the-plot", "role": "setup", "description": "d"}]}
+        assert "plot_roles" not in unfilled_fields("scene", with_role)
 
     def test_unfilled_fields_sequence(self):
         from core.entity import unfilled_fields

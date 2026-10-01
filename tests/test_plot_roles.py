@@ -20,7 +20,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from core.constants import PLOT_ROLES  # noqa: E402
-from core.entity import PLOT_BEAT_FIELDS, _RELATION_FIELDS  # noqa: E402
+from core.entity import PLOT_BEAT_FIELDS  # noqa: E402
 
 
 class TestVocabulary:
@@ -56,7 +56,7 @@ class TestVocabulary:
 @pytest.fixture
 def full_role_project(tmp_path):
     """A project where one plot fills every role, in one sequence inside one act."""
-    from core.writes import create_entity, create_project
+    from core.writes import create_entity, create_project, edit_entity
 
     root = tmp_path / "v"
     (root / "projects").mkdir(parents=True)
@@ -66,24 +66,21 @@ def full_role_project(tmp_path):
     create_entity(project, "act", "act-1", {"title": "Act One", "order": 1, "status": "drafted"})
     create_entity(project, "sequence", "seq-1", {"title": "Seq", "order": 1,
                                                  "status": "drafted", "act_id": "act-1"})
-    # One scene per role, and each field filled with the scene its own kind
-    # names — the pairing comes from the kind, not from the two lists happening
-    # to be in the same order (nothing guarantees that).
-    scene_by_role = {}
+    # One scene per role. The role is written on the SCENE as `plot_roles` —
+    # the plot's own fields are computed, so this is the only write path.
     for i, role in enumerate(PLOT_ROLES):
-        slug = f"scene-{i}"
-        scene_by_role[role] = slug
-        create_entity(project, "scene", slug, {
+        create_entity(project, "scene", f"scene-{i}", {
             "title": f"Scene {i}", "order": i, "status": "written",
             "dramatic_role": role, "sequence_id": "seq-1", "act_id": "act-1",
         })
 
     create_entity(project, "plot", "the-plot", {
         "name": "The Plot", "one_sentence": "x", "plot_scope": "main",
-        **{field: [{"scene_id": scene_by_role[kind.replace("plot_", "")],
-                    "description": "d"}]
-           for field, kind in PLOT_BEAT_FIELDS.items()},
     })
+    for i, role in enumerate(PLOT_ROLES):
+        edit_entity(project, "scene", f"scene-{i}", {
+            "plot_roles": [{"plot": "the-plot", "role": role, "description": "d"}],
+        }, f"record the {role}")
     return project
 
 

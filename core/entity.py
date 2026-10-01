@@ -7,7 +7,7 @@ from .constants import (
     SCENE_STATUSES, SEQUENCE_STATUSES, ACT_STATUSES,
     SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
     VALUE_CHARGES, STRUCTURE_TYPES, PLOT_TYPES,
-    PLOT_SCOPES, VALUE_ARCS, ARC_TYPES,
+    PLOT_SCOPES, VALUE_ARCS, ARC_TYPES, PLOT_ROLES,
 )
 from .section_parser import list_sections
 
@@ -255,6 +255,24 @@ _RELATION_FIELDS = {
 # is one edit to `_RELATION_FIELDS` plus `PLOT_ROLES` in constants.
 PLOT_BEAT_FIELDS = {field: kind for field, (kind, _) in _RELATION_FIELDS["plot"].items()}
 
+# Relation-stored fields the map above cannot express: `plot_roles` is ONE
+# field to FIVE kinds (the entry's `role` picks the kind), so it is written
+# and read by bespoke blocks — see plot_role_relations.
+#
+# It is listed separately rather than inside `_RELATION_FIELDS` precisely
+# because putting it there would make the generic loop write rows of a kind
+# that does not exist. But it is still relation storage and not `extra`, so
+# every site that splits those two apart has to know about it — hence
+# relation_fields(), which is the one place to ask.
+BESPOKE_RELATION_FIELDS = {"scene": {"plot_roles"}}
+
+
+def relation_fields(entity_type: str) -> dict:
+    """Every relation-stored field of a type: the generic map, plus the
+    bespoke one-field-to-many-kinds fields."""
+    return {**_RELATION_FIELDS.get(entity_type, {}),
+            **{f: None for f in BESPOKE_RELATION_FIELDS.get(entity_type, set())}}
+
 
 def _is_empty(value, default) -> bool:
     """True when a field holds nothing worth showing.
@@ -365,7 +383,7 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
     status, parent_id, location_id, extra.
     """
     column_map = ENTITY_COLUMN_MAP.get(entity_type, {})
-    relation_fields = _RELATION_FIELDS.get(entity_type, {})
+    rel_fields = relation_fields(entity_type)
     from .constants import ENTITY_SCHEMAS
     schema = ENTITY_SCHEMAS.get(entity_type, {})
 
@@ -386,7 +404,7 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
             continue
         # Arc keeps 'scene' as an extra attribute (which scene the beat occurs in)
         # in addition to the arc_beat relation created separately
-        if key in relation_fields and not (entity_type == "arc_beat" and key == "scene"):
+        if key in rel_fields and not (entity_type == "arc_beat" and key == "scene"):
             continue  # handled separately as relations
         if schema.get(key, {}).get("type") == "number":
             value = coerce_number(value)
@@ -435,11 +453,51 @@ def location_scene_relations(scene_id: str, location_id) -> list[dict]:
     }]
 
 
+def plot_role_relations(scene_id: str, entries) -> list[dict]:
+    """The `plot_<role>` rows implied by a scene's `plot_roles`.
+
+    A plot role is WRITTEN on the scene and READ on the plot, so the agent
+    never reopens a plot to add a scene to it. The row is still owned by the
+    plot (`from_id=plot, to_id=scene`) because every reader in the codebase
+    keys off that direction, and flipping it would rewrite eight of them for
+    no added capability.
+
+    Bespoke by necessity: `_RELATION_FIELDS` maps one field to ONE kind, and
+    this is one field to five — the entry's `role` picks the kind. The generic
+    loop in `relations_for_insert` cannot express that.
+
+    An entry with no plot, or a role outside PLOT_ROLES, yields no row: the
+    validator refuses both before this runs, so a row reaching here without
+    them is a shape the caller should not have passed.
+    """
+    if not isinstance(entries, list):
+        return []
+    rows = []
+    for i, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            continue
+        plot = str(entry.get("plot") or "")
+        role = str(entry.get("role") or "")
+        if not plot or role not in PLOT_ROLES:
+            continue
+        rows.append({
+            "from_id": plot,
+            "to_id": scene_id,
+            "kind": f"plot_{role}",
+            "note": str(entry.get("description") or ""),
+            "order": i,
+        })
+    return rows
+
+
 def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
     """Build relation rows from frontmatter for INSERT.
 
     Returns list of dicts with keys: from_id, to_id, kind, note, order.
     """
+    # `_RELATION_FIELDS`, not relation_fields(): a bespoke field has no single
+    # kind, and this loop is the one-field-to-one-kind writer that cannot
+    # express it. The scene branch below calls plot_role_relations directly.
     relation_fields = _RELATION_FIELDS.get(entity_type, {})
     relations = []
 
@@ -447,6 +505,9 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
     # location_scene_relations for why both exist.
     if entity_type == "scene":
         relations += location_scene_relations(slug, fm.get("location"))
+        # One field, five kinds — see plot_role_relations for why this is
+        # outside the loop below.
+        relations += plot_role_relations(slug, fm.get("plot_roles"))
 
     for field, (kind, is_list) in relation_fields.items():
         value = fm.get(field, [])
@@ -529,6 +590,45 @@ def validate_scene_location(project_path, location: str) -> None:
         ).fetchone()
         if not row:
             raise ValueError(f"Location not found: {location}")
+    finally:
+        conn.close()
+
+
+def validate_scene_plot_roles(project_path, entries) -> None:
+    """Raise ValueError if a scene's `plot_roles` names a plot that doesn't exist,
+    or a role that is not a dramatic plot role.
+
+    Same class of defect as an unresolvable `location`: a role recorded against
+    a plot that does not exist is invisible to every reader (they filter on
+    `to_id`), so the scene looks like it serves no plot and the plot looks
+    unpopulated — with nothing to say so.
+
+    Ordering note: this reads the DB on write, so a plot created in the SAME
+    draft is not visible here. Commit the plot first — the same constraint
+    `validate_scene_location` has.
+    """
+    if not isinstance(entries, list):
+        return
+    from core.db import get_db
+    conn = get_db(project_path)
+    try:
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            role = str(entry.get("role") or "")
+            if role not in PLOT_ROLES:
+                raise ValueError(
+                    f"Invalid plot role: {role or '(empty)'}. "
+                    f"One of: {', '.join(PLOT_ROLES)}")
+            plot = str(entry.get("plot") or "")
+            if not plot:
+                raise ValueError(
+                    f"plot_roles entry needs a plot slug: {entry!r}")
+            row = conn.execute(
+                "SELECT id FROM entities WHERE id=? AND type='plot'", (plot,)
+            ).fetchone()
+            if not row:
+                raise ValueError(f"Plot not found: {plot}")
     finally:
         conn.close()
 

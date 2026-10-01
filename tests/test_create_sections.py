@@ -156,13 +156,13 @@ class TestUnknownField:
     def test_every_valid_field_of_every_type_is_accepted(self, vault):
         """A guard that rejects real fields is worse than no guard."""
         from core.constants import ENTITY_SCHEMAS
-        from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+        from core.entity import ENTITY_COLUMN_MAP, relation_fields
         rejected = []
         for entity_type, schema in ENTITY_SCHEMAS.items():
             if entity_type == "project":
                 continue
             keys = [k for k, m in schema.items() if not m.get("computed")]
-            keys += list(_RELATION_FIELDS.get(entity_type, {}))
+            keys += list(relation_fields(entity_type))
             keys += list(ENTITY_COLUMN_MAP.get(entity_type, {}))
             for key in keys:
                 slug = f"probe-{entity_type}-{key}"

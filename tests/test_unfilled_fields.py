@@ -112,7 +112,8 @@ class TestSubFields:
 
     def test_list_parent_present_counts_as_filled(self):
         """An entry existing = filled; its notes are optional prose."""
-        assert "setups" not in _unfilled("plot", setups=[{"scene_id": "s1", "description": ""}])
+        assert "plot_roles" not in _unfilled("scene", plot_roles=[
+            {"plot": "the-plot", "role": "setup", "description": ""}])
 
     def test_cleared_list_parent_is_unfilled(self):
-        assert "setups" in _unfilled("plot", setups=[])
+        assert "plot_roles" in _unfilled("scene", plot_roles=[])

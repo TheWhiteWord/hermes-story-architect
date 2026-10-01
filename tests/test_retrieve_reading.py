@@ -89,12 +89,29 @@ class TestRelationBackedFields:
         assert r["entities"][0]["fields"]["characters"]
 
     def test_empty_beats_show_as_empty_not_missing(self, db):
-        """The point of the fix: an unset crisis must read as empty."""
+        """The point of the fix: an unset crisis must read as empty.
+
+        It is not reported as a GAP though: the five role fields are computed,
+        so they are derived at read time and never appear in `unfilled_fields`.
+        The gap that replaced them is the scene's `plot_roles`.
+        """
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
                   fields=["crisis"], sections=[])
         assert r["entities"][0]["fields"]["crisis"] == []
-        assert "crisis" in r["entities"][0]["unfilled_fields"]
+        assert "crisis" not in r["entities"][0]["unfilled_fields"]
+
+    def test_a_scenes_plot_roles_are_readable(self, db):
+        """The write side is the read side too — `plot_roles` is in `["all"]`."""
+        proj, vault = db
+        r = _get(proj, vault, entity_type="scene", id=["central-room-day"],
+                  fields=["plot_roles"])
+        roles = r["entities"][0]["fields"]["plot_roles"]
+        assert roles, "the scene's plot roles are unreachable"
+        assert roles[0]["plot"] == "the-resistance"
+        assert roles[0]["role"] == "setup"
+        assert "description" in roles[0]
+        assert "plot_roles" not in r["entities"][0]["unfilled_fields"]
 
 
 class TestSelection:

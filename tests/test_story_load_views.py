@@ -66,17 +66,41 @@ class TestPlotBeatsLiveInTheirOwnView:
         assert roles <= {"setup", "complication", "crisis", "climax", "resolution"}
 
     def test_retrieve_returns_the_plot_beats(self, project):
+        """The five fields are computed, so `["all"]` skips them — name them.
+
+        The write side moved to the scene, and `plot_roles` is in `["all"]`; this
+        asserts the plot side is still readable by name, which is the cost of
+        `computed` and the thing worth pinning.
+        """
         from tools.story_retrieve import handler as retrieve_handler
         import json as _json
         plot_id = load(project)["plots"][0]["id"]
         got = _json.loads(retrieve_handler({
             "project": "save-the-children", "entity_type": "plot",
-            "id": [plot_id], "fields": ["all"], "root_path": str(project.parent.parent),
+            "id": [plot_id],
+            "fields": ["setups", "complications", "crisis", "climax",
+                       "resolutions"],
+            "root_path": str(project.parent.parent),
         }))["entities"][0]["fields"]
         beats = got.get("setups", []) + got.get("complications", []) \
             + got.get("crisis", []) + got.get("climax", []) \
             + got.get("resolutions", [])
         assert beats, f"{plot_id} lost its beats — they are readable nowhere"
+
+    def test_the_scenes_plot_roles_are_the_write_side(self, project):
+        """Same rows, reachable from the scene, which is where they are written."""
+        from tools.story_retrieve import handler as retrieve_handler
+        import json as _json
+        got = _json.loads(retrieve_handler({
+            "project": "save-the-children", "entity_type": "scene",
+            "id": ["central-room-day"], "fields": ["all"],
+            "root_path": str(project.parent.parent),
+        }))["entities"][0]["fields"]
+        assert got["plot_roles"], "the scene's own plot roles are unreadable"
+        assert got["plot_roles"][0] == {
+            "plot": "the-resistance", "role": "setup",
+            "description": got["plot_roles"][0]["description"]}
+        assert got["plot_roles"][0]["description"]
 
 
 class TestBaseViewIsUnchanged:
@@ -218,12 +242,21 @@ class TestUnfilledView:
         counts = [i["count"] for i in load(project, view="unfilled")["unfilled"]]
         assert counts == sorted(counts, reverse=True)
 
-    def test_is_capped_so_it_stays_a_suggestion_not_an_inventory(self, project):
+    def test_is_capped_so_it_stays_a_suggestion_not_an_inventory(self, project,
+                                                                 monkeypatch):
+        # The cap is set here rather than left to the fixture's gap count: the
+        # plot's five role fields stopped being gaps when they became computed,
+        # so the fixture sits exactly on the cap and truncation stopped firing
+        # for a reason unrelated to truncation.
+        import tools.story_load as sl
+        monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)
         r = load(project, view="unfilled")
-        assert len(r["unfilled"]) <= 15
+        assert len(r["unfilled"]) <= 3
         assert r["truncated"] is True
 
-    def test_truncation_is_honest_about_what_is_hidden(self, project):
+    def test_truncation_is_honest_about_what_is_hidden(self, project, monkeypatch):
+        import tools.story_load as sl
+        monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)
         r = load(project, view="unfilled")
         assert r["shown_types"] == len(r["unfilled"])
         assert str(r["gap_types"]) in r["hint"]

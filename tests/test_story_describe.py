@@ -146,13 +146,13 @@ class TestStorageLabelsAreTrue:
     """
 
     def test_no_field_is_labelled_with_storage_it_does_not_have(self):
-        from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+        from core.entity import ENTITY_COLUMN_MAP, relation_fields
 
         out = _handler({})["entity_schemas"]
         wrong = []
         for et, fields in out.items():
             cols = ENTITY_COLUMN_MAP.get(et, {})
-            rels = _RELATION_FIELDS.get(et, {})
+            rels = relation_fields(et)
             for field, entry in fields.items():
                 claim = entry.get("stored_as")
                 if not claim:
@@ -164,14 +164,15 @@ class TestStorageLabelsAreTrue:
         assert not wrong, wrong
 
     def test_every_declared_reference_is_labelled(self):
-        from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+        from core.constants import ENTITY_SCHEMAS
+        from core.entity import ENTITY_COLUMN_MAP, relation_fields
 
         out = _handler({})["entity_schemas"]
         declared = set()
         for et, cols in ENTITY_COLUMN_MAP.items():
             declared |= {(et, f) for f, c in cols.items() if c.endswith("_id")}
-        for et, rels in _RELATION_FIELDS.items():
-            declared |= {(et, f) for f in rels}
+        for et in ENTITY_SCHEMAS:
+            declared |= {(et, f) for f in relation_fields(et)}
         unlabelled = [f"{et}.{f}" for et, f in declared
                       if not out[et][f].get("stored_as")]
         assert not unlabelled, unlabelled

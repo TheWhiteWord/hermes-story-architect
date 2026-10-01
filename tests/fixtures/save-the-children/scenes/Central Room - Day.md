@@ -11,6 +11,7 @@ is_sequence_climax: False
 is_story_climax: False
 location: the-central-room
 order: 1
+plot_roles: [{'description': "Kael discovers the door isn't locked — it was never locked.", 'plot': 'the-resistance', 'role': 'setup'}]
 sequence_id: seq-discovery
 shift: blind trust → first doubt
 status: drafted

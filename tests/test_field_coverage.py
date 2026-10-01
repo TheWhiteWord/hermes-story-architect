@@ -61,6 +61,11 @@ def _sample_value(field, meta):
             return ["no violence"]
         if field in ("setups", "complications", "crisis", "climax", "resolutions"):
             return _make_beats()
+        if field == "plot_roles":
+            # The write side of a role, and the only place one is written. The
+            # plot must exist for it to validate — the fixture's parents
+            # provide that only when a scene is created after a plot.
+            return []
         if field in ("conflict_levels",):
             return ["inner", "personal"]
         return [f"item-{i}" for i in range(1, 3)]
@@ -275,15 +280,13 @@ def test_edit_all_field_types(entity_type, project):
         edit_data[section_name] = f"Updated {section_name} content via edit."
 
     if entity_type == "plot":
-        # All 5 role fields
+        # The five role fields are computed, so they cannot be edited. The role
+        # is written on the SCENE as `plot_roles` — covered by
+        # test_scene_plot_roles.py. What is asserted here is the refusal: an
+        # edit naming one reports it read-only instead of writing rows.
         edit_data["setups"] = [
             {"scene_id": "scene-1", "description": "New setup"},
-            {"scene_id": "scene-2", "description": "Added setup"},
         ]
-        edit_data["crisis"] = [{"scene_id": "scene-1", "description": "Crisis beat"}]
-        edit_data["climax"] = [{"scene_id": "scene-2", "description": "Climax beat"}]
-        edit_data["complications"] = [{"scene_id": "scene-3", "description": "Complication beat"}]
-        edit_data["resolutions"] = [{"scene_id": "scene-3", "description": "New resolution"}]
 
     assert edit_entity(project, entity_type, slug, edit_data,
                        f"Test edit for {entity_type}").get("success"), \
@@ -363,16 +366,21 @@ def test_edit_all_field_types(entity_type, project):
     # view='dramatic_elements' with add_plot, and story_retrieve returns the
     # plot whole), so verify through story_retrieve.
     if entity_type == "plot":
+        # Naming the five explicitly: they are computed, so `["all"]` omits
+        # them. An edit that tried to set `setups` above was reported read-only
+        # and wrote nothing — so the rows read here are whatever the edit left,
+        # which is the assertion: a read-only field produced no rows.
         plot_after = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "plot",
             "id": [entity_id],
-            "fields": ["all"],
+            "fields": ["setups", "complications", "crisis", "climax",
+                       "resolutions"],
         }))["entities"][0]["fields"]  # field values are nested under "fields"
         all_scenes = (plot_after.get("setups", []) + plot_after.get("complications", [])
                       + plot_after.get("crisis", []) + plot_after.get("climax", [])
                       + plot_after.get("resolutions", []))
-        assert len(all_scenes) > 0, "Plot has no scene references after edit"
+        assert not all_scenes, "a computed role field was written by an edit"
 
 
 # ─── Phase 3: Dashboard renders without error ────────────────────────────────

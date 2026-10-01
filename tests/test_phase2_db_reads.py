@@ -338,14 +338,18 @@ class TestNavigationalQueries:
     def test_plot_to_scenes(self, db_project):
         """Which scenes does 'the-resistance' plot touch?
 
-        Verified through story_retrieve, which returns the plot whole — the
-        base map no longer carries beats.
+        Verified through story_retrieve. The five role fields are computed, so
+        `fields: ["all"]` no longer returns them — naming them does, and that is
+        the cost of moving the write to the scene. The same rows are also on
+        each scene as `plot_roles`, which IS in `["all"]`.
         """
         proj, vault = db_project
         from tools.story_retrieve import handler as retrieve_handler
         result = json.loads(retrieve_handler({
             "project": str(proj), "entity_type": "plot",
-            "id": ["the-resistance"], "fields": ["all"]}))
+            "id": ["the-resistance"],
+            "fields": ["setups", "complications", "crisis", "climax",
+                       "resolutions"]}))
         plot = result["entities"][0]["fields"]  # field values are nested under "fields"
         scenes = (
             plot.get("setups", [])
