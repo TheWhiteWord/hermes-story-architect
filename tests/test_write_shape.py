@@ -177,3 +177,80 @@ def test_a_bare_slug_still_writes_as_is(vault):
     """The other shape the same loop serves: `characters` holds plain slugs."""
     create_entity(vault, "scene", "s1", {"title": "S1", "characters": ["kael"]})
     assert ("character_scene", "s1") in [(k, t) for k, t, _ in _notes(vault)]
+
+
+# ─── Create-path coverage for EVERY writable relation field ──────────────────
+#
+# The corruption above survived because the create path had no coverage at all —
+# only the edit path, which was already correct. So this is the audit the bug
+# asked for: derived from the schema rather than hand-listed, because a hand list
+# is the same thing that let the hole exist.
+#
+# `CREATE_PATH_CASES` is the only hand-written part: a relation field needs a
+# *target that exists*, and only the test knows what a valid slug looks like for
+# each entity. The list is asserted against the schema, so a relation field added
+# without a case here fails rather than passing untested.
+
+CREATE_PATH_CASES = [
+    # (entity_type, field, value, expected kind, the row's `to_id`, child slug)
+    # `character_scene` is stored from the CHARACTER side, so the row points at
+    # the scene; every other kind points away from its owner. The case says which
+    # end, rather than assuming one shape for all rows.
+    ("location", "variant_of", "the-room", "location_variant", "the-room", "the-room-night"),
+    ("world", "variant_of", "the-real-world", "world_variant", "the-real-world", "the-mirror-world"),
+    ("scene", "characters", ["kael"], "character_scene", "s1", "s1"),
+]
+
+
+def _writable_relation_fields():
+    """Every relation field a create may write — computed ones are read-only."""
+    from core.constants import ENTITY_SCHEMAS
+    from core.entity import relation_fields
+    # `computed` only, and via .get: writes.py accepts a relation field that has no
+    # schema entry (valid = schema | sections | rel_fields), so filtering on schema
+    # membership here would exempt exactly the fields create still writes.
+    return {(et, f) for et, schema in ENTITY_SCHEMAS.items() for f in relation_fields(et)
+            if not schema.get(f, {}).get("computed")}
+
+
+def test_every_writable_relation_field_has_a_create_path_case():
+    """The audit's own guard. Add a relation field and this names what is missing."""
+    covered = {(et, f) for et, f, _v, _kind, _to, _slug in CREATE_PATH_CASES} | {("scene", "plot_roles")}
+    missing = _writable_relation_fields() - covered
+    assert not missing, f"relation fields with no create-path test: {sorted(missing)}"
+
+
+def _create_with_relation(vault, entity_type, field, value, child):
+    """A base target that exists, then the entity carrying the relation field."""
+    if entity_type == "scene":
+        create_entity(vault, "character", value[0], {"name": "Kael"})
+        return create_entity(vault, entity_type, child, {"title": "S", field: value})
+    base = {"name": "Base", "one_sentence": "x"} if entity_type == "world" else {"name": "Base"}
+    create_entity(vault, entity_type, value, base)
+    return create_entity(vault, entity_type, child, {**base, field: value})
+
+
+@pytest.mark.parametrize("entity_type, field, value, kind, to_id, child", CREATE_PATH_CASES)
+def test_create_writes_the_relation_row_and_it_reads_back(
+        vault, entity_type, field, value, kind, to_id, child):
+    """The audit's assertion, per field: create writes the row, and it means something.
+
+    Both halves in one test because the row alone is the name-only assertion this
+    phase is removing — a row that exists but resolves to nothing passes it.
+    """
+    import json
+
+    from tools.story_retrieve import handler as retrieve_handler
+
+    _create_with_relation(vault, entity_type, field, value, child)
+    rows = [(k, t) for k, t, _ in _notes(vault) if k == kind]
+    assert rows == [(kind, to_id)], f"{entity_type}.{field} wrote {rows}"
+    assert not [r for r in rows if "{" in r[1]], "a dict repr reached the row"
+
+    out = json.loads(retrieve_handler({
+        "action": "retrieve", "project": str(vault), "root_path": str(vault),
+        "entity_type": entity_type, "id": [child], "fields": [field],
+    }))
+    # `fields` nests the values; `unfilled_fields` sits beside it.
+    got = out["entities"][0]["fields"][field]
+    assert got == value, f"{entity_type}.{field} read back as {got!r}"
