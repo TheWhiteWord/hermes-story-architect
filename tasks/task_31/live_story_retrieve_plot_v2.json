@@ -1,0 +1,139 @@
+{
+  "note": "Live capture: story_retrieve(project='browser-verification-test', entity_type='plot', fields=['all'], sections=['all']). Captured 2026-10-01 against the INSTALLED plugin after the four commits (dfeaf42, 5e17811, 8eaaf3c) and a full re-import. This is the capture that shows the fix: fields=['all'] now returns the five role fields, so a full plot retrieve shows its scenes.",
+  "before": "fields=['all'] filtered out computed fields, so a full retrieve returned name, type, scope, value_arc, characters and five prose sections — and not one scene. The five role fields are the entire content of a plot entity.",
+  "findings": [
+    "THE FIX, visible here: setups/crisis/climax/complications/resolutions are all present in `fields`. Before this they were absent from a ['all'] retrieve and had to be named one by one.",
+    "setups holds TWO entries for the-resistance — central-room-day and garden-dream. The multi-scene-per-role case, on live data, in the reader the agent actually uses.",
+    "An unfulfilled role appears TWICE, which is the point: `complications` is `[]` in `fields` AND the string 'complications' is in `unfilled_fields` for the-scientists-last-stand. Before, an unfilled role was invisible in both places — the fields were excluded from ['all'] and unfilled_fields skipped every computed field — so a plot with no crisis looked identical to a fully built one.",
+    "The-resistance has all five roles filled, so none of them is in its unfilled_fields. The only gaps it reports are genuine authoring gaps: one_sentence (a column, so unfilled_fields cannot see it — a false gap, pre-existing) and plot_type (genuinely unset).",
+    "CONFIRMED FALSE GAP, unchanged and still open: `one_sentence` is returned with a real value in `fields` and simultaneously listed in `unfilled_fields` on BOTH plots. It is a DB column, not an `extra` key, so the unfilled check cannot see it. This is the same blind spot that reports `location` on scenes, and it is why a plot looks like it is missing its logline when it has one.",
+    "the-scientists-last-stand reports `complications` — a REAL gap, deliberately left empty so the unfilled case is exercised by live data rather than only by a test.",
+    "the-core-day appears in the-scientists-last-stand twice, as climax AND resolution, matching the scene side. Two readers, one set of rows, no disagreement.",
+    "The two readers agree completely: every (plot, role, scene) triple in this payload appears in live_story_load_dramatic_elements_v2.json, and vice versa."
+  ],
+  "role_coverage": {
+    "the-resistance": {
+      "setups": ["central-room-day", "garden-dream"],
+      "complications": ["garden-day"],
+      "crisis": ["central-room-night"],
+      "climax": ["the-door-closes"],
+      "resolutions": ["the-core-day"],
+      "all_five_filled": true
+    },
+    "the-scientists-last-stand": {
+      "setups": ["central-room-day"],
+      "complications": [],
+      "crisis": ["central-room-night"],
+      "climax": ["the-core-day"],
+      "resolutions": ["the-core-day"],
+      "all_five_filled": false,
+      "reported_as_gap": ["complications"]
+    }
+  },
+  "payload": {
+    "entity_type": "plot",
+    "entities": [
+      {
+        "id": "the-resistance",
+        "fields": {
+          "characters": ["kael", "mira"],
+          "value_arc": "Maturation",
+          "plot_scope": "main",
+          "climax": [
+            {
+              "scene_id": "the-door-closes",
+              "description": "Kael chooses to leave — not because the system is wrong, but because staying is."
+            }
+          ],
+          "complications": [
+            {
+              "scene_id": "garden-day",
+              "description": "Kael returns to the Garden, but something has changed."
+            }
+          ],
+          "resolutions": [
+            {
+              "scene_id": "the-core-day",
+              "description": "The children emerge into the real world for the first time."
+            }
+          ],
+          "crisis": [
+            {
+              "scene_id": "central-room-night",
+              "description": "The Administrator makes its final offer. Kael refuses."
+            }
+          ],
+          "one_sentence": "Kael and Mira organize the children to breach the Central Room.",
+          "setups": [
+            {
+              "scene_id": "central-room-day",
+              "description": "Kael discovers the door isn't locked — it was never locked."
+            },
+            {
+              "scene_id": "garden-dream",
+              "description": "The spirals in the Garden dream are wrong. Kael cannot say why."
+            }
+          ],
+          "plot_type": "",
+          "status": "active",
+          "name": "The Resistance"
+        },
+        "unfilled_fields": ["one_sentence", "plot_type"],
+        "sections": {
+          "Summary": "Kael's growing awareness of the system's wrongness becomes a quiet revolution. What begins as private questions becomes shared doubt, and shared doubt becomes organized resistance. The children must decide: accept the world as it is, or risk everything to find what's beyond the door.",
+          "Role": "",
+          "Threads": "- The Administrator controls every system — meals, light, access. Resistance means going without.\n- Not all children want to leave. Some prefer the certainty of the known to the terror of the unknown.\n- Kael's own doubt: what if the wrongness is in them, not the system?",
+          "Value": "If they fail, the children remain in a dying system — safe but stagnant, alive but not living. If they succeed, they step into a world that was never designed for them, with no guarantee of survival. The door opens both ways.",
+          "Characters": "",
+          "Notes": ""
+        }
+      },
+      {
+        "id": "the-scientists-last-stand",
+        "fields": {
+          "characters": ["dr-elena-voss", "marcus-chen", "the-outsider"],
+          "value_arc": "",
+          "plot_scope": "sub",
+          "climax": [
+            {
+              "scene_id": "the-core-day",
+              "description": "The last scientist seals the door from the inside — the ultimate sacrifice that becomes the children's prison."
+            }
+          ],
+          "complications": [],
+          "resolutions": [
+            {
+              "scene_id": "the-core-day",
+              "description": "The door is sealed. The children will wake 400 years later with no idea what was done to save them."
+            }
+          ],
+          "crisis": [
+            {
+              "scene_id": "central-room-night",
+              "description": "Dr. Voss argues with Marcus about whether to wake the children or let them sleep forever."
+            }
+          ],
+          "one_sentence": "400 years earlier, the scientists race to complete Project Save the Children as the outsiders gather.",
+          "setups": [
+            {
+              "scene_id": "central-room-day",
+              "description": "The scientists first realize the Institute is failing — and the children are the only survivors."
+            }
+          ],
+          "plot_type": "Contradictory",
+          "status": "active",
+          "name": "The Scientists' Last Stand"
+        },
+        "unfilled_fields": ["one_sentence", "value_arc", "complications"],
+        "sections": {
+          "Summary": "Dr. Elena Voss and her team built the Institute to save the last children of a dying world. But 400 years later, their sanctuary has become a prison — and the children they saved are now trying to escape. The scientists' sacrifice is the reason the Institute exists; their failure is the reason it's dying.",
+          "Role": "",
+          "Threads": "- The Institute's power systems are failing. There's not enough energy to keep the children alive and the doors sealed.\n- Marcus wants to wake the children. Elena believes the world outside is still uninhabitable.\n- The outsiders are at the gates. The scientists must choose: open the door to save the children, or seal it to protect them.",
+          "Value": "If the scientists succeed, the children survive — but in a cage. If they fail, the Institute collapses and everyone dies. Either way, the children will never see the sky.",
+          "Characters": "",
+          "Notes": ""
+        }
+      }
+    ]
+  }
+}

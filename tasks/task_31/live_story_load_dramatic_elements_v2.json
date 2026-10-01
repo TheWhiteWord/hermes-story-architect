@@ -1,0 +1,136 @@
+{
+  "note": "Live capture: story_load(project='browser-verification-test', view='dramatic_elements'). Captured 2026-10-01 against the INSTALLED plugin after the four commits (dfeaf42, 5e17811, 8eaaf3c) and a full re-import of the project from its corrected markdown.",
+  "what_this_view_is_for": "The structural milestones (a scene's is_* flags) and the plot dramatic roles (relations reaching at the scene from each plot) are recorded independently and nothing in the system reconciles them. This view puts both in one payload so the disagreement is visible.",
+  "findings": [
+    "The plot data is UNCONDITIONAL — the add_plot flag is gone from the handler and from the tool schema. An argument that no longer changes behaviour is an argument that can only mislead.",
+    "project.plots is the index that makes the scene slugs readable: id, name, plot_scope, plot_type. Every slug a scene names resolves against it (verified: 2/2), which is the cross-check the index exists for.",
+    "the-resistance has plot_scope 'main' and an EMPTY plot_type; the-scientists-last-stand has 'sub' and 'Contradictory'. The unset field is present and empty so the shape does not change with the data.",
+    "dramatic_role is reported on every scene as 'plot_role' — including the value that asserts nothing beyond 'this scene serves a plot'. That is deliberate: 'plot_role' beside a plots[] entry IS the agreement, and 'plot_role' with an empty plots[] would be the disagreement.",
+    "Both scenes flagged as a milestone carry the derived label too (milestone), because the base map reports the label and this view the flags, and a reader comparing the two needs to see they agree.",
+    "OBSERVABLE TENSION, not a defect: central-room-night is the SEQUENCE climax (is_sequence_climax + milestone) while serving 'crisis' for BOTH plots. Likewise central-room-day is the project's inciting incident and the 'setup' for both plots. That is coherent for this story, and it is exactly the kind of pairing this view now makes checkable — before, it took two tools and a mental join to see.",
+    "the-core-day serves THREE entries across two plots (resolution for the-resistance; climax AND resolution for the-scientists-last-stand). One scene, one plot, two different roles is legal: the relations PK is (from_id, to_id, kind) and the kinds differ.",
+    "the-resistance/setup is filled on TWO scenes (central-room-day AND garden-dream) — the multi-scene-per-role case, confirmed on live data.",
+    "act-2's sequence (seq-confrontation) has NO seq_climax_scene_id key at all, while act-1's has one. Unset fields are omitted rather than emitted empty here — deliberately different from the plot index, where the key is always present because a reader compares across entries and needs the column to exist."
+  ],
+  "role_coverage": {
+    "the-resistance": "5/5 roles filled; setup split across 2 scenes",
+    "the-scientists-last-stand": "4/5 filled; complications deliberately empty"
+  },
+  "payload": {
+    "view": "dramatic_elements",
+    "act": "all",
+    "project": {
+      "structure_type": "Classical",
+      "story_climax_scene_id": "central-room-night",
+      "inciting_incident_scene_id": "central-room-day",
+      "plots": [
+        {
+          "id": "the-resistance",
+          "name": "The Resistance",
+          "plot_scope": "main",
+          "plot_type": ""
+        },
+        {
+          "id": "the-scientists-last-stand",
+          "name": "The Scientists' Last Stand",
+          "plot_scope": "sub",
+          "plot_type": "Contradictory"
+        }
+      ]
+    },
+    "acts": [
+      {
+        "id": "act-1",
+        "title": "Act One",
+        "act_climax_scene_id": "central-room-night",
+        "sequences": [
+          {
+            "id": "seq-discovery",
+            "title": "The Discovery",
+            "seq_climax_scene_id": "central-room-night",
+            "primary_plot": "the-resistance",
+            "scenes": [
+              {
+                "id": "central-room-day",
+                "title": "Central Room - Day",
+                "status": "drafted",
+                "dramatic_role": "plot_role",
+                "is_inciting_incident": true,
+                "milestone": "inciting incident",
+                "plots": [
+                  {"plot": "the-resistance", "role": "setup"},
+                  {"plot": "the-scientists-last-stand", "role": "setup"}
+                ]
+              },
+              {
+                "id": "central-room-night",
+                "title": "Central Room - Night",
+                "status": "drafted",
+                "dramatic_role": "plot_role",
+                "is_sequence_climax": true,
+                "milestone": "sequence climax",
+                "plots": [
+                  {"plot": "the-resistance", "role": "crisis"},
+                  {"plot": "the-scientists-last-stand", "role": "crisis"}
+                ]
+              },
+              {
+                "id": "the-core-day",
+                "title": "The Core - Day",
+                "status": "written",
+                "dramatic_role": "plot_role",
+                "plots": [
+                  {"plot": "the-resistance", "role": "resolution"},
+                  {"plot": "the-scientists-last-stand", "role": "climax"},
+                  {"plot": "the-scientists-last-stand", "role": "resolution"}
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "act-2",
+        "title": "Act II",
+        "sequences": [
+          {
+            "id": "seq-confrontation",
+            "title": "The Confrontation",
+            "primary_plot": "the-resistance",
+            "scenes": [
+              {
+                "id": "garden-day",
+                "title": "Garden - Day",
+                "status": "drafted",
+                "dramatic_role": "plot_role",
+                "plots": [
+                  {"plot": "the-resistance", "role": "complication"}
+                ]
+              },
+              {
+                "id": "garden-dream",
+                "title": "Garden Dream",
+                "status": "drafted",
+                "dramatic_role": "plot_role",
+                "plots": [
+                  {"plot": "the-resistance", "role": "setup"}
+                ]
+              },
+              {
+                "id": "the-door-closes",
+                "title": "The Door Closes",
+                "status": "written",
+                "dramatic_role": "plot_role",
+                "is_sequence_climax": true,
+                "milestone": "sequence climax",
+                "plots": [
+                  {"plot": "the-resistance", "role": "climax"}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

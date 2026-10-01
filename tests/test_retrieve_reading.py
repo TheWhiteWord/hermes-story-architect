@@ -73,6 +73,42 @@ class TestBadIdIsNotAnImportProblem:
 
 
 class TestRelationBackedFields:
+    def test_fields_come_back_in_schema_order(self, db):
+        """Reading order is part of the contract.
+
+        `_entity_fields` used to iterate `wanted`, which is a SET, so the
+        output order was whatever the hash table produced — `one_sentence`
+        landed between two role fields and the five roles came out shuffled.
+        It emits in schema order now, and the plot's schema is ordered for
+        reading: identity, then cast and shape, then the dramatic progression.
+        """
+        proj, vault = db
+        r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
+                 fields=["all"])
+        assert list(r["entities"][0]["fields"].keys()) == [
+            "name", "one_sentence", "status", "characters", "value_arc",
+            "plot_scope", "plot_type",
+            "setups", "complications", "crisis", "climax", "resolutions"]
+
+    def test_the_order_is_the_same_whatever_subset_is_asked_for(self, db):
+        """Naming fields explicitly must not reorder them — a caller that asks
+        for `crisis, setups` gets them back setup-then-crisis, in the order the
+        schema declares. Otherwise an agent comparing two calls sees a
+        difference that is only the request order."""
+        proj, vault = db
+        r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
+                 fields=["crisis", "setups", "name"])
+        assert list(r["entities"][0]["fields"].keys()) == ["name", "setups", "crisis"]
+
+    def test_unfilled_fields_comes_last(self, db):
+        """It is the verdict on the fields and the prose above it, so it reads
+        as a summary rather than as one more section among them."""
+        proj, vault = db
+        r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
+                 fields=["all"], sections=["all"])
+        keys = list(r["entities"][0].keys())
+        assert keys.index("unfilled_fields") == len(keys) - 1
+
     def test_plot_beats_are_readable(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],

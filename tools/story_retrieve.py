@@ -91,16 +91,25 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     column_map = ENTITY_COLUMN_MAP.get(entity_type, {})
 
+    # Emit in SCHEMA order, not in `wanted` order. `wanted` is a set, so
+    # iterating it gave whatever order the hash table happened to produce —
+    # which put one_sentence between two role fields and shuffled the five
+    # roles against each other. The schema is the one ordered declaration of a
+    # type's fields, so it is what the output order follows: a reader gets the
+    # fields as the type declares them, on every call, and reordering the
+    # schema reorders every reader at once.
     values = {}
-    for field in wanted:
-        if field not in schema:
+    for field, meta in schema.items():
+        if field not in wanted:
             continue
         if field in column_map:
             values[field] = data.get(column_map[field], "")
         else:
-            values[field] = extra.get(field, schema[field]["default"])
+            values[field] = extra.get(field, meta["default"])
 
-    # Relation-backed fields: plot beats are rows linking to scenes, not columns.
+    # Relation-backed fields: plot beats are rows linking to scenes, not
+    # columns. Their position in the output is wherever the schema puts them,
+    # so the first loop above reserves the key and this one fills it.
     for field, (kind, is_list) in _RELATION_FIELDS.get(entity_type, {}).items():
         if field not in wanted:
             continue
@@ -225,7 +234,6 @@ def handler(args: dict, **kwargs) -> str:
             entry = {"id": data["id"]}
             if wanted:
                 entry["fields"] = _entity_fields(conn, data, entity_type, wanted)
-                entry["unfilled_fields"] = _unfilled(conn, data, entity_type)
             if want_sections:
                 found = _sections(conn, data["id"], want_sections)
                 entry["sections"] = found
@@ -233,6 +241,11 @@ def handler(args: dict, **kwargs) -> str:
                 if missing:
                     entry["sections_not_found"] = missing
                     entry["available_sections"] = list(_sections(conn, data["id"], ["all"]))
+            # `unfilled_fields` LAST: it is the verdict on everything above, and
+            # it reads as a summary of the fields and the prose rather than as
+            # one more section among them.
+            if wanted:
+                entry["unfilled_fields"] = _unfilled(conn, data, entity_type)
             entities.append(entry)
     finally:
         conn.close()

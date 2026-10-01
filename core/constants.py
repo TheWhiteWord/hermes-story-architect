@@ -95,23 +95,36 @@ ENTITY_SCHEMAS = {
         "power": {"type": "list", "default": [], "optional": True, "description": "Who holds power and how (e.g. 'the Church sanctions all tech')"},
         "variant_of": {"type": "string", "default": "", "optional": True, "description": "Slug of the base world this is a version of. Empty on base worlds."},
     },
+    # Field ORDER is part of the contract: a reader gets these fields in
+    # reading order, not hash order. What a plot IS (name, one-sentence,
+    # status), then WHO and WHAT SHAPE (cast, value arc, scope, type), then
+    # its dramatic progression in the order the beats happen. The roles were
+    # declared setups/crisis/climax/complications/resolutions, which is neither
+    # the dramatic order (setup, complication, crisis, climax, resolution) nor
+    # the order a reader scans them in.
     "plot": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
         "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
-        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
-        "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
-        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
+        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
+        "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
+        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
         # The five role fields are READ-ONLY: they are the same `plot_<role>`
         # rows the scene writes as `plot_roles`, read back from the plot side.
         # The agent records a role where it is writing the scene, and never has
         # to reopen a plot to add one. `computed` is what makes every write
         # path refuse them — draft preview, create, edit, describe.
+        #
+        # Declared in dramatic order, which is the order they occur and the
+        # order a reader scans them: setup → complication → crisis → climax →
+        # resolution. Note this is NOT `PLOT_ROLES`' order — complications is
+        # plural and sits second, not last. A test pins the two so they cannot
+        # drift, because the field names are not the role names.
         "setups": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is established (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
     },
     "project": {

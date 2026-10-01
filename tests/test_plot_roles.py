@@ -32,6 +32,34 @@ class TestVocabulary:
         """The dramatic roles. `transition`/`non-event` are scene beats, not plot roles."""
         assert PLOT_ROLES == ["setup", "complication", "crisis", "climax", "resolution"]
 
+    def test_the_plot_schema_declares_the_roles_in_dramatic_order(self):
+        """Field order is part of the contract, not an accident of the dict.
+
+        `story_retrieve(fields=['all'])` emits in schema order, so the order
+        the plot declares its fields in IS the order a reader reads them. The
+        roles were declared setups/crisis/climax/complications/resolutions —
+        complications second-to-last instead of second — which put the plot's
+        dramatic progression out of order in the one payload meant to show it.
+
+        The order cannot be derived from PLOT_ROLES: `complications` is plural
+        and sits second there, not last, which is the same
+        field-name-is-not-role-name trap as `crisis` staying singular.
+        """
+        from core.constants import ENTITY_SCHEMAS
+        role_fields = [f for f in ENTITY_SCHEMAS["plot"] if f in PLOT_BEAT_FIELDS]
+        assert role_fields == ["setups", "complications", "crisis", "climax",
+                               "resolutions"]
+
+    def test_the_identity_fields_come_before_the_roles(self):
+        """What a plot IS, then WHO it involves, then what it does. A reader
+        meeting `one_sentence` halfway through the role list has to hold the
+        plot's identity in their head while reading its beats."""
+        from core.constants import ENTITY_SCHEMAS
+        order = list(ENTITY_SCHEMAS["plot"])
+        assert order[:7] == ["name", "one_sentence", "status", "characters",
+                             "value_arc", "plot_scope", "plot_type"]
+        assert set(order[7:]) == set(PLOT_BEAT_FIELDS)
+
     def test_the_dashboard_role_list_is_the_same_list(self):
         """The JS copy is hand-written like PLOT_ROLES was — so pin it.
 
