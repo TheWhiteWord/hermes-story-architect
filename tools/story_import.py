@@ -460,6 +460,22 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     """
     from core.constants import ENTITY_SCHEMAS
 
+    # The VALUE checks, which `_extra_for` was missing and the write paths both
+    # have. A hand-edited note carrying a retired value used to import clean:
+    # `dramatic_role: climax` was accepted after the enum narrowed to
+    # plot_role/transition/non-event, stored, and read back as a value no
+    # reader expects — the silent version of the unknown-key refusal below.
+    #
+    # Only the value checks, NOT the structural ones. `value_problems` is the
+    # split, and it lives beside the checks so the two kinds cannot drift.
+    from core.entity import value_problems
+    problems = value_problems(entity_type, fm)
+    if problems:
+        raise ValueError(
+            f"Invalid {entity_type} frontmatter in the note: "
+            f"{'; '.join(problems)}. story_describe lists the valid fields "
+            f"for this type.")
+
     # Fields that go to columns or relations (not extra)
     skip = {
         "character": {"name", "one_sentence", "id"},

@@ -108,6 +108,33 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
     return warnings
 
 
+# The problems above fall into two kinds, and only one of them is fatal to an
+# import. Naming them here beats having the importer pattern-match the English:
+# a reworded message would otherwise silently change which checks run.
+#
+#   VALUE       — a stored value outside the declared vocabulary or range. No
+#                 later pass fixes it, and it is written as-is, so a note
+#                 carrying one must be refused rather than imported.
+#   STRUCTURE   — a build-order constraint: a required field not yet written, a
+#                 relationship still missing one of its two perspectives. An
+#                 import creates every entity in one pass and a note is allowed
+#                 to be mid-shape, so these are the author's business and not
+#                 the importer's to enforce.
+STRUCTURAL_WARNINGS = ("Missing required field", "relationship requires",
+                       "Missing perspective")
+
+
+def value_problems(entity_type: str, frontmatter: dict) -> list[str]:
+    """Only the VALUE problems from `validate_entity` — see STRUCTURAL_WARNINGS.
+
+    This is what a write path and an import both refuse on: a value the schema
+    does not allow. Returning the list rather than raising keeps
+    `validate_entity`'s warning contract intact for its other callers.
+    """
+    return [w for w in validate_entity(entity_type, frontmatter)
+            if not w.startswith(STRUCTURAL_WARNINGS)]
+
+
 def _validate_shapes(entity_type: str, frontmatter: dict, warnings: list[str]) -> None:
     """A field that declares a shape must actually hold it.
 
