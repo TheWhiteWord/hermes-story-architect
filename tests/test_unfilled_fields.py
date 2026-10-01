@@ -84,11 +84,30 @@ class TestNeverUnfilled:
                     assert field not in unfilled_fields(
                         entity_type, {field: False if meta["type"] == "boolean" else 0})
 
-    def test_computed_fields_are_skipped(self):
+    def test_computed_fields_are_skipped_except_the_plot_roles(self):
+        """Computed means "derived at read time", which is not the same as
+        "never a gap".
+
+        The plot's five role fields are the case that proved it: a plot with no
+        crisis scene is missing its crisis, and reporting nothing there left
+        the author no way to ask which plot was incomplete. They are relation
+        fields whose rows exist or do not, and `story_retrieve._unfilled` feeds
+        the derived value in — so an absent row reads as an empty role, which
+        is the gap.
+
+        Every other computed field stays out: a scene's `arc_beats_list` or a
+        character's `relationships` summarises entities that live elsewhere and
+        are reported there.
+        """
+        from core.entity import _RELATION_FIELDS
         for entity_type, fields in ENTITY_SCHEMAS.items():
             computed = [f for f, m in fields.items() if m.get("computed")]
+            relation_fields = _RELATION_FIELDS.get(entity_type, {})
             for field in computed:
-                assert field not in unfilled_fields(entity_type, {field: ""})
+                if field in relation_fields:
+                    assert field in unfilled_fields(entity_type, {field: ""})
+                else:
+                    assert field not in unfilled_fields(entity_type, {field: ""})
 
 
 class TestSubFields:

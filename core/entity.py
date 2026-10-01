@@ -337,8 +337,19 @@ def unfilled_fields(entity_type: str, extra: dict) -> list[str]:
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     unfilled = []
     for field, meta in schema.items():
-        # Skip computed fields — derived at read time, not persisted
-        if meta.get("computed"):
+        # A computed field is derived at read time and not persisted, so it has
+        # no stored value to be missing. It is still reported when it is a
+        # plot's dramatic role: setups/crisis/climax/complications/resolutions
+        # are the plot's content, and a plot whose crisis is unfulfilled is
+        # exactly the gap an author needs told about. The caller feeds derived
+        # values in through `extra` (see story_retrieve._unfilled), so an
+        # absent key and an empty one both read as unfulfilled — which is what
+        # "this plot has no crisis scene" should say.
+        #
+        # Other computed fields (a scene's arc_beats_list, a character's
+        # relationships) are summaries of entities that exist elsewhere and are
+        # reported there, so they stay out.
+        if meta.get("computed") and field not in _RELATION_FIELDS.get(entity_type, {}):
             continue
         # variant_of is empty ON a base location or world — that is what a base
         # one is. Reporting it is noise: every project would carry the gap

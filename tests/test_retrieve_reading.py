@@ -89,17 +89,21 @@ class TestRelationBackedFields:
         assert r["entities"][0]["fields"]["characters"]
 
     def test_empty_beats_show_as_empty_not_missing(self, db):
-        """The point of the fix: an unset crisis must read as empty.
+        """An unset crisis reads as `[]` in the fields AND is named in
+        `unfilled_fields`.
 
-        It is not reported as a GAP though: the five role fields are computed,
-        so they are derived at read time and never appear in `unfilled_fields`.
-        The gap that replaced them is the scene's `plot_roles`.
+        Both halves changed together. It used to be reported as NEITHER: the
+        fields were computed so they were excluded from `["all"]`, and computed
+        fields were skipped by the unfilled check — so a plot with no crisis
+        looked identical to a plot with every role filled, and the gap lived
+        only on the scene side as `plot_roles`. Asking a plot what it still
+        needs has to answer "your crisis", which is what this now says.
         """
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
                   fields=["crisis"], sections=[])
         assert r["entities"][0]["fields"]["crisis"] == []
-        assert "crisis" not in r["entities"][0]["unfilled_fields"]
+        assert "crisis" in r["entities"][0]["unfilled_fields"]
 
     def test_a_scenes_plot_roles_are_readable(self, db):
         """The write side is the read side too — `plot_roles` is in `["all"]`."""

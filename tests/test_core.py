@@ -885,20 +885,29 @@ class TestUnfilledFields:
         assert "perspectives.mira" not in unfilled_fields("relationship", full)
 
     def test_unfilled_fields_subfields_plot_beats(self):
-        """The plot-role gap moved to the scene, which is where a role is written.
+        """Both sides report the gap now, and they mean different things.
 
-        It used to be `plot.setups` / `plot.crisis` — five gaps on every plot,
-        reported whether or not the story had anything to say in those slots. The
-        plot's fields are computed now, so the one writable field is the scene's
-        `plot_roles`, and it follows the sub_fields rule: an entry present = filled.
+        The plot's five role fields are computed, and it used to follow that
+        they were therefore never gaps — the reasoning being that a derived
+        value has no stored value to be missing. But a plot whose crisis is
+        unfulfilled IS missing its crisis, and an author asking the plot what
+        it still needs was told nothing. So the role fields are reported, while
+        remaining unwritable: the scene's `plot_roles` is where a role is
+        actually written, and it follows the sub_fields rule (an entry present
+        = filled).
         """
         from core.entity import unfilled_fields
-        # The plot side reports none of it — the fields are computed, and a
-        # computed field is derived at read time so it is never a gap.
+        # The plot side: an unfilled role is named. All five, every time —
+        # that is the question "what does this plot still need".
         bare = {"name": "X", "status": "active"}
         result = unfilled_fields("plot", bare)
-        for field in ("setups", "crisis", "resolutions"):
-            assert field not in result, f"{field} is computed, not a gap"
+        for field in ("setups", "complications", "crisis", "climax",
+                      "resolutions"):
+            assert field in result, f"{field} is an unfulfilled plot role"
+
+        # And it stops being reported once the role row exists.
+        filled = {"name": "X", "status": "active", "crisis": [1]}
+        assert "crisis" not in unfilled_fields("plot", filled)
 
         # The scene side: no roles written is a real gap, one entry is filled.
         assert "plot_roles" in unfilled_fields("scene", {"title": "S"})

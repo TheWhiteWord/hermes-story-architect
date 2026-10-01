@@ -41,8 +41,9 @@ SCHEMA = {
         "fields": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Field names to return. ['all'] for every non-computed field. Omit for "
-                           "none. Call story_describe to see what fields a type has.",
+            "description": "Field names to return. ['all'] for every field, including the "
+                           "computed ones a plot's five role fields are. Omit for none. Call "
+                           "story_describe to see what fields a type has.",
         },
     },
     "required": ["project", "entity_type", "id"],
@@ -201,8 +202,18 @@ def handler(args: dict, **kwargs) -> str:
             return json.dumps({"error": "Database schema incomplete. Run story_import first."})
 
         schema = ENTITY_SCHEMAS.get(entity_type, {})
-        wanted = set(f for f, m in schema.items() if not m.get("computed")) \
-            if want_fields == ["all"] else set(want_fields or [])
+        # `["all"]` means EVERY field, computed ones included. It used to filter
+        # them out, on the reasoning that a computed field is derived and so is
+        # not "the entity's own" — which reads right until you retrieve a plot
+        # in full and find no scenes anywhere in it. The five role fields are
+        # the whole content of a plot entity: without them a full retrieve
+        # returns the plot's name, type and scope and nothing about its story.
+        #
+        # They are still refused on the WRITE paths (drafts, create, edit) and
+        # by the importer, which is where "computed" earns its keep: nobody
+        # types them, they are derived. Excluding them from a READ is a
+        # different claim, and the wrong one.
+        wanted = set(schema) if want_fields == ["all"] else set(want_fields or [])
 
         entities, not_found = [], []
         for entity_id in ids:
