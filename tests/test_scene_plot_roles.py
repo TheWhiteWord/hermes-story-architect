@@ -22,16 +22,15 @@ in `test_restore_brings_the_plot_back_without_its_roles`.
 import json
 import shutil
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.constants import PLOT_ROLES  # noqa: E402
-from core.writes import create_entity, create_project, delete_entity, edit_entity  # noqa: E402
+
+from core.constants import PLOT_ROLES
+from core.writes import create_entity, create_project, delete_entity, edit_entity
 
 
 @pytest.fixture

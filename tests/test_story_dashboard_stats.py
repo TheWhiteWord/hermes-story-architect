@@ -5,8 +5,7 @@ from pathlib import Path
 import pytest
 
 # Add repo root to path
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "save-the-children"
 

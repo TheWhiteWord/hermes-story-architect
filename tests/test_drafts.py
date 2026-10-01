@@ -6,17 +6,16 @@ already happened, and the confirmation loop would be theatre.
 """
 import json
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core import drafts  # noqa: E402
-from core.constants import ENTITY_SCHEMAS  # noqa: E402
-from core.db import get_db  # noqa: E402
+
+from core import drafts
+from core.constants import ENTITY_SCHEMAS
+from core.db import get_db
 
 
 def _counts(project_path):

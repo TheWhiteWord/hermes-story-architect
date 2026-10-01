@@ -6,16 +6,12 @@ validation reports what is wrong with a shape while staying silent about a
 cross-entity reference that is not wrong yet.
 """
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.constants import ENTITY_SCHEMAS  # noqa: E402
-from core.drafts import commit, render_preview_md, stage, validate_shape  # noqa: E402
+from core.constants import ENTITY_SCHEMAS
+from core.drafts import commit, render_preview_md, stage, validate_shape
 
 BATCH = [
     {"op": "create", "type": "scene", "id": "mira-tells-kael",

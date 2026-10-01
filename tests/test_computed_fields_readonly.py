@@ -7,13 +7,9 @@ preview is the only place it can still be told. It was silent: the draft
 validator skipped every op that was not a `create`.
 """
 import json
-import sys
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from tools.story_draft import handler  # noqa: E402
+from tools.story_draft import handler
 
 
 def _stage(project, ops):

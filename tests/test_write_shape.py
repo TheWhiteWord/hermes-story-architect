@@ -15,16 +15,13 @@ mistake when the display is not consulted.
 """
 import json
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.entity import validate_entity  # noqa: E402
-from core.writes import create_entity, create_project  # noqa: E402
+from core.entity import validate_entity
+from core.writes import create_entity, create_project
 
 
 @pytest.fixture

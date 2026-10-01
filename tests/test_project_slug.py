@@ -3,15 +3,11 @@
 Regression: the create path returned to project creation before the slug check
 ran, so slug='../escape' became a literal path under projects/.
 """
-import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.writes import create_project  # noqa: E402
+from core.writes import create_project
 
 
 def _create(slug, root, **extra):

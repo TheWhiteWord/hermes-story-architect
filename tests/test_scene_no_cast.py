@@ -8,12 +8,10 @@ Two halves, both load-bearing:
 """
 import json
 import shutil
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 

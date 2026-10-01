@@ -9,18 +9,14 @@ as required, so a model could try to write it and watch it vanish.
 Retrieval and editing address an entity by the entry's `id`, which is the row
 key — never by a field. So the field carried nothing but a wrong-looking blank.
 """
-import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.constants import ENTITY_SCHEMAS  # noqa: E402
-from core.entity import FIELDS_TO_SKIP  # noqa: E402
+from core.constants import ENTITY_SCHEMAS
+from core.entity import FIELDS_TO_SKIP
 
-from tools.story_retrieve import handler  # noqa: E402
+from tools.story_retrieve import handler
 
 
 @pytest.fixture

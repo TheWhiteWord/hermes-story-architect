@@ -12,10 +12,10 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from tools.story_draft import handler  # noqa: E402
-from tools.story_draft import SCHEMA  # noqa: E402
+
+from tools.story_draft import handler
+from tools.story_draft import SCHEMA
 
 OPS = [{
     "op": "create", "type": "scene", "id": "mira-tells-kael",

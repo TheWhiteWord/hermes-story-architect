@@ -8,16 +8,12 @@ of a miss. These tests fail if that regresses, or if the reported list drifts
 from what the write path actually accepts.
 """
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.entity import standard_sections  # noqa: E402
-from tools.story_describe import handler  # noqa: E402
+from core.entity import standard_sections
+from tools.story_describe import handler
 
 
 def _describe(entity_type=None):

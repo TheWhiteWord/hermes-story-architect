@@ -14,15 +14,12 @@ on every call, on a root that may hold hundreds.
 import json
 import shutil
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from tools import story_admin  # noqa: E402
+from tools import story_admin
 
 
 def _run(args, root):

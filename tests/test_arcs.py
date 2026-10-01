@@ -1,6 +1,5 @@
 """Tests for arc entity validation and Phase 3 tool integration (DB-backed)."""
 import pytest
-from pathlib import Path
 from core.entity import validate_entity
 from core.constants import ARC_TYPES, ENTITY_SCHEMAS, REQUIRED_FIELDS, WRITE_PATH_SUPPLIED
 from core.drafts import validate_shape

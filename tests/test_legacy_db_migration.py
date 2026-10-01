@@ -19,13 +19,9 @@ that has no such column. `ensure_draft_status_column` adds it, guarded on the
 table existing, which is the same rule the soft-delete repair follows.
 """
 import sqlite3
-import sys
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.db import ensure_soft_delete_columns, get_db  # noqa: E402
+from core.db import ensure_soft_delete_columns, get_db
 
 
 def test_get_db_migrates_a_legacy_database(tmp_path):

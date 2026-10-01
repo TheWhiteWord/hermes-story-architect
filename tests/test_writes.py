@@ -7,16 +7,15 @@ draft would land.** A divergence here is invisible until a committed draft
 quietly writes the wrong thing.
 """
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core import writes  # noqa: E402
-from core.db import get_db  # noqa: E402
+
+from core import writes
+from core.db import get_db
 
 
 def test_core_never_imports_tools():

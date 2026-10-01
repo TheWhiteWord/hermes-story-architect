@@ -10,17 +10,16 @@ not, which is why it is a test.
 import json
 import re
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.constants import PLOT_ROLES  # noqa: E402
-from core.entity import PLOT_BEAT_FIELDS  # noqa: E402
+
+from core.constants import PLOT_ROLES
+from core.entity import PLOT_BEAT_FIELDS
 
 
 class TestVocabulary:

@@ -6,9 +6,14 @@ from pathlib import Path
 
 import pytest
 
-# Add repo root to sys.path so `core` and `tools` are importable as top-level packages
-repo_root = Path(__file__).parent
-sys.path.insert(0, str(repo_root))
+# Put the REPO ROOT on sys.path so `core` and `tools` import as top-level packages.
+# This was `Path(__file__).parent` — i.e. `tests/` — under the name `repo_root`.
+# It only appeared to work because 31 test files each carried their own copy of this
+# insert, so nobody noticed the one in conftest was wrong. conftest is the single
+# place it belongs: pytest imports it before collecting anything, so every test file
+# is covered without repeating the line.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 

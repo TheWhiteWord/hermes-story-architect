@@ -7,14 +7,10 @@ tests compare the declaration against the real payload and the real data.
 """
 import json
 import shutil
-import sys
 import tempfile
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.constants import ENTITY_SCHEMAS  # noqa: E402
+from core.constants import ENTITY_SCHEMAS
 
 
 def _load(project_dir):

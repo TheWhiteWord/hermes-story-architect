@@ -17,15 +17,12 @@ import re
 import shutil
 import sqlite3
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
-PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _make(vault_root, slug, project_name=None):
@@ -364,7 +361,6 @@ class TestActuallyRenders:
         missing = sorted(c for c in used if f".{c}" not in css)
         assert used, "no class names parsed — the extractor is broken, not the CSS"
         assert not missing, f"classes used in JS but absent from the CSS: {missing}"
-
 
     def test_all_five_roles_render_in_the_plot_panel(self, vault, tmp_path):
         """One section per role, from the same list Python pins.

@@ -5,15 +5,11 @@ Every "must flag" case below was measured against `core.screenplay.extract_scene
 1. The test asserts both directions, so the linter cannot drift into flagging
 something that renders, or missing something that does not.
 """
-import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core.scene_content_lint import check_scene_content, check_scenes  # noqa: E402
+from core.scene_content_lint import check_scene_content, check_scenes
 
 
 # ── Renders, so must not be flagged ────────────────────────────────────────

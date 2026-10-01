@@ -4,13 +4,9 @@ A check nothing calls is a comment. These go through the real tool, so the
 finding has to survive the whole path an agent actually takes.
 """
 import json
-import sys
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from tools.story_draft import handler  # noqa: E402
+from tools.story_draft import handler
 
 GOOD = "INT. THE CENTRAL ROOM - DAY\n\nHe waits at the door."
 BAD = "KAEL stands before the door, hand on the handle."

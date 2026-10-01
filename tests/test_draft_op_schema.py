@@ -10,18 +10,14 @@ Deliberately stdlib-only: the repo has no jsonschema dependency and adding one t
 check four dicts is not worth it. The check is that both sides agree, not that a
 third-party validator agrees.
 """
-import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
 
-from core import drafts  # noqa: E402
-from core.constants import ENTITY_SCHEMAS  # noqa: E402
-from core.writes import REORDERABLE_TYPES  # noqa: E402
-from tools.story_draft import _op_schemas  # noqa: E402
+from core import drafts
+from core.constants import ENTITY_SCHEMAS
+from core.writes import REORDERABLE_TYPES
+from tools.story_draft import _op_schemas
 
 
 def _branches():
