@@ -100,14 +100,85 @@ must derive from it rather than restate it.
 
 ## Checklist
 
-- [ ] `PLOT_ROLES` declared in `constants.py`, 4 entries (phase 3 grows it to 5)
-- [ ] Drift test asserts `PLOT_ROLES` == roles in `_RELATION_FIELDS["plot"]`
-- [ ] `db.py:707-714` unfilled map is a loop, not four `elif`s
-- [ ] `db.py:1109-1112` is a loop, not four assignments
-- [ ] `has_*` flags derived from `PLOT_ROLES` at **both** `db.py:1259` and `db.py:1299`
-- [ ] `story_import.py:505` and `story_export.py:170` derive their pairs from the mapping
-- [ ] No inline `plot_setup`/`plot_crisis`/`plot_climax`/`plot_payoff` tuple left outside `_RELATION_FIELDS`
-- [ ] Four-role `has_*` test added (fails before the refactor); phase 3 extends it to five
-- [ ] JS confirmed unaffected; left untouched if so
-- [ ] Full suite green
-- [ ] No compat shim or alias
+- [x] `PLOT_ROLES` declared in `constants.py`, 4 entries (phase 3 grows it to 5)
+- [x] Drift test asserts `PLOT_ROLES` == roles in `_RELATION_FIELDS["plot"]`
+- [x] `db.py:707-714` unfilled map is a loop, not four `elif`s
+- [x] `db.py:1109-1112` is a loop, not four assignments
+- [x] `has_*` flags derived from `PLOT_ROLES` at **both** `db.py:1259` and `db.py:1299`
+- [x] `story_import.py:505` and `story_export.py:170` derive their pairs from the mapping
+- [x] No inline `plot_setup`/`plot_crisis`/`plot_climax`/`plot_payoff` tuple left outside `_RELATION_FIELDS`
+- [x] Four-role `has_*` test added (fails before the refactor); phase 3 extends it to five
+- [x] JS confirmed unaffected; left untouched if so
+- [x] Full suite green
+- [x] No compat shim or alias
+
+---
+
+## Final brief
+
+**Done.** The role vocabulary now lives in exactly two places: `PLOT_ROLES`
+(`core/constants.py:16`) and `_RELATION_FIELDS["plot"]` (`core/entity.py:241`).
+Everything else derives from them.
+
+### What changed
+
+| site | before | after |
+|---|---|---|
+| `core/entity.py` | — | `PLOT_BEAT_FIELDS` added, derived from `_RELATION_FIELDS["plot"]` |
+| `core/db.py:707` | 4-branch `elif` chain | `elif kind in PLOT_FIELD_BY_KIND` + one lookup |
+| `core/db.py:996` | inline 4-tuple | `elif kind in PLOT_FIELD_BY_KIND` |
+| `core/db.py:1109` | 4 assignments | loop over `PLOT_BEAT_FIELDS` |
+| `core/db.py:1259`, `:1299` | 4 hardcoded `False` + 4 `elif` per site | `{f"has_{r}": False for r in PLOT_ROLES}` + one `if beat in PLOT_ROLES` |
+| `tools/story_import.py:503`, `story_export.py:170` | inline tuples | loop over `PLOT_BEAT_FIELDS` |
+| `tools/story_import.py:469` | skip-set naming the 4 fields | `{"name","one_sentence","status","id"} | set(PLOT_BEAT_FIELDS)` |
+
+`PLOT_FIELD_BY_KIND` in `db.py` is the one added derived view — the two
+lookups there key on the relation *kind*, not the field, so it is not a rename
+of the existing dict but a genuine second direction. Nothing else needed it.
+
+**Not changed, deliberately:** `tools/story_load.py:259` already derives the
+role from the kind via SQL (`kind LIKE 'plot_%'` + `replace`), so it never
+restated the list. Left alone.
+
+### Tests
+
+New `tests/test_plot_roles.py`, 6 tests:
+- **drift guard** — `PLOT_ROLES` == roles derived from `_RELATION_FIELDS["plot"]`,
+  plus a count of 4 at this phase. Phase 3 changes both to 5.
+- a test stating the field-name constraint (`crisis`/`climax` stay singular),
+  so the reason the map is explicit survives the next reader.
+- **four-role `has_*`**, parametrised over sequence *and* act, plus a test that
+  the flag set is exactly `{has_<role>}` — no stale hardcoded flag survives.
+
+Verified as a real guard, not a tautology: simulated phase 3 by adding
+`complications`/`plot_complication` to the map and `complication` to
+`PLOT_ROLES` — the flag tests fail (`act row missing has_complication`), and
+pass again once reverted. Baseline 959 → **965 passed**.
+
+JS: verified, not assumed. Extracted every `has_*` the JS reads and compared to
+what the backend emits — identical set, and each `p.has_X` is paired with a
+label `X` in both blocks. Payload key shape unchanged, so
+`entity-panels.js` is **untouched**. (Phase 7 owns it.)
+
+### Notes for the next phase
+
+1. **`zip`-ing the two lists is a trap I hit while testing.** My first fixture
+   paired fields to roles positionally; adding `complication` in the middle
+   silently mispaired every scene. Now the pairing is derived from the kind.
+   Phase 3 should do the same — never assume `PLOT_ROLES` and
+   `PLOT_BEAT_FIELDS` are in the same order.
+2. **Phase 3 checklist delta beyond the task file:** `story_import.py:469`
+   (the skip-set) is now derived, so INTEGRATION.md's warning about it is
+   already handled — do not re-derive it there. `PLOT_ROLES` becomes 5 and
+   `test_four_roles_at_this_phase` becomes 5; that test is the intended tripwire.
+3. **`db.py` now imports `entity` at module level** (it only ever imported
+   `unfilled_fields` lazily inside a function). No cycle — `entity` imports
+   `db` only inside functions — verified by import and by the suite. Worth
+   remembering if `entity` ever grows a module-level `db` import.
+4. **Unverified, pre-existing, out of scope:** `test_field_coverage.py:445-457`
+   and `test_write_shape.py:107-112` hardcode kind strings. They are test
+   fixtures for specific roles, not restatements of the vocabulary, and phase 3
+   will have to touch them anyway for the rename. Left as-is.
+5. `PLOT_ROLES` in `constants.py` sits between `PLOT_SCOPES` and `VALUE_ARCS`
+   with a comment explaining why it cannot be derived. If phase 3 finds a way to
+   derive it after all, delete the comment with it.

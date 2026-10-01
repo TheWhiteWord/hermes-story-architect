@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from core.entity import relation_entry
+from core.entity import PLOT_BEAT_FIELDS, relation_entry
 
 SCHEMA = {
     "description": "DESTRUCTIVE. Rebuilds the database from the Markdown vault: deletes every row "
@@ -465,7 +465,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "character": {"name", "one_sentence", "id"},
         "location": {"name", "one_sentence", "id", "world", "variant_of"},
         "world": {"name", "one_sentence", "id", "variant_of"},
-        "plot": {"name", "one_sentence", "status", "id", "setups", "payoffs", "crisis", "climax"},
+        "plot": {"name", "one_sentence", "status", "id"} | set(PLOT_BEAT_FIELDS),
         "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
@@ -503,8 +503,7 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                 (loc_id, slug, "location_scene"),
             )
     elif entity_type == "plot":
-        # All 4 plot beat types — setups, crisis, climax, payoffs
-        for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"), ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
+        for field, kind in PLOT_BEAT_FIELDS.items():
             for beat in fm.get(field, []):
                 sid, desc = relation_entry(beat)
                 if sid:

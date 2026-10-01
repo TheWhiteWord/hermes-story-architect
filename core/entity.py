@@ -249,6 +249,11 @@ _RELATION_FIELDS = {
     "relationship": {},
 }
 
+# Plot beat fields → relation kinds, read from the map above rather than
+# restated. Every reader (db reads, import, export) iterates this; adding a role
+# is one edit to `_RELATION_FIELDS` plus `PLOT_ROLES` in constants.
+PLOT_BEAT_FIELDS = {field: kind for field, (kind, _) in _RELATION_FIELDS["plot"].items()}
+
 
 def _is_empty(value, default) -> bool:
     """True when a field holds nothing worth showing.

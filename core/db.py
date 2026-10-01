@@ -5,7 +5,15 @@ import sqlite3
 import yaml
 from pathlib import Path
 
-from .constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT, ENTITY_SCHEMAS
+from .constants import (MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT,
+                        ENTITY_SCHEMAS, PLOT_ROLES)
+from .entity import PLOT_BEAT_FIELDS
+
+# The plot beat vocabulary read the other way, for the two lookups that key on
+# the relation kind. Field names are not role names pluralised (`crisis` stays
+# `crisis`), which is why the field↔kind map in entity.py stays explicit and
+# only the iteration is derived from it.
+PLOT_FIELD_BY_KIND = {kind: field for field, kind in PLOT_BEAT_FIELDS.items()}
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS entities (
@@ -704,14 +712,9 @@ def get_unfilled_map(project_path: Path) -> dict:
                 scene_chars.setdefault(to_id, []).append(from_id)
             elif kind == "location_scene":
                 scene_loc[to_id] = from_id
-            elif kind == "plot_setup":
-                plot_beats.setdefault(from_id, {}).setdefault("setups", []).append(to_id)
-            elif kind == "plot_crisis":
-                plot_beats.setdefault(from_id, {}).setdefault("crisis", []).append(to_id)
-            elif kind == "plot_climax":
-                plot_beats.setdefault(from_id, {}).setdefault("climax", []).append(to_id)
-            elif kind == "plot_payoff":
-                plot_beats.setdefault(from_id, {}).setdefault("payoffs", []).append(to_id)
+            elif kind in PLOT_FIELD_BY_KIND:
+                plot_beats.setdefault(from_id, {}).setdefault(
+                    PLOT_FIELD_BY_KIND[kind], []).append(to_id)
 
         from .entity import unfilled_fields
         unfilled_inv = {}
@@ -993,7 +996,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                 char_scenes.setdefault(from_id, []).append(to_id)
             elif kind == "location_scene":
                 scene_locs.setdefault(to_id, []).append(from_id)
-            elif kind in ("plot_setup", "plot_crisis", "plot_climax", "plot_payoff"):
+            elif kind in PLOT_FIELD_BY_KIND:
                 beat = kind.replace("plot_", "")
                 scene_plots.setdefault(to_id, []).append({"id": from_id, "beat": beat})
             elif kind in ("location_variant", "world_variant"):
@@ -1106,10 +1109,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                         else:
                             result.append({"scene_id": str(b), "description": ""})
                     return result
-                d["setups"] = _normalize_beats(rel_map.get(eid, {}).get("plot_setup", []))
-                d["crisis"] = _normalize_beats(rel_map.get(eid, {}).get("plot_crisis", []))
-                d["climax"] = _normalize_beats(rel_map.get(eid, {}).get("plot_climax", []))
-                d["payoffs"] = _normalize_beats(rel_map.get(eid, {}).get("plot_payoff", []))
+                for field, kind in PLOT_BEAT_FIELDS.items():
+                    d[field] = _normalize_beats(rel_map.get(eid, {}).get(kind, []))
                 # characters from character list (stored in extra.characters)
                 d["characters"] = extra.get("characters", [])
                 plots.append(d)
@@ -1258,17 +1259,14 @@ def get_dashboard_data(project_path: Path) -> dict:
                         meta = plot_lookup.get(pid, {})
                         seq_plots[pid] = {
                             "id": pid,
-                            "has_setup": False, "has_crisis": False,
-                            "has_climax": False, "has_payoff": False,
+                            **{f"has_{role}": False for role in PLOT_ROLES},
                             "plot_scope": meta.get("plot_scope", ""),
                             "plot_type": meta.get("plot_type", ""),
                             "value_arc": meta.get("value_arc", ""),
                         }
                     beat = p.get("beat", "") if isinstance(p, dict) else ""
-                    if beat == "setup": seq_plots[pid]["has_setup"] = True
-                    elif beat == "crisis": seq_plots[pid]["has_crisis"] = True
-                    elif beat == "climax": seq_plots[pid]["has_climax"] = True
-                    elif beat == "payoff": seq_plots[pid]["has_payoff"] = True
+                    if beat in PLOT_ROLES:
+                        seq_plots[pid][f"has_{beat}"] = True
             seq["plots"] = sorted(seq_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
         # Act enrichment: sequences_list, scenes_list (via sequences), counts, plots
@@ -1297,17 +1295,14 @@ def get_dashboard_data(project_path: Path) -> dict:
                         meta = plot_lookup.get(pid, {})
                         act_plots[pid] = {
                             "id": pid,
-                            "has_setup": False, "has_crisis": False,
-                            "has_climax": False, "has_payoff": False,
+                            **{f"has_{role}": False for role in PLOT_ROLES},
                             "plot_scope": meta.get("plot_scope", ""),
                             "plot_type": meta.get("plot_type", ""),
                             "value_arc": meta.get("value_arc", ""),
                         }
                     beat = p.get("beat", "") if isinstance(p, dict) else ""
-                    if beat == "setup": act_plots[pid]["has_setup"] = True
-                    elif beat == "crisis": act_plots[pid]["has_crisis"] = True
-                    elif beat == "climax": act_plots[pid]["has_climax"] = True
-                    elif beat == "payoff": act_plots[pid]["has_payoff"] = True
+                    if beat in PLOT_ROLES:
+                        act_plots[pid][f"has_{beat}"] = True
             act["plots"] = sorted(act_plots.values(), key=lambda x: (0 if x["plot_scope"] == "main" else 1, x["id"]))
 
         story_memory = get_memory_block(project_path)

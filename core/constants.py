@@ -12,6 +12,13 @@ VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
 PLOT_SCOPES = ["main", "sub"]
+
+# The dramatic roles a plot can hold — the `plot_<role>` relation kinds and the
+# `has_<role>` flags the dashboard reads. Declared here because `constants`
+# cannot import `entity` (entity imports constants); the authoritative
+# field↔kind map is `_RELATION_FIELDS["plot"]`, and tests/test_plot_roles.py
+# pins the two together so they cannot drift.
+PLOT_ROLES = ["setup", "crisis", "climax", "payoff"]
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
 ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40

@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
+from core.entity import PLOT_BEAT_FIELDS
 
 SCHEMA = {
     "description": "Write the whole database back out to Markdown files. Use to publish the "
@@ -167,8 +168,7 @@ def _export_all(conn, project_path: Path) -> set:
                 extra["variant_of"] = var[0]
 
         if entity_type == "plot":
-            for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"),
-                                ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
+            for field, kind in PLOT_BEAT_FIELDS.items():
                 beat_rows = conn.execute(
                     f"SELECT to_id, note FROM relations WHERE from_id=? AND kind='{kind}' "
                     f'ORDER BY "order"', (entity_id,)
