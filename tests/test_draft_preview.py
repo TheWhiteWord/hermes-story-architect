@@ -108,12 +108,18 @@ def test_an_edit_renders_one_line_per_changed_field(fixture_path):
 
 
 def test_an_unset_field_reads_as_not_set_not_as_a_blank(fixture_path):
-    """The fixture's location has no mood, so a blank before the arrow would
-    read as a rendering fault rather than as 'this was empty'."""
+    """An unset field renders `_not set_`; a blank would read as a rendering fault.
+
+    `variant_of` because it is empty **by design** on a base location — pinned by
+    `test_a_field_that_is_empty_by_design_is_not_a_gap`. This test used `mood`,
+    which asserted a fixture accident: the location had no mood until task 22 gave
+    it one, and the test broke on the next fixture rebuild rather than on a defect.
+    A field that is unset by design does not drift.
+    """
     op = {"op": "edit", "entity_type": "location", "entity_id": "the-central-room",
-          "data": {"mood": "claustrophobic warmth"}, "summary": "set the mood"}
-    md = stage(fixture_path, [op], "set the mood")["preview_md"]
-    assert "`mood`: _not set_ → **claustrophobic warmth**" in md
+          "data": {"variant_of": "the-garden"}, "summary": "set the parent"}
+    md = stage(fixture_path, [op], "set the parent")["preview_md"]
+    assert "`variant_of`: _not set_ → **the-garden**" in md
 
 
 def test_the_prose_an_op_carries_is_rendered(fixture_path):
@@ -188,11 +194,17 @@ def test_a_one_line_section_is_still_fenced(fixture_path):
 
 
 def test_a_scalar_field_still_renders_before_after(fixture_path):
-    """The fence is for bodies, not fields: a one-line value is still a delta."""
+    """The fence is for bodies, not fields: a one-line value is still a delta.
+
+    This test is about the fence, not about what is unset, so it reads the `mood`
+    that is there — which is the point: the same one-line value must render as a
+    delta whether the field was empty or not. (`mood` set vs `_not set_` is the
+    sibling test's job, on a field that is unset by design.)
+    """
     op = {"op": "edit", "entity_type": "location", "entity_id": "the-central-room",
           "data": {"mood": "claustrophobic warmth"}, "summary": "set the mood"}
     md = stage(fixture_path, [op], "set the mood")["preview_md"]
-    assert "`mood`: _not set_ → **claustrophobic warmth**" in md
+    assert "`mood`: ~~oppressive stillness~~ → **claustrophobic warmth**" in md
     assert "```" not in md
 
 

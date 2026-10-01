@@ -255,6 +255,12 @@ class TestOneVocabularyAcrossReadAndWrite:
 
         out = _handler({})["entity_schemas"]
         known = {f for fields in out.values() for f in fields}
+        # Declared sub_field names are real vocabulary too. `with` lives here and
+        # nowhere else — `character.relationships.sub_fields` — so a top-level-only
+        # set rejects a name story_describe in fact reports, and this test failed on
+        # a correct payload for three phases before anyone read what it was asserting.
+        known |= {sub for fields in out.values() for f in fields.values()
+                  for sub in (f.get("sub_fields") or {})}
         # Entity containers, not fields: they hold other entities.
         known |= {"acts", "sequences", "scenes", "worlds", "locations",
                   "plots", "characters"}

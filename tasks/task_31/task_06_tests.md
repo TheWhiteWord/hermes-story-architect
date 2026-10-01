@@ -159,31 +159,63 @@ create-path regression + the malformed-entry triple, phase 2's drift guard + fiv
 `has_*` (`test_plot_roles.py`), phase 3's nine-file rename + `complications` round-trip,
 phase 4's 26 tests in `test_scene_plot_roles.py`. Nothing was re-audited here.
 
-### Suite
+### The three failures were ours, not pre-existing — and not code defects
 
-| | |
+Recorded wrongly in phases 3, 4 and 6 as *"pre-existing, verified by stashing"*.
+They were **not**. Verified by bisecting the history: they fail at every commit
+that has a `tests/` dir, back to `6a8db71`, long before task 31 existed. Two root
+causes, both **test bugs** — the product code was right in every case.
+
+**1. `tests/fixtures/.../story.db` is gitignored** (`.gitignore:6` — `*.db`).
+Phase 3 regenerated it from the markdown, which is correct, and that is what exposed
+both fixture-dependent bugs below. But it also means `git checkout` never restored
+it, so every historical bisect ran against the *regenerated* DB — which is why the
+failures appeared to reach further back than they do, and why "verified by stashing"
+was never evidence of anything.
+
+**2. `test_an_unset_field_reads_as_not_set_not_as_a_blank` asserted a fixture
+accident.** Its docstring said *"the fixture's location has no mood"* — true when
+written, false since task 22 gave the location `mood: oppressive stillness`. Fixed
+by using **`variant_of`**, which is unset *by design* on a base location and is
+already pinned by `test_a_field_that_is_empty_by_design_is_not_a_gap`. A field that
+is unset by design does not drift when the fixture is rebuilt.
+
+**3. `test_a_scalar_field_still_renders_before_after` was asserting the wrong
+thing.** It is about the *fence* (a one-line value must render as a delta, not a
+fenced body) but asserted a `_not set_` before-value — copying its sibling's
+premise. Now asserts the `~~oppressive stillness~~ →` delta, which is its actual
+subject and is correct for a field that has a value.
+
+**4. `test_every_link_key_story_load_emits_is_a_real_field_name` rejected a name
+the schema declares.** `with` is emitted by `story_load` (`db.py:566`, `:1214`) and
+is declared — but as a **`sub_fields`** entry of `character.relationships`
+(`constants.py:61`), and the test's `known` set collected only *top-level* field
+names. The test was calling a correct payload wrong. Now includes declared
+`sub_fields`.
+
+**All three verified as real guards**, not weakened into passing:
+
+| reverted | fails |
 |---|---|
-| before this phase | 991 passed, 3 failed |
-| after | **995 passed, 3 failed** (+4) |
+| `drafts.py` `_not set_` branch removed | the `_not set_` test |
+| `drafts.py` scalar wrongly fenced | 3 tests, incl. the fence test |
+| `with` removed from `sub_fields` | the vocabulary test |
 
-The 3 failures are the pre-existing ones phase 4 verified by stashing — `test_draft_preview.py` ×2
-and `test_story_describe.py::test_every_link_key_story_load_emits_is_a_real_field_name`.
-Unchanged and unrelated; see NOTE 1.
+`core/` and `tools/` reverted clean; the fix is 3 test files, no product change.
+
+**Suite: 998 passed, 0 failed.**
 
 `tests/test_legacy_db_migration.py` untouched, per the recorded decision.
 
 ### NOTE — observations, not objectives
 
-1. **The `with` failure looks like a real gap, not a flaky test.** `test_story_describe.py:273`
-   walks `story_load` output and rejects relationship field `with` as unknown, so `with`
-   is emitted by a reader but absent from the relationship schema's known set. Carried
-   from phase 3 through phase 4 and now through phase 6 — three phases is long enough to
-   call it unowned. Either the schema is missing `with` or the reader should not emit it.
-2. **The two `test_draft_preview.py` failures have never been diagnosed** by any phase.
-   They predate task 31. Worth one look before they are normalised as "known failures".
-3. **`kind LIKE 'plot_%'` uses `_` as a wildcard** (carried from phase 4 NOTE 2) — three
+1. **The fixture DB being gitignored is the real lesson.** A build artefact that
+   tests depend on but git does not track means every "verified by stashing" claim
+   about a fixture-dependent test is unverifiable. Either commit it (`!` rule in
+   `.gitignore`) or add it in `conftest.py` from the markdown on every run — the
+   second removes the whole class. Until then, *any* future fixture edit can break a
+   test on a premise, as these three did.
+2. **`kind LIKE 'plot_%'` uses `_` as a wildcard** (carried from phase 4) — three
    sites, no reachable defect today, `IN (SELECT …)` would be exact.
-4. **`tasks/task_31/rename_plot_roles.py` is still in the tree** after its successful run.
-   Phase 5 left the delete call to the owner; not this phase's call.
-5. **`tests/fixtures/save-the-children/.story/story.db` is modified but uncommitted**
-   (regenerated in phase 3). It must land with its markdown or CI rebuilds a stale pair.
+3. **`tasks/task_31/rename_plot_roles.py` is still in the tree** after its successful
+   run. Phase 5 left the delete call to the owner; not this phase's call.
