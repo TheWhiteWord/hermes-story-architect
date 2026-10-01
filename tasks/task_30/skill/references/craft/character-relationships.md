@@ -45,15 +45,10 @@ and the other empty is not a finished record. Each holds:
   wrong about what the other knows.
 
 **The two views are decided against each other.** Write one, then the other,
-with the question being where they part. The shape to aim for is two people
-who read the same bond in opposite terms — one holding it as something
-earned, the other as something imposed — and one of them not saying so. The
-asymmetry is the bond's content: a mentor who reads trust where the apprentice
-reads surveillance, and neither is lying. Identical views are the sign the
-second one was filled rather than considered.
-
-`strength` is optional per side, so a half-written perspective comes back
-empty rather than wrong.
+with the question being where they part: the mentor who reads the bond as
+trust and the apprentice who reads it as surveillance are one record, not two
+inconsistent ones. A perspective identical to the other is a sign the second
+one was filled rather than considered.
 
 **`scenes`** — where this bond is on stage. The scenes it is featured in, not
 every scene both characters are in.

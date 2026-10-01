@@ -1,148 +1,152 @@
 # Scene design
 
-*Schematic draft — headings and notes only.*
+*The smallest unit the system records, and the one where "a lot of content"
+and "a scene" are easiest to confuse.* → `theory/scene-and-beat.md`
 
-What a scene needs before it is worth staging. The scene is the smallest unit
-the system records, and it is the one where "a lot of content" and "a scene" are
-most easily confused.
+**Two things are called a beat.** A scene's `Beats` section holds the theory's
+exchange of behavior inside the scene. An `arc_beat` is one moment in one
+character's arc, a different record entirely. → `character-arc.md`
 
-The field names are in `story_describe`. Fountain syntax is not here.
+**The screenplay is the `Content` sections, in order.** Nothing else reaches
+the script: the concatenation is by act → sequence → scene `order`, so scene
+order *is* the screenplay. → `screenplay-format.md`
 
----
+## Before and after
 
-## A scene turns, or it is an event
+A scene is where everything in the story meets: the cast, the value, the turn,
+the place in the structure. So it is worth reading before deciding it, and
+worth reading back after.
 
-*The whole test, and the reason this file exists.*
+**Read before deciding what the scene turns.** These are what the turn is made
+from, and they are considerations rather than instructions — what the story
+needs here may be one of these or none of them:
 
-- A scene is **continuous time and place in which something changes.** If the
-  value entering is the same as the value leaving, nothing happened dramatically
-  no matter how much was written.
-- That is the difference between a scene and a sequence of things happening. A
-  character enters a room, learns a thing, and leaves having lost something they
-  wanted — the charge moved, and the scene turned.
-- **So the test before staging: can you say what the value is on the way out, and
-  how it differs from the way in?** If not, the scene is not ready, and adding
-  prose will not make it ready.
-- *A scene that does not turn is not always wrong* — a deliberate flat beat, a
-  rest, a non-event. But it should be a decision, not an accident, and the
-  `dramatic_role` field is where that decision gets recorded.
+- **The arc beats of the characters in it.** They show where each character's
+  value has been and what it has done so far, so the scene can pick up where
+  the last turn left them — what state they are in, and what would be a change
+  from it. A curve that has been flat is information too: a protagonist's
+  wants a more dynamic line than a supporting character's, and a scene is
+  where a stalled arc can be moved.
+- **The character values themselves.** A character's value is what the scene
+  serves for them, and it points at what would be relevant to that character
+  here.
 
-## Where the turn is recorded
+**Other things may rightly drive the scene instead** — the story value, the
+structure, what the scene has to accomplish technically. A story progresses on
+more than one front, and **not everything progresses at the same pace in every
+scene.** A scene that moves the story's value and leaves every character's arc
+where it was is correct, not incomplete.
 
-*Four fields, one fact. They answer different questions and none of them is
-optional in principle.*
+**Read back after.** The scene turns the value — is that visible? Does the
+cast have someone to happen to? Are the people present the ones the turn
+belongs to?
 
-- **The charge pair** — what the value is entering and leaving. This is the
-  measurement of the turn.
-- **`shift`** — how it turns, in the story's language. This is the finding, and
-  the one a writer actually uses.
-- **`y`** — where the turn lands on the scale, so the curve can be drawn.
-- → `value-system.md` for how to read the charge words, derive `y` from `shift`,
-  and what a missing `y` means.
-- **The scene sections carry the same turn in prose**: `Objective` (what is
-  wanted), `Conflict` (what resists it), `Beats` (the exchanges), `Value Turn`
-  (the measurement in words). The fields and the sections are the same decision
-  in two forms; neither requires the other. → `entity-sections.md`
-- **Conflict levels** — inner, personal, extra-personal. More than one is
-  normal, and a scene with only one is worth a second look.
+## Requisites
 
-## Placement: sequence, act, and order
+- **The sequence, and the act that matches it.** `sequence_id` is required and
+  a missing sequence is refused by name. The act comes from the sequence, not
+  from a choice — a scene whose `act_id` disagrees with its sequence's act is
+  refused too. Do not stage a scene before its sequence exists.
+- **The location, if it is set.** Empty is a field not yet set and is reported
+  as unfilled. A value that is set must name a location that exists, so create
+  the location and commit it first. → `location.md`
 
-*The structural side, and one rule the write path enforces.*
+## Deciding it
 
-- A scene lives in a **sequence**, which lives in an act. Both are required.
-- **Both are checked, and both can refuse the write.** Verified: a sequence that
-  does not exist is refused by name, and a scene whose `act_id` disagrees with
-  its sequence's act is refused too. So neither is free-form — derive the act
-  from the sequence rather than choosing it, and do not stage a scene before its
-  sequence exists. **[checked]**
-- `order` is a **fraction**, not an integer, so a scene can be inserted between
-  two others without renumbering anything. Reordering is a separate operation
-  that renumbers a whole list.
-- → `plot-and-structure.md` for where a scene sits in the larger shape.
-- → `mechanics/dashboard.md` for why order is not bookkeeping: scene order *is*
-  the screenplay.
+**Where it sits.** `order` is a fraction, not an integer, so a scene can be
+inserted between two others without renumbering anything; a reordering is a
+separate operation that renumbers the whole list. → `plot-and-structure.md`
 
-## Role and milestones: two different questions
+**Who is in it — `characters`.** The cast present. An empty list on a scene
+that genuinely has nobody in it is recorded with `no_cast`, so the absence
+reads as chosen rather than as an oversight.
 
-*The scene has a role word and four booleans. They are not the same fact.*
+**What turns here — the value pair and the shift.** The scene's job is the
+turn, and it is three records of that one fact:
+- `value_at_open` and `value_at_close` are the charge entering and leaving.
+- `shift` is how the value turns *in the story's language* — the finding, the
+  thing a writer uses. It is not the pair of charge words restated.
+- `y` is that shift measured, read only to draw the curve.
 
-- **`dramatic_role`** is what this scene *does* structurally: setup,
-  complication, crisis, climax, resolution, transition, non-event. Exactly one.
-- **The four booleans** mark *milestone* scenes specifically: this is the
-  inciting incident, this is the sequence's climax, this is the act's climax,
-  this is the story's climax. Each is a separate claim at a different level of
-  the hierarchy.
-- **A scene with the role `climax` is not the story climax.** It is a climax
-  *of something* — of a beat, of a sequence, of a subplot. Setting the role does
-  not set a milestone, and setting a milestone does not set the role.
-- Setting a milestone also has a counterpart on the project — see
-  `project-design.md`, which states which reader each side serves.
-- The milestones are what the structural views report, so an unmarked climax is
-  a scene the views cannot see.
+**A scene that does not turn is not a scene.** If the two charges are the
+same, the scene is exposition, and that is a thing to find out before writing
+it rather than after. The turn need not be the loudest thing in the scene —
+it is the point where the value differs on the way out.
 
-## Cast
+**What the scene is for — `dramatic_role`, against the level flags.** These
+answer different questions and are not interchangeable:
+- `dramatic_role` is what this scene *does* structurally: setup, complication,
+  crisis, climax, resolution, transition, non-event. Exactly one.
+- `is_inciting_incident`, `is_sequence_climax`, `is_act_climax`,
+  `is_story_climax` mark the scene at each level of the hierarchy.
+- **A scene whose role is `climax` is a climax of something.** A climax is the
+  culmination of a level, and it is defined by being greater than everything
+  inside that level — which is why there is one per level rather than one in
+  the story, and why the levels usually land in different scenes. A scene with
+  the role `climax` is the culmination of whatever contains it; which one is
+  decided by the container, not by the role. Setting the role does not set a
+  level flag. → `structure-and-plot.md`
+- **Climaxes nest, so a scene can carry several, or one, or none.** The story
+  has one climax, each act one, each sequence one: within an act, one of its
+  sequence climaxes is also the act's, and across the story exactly one act
+  climax is also the story's. So several flags being true is not a conflict —
+  that is one scene that culminates at several scales. Which flags *should* be
+  set is relative to what this scene has to do and to its level: the scene's
+  own turn decides whether a flag is earned here, and the story-level ones
+  carry the most weight because the whole structure resolves on them.
+- **A climax is as large as its level, and no larger.** A scene that is only
+  its sequence's climax must be smaller than its act's climax, and the act's
+  smaller than the story's. A sequence climax that outruns its act's has
+  nothing left for the act to do, and the higher culmination lands flat. So
+  the `shift` of a lower climax is a smaller turn than the `shift` of a higher
+  one — same field, different magnitude. → `values.md`
+- **Every other scene is trajectory toward a culmination.** A scene that is
+  not a climax is not a failed climax: it moves the value toward the one that
+  is coming, and the size of its turn is set by that distance. → `values.md`
 
-- `characters` is a list of slugs present in the scene.
-- **`no_cast` is a decision, not a workaround.** Set it when a scene
-  deliberately has no characters — an empty room, a landscape, a device — so the
-  absence is recorded as chosen rather than left looking like an oversight.
-- **It works on one surface, not two.** Verified: `story_load(view="unfilled")`
-  honours the flag and reports the scene as complete on that field, while
-  `story_retrieve`'s per-entity `unfilled_fields` does not know about it and
-  still lists `characters` as unfilled. The flag is substituted further down, in
-  the view, not in the field check.
-- So **an agent reading the per-entity surface will see a deliberate empty cast
-  reported as a gap.** That is not a bug to work around — it is the flag doing
-  its job on the surface that shows the user. Trust the unfilled view for "is
-  this scene missing its cast", and do not re-add a character to satisfy the
-  other one.
-- An empty cast with no flag is an oversight. An empty cast with the flag is a
-  decision. Nothing else distinguishes them.
+**The prose.** `Objective` is the immediate desire in this time and place;
+`Conflict` is what resists it, from one of the concentric levels — inner,
+personal, extra-personal, and more than one at once is normal. `Value Turn`
+is the turn above, in words. `Dramatic Function` is why the scene exists, and
+`Production` is what it needs to be made.
 
-## Two headings, and they are not interchangeable
+**`status`** runs planned → drafted → written → locked, and is the user's to
+move.
 
-*Both concern the script, and only one of them is what the script reads.*
+## The couplings
 
-- The **`heading` field** is screenplay metadata — a slug-friendly heading for
-  the scene. It is optional and defaults to empty.
-- **The `Content` section's first line** is what the renderer actually reads, and
-  it must be a Fountain scene heading. A scene whose Content does not open with
-  one is silently absent from the script.
-- They can disagree and nothing checks. The field is for the user's own
-  organisation; the section is the script.
-- → `screenplay-format.md` for the format, and the two failure modes that render
-  as a working dashboard.
+- **A climax is one decision, made where the scene is made.** The flag lives
+  on the scene and the container points at the scene — `climax_scene_id` on an
+  act and on a sequence, and the story's own pointer on the project. The flag
+  cannot be set before the scene exists, so setting it and updating the
+  container are the same operation, not two things to remember. Both halves,
+  every time: a flag alone is a scene that claims a culmination nothing points
+  at. → `plot-and-structure.md`, `project-design.md`
 
-## Content is the scene, not about the scene
+- **The inciting incident is the same shape**: the scene's flag and the
+  project's pointer. → `project-design.md`
 
-- The `Content` section holds **the screenplay itself** — Fountain, not prose
-  describing what happens. Every other section is about the scene; this one is
-  the scene.
-- That is worth stating plainly because the section is named the same as every
-  other one and reads like it: `Objective` and `Content` are not the same kind of
-  thing.
-- *The sections, in order:* `Content`, `Objective`, `Conflict`, `Beats`,
-  `Value Turn`, `Dramatic Function`, `Production`, `Notes`.
+- **A beat's scene should contain the beat's character.** The beat says where
+  the character's arc turns; the scene says who is in it. Nothing compares
+  them. → `character-arc.md`
 
-## What a scene needs before it is worth staging
+- **`heading` and the Content's first line are two different things.** The
+  field is a slug-friendly heading for the user's own organisation, and it is
+  optional. The script reads the *first line of the `Content` section*, and
+  that line must be a Fountain scene heading — one beginning `INT`, `EXT`,
+  `EST` or `I/E`. A scene whose Content does not open with one is simply
+  absent from the screenplay, with no error. The field and the line can
+  disagree and nothing checks it.
 
-*The practical version of the top of this file.*
+## Consistency
 
-- [ ] A turn: the charge entering differs from the charge leaving.
-- [ ] The shift stated in the story's language, not as a pair of charge words.
-- [ ] A sequence, and an act that matches it.
-- [ ] A role — or a decision that it has none.
-- [ ] Cast, or `no_cast`.
-- [ ] Content, if the scene is being written rather than only planned.
-- `status` runs planned → drafted → written → locked, and is the user's to move.
+**A scene's cast against what the scene does.** The turn happens to someone.
+A scene whose `characters` is empty but whose `Value Turn` moves a particular
+character's value is two records disagreeing about who is present — and
+`no_cast` does not cover it, because that flag records a scene with nobody in
+it, not a scene whose turn belongs to someone who is absent.
 
----
-
-## Open questions
-
-- [ ] `heading` and the Content's first line are two headings with no
-      relationship. Is the field worth keeping in the file at all, or is it
-      mentioned once and left alone?
-- [ ] "A scene that does not turn is not always wrong" — is that permission
-      worth giving explicitly, or does it weaken the test at the top?
+**A scene's shift against its beats and its objective.** The shift is what the
+gap and the choice add up to. A `Value Turn` that no `Conflict` produces is a
+turn the scene has not earned, and reading the two sections together is the
+cheapest way to find it.

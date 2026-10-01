@@ -83,13 +83,21 @@ what all of that adds up to:
 7. **`y`** — that same `shift` as a number, derived from it, and read only to
    draw the arc's curve. The shift is the fact; `y` is its measurement. It is
    the one field here the agent can compute rather than ask for.
-8. **the two charges** — `character_value_at_open` and
+8. **The two charges** — `character_value_at_open` and
    `character_value_at_close` on the beat, the charge entering and leaving
    this moment. They are this beat's own, not the arc's ends. A beat's close
    is usually the next beat's open, but the arc moves on the character, not
    only on camera: they can be changed by something that happens while they
    are not in the room. Read the beats in order and set each open charge from
    the one before it, unless the story has moved them in between.
+
+**A beat is added when the arc turns here, and not otherwise.** A turn is not
+only a swing from one charge to its opposite: `mixed` and `ironic` are turns
+too, and a scene that lands a character somewhere unresolved is a beat, not a
+scene that moved nothing. Equally, a character can be in a scene that does
+not move their arc at all — that is a correct scene, not a missing beat. A
+story progresses on more than one front and not everything progresses at the
+same pace. → `scene-design.md`
 
 **The sections** — `Action`, `The Gap`, `Choice`, `Value Shift`, `Notes` — are
 the same beat in prose, one per field. Write the reason here, not the field

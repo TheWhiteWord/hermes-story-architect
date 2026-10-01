@@ -25,6 +25,37 @@ are not the same size.
   the building block a scene's turn is made of. A beat continues until
   behavior changes.
 
+## Why there is a climax at every level
+
+**A climax is the culmination of a level, and it is defined by a comparison
+with everything inside that level.** A sequence's climax is the scene with
+greater impact than any preceding scene in it; an act's is the climax of that
+act, more powerful than any previous sequence or scene; the story's delivers
+the absolute and irreversible change.
+
+- **The measure is relative, so it has to be taken at each level — and each
+  level yields a different scene.** That is why climaxes repeat rather than
+  there being one. It is a consequence of the comparison, not a convention
+  layered on top.
+- **The repetition mirrors the magnitude.** Scenes carry minor but significant
+  change, sequences moderate and more impactful change, acts major reversals.
+  A story runs three sizes of change, and a single climax could only mark the
+  largest — leaving two thirds of the progression unmeasured.
+- **Each is irreversible at its own scale.** The story climax is irreversible
+  absolutely; an act climax is irreversible within its act; a sequence climax
+  within its sequence. That is also why they are usually different scenes, and
+  why a climax of one level is not thereby the climax of another.
+- So the hierarchy of climaxes and the hierarchy of magnitudes are the same
+  shape. Asked "where does the story turn hardest", the answer is the story's;
+  asked "where does this act turn hardest", it is the act's, and both are
+  correct at the scale they were asked.
+- **They nest, so some coincide and most do not.** One climax per container at
+  every level means the story has one climax, each act has one, and each
+  sequence has one. Within an act, one of that act's sequence climaxes is the
+  act's climax; the rest are only sequence climaxes. And of the act climaxes
+  across the story, exactly one is also the story's. A scene can therefore
+  carry several climaxes at once, or one, or — usually — none.
+
 ## Crisis, climax, resolution
 
 - **A crisis is the true dilemma** at maximum pressure: the confrontation
