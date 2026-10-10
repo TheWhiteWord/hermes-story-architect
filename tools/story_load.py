@@ -354,6 +354,22 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     # types. Listing them once here is what makes a scene's `plots[]` entries
     # readable, and it is the only place the two sets can be compared: a plot
     # in this index with no scene below it is a plot serving nothing.
+    #
+    # Each entry carries its own milestones — the scenes holding each role in
+    # THAT plot. The main plot's are the story's; every sub-plot's are its own.
+    scene_order = {sid: ok for sid, ok in conn.execute(
+        "SELECT id, order_key FROM entities WHERE type='scene' AND is_deleted=0")}
+    plot_milestones = {}
+    for scene_id, roles in plot_refs.items():
+        for entry in roles:
+            plot_milestones.setdefault(entry["plot"], {}).setdefault(
+                entry["role"], []).append(scene_id)
+    for roles in plot_milestones.values():
+        for scene_ids in roles.values():
+            # Story order, so a plot with several scenes in one role lists
+            # them as they happen rather than in relation-insertion order.
+            scene_ids.sort(key=lambda sid: (scene_order.get(sid, 0), sid))
+
     plot_index = []
     for plot_id, plot_name, plot_extra_json in conn.execute(
             "SELECT id, name, extra FROM entities "
@@ -364,6 +380,7 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
             "name": plot_name,
             "plot_scope": pe.get("plot_scope", ""),
             "plot_type": pe.get("plot_type", ""),
+            "milestones": plot_milestones.get(plot_id, {}),
         })
     # Story-level milestones are the main plot's roles. Find the main plot's
     # inciting_incident and climax scenes from the plot role relations.

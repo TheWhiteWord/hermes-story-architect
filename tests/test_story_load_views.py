@@ -79,6 +79,19 @@ class TestPlotBeatsLiveInTheirOwnView:
         # and empty so the shape does not change with the data.
         assert entry["plot_scope"] == ""
 
+    def test_plot_index_carries_per_plot_milestones(self, project):
+        """Each plot's index entry reports its own role scenes — the main
+        plot's are the story's milestones, every sub-plot's are its own.
+        The fixture gives the-resistance two setups and one resolution."""
+        plots = load(project, view="dramatic_elements")["project"]["plots"]
+        by_id = {p["id"]: p for p in plots}
+        assert by_id["the-resistance"]["milestones"] == {
+            "setup": ["central-room-day", "central-room-night"],
+            "resolution": ["the-core-day"],
+        }
+        # A plot with no roles carries an empty milestone map, not a missing key.
+        assert by_id["the-scientists-last-stand"]["milestones"] == {}
+
     def test_every_scene_plot_slug_resolves_against_the_index(self, project):
         """The cross-check the index exists for: a role naming a plot absent
         from the index has nothing to be checked against."""

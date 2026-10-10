@@ -115,3 +115,32 @@ of reading the old per-scene flags (`is_inciting_incident`, `is_sequence_climax`
 - The `project` section in `dramatic_elements` reports milestone scene IDs as
   a list of slugs (or `"unfilled"`) rather than a single string, matching the
   new multi-milestone semantics.
+
+## Follow-up — Sub-plot milestones (added after Task 3)
+
+Per user direction, sub-plots are now tracked with their own milestones in the
+same fashion, in the non-graph surfaces only (the graph needs a design first).
+
+**Decisions taken (confirmed with the user):**
+1. `scene.milestone` stays **story level = main plot only**. Sub-plot roles
+   stay visible per-plot via each scene's `plots[]` — no duplication.
+2. All six plot roles count as milestones (keep `milestone_label` as shipped).
+3. Both surfaces present the per-plot summary: the `dramatic_elements` view and
+   the dashboard story view.
+
+**Changes:**
+- `tools/story_load.py` — `_view_dramatic_elements`'s plot index entries now
+  carry a `milestones` map (`{role: [scene_id, ...]}`), scenes in story order.
+  Covers main and sub plots; a plot with no roles carries `{}`.
+- `src/dashboard/js/views/story.js` — new "Subplot milestones" block: each
+  sub-plot with roles, listing its role scenes as clickable links in story
+  order. Omitted when there are no sub-plots or none carry roles.
+
+**Verification:**
+- `tests/test_story_load_views.py::test_plot_index_carries_per_plot_milestones`
+  — asserts the per-plot `milestones` map against the fixture.
+- `tests/test_story_view_subplot_milestones.py` (new, node render) — 6 tests
+  driving the real `story.js` in node against a stub DOM: block rendered, scenes
+  linked, role label humanised, main plot not duplicated, block omitted with no
+  sub-plots / no roles, and the real `get_dashboard_data` payload renders.
+- Full suite: **1075 passed**.
