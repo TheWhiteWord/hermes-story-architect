@@ -78,7 +78,7 @@ class TestRelationBackedFields:
 
         `_entity_fields` used to iterate `wanted`, which is a SET, so the
         output order was whatever the hash table produced — `one_sentence`
-        landed between two role fields and the five roles came out shuffled.
+        landed between two role fields and the six roles came out shuffled.
         It emits in schema order now, and the plot's schema is ordered for
         reading: identity, then cast and shape, then the dramatic progression.
         """
@@ -88,7 +88,8 @@ class TestRelationBackedFields:
         assert list(r["entities"][0]["fields"].keys()) == [
             "name", "one_sentence", "status", "characters", "value_arc",
             "plot_scope", "plot_type",
-            "setups", "complications", "crisis", "climax", "resolutions"]
+            "setups", "inciting_incident", "complications",
+            "crisis", "climax", "resolutions"]
 
     def test_the_order_is_the_same_whatever_subset_is_asked_for(self, db):
         """Naming fields explicitly must not reorder them — a caller that asks

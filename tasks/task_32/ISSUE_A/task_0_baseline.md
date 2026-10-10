@@ -15,7 +15,29 @@ leaves the suite green, so this is the reference point.
 
 ## Checklist
 
-- [ ] pytest installed
-- [ ] Full suite run on dev
-- [ ] Total test count recorded
-- [ ] All tests green (or pre-existing failures noted)
+- [x] pytest installed
+- [x] Full suite run on dev
+- [x] Total test count recorded
+- [x] All tests green (or pre-existing failures noted)
+
+## Baseline Record
+
+| Field | Value |
+|---|---|
+| Date | 2026-10-10 |
+| Branch | feature/issue-redesign |
+| Working tree | clean |
+| Python | 3.14.7 |
+| pytest | 9.1.1 |
+| Tests collected | 1067 |
+| Tests passed | 1067 |
+| Tests failed | 0 |
+| Duration | 75.30s |
+| Pre-existing failures | None |
+
+## Final Brief
+
+Baseline established. The full test suite on `feature/issue-redesign` is green:
+**1067 tests, 1067 passed, 0 failed** in 75.30s. pytest 9.1.1 was installed via
+`pip install -e ".[dev]"`. No pre-existing failures. This is the reference point
+for all subsequent Issue A tasks.

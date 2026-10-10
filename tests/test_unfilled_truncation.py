@@ -54,7 +54,7 @@ def test_a_filtered_answer_is_complete_and_points_both_ways(project, monkeypatch
     from core.db import get_unfilled_map
     known = get_unfilled_map(project)
     # The cap is set here rather than left to the fixture's gap count: the
-    # plot's five role fields stopped being gaps when they became computed, so
+    # plot's six role fields stopped being gaps when they became computed, so
     # the fixture sits exactly on the cap and truncation stopped firing for a
     # reason that has nothing to do with truncation.
     monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)

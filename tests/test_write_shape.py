@@ -102,12 +102,12 @@ def test_a_string_writes_no_relation_rows(vault):
 # that did not exist and the prose was dropped. Edit and import were already
 # correct, which is why it went unnoticed: the only coverage was through edit.
 #
-# These ran through the plot's five fields. Those are computed now — a role is
+# These ran through the plot's six fields. Those are computed now — a role is
 # written on the SCENE as `plot_roles` — so the coverage moved with the write
 # path rather than being deleted. See test_scene_plot_roles.py for the
 # scene-side contract.
 
-PLOT_ROLES = ["setup", "complication", "crisis", "climax", "resolution"]
+PLOT_ROLES = ["setup", "inciting_incident", "complication", "crisis", "climax", "resolution"]
 
 
 def _with_plot(vault):

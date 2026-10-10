@@ -28,9 +28,9 @@ class TestVocabulary:
         roles_from_map = {kind.replace("plot_", "") for kind in PLOT_BEAT_FIELDS.values()}
         assert set(PLOT_ROLES) == roles_from_map
 
-    def test_the_five_dramatic_roles(self):
+    def test_the_six_dramatic_roles(self):
         """The dramatic roles. `transition`/`non-event` are scene beats, not plot roles."""
-        assert PLOT_ROLES == ["setup", "complication", "crisis", "climax", "resolution"]
+        assert PLOT_ROLES == ["setup", "inciting_incident", "complication", "crisis", "climax", "resolution"]
 
     def test_the_plot_schema_declares_the_roles_in_dramatic_order(self):
         """Field order is part of the contract, not an accident of the dict.
@@ -47,8 +47,8 @@ class TestVocabulary:
         """
         from core.constants import ENTITY_SCHEMAS
         role_fields = [f for f in ENTITY_SCHEMAS["plot"] if f in PLOT_BEAT_FIELDS]
-        assert role_fields == ["setups", "complications", "crisis", "climax",
-                               "resolutions"]
+        assert role_fields == ["setups", "inciting_incident", "complications",
+                               "crisis", "climax", "resolutions"]
 
     def test_the_identity_fields_come_before_the_roles(self):
         """What a plot IS, then WHO it involves, then what it does. A reader

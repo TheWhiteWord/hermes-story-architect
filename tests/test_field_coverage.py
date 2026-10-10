@@ -59,7 +59,7 @@ def _sample_value(field, meta):
             return ["knows the truth"]
         if field == "rules":
             return ["no violence"]
-        if field in ("setups", "complications", "crisis", "climax", "resolutions"):
+        if field in ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions"):
             return _make_beats()
         if field == "plot_roles":
             # The write side of a role, and the only place one is written. The
@@ -280,7 +280,7 @@ def test_edit_all_field_types(entity_type, project):
         edit_data[section_name] = f"Updated {section_name} content via edit."
 
     if entity_type == "plot":
-        # The five role fields are computed, so they cannot be edited. The role
+        # The six role fields are computed, so they cannot be edited. The role
         # is written on the SCENE as `plot_roles` — covered by
         # test_scene_plot_roles.py. What is asserted here is the refusal: an
         # edit naming one reports it read-only instead of writing rows.
@@ -366,7 +366,7 @@ def test_edit_all_field_types(entity_type, project):
     # view='dramatic_elements' with add_plot, and story_retrieve returns the
     # plot whole), so verify through story_retrieve.
     if entity_type == "plot":
-        # Naming the five explicitly: they are computed, so `["all"]` omits
+        # Naming the six explicitly: they are computed, so `["all"]` omits
         # them. An edit that tried to set `setups` above was reported read-only
         # and wrote nothing — so the rows read here are whatever the edit left,
         # which is the assertion: a read-only field produced no rows.
@@ -374,10 +374,11 @@ def test_edit_all_field_types(entity_type, project):
             "project": str(project),
             "entity_type": "plot",
             "id": [entity_id],
-            "fields": ["setups", "complications", "crisis", "climax",
-                       "resolutions"],
+            "fields": ["setups", "inciting_incident", "complications",
+                       "crisis", "climax", "resolutions"],
         }))["entities"][0]["fields"]  # field values are nested under "fields"
-        all_scenes = (plot_after.get("setups", []) + plot_after.get("complications", [])
+        all_scenes = (plot_after.get("setups", []) + plot_after.get("inciting_incident", [])
+                      + plot_after.get("complications", [])
                       + plot_after.get("crisis", []) + plot_after.get("climax", [])
                       + plot_after.get("resolutions", []))
         assert not all_scenes, "a computed role field was written by an edit"

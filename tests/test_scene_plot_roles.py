@@ -2,7 +2,7 @@
 
 The whole point of the phase: the agent records which plot a scene runs
 through where it is already writing the scene, so a plot is never reopened to
-add a scene to it. The plot's five role fields became `computed` — the same
+add a scene to it. The plot's six role fields became `computed` — the same
 rows, seen from the other side.
 
 Two of these tests fail without the fix and are marked as such below: the
@@ -79,7 +79,7 @@ class TestWriting:
         assert ("the-resistance", "s1", "plot_crisis", "d", 1) in rows(vault, "plot_crisis")
 
     def test_every_role_reaches_its_own_kind(self, vault):
-        """All five, not the two the old dict→row unwrap happened to handle."""
+        """All six, not the two the old dict→row unwrap happened to handle."""
         for i, role in enumerate(PLOT_ROLES, 4):
             create_entity(vault, "scene", f"s{i}", {"title": f"S{i}", "order": i})
             write_roles(vault, f"s{i}",
@@ -158,7 +158,7 @@ class TestValidation:
                 "plot_roles": [{"plot": "no-such-plot", "role": "setup",
                                 "description": "d"}]})
 
-    def test_a_role_outside_the_dramatic_five_is_refused(self, vault):
+    def test_a_role_outside_the_six_is_refused(self, vault):
         """`transition` and `non-event` are scene beats, not plot roles."""
         with pytest.raises(ValueError, match="Invalid plot role: transition"):
             write_roles(vault, "s1", [{"plot": "the-resistance",
@@ -276,9 +276,9 @@ class TestExportRoundTrip:
         assert "plot_roles:" in text, "the scene note lost every plot role"
         assert "the-resistance" in text and "setup" in text
 
-    def test_the_plot_note_no_longer_carries_the_five_fields(self, round_tripped):
+    def test_the_plot_note_no_longer_carries_the_six_fields(self, round_tripped):
         text = (round_tripped / "plots" / "The Resistance.md").read_text()
-        for field in ("setups", "crisis", "climax", "complications", "resolutions"):
+        for field in ("setups", "inciting_incident", "crisis", "climax", "complications", "resolutions"):
             assert f"\n{field}:" not in text, \
                 f"the plot note still emits the computed field {field}"
 
@@ -311,7 +311,7 @@ class TestExportRoundTrip:
 class TestSchema:
     def test_the_plot_role_fields_are_computed(self):
         from core.constants import ENTITY_SCHEMAS
-        for field in ("setups", "complications", "crisis", "climax", "resolutions"):
+        for field in ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions"):
             assert ENTITY_SCHEMAS["plot"][field]["computed"] is True, \
                 f"plot.{field} is still writable"
 
@@ -330,7 +330,7 @@ class TestSchema:
         assert any("plot_roles must be a list" in w for w in warnings), warnings
         assert any("plot, role, description" in w for w in warnings), warnings
 
-    def test_a_role_outside_the_five_is_not_caught_by_the_shape_check(self):
+    def test_a_role_outside_the_six_is_not_caught_by_the_shape_check(self):
         """The shape is fine; only `validate_scene_plot_roles` can judge the
         role, because the same call also resolves the plot. Stated so the
         division of labour is not mistaken for a gap."""

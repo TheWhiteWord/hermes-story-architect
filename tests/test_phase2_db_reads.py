@@ -338,7 +338,7 @@ class TestNavigationalQueries:
     def test_plot_to_scenes(self, db_project):
         """Which scenes does 'the-resistance' plot touch?
 
-        Verified through story_retrieve. The five role fields are computed, so
+        Verified through story_retrieve. The six role fields are computed, so
         `fields: ["all"]` no longer returns them — naming them does, and that is
         the cost of moving the write to the scene. The same rows are also on
         each scene as `plot_roles`, which IS in `["all"]`.
@@ -348,11 +348,12 @@ class TestNavigationalQueries:
         result = json.loads(retrieve_handler({
             "project": str(proj), "entity_type": "plot",
             "id": ["the-resistance"],
-            "fields": ["setups", "complications", "crisis", "climax",
-                       "resolutions"]}))
+            "fields": ["setups", "inciting_incident", "complications",
+                       "crisis", "climax", "resolutions"]}))
         plot = result["entities"][0]["fields"]  # field values are nested under "fields"
         scenes = (
             plot.get("setups", [])
+            + plot.get("inciting_incident", [])
             + plot.get("complications", [])
             + plot.get("crisis", [])
             + plot.get("climax", [])

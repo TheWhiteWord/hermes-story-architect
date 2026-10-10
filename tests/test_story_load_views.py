@@ -100,7 +100,7 @@ class TestPlotBeatsLiveInTheirOwnView:
         assert all(set(p) == {"plot", "role"} for p in entries)
 
     def test_retrieve_returns_the_plot_beats(self, project):
-        """The five fields are computed, so `["all"]` skips them — name them.
+        """The six fields are computed, so `["all"]` skips them — name them.
 
         The write side moved to the scene, and `plot_roles` is in `["all"]`; this
         asserts the plot side is still readable by name, which is the cost of
@@ -112,13 +112,13 @@ class TestPlotBeatsLiveInTheirOwnView:
         got = _json.loads(retrieve_handler({
             "project": "save-the-children", "entity_type": "plot",
             "id": [plot_id],
-            "fields": ["setups", "complications", "crisis", "climax",
-                       "resolutions"],
+            "fields": ["setups", "inciting_incident", "complications",
+                       "crisis", "climax", "resolutions"],
             "root_path": str(project.parent.parent),
         }))["entities"][0]["fields"]
-        beats = got.get("setups", []) + got.get("complications", []) \
-            + got.get("crisis", []) + got.get("climax", []) \
-            + got.get("resolutions", [])
+        beats = got.get("setups", []) + got.get("inciting_incident", []) \
+            + got.get("complications", []) + got.get("crisis", []) \
+            + got.get("climax", []) + got.get("resolutions", [])
         assert beats, f"{plot_id} lost its beats — they are readable nowhere"
 
     def test_the_scenes_plot_roles_are_the_write_side(self, project):
@@ -381,7 +381,7 @@ class TestUnfilledView:
     def test_is_capped_so_it_stays_a_suggestion_not_an_inventory(self, project,
                                                                  monkeypatch):
         # The cap is set here rather than left to the fixture's gap count: the
-        # plot's five role fields stopped being gaps when they became computed,
+        # plot's six role fields stopped being gaps when they became computed,
         # so the fixture sits exactly on the cap and truncation stopped firing
         # for a reason unrelated to truncation.
         import tools.story_load as sl

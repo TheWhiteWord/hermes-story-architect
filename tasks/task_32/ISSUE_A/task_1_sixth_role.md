@@ -16,17 +16,17 @@ foundational change — every later task depends on it.
 
 ### 1.2 `core/entity.py` — `_RELATION_FIELDS["plot"]`
 
-- Add `"inciting_incidents": ("plot_inciting_incident", True)` to the plot
+- Add `"inciting_incident": ("plot_inciting_incident", True)` to the plot
   entry in `_RELATION_FIELDS`. The field name is plural (like `setups`,
   `complications`, `resolutions`) because a plot can have multiple inciting
   incidents (though typically one).
 
 ### 1.3 `core/entity.py` — `ENTITY_SCHEMAS["plot"]`
 
-- Add the `inciting_incidents` field to the plot schema, in dramatic order
+- Add the `inciting_incident` field to the plot schema, in dramatic order
   (after `setups`, before `complications`):
   ```python
-  "inciting_incidents": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is incited (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+  "inciting_incident": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is incited (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
   ```
 
 ### 1.4 `core/entity.py` — `validate_scene_plot_roles`
@@ -45,9 +45,9 @@ foundational change — every later task depends on it.
 - Update `test_the_five_dramatic_roles` → rename to `test_the_six_dramatic_roles`
   and assert the new list.
 - Update `test_the_plot_schema_declares_the_roles_in_dramatic_order` → assert
-  the new field order including `inciting_incidents`.
+  the new field order including `inciting_incident`.
 - Update `test_the_identity_fields_come_before_the_roles` → the identity fields
-  slice may need adjustment (7 → 7, since `inciting_incidents` is a role field).
+  slice may need adjustment (7 → 7, since `inciting_incident` is a role field).
 - Update `test_the_dashboard_role_list_is_the_same_list` → no code change needed
   (it reads `PLOT_ROLES` and compares to the JS copy), but it will now check
   six roles.
@@ -74,7 +74,7 @@ foundational change — every later task depends on it.
 ### 1.9 `tests/test_field_coverage.py`
 
 - Update `_sample_value` for plot role fields → the `if field in (...)` check
-  at line 62 needs `"inciting_incidents"` added to the tuple.
+  at line 62 needs `"inciting_incident"` added to the tuple.
 
 ### 1.10 `tests/test_unfilled_fields.py`
 
@@ -84,20 +84,37 @@ foundational change — every later task depends on it.
 
 ### 1.11 `tests/test_story_describe.py`
 
-- Update `test_relation_backed_fields_are_flagged` → add `"inciting_incidents"`
+- Update `test_relation_backed_fields_are_flagged` → add `"inciting_incident"`
   to the asserted field list.
 - Update `test_a_link_in_extra_is_still_marked_as_a_reference` → no change
   needed (it checks specific fields, not the new one).
 
 ## Checklist
 
-- [ ] `PLOT_ROLES` in constants has six roles in dramatic order
-- [ ] `_RELATION_FIELDS["plot"]` has `inciting_incidents` entry
-- [ ] `ENTITY_SCHEMAS["plot"]` has `inciting_incidents` computed field in dramatic order
-- [ ] `DASH.PLOT_ROLES` in colors.js matches
-- [ ] `test_plot_roles.py` updated and passing
-- [ ] `test_scene_plot_roles.py` updated and passing
-- [ ] `test_write_shape.py` updated and passing
-- [ ] `test_field_coverage.py` updated and passing
-- [ ] `test_story_describe.py` updated and passing
-- [ ] Full suite green
+- [x] `PLOT_ROLES` in constants has six roles in dramatic order
+- [x] `_RELATION_FIELDS["plot"]` has `inciting_incident` entry
+- [x] `ENTITY_SCHEMAS["plot"]` has `inciting_incident` computed field in dramatic order
+- [x] `DASH.PLOT_ROLES` in colors.js matches
+- [x] `test_plot_roles.py` updated and passing
+- [x] `test_scene_plot_roles.py` updated and passing
+- [x] `test_write_shape.py` updated and passing
+- [x] `test_field_coverage.py` updated and passing
+- [x] `test_story_describe.py` updated and passing
+- [x] Full suite green
+
+## Final Brief
+
+Added `inciting_incident` as the sixth plot role. Changes:
+
+- `core/constants.py`: `PLOT_ROLES` now has six roles; `ENTITY_SCHEMAS["plot"]` has
+  `inciting_incident` computed field in dramatic order; `plot_roles.role` description
+  updated.
+- `core/entity.py`: `_RELATION_FIELDS["plot"]` has `inciting_incident` entry;
+  comments updated from "five" to "six".
+- `src/dashboard/js/colors.js`: `DASH.PLOT_ROLES` updated.
+- Tests updated: `test_plot_roles.py`, `test_scene_plot_roles.py`,
+  `test_write_shape.py`, `test_field_coverage.py`, `test_story_describe.py`,
+  `test_story_load_views.py`, `test_phase2_db_reads.py`, `test_retrieve_reading.py`,
+  `test_unfilled_fields.py`, `test_unfilled_truncation.py`, `test_core.py`.
+
+Full suite: **1068 passed, 0 failed** (was 1067; +1 from the new parametrized role case).

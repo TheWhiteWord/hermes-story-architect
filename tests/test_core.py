@@ -887,7 +887,7 @@ class TestUnfilledFields:
     def test_unfilled_fields_subfields_plot_beats(self):
         """Both sides report the gap now, and they mean different things.
 
-        The plot's five role fields are computed, and it used to follow that
+        The plot's six role fields are computed, and it used to follow that
         they were therefore never gaps — the reasoning being that a derived
         value has no stored value to be missing. But a plot whose crisis is
         unfulfilled IS missing its crisis, and an author asking the plot what

@@ -23,7 +23,7 @@ DASH.REL_TYPE_COLORS = {
 
 // The dramatic roles a plot holds — must match PLOT_ROLES in core/constants.py.
 // One list, so adding a role is an edit here and nowhere else.
-DASH.PLOT_ROLES = ['setup', 'complication', 'crisis', 'climax', 'resolution'];
+DASH.PLOT_ROLES = ['setup', 'inciting_incident', 'complication', 'crisis', 'climax', 'resolution'];
 
 // The `has_<role>` badges on a plot row (act and sequence panels are identical).
 DASH.plotRoleBadges = function(p) {

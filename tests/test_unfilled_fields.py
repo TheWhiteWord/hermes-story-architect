@@ -88,7 +88,7 @@ class TestNeverUnfilled:
         """Computed means "derived at read time", which is not the same as
         "never a gap".
 
-        The plot's five role fields are the case that proved it: a plot with no
+        The plot's six role fields are the case that proved it: a plot with no
         crisis scene is missing its crisis, and reporting nothing there left
         the author no way to ask which plot was incomplete. They are relation
         fields whose rows exist or do not, and `story_retrieve._unfilled` feeds

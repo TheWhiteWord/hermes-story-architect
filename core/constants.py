@@ -22,7 +22,7 @@ PLOT_SCOPES = ["main", "sub"]
 # cannot import `entity` (entity imports constants); the authoritative
 # field↔kind map is `_RELATION_FIELDS["plot"]`, and tests/test_plot_roles.py
 # pins the two together so they cannot drift.
-PLOT_ROLES = ["setup", "complication", "crisis", "climax", "resolution"]
+PLOT_ROLES = ["setup", "inciting_incident", "complication", "crisis", "climax", "resolution"]
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
 ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
@@ -110,18 +110,20 @@ ENTITY_SCHEMAS = {
         "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
         "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
-        # The five role fields are READ-ONLY: they are the same `plot_<role>`
+        # The six role fields are READ-ONLY: they are the same `plot_<role>`
         # rows the scene writes as `plot_roles`, read back from the plot side.
         # The agent records a role where it is writing the scene, and never has
         # to reopen a plot to add one. `computed` is what makes every write
         # path refuse them — draft preview, create, edit, describe.
         #
         # Declared in dramatic order, which is the order they occur and the
-        # order a reader scans them: setup → complication → crisis → climax →
-        # resolution. Note this is NOT `PLOT_ROLES`' order — complications is
-        # plural and sits second, not last. A test pins the two so they cannot
-        # drift, because the field names are not the role names.
+        # order a reader scans them: setup → inciting_incident → complication →
+        # crisis → climax → resolution. Note this is NOT `PLOT_ROLES`' order —
+        # complications is plural and sits third, not last. A test pins the
+        # two so they cannot drift, because the field names are not the role
+        # names.
         "setups": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is established (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "inciting_incident": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is incited (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
         "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
@@ -177,7 +179,7 @@ ENTITY_SCHEMAS = {
             "description": "Which plots run through this scene, and in what role. One entry per plot. This is where a plot role is written — never on the plot itself.",
             "sub_fields": {
                 "plot": {"type": "string", "description": "Slug of an existing plot"},
-                "role": {"type": "string", "description": "One of: setup, complication, crisis, climax, resolution"},
+                "role": {"type": "string", "description": "One of: setup, inciting_incident, complication, crisis, climax, resolution"},
                 "description": {"type": "string", "description": "What this scene does for that plot"},
             },
         },

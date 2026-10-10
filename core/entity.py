@@ -266,6 +266,7 @@ _RELATION_FIELDS = {
     "scene": {"characters": ("character_scene", True)},
     "plot": {
         "setups": ("plot_setup", True),
+        "inciting_incident": ("plot_inciting_incident", True),
         "complications": ("plot_complication", True),
         "crisis": ("plot_crisis", True),
         "climax": ("plot_climax", True),
@@ -283,7 +284,7 @@ _RELATION_FIELDS = {
 PLOT_BEAT_FIELDS = {field: kind for field, (kind, _) in _RELATION_FIELDS["plot"].items()}
 
 # Relation-stored fields the map above cannot express: `plot_roles` is ONE
-# field to FIVE kinds (the entry's `role` picks the kind), so it is written
+# field to SIX kinds (the entry's `role` picks the kind), so it is written
 # and read by bespoke blocks — see plot_role_relations.
 #
 # It is listed separately rather than inside `_RELATION_FIELDS` precisely
@@ -521,7 +522,7 @@ def plot_role_relations(scene_id: str, entries) -> list[dict]:
     no added capability.
 
     Bespoke by necessity: `_RELATION_FIELDS` maps one field to ONE kind, and
-    this is one field to five — the entry's `role` picks the kind. The generic
+    this is one field to six — the entry's `role` picks the kind. The generic
     loop in `relations_for_insert` cannot express that.
 
     An entry with no plot, or a role outside PLOT_ROLES, yields no row: the
@@ -563,7 +564,7 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
     # location_scene_relations for why both exist.
     if entity_type == "scene":
         relations += location_scene_relations(slug, fm.get("location"))
-        # One field, five kinds — see plot_role_relations for why this is
+        # One field, six kinds — see plot_role_relations for why this is
         # outside the loop below.
         relations += plot_role_relations(slug, fm.get("plot_roles"))
 
