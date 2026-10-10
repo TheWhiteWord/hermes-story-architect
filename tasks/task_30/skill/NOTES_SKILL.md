@@ -49,3 +49,82 @@ SKILL.md is written.*
 - `craft/SAMPLE.md` is a working document, not part of the skill. Delete when
   the craft files are done.
 
+---
+
+## Issue A — Skill update notes (task 5)
+
+### Theory guidance (design §4.2–4.3)
+
+These are the standing rules the skill teaches. They live in the skill, not in
+the schema.
+
+1. **Plan, execution and verification are separate.** The plan is what the
+   user or assistant intends. Execution is what the written scenes actually
+   do. Verification is the user's and assistant's reasoning about plan
+   versus execution against the theory. No program judges whether the story
+   obeys the theory.
+2. **Each fact is stored once.** Duplicated facts drift. The fixture
+   `save-the-children` proved it: `is_inciting_incident: False` on a scene
+   that both the project pointer and its own text claimed was the inciting
+   incident.
+3. **Only record what the theory does not already determine.** A sequence
+   culminates in its climax and an act peaks in its climax — position follows
+   from the theory. Recording it adds no information.
+4. **The full set of story elements is tracked at story and plot level.**
+   The source file defines them at story level. Applying them inside
+   sequences and acts is an inference, and resolution cannot exist inside a
+   unit that ends at its climax.
+5. **Setup is not the inciting incident.** Setup is the opening state before
+   the balance is upset. The inciting incident is the first major turn that
+   upsets it, and the protagonist must react to it.
+6. **Story-level milestones are the main plot's roles.** The main plot is the
+   plot with `plot_scope = main`. The story's inciting incident, crisis and
+   climax are whatever scenes hold those roles in the main plot. Nothing
+   separate is stored at project level.
+7. **Act and sequence climaxes are not stored.** Position follows from the
+   theory.
+
+### Planning instruction
+
+Record any planning discussion for an element in that element's sections
+when creating it. A plan can be written before any scene exists, and it
+evolves with the writing. It never names a scene, because where an element
+happens is only known once the scene is written. No new schema fields are
+added for planning.
+
+### Verification layer
+
+The `story-theory` skill states the expectations (escalation, position of
+climaxes, plan versus execution), and the findings go in the existing memory
+categories: `decisions`, `open_questions`, `continuity_warnings`.
+
+### What changed in scene-design.md
+
+Removed stale descriptions of deleted fields:
+
+- The "What the scene is for" bullet no longer lists `dramatic_role` values
+  as structural roles (setup, complication, etc.). It now says
+  `dramatic_role` only distinguishes whether a scene serves a plot
+  (`plot_role`, `transition`, `non-event`), and `plot_roles` carries the
+  six structural roles.
+- The `is_inciting_incident`, `is_sequence_climax`, `is_act_climax`,
+  `is_story_climax` flag names are gone from the bullet.
+- The "Climaxes nest" bullet no longer says "several flags being true is not
+  a conflict." It says which level a climax belongs to is decided by the
+  container, not stored on the scene.
+- The "A climax is as large as its level" bullet dropped the sentence about
+  a sequence climax outrunning its act's climax landing flat (the theory
+  point stands without it).
+- "The couplings" section dropped the two bullets about `climax_scene_id`
+  pointers and the incident flag/pointer pattern — both removed in Issue A.
+
+### Verification
+
+- Skill files are not tested by the suite. The check is that no test imports
+  or parses them. Suite stays green without changes for this task.
+- `core/constants.py` confirms `PLOT_ROLES` has six roles including
+  `inciting_incident`, and `SCENE_DRAMATIC_ROLES` is `["plot_role",
+  "transition", "non-event"]` — the scene-design.md description now matches.
+- `core/entity.py` `validate_scene_dramatic_role` confirms `dramatic_role`
+  carries no structural role, only the plot-serving distinction.
+

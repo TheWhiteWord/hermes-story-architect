@@ -73,33 +73,25 @@ same, the scene is exposition, and that is a thing to find out before writing
 it rather than after. The turn need not be the loudest thing in the scene —
 it is the point where the value differs on the way out.
 
-**What the scene is for — `dramatic_role`, against the level flags.** These
-answer different questions and are not interchangeable:
-- `dramatic_role` is what this scene *does* structurally: setup, complication,
-  crisis, climax, resolution, transition, non-event. Exactly one.
-- `is_inciting_incident`, `is_sequence_climax`, `is_act_climax`,
-  `is_story_climax` mark the scene at each level of the hierarchy.
+**What the scene is for — `dramatic_role` and `plot_roles`.** These answer
+different questions and are not interchangeable:
+- `dramatic_role` is whether this scene serves a plot at all: `plot_role`,
+  `transition`, or `non-event`. Exactly one. It carries no structural role.
+- `plot_roles` is where the structural role lives — one entry per plot, with
+  role from the six: setup, inciting_incident, complication, crisis, climax,
+  resolution. A scene can hold different roles in different plots.
 - **A scene whose role is `climax` is a climax of something.** A climax is the
   culmination of a level, and it is defined by being greater than everything
-  inside that level — which is why there is one per level rather than one in
-  the story, and why the levels usually land in different scenes. A scene with
-  the role `climax` is the culmination of whatever contains it; which one is
-  decided by the container, not by the role. Setting the role does not set a
-  level flag. → `structure-and-plot.md`
+  inside that level. A scene with the role `climax` is the culmination of
+  whatever contains it; which one is decided by the container, not by the
+  role. → `structure-and-plot.md`
 - **Climaxes nest, so a scene can carry several, or one, or none.** The story
-  has one climax, each act one, each sequence one: within an act, one of its
-  sequence climaxes is also the act's, and across the story exactly one act
-  climax is also the story's. So several flags being true is not a conflict —
-  that is one scene that culminates at several scales. Which flags *should* be
-  set is relative to what this scene has to do and to its level: the scene's
-  own turn decides whether a flag is earned here, and the story-level ones
-  carry the most weight because the whole structure resolves on them.
+  has one climax, each act one, each sequence one. Which level a climax belongs
+  to is decided by the container, not stored on the scene. → `structure-and-plot.md`
 - **A climax is as large as its level, and no larger.** A scene that is only
   its sequence's climax must be smaller than its act's climax, and the act's
-  smaller than the story's. A sequence climax that outruns its act's has
-  nothing left for the act to do, and the higher culmination lands flat. So
-  the `shift` of a lower climax is a smaller turn than the `shift` of a higher
-  one — same field, different magnitude. → `values.md`
+  smaller than the story's. So the `shift` of a lower climax is a smaller turn
+  than the `shift` of a higher one — same field, different magnitude. → `values.md`
 - **Every other scene is trajectory toward a culmination.** A scene that is
   not a climax is not a failed climax: it moves the value toward the one that
   is coming, and the size of its turn is set by that distance. → `values.md`
@@ -114,17 +106,6 @@ is the turn above, in words. `Dramatic Function` is why the scene exists, and
 move.
 
 ## The couplings
-
-- **A climax is one decision, made where the scene is made.** The flag lives
-  on the scene and the container points at the scene — `climax_scene_id` on an
-  act and on a sequence, and the story's own pointer on the project. The flag
-  cannot be set before the scene exists, so setting it and updating the
-  container are the same operation, not two things to remember. Both halves,
-  every time: a flag alone is a scene that claims a culmination nothing points
-  at. → `plot-and-structure.md`, `project-design.md`
-
-- **The inciting incident is the same shape**: the scene's flag and the
-  project's pointer. → `project-design.md`
 
 - **A beat's scene should contain the beat's character.** The beat says where
   the character's arc turns; the scene says who is in it. Nothing compares
