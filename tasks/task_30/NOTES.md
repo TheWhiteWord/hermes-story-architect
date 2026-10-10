@@ -26,4 +26,13 @@ can be something like:
 "use 'story_describe' to report them. Sections are not customizable"
 
 
+## USER NOTES
+
+redesigned "dramatic role" to state only if is one of plot role, transition, non-event.
+If dramatic role is set to plot role than the plot role must be filled
+If is set to transition, non-event than no plot roles can be added.
+
+Stub_scenes
+PLanned , which is defauikt creates a stubbed scene,usefull for planning stages.
+"status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, drafted, written, locked"},
 

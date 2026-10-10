@@ -668,18 +668,77 @@ Before crafting the Inciting Incident, define the story world:
 **Value Categories:**
 
 * **Positive Value [P]:** Ideal state.
-* **Contrary Value [C]:** Opposite, but not absolute negation.
+* **Contrary Value [C]:**  Opposite, but not absolute negation.
 * **Contradictory Value [CD]:** Direct negation of Positive Value.
 * **Negation of Negation Value [NN]:** Negation of Contradictory, often appearing as perversion or false version of Positive Value.
 
-**Relationships Between Values:**
+**EXAMPLES of Value Schemas:** 
 
-* **[P] <-> [C]:** Contrary relationship (opposition, tension).
-* **[P] -> [NN]:** Negation of Negation (positive leads to its distorted form).
-* **[C] -> [CD]:** Contradictory relationship (contrary leads to direct opposite).
-* **[NN] -> [P]:** Return/Ideal relationship (negation of negation can lead back to positive).
+-Justice:
+[P] justice
+[C] unfairness
+[CD] injustice
+[NN] tyranny
 
-**EXAMPLES of Value Schemas:** (Truth, Love, Might Makes Right, Consciousness, Wealth, Communication, Success, Intelligence, Courage, Liberty, Sanctioned Sex, Loyalty, Maturity, Honesty) - *Refer to original examples for detailed schemas for each value.*
+-Love
+[P] love
+[C] indifference
+[CD] hate
+[NN] self hate
+[NN] hatred masquerading as love (variation)
+
+-Truth
+[P] truth
+[C] white Lies
+[CD] lies
+[NN] self-Deception
+
+-consciousness (being alive/aware)
+[P] consciousness
+[C] unconsciousness
+[CD] death
+[NN] damnation
+
+-Wealth
+[P] rich
+[C] middle-class
+[CD] poor suffering the pains of poverty
+[NN] rich but suffering the pains of poverty
+
+-Communication
+[P] communication
+[C] alienation
+[CD] isolation
+[NN] insanity
+
+-Achievement of ideals or goals
+[P] success
+[C] compromise
+[CD] failure
+[NN] selling out
+
+-Intelligence
+[P] wisdom
+[C] ignorance
+[CD] stupidity
+[NN] stupidity perceived as intelligence
+
+-Liberty
+[P] freedom
+[C] restraint
+[CD] slavery
+[NN] slavery perceived as Freedom
+
+-Courage
+[P] bravery
+[C] fear
+[CD] cowardice
+[NN] cowardice perceived as bravery
+
+-Loyalty
+[P] loyalty
+[C] split-alliance
+[CD] betrayal
 
 ---
 
