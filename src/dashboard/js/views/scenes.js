@@ -50,10 +50,7 @@ DASH.renderSceneItem = function(s) {
       && (s.dramatic_role === 'transition' || s.dramatic_role === 'non-event')) {
     structTags.push(s.dramatic_role);
   }
-  if (s.is_inciting_incident) structTags.push('inciting');
-  if (s.is_sequence_climax) structTags.push('seq-climax');
-  if (s.is_act_climax) structTags.push('act-climax');
-  if (s.is_story_climax) structTags.push('story-climax');
+  (s.milestone || []).forEach(m => structTags.push(m));
   const structHtml = roleTags
     + structTags.map(t => `<span class="tag tag-struct">${DASH.escapeHtml(t)}</span>`).join('');
   // Arc beat indicator dots

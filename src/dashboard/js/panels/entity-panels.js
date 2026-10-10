@@ -448,10 +448,7 @@ DASH.showScenePanel = function(sceneId) {
       && (scene.dramatic_role === 'transition' || scene.dramatic_role === 'non-event')) {
     dramaTags.push({ l: 'role', v: scene.dramatic_role });
   }
-  if (scene.is_inciting_incident) dramaTags.push({ l: 'inciting', v: 'Inciting Incident' });
-  if (scene.is_sequence_climax) dramaTags.push({ l: 'seq-climax', v: 'Sequence Climax' });
-  if (scene.is_act_climax) dramaTags.push({ l: 'act-climax', v: 'Act Climax' });
-  if (scene.is_story_climax) dramaTags.push({ l: 'story-climax', v: 'Story Climax' });
+  (scene.milestone || []).forEach(m => dramaTags.push({ l: m, v: m }));
 
   const valueArc = [scene.value_at_open, scene.value_at_close].filter(Boolean);
   const conflicts = (scene.conflict_levels || []).filter(Boolean);

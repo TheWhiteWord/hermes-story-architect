@@ -240,8 +240,10 @@ class TestDramaticElementsView:
         out = load(project, view="dramatic_elements")
         project = out["project"]
         assert project["structure_type"] == "Classical"
-        assert project["story_climax_scene_id"] == "central-room-night"
-        assert project["inciting_incident_scene_id"] == "central-room-day"
+        # The fixture leaves plot_scope unset, so there is no main plot and
+        # the milestones are reported as unfilled.
+        assert project["story_climax_scene_id"] == "unfilled"
+        assert project["inciting_incident_scene_id"] == "unfilled"
         # The plot index lives here too, so the scene slugs below resolve.
         assert {p["id"] for p in project["plots"]}
 
@@ -249,7 +251,7 @@ class TestDramaticElementsView:
         """The whole reason it is in this view: filtering to one act must not
         remove the context that says what the act is part of."""
         out = load(project, view="dramatic_elements", act="act-1")
-        assert out["project"]["story_climax_scene_id"] == "central-room-night"
+        assert out["project"]["story_climax_scene_id"] == "unfilled"
         assert [a["id"] for a in out["acts"]] == ["act-1"]
 
     def test_act_carries_its_own_climax_scene(self, project):
@@ -272,27 +274,20 @@ class TestDramaticElementsView:
         assert "climax_scene_id" not in act and "climax_scene_id" not in seq
         assert act["act_climax_scene_id"] == seq["seq_climax_scene_id"]
 
-    def test_scene_reports_the_milestone_flags_that_are_true(self, project):
-        """Only the True ones. The fixture's flags are explicit False on every
-        scene except central-room-night, which is the sequence climax — so a
-        view that emitted them unconditionally would look identical here and
-        only differ on real data."""
+    def test_scene_reports_milestones_from_main_plot_roles(self, project):
+        """Milestones are the main plot's roles. The fixture leaves plot_scope
+        unset, so no scene carries a milestone."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
         night = scenes[1]
-        assert night["is_sequence_climax"] is True
-        for absent in ("is_inciting_incident", "is_act_climax",
-                       "is_story_climax"):
-            assert absent not in night
+        assert "milestone" not in night
 
     def test_scene_reports_the_derived_milestone_label(self, project):
-        """The flags say which milestone; the label says what it is called.
-        Both, because the base map reports the label and this view the flags,
-        and a reader comparing the two needs to see they agree."""
+        """The milestone label is derived from the scene's plot_roles. A scene
+        with no main-plot roles carries no label."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
-        assert scenes[1]["milestone"] == "sequence climax"
-        # A scene with no flag carries no label either.
+        assert "milestone" not in scenes[1]
         assert "milestone" not in scenes[0]
 
     def test_no_dead_markers_are_emitted(self, project):

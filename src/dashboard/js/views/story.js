@@ -44,19 +44,19 @@ DASH.buildStoryView = function() {
 
   if (p.structure_type) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Structure</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.structure_type}</div></div>`);
 
-  // Key scenes: inciting incident, story climax — clickable
+  // Key scenes: the main plot's inciting_incident and climax scenes.
+  const mainPlotIds = new Set((DASH.story.plots || []).filter(p => p.plot_scope === 'main').map(p => p.id));
+  const mainMilestoneScenes = (DASH.story.scenes || []).filter(s =>
+    (s.plots || []).some(p => mainPlotIds.has(p.id) && (p.role === 'inciting_incident' || p.role === 'climax'))
+  );
   const keyScenes = [];
-  if (p.inciting_incident_scene_id) {
-    const sid = p.inciting_incident_scene_id;
-    const scene = (DASH.story.scenes || []).find(s => String(s.id) === String(sid));
-    const label = scene ? scene.title : sid;
-    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${sid}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${label}</button></div></div>`);
+  const inciting = mainMilestoneScenes.find(s => (s.plots || []).some(p => mainPlotIds.has(p.id) && p.role === 'inciting_incident'));
+  const climax = mainMilestoneScenes.find(s => (s.plots || []).some(p => mainPlotIds.has(p.id) && p.role === 'climax'));
+  if (inciting) {
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${inciting.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${inciting.title}</button></div></div>`);
   }
-  if (p.story_climax_scene_id) {
-    const sid = p.story_climax_scene_id;
-    const scene = (DASH.story.scenes || []).find(s => String(s.id) === String(sid));
-    const label = scene ? scene.title : sid;
-    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${sid}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${label}</button></div></div>`);
+  if (climax) {
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${climax.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${climax.title}</button></div></div>`);
   }
 
   const structureHtml = (structure.length || keyScenes.length) ? `

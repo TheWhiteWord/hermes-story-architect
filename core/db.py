@@ -213,32 +213,15 @@ def empty_memory() -> dict:
     return {category: [] for category in MEMORY_CATEGORIES}
 
 
-# The four milestone flags a scene can carry, DERIVED from the schema rather
-# than restated: adding a fifth milestone flag to the scene schema puts it in
-# this list, and there is no second list to forget.
-SCENE_MILESTONE_FLAGS = [f for f in ENTITY_SCHEMAS["scene"]
-                          if f.startswith("is_") and f.endswith("_climax")] \
-    + ["is_inciting_incident"]
+def milestone_label(plot_roles: list, plot_scopes: dict):
+    """Milestone labels for a scene, derived from its main-plot roles.
 
-
-def milestone_label(extra: dict):
-    """The milestone name for a scene's `extra`, or None if it carries none.
-
-    Lives at module level because two readers need it — the base map and
-    `story_load(view='dramatic_elements')` — and a closure inside one of them
-    is how the two drift into disagreeing about the same scene. The order is
-    the precedence: a scene that is both the inciting incident and the story
-    climax reports as the story climax, the larger claim.
+    A scene can hold multiple milestones (e.g. both the inciting incident and
+    a complication), so this returns a list. Only main-plot roles are
+    milestones; sub-plot roles are tracked separately.
     """
-    if extra.get("is_inciting_incident"):
-        return "inciting incident"
-    if extra.get("is_story_climax"):
-        return "story climax"
-    if extra.get("is_act_climax"):
-        return "act climax"
-    if extra.get("is_sequence_climax"):
-        return "sequence climax"
-    return None
+    return [entry["role"] for entry in plot_roles
+            if plot_scopes.get(entry.get("plot")) == "main"]
 
 
 def validate_memory(memory: dict) -> dict:
@@ -411,15 +394,16 @@ def get_project_summary(project_path: Path) -> dict:
         scene_loc = {}    # scene_id -> loc_slug
         variant_of = {}   # entity_id -> base_slug (location_variant / world_variant)
 
-        # Plot beats are deliberately NOT collected here: the base map does not
-        # carry them (view='dramatic_elements' with add_plot does, per scene,
-        # with the beat's prose). Building the map cost a dict per plot for
-        # nothing.
+        scene_plot_roles = {}  # scene_id -> [{plot, role}, ...]
         for from_id, to_id, kind, note in rel_rows:
             if kind == "character_scene":
                 scene_chars.setdefault(to_id, []).append(from_id)
             elif kind == "location_scene":
                 scene_loc[to_id] = from_id
+            elif kind in PLOT_FIELD_BY_KIND:
+                role = kind.replace("plot_", "")
+                scene_plot_roles.setdefault(to_id, []).append(
+                    {"plot": from_id, "role": role})
             elif kind in ("location_variant", "world_variant"):
                 variant_of[from_id] = to_id
 
@@ -507,7 +491,7 @@ def get_project_summary(project_path: Path) -> dict:
         def _is_scene_stub(s):
             return s["status"] == "planned"
 
-        _milestone_marker = milestone_label
+        plot_scopes = {pid: p["plot_scope"] for pid, p in plots.items()}
 
         def _omit(d, defaults, always_keep=None):
             always_keep = always_keep or set()
@@ -536,9 +520,9 @@ def get_project_summary(project_path: Path) -> dict:
                 # every agent has to learn and bridge.
                 "characters": chars,
                 "location": scene_loc.get(sid),
-                "milestone": _milestone_marker(s["_extra"]),
+                "milestone": milestone_label(scene_plot_roles.get(sid, []), plot_scopes),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": None},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": []},
                          always_keep={"status"})
 
         # ── Build sequence output ──
@@ -1037,6 +1021,12 @@ def get_dashboard_data(project_path: Path) -> dict:
             elif kind in ("location_variant", "world_variant"):
                 variant_map[from_id] = to_id
 
+        # Plot scopes for milestone derivation (main plot's roles are milestones)
+        plot_scopes = {}
+        for e in ent_rows:
+            if e[1] == "plot":
+                plot_scopes[e[0]] = json.loads(e[8] or "{}").get("plot_scope", "")
+
         # Denormalize: build per-type arrays with cross-references
         def _entity_dict(e):
             d = {
@@ -1101,6 +1091,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                 if e[7] and e[7] not in d["locations"]:
                     d["locations"].append(e[7])
                 d["plots"] = scene_plots.get(eid, [])
+                d["milestone"] = milestone_label(scene_plots.get(eid, []), plot_scopes)
                 scenes.append(d)
 
             elif etype == "location":

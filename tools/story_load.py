@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from core.db import SCENE_MILESTONE_FLAGS, milestone_label
+from core.db import milestone_label
 
 
 SCHEMA = {
@@ -252,12 +252,10 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     each other: the STRUCTURAL milestones (inciting incident, the three
     climaxes) and the PLOT dramatic roles.
 
-    Those are recorded independently — a scene's milestone flags live on the
-    scene, its plot roles are relations reaching at it from each plot — so
-    nothing in the system checks that they agree. A scene can be the story
-    climax and a non-event; a plot can have no climax at all. Putting both in
-    one payload is what lets a reader see that, which is why the plot data is
-    no longer behind a flag.
+    Milestones are the main plot's roles. A scene's plot roles are relations
+    reaching at it from each plot — the role comes from the relation kind
+    ("plot_setup" -> "setup") — and the main plot's inciting_incident, crisis
+    and climax roles are the story-level milestones.
     """
     act_filter = args.get("act")
 
@@ -278,6 +276,13 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
             # roughly doubles if every role brings its paragraph.
             plot_refs.setdefault(to_id, []).append(
                 {"plot": plot_id, "role": kind[len("plot_"):]})
+
+    # Plot scopes, so milestone_label knows which plot is the main one.
+    plot_scopes = {}
+    for plot_id, extra_json in conn.execute(
+            "SELECT id, extra FROM entities WHERE type='plot' AND is_deleted=0"):
+        pe = json.loads(extra_json or "{}")
+        plot_scopes[plot_id] = pe.get("plot_scope", "")
 
     acts_out = []
     for act_id, act_title, act_order, act_extra_json in conn.execute(
@@ -320,24 +325,12 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                 # — it asserts nothing, and this view is not the unfilled map.
                 if extra.get("dramatic_role"):
                     scene["dramatic_role"] = extra["dramatic_role"]
-                # The four milestone flags, and only the ones that are True.
-                # This replaces a loop over is_setup / is_turning_point /
-                # is_crisis / is_climax / is_resolution / milestone, none of
-                # which is a scene field: the first two of those belong to
-                # arc_beat, three are defined nowhere, and `milestone` is not
-                # stored at all — it is DERIVED from these same four flags by
-                # db._milestone_marker. So the old loop could not fire, and
-                # because `extra` is an untyped blob it would have fired on a
-                # hand-written key rather than on a real one.
-                for flag in SCENE_MILESTONE_FLAGS:
-                    if extra.get(flag):
-                        scene[flag] = True
-                # The derived label, alongside the raw flags: the flags say
-                # which milestone, this says what it is called, and the base
-                # map already reports it this way.
-                marker = milestone_label(extra)
-                if marker:
-                    scene["milestone"] = marker
+                # Milestones are the main plot's roles, derived from the
+                # scene's plot_roles. A scene can hold multiple (e.g. both
+                # the inciting incident and a complication).
+                milestones = milestone_label(plot_refs.get(scene_id, []), plot_scopes)
+                if milestones:
+                    scene["milestone"] = milestones
                 if scene_id in plot_refs:
                     scene["plots"] = plot_refs[scene_id]
                 scenes_out.append(scene)
@@ -372,13 +365,23 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
             "plot_scope": pe.get("plot_scope", ""),
             "plot_type": pe.get("plot_type", ""),
         })
+    # Story-level milestones are the main plot's roles. Find the main plot's
+    # inciting_incident and climax scenes from the plot role relations.
+    main_milestones = {"inciting_incident": [], "climax": []}
+    main_plot_ids = [pid for pid, scope in plot_scopes.items() if scope == "main"]
+    if main_plot_ids:
+        for scene_id, roles in plot_refs.items():
+            for entry in roles:
+                if entry["plot"] in main_plot_ids and entry["role"] in main_milestones:
+                    main_milestones[entry["role"]].append(scene_id)
+
     out = {
         "view": "dramatic_elements",
         "act": act_filter or "all",
         "project": {
             "structure_type": pro.get("structure_type", ""),
-            "story_climax_scene_id": pro.get("story_climax_scene_id", ""),
-            "inciting_incident_scene_id": pro.get("inciting_incident_scene_id", ""),
+            "story_climax_scene_id": main_milestones["climax"] or "unfilled",
+            "inciting_incident_scene_id": main_milestones["inciting_incident"] or "unfilled",
             "plots": plot_index,
         },
         "acts": acts_out,
