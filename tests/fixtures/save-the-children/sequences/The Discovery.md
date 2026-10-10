@@ -1,6 +1,5 @@
 ---
 act_id: act-1
-seq_climax_scene_id: central-room-night
 id: seq-discovery
 order: 1
 primary_plot: the-resistance

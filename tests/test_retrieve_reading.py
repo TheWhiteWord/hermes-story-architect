@@ -113,11 +113,16 @@ class TestRelationBackedFields:
     def test_plot_beats_are_readable(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
-                  fields=["setups", "complications", "crisis", "climax", "resolutions"])
+                  fields=["inciting_incident", "complications", "crisis",
+                          "climax", "resolutions"])
         f = r["entities"][0]["fields"]
-        assert f["setups"], "plot setups are stored as relations and were unreachable"
-        assert f["setups"][0]["scene_id"]
-        assert "description" in f["setups"][0]
+        assert f["inciting_incident"], "plot inciting_incident is stored as a relation and was unreachable"
+        assert f["inciting_incident"][0]["scene_id"]
+        assert "description" in f["inciting_incident"][0]
+        assert f["climax"], "plot climax is stored as a relation and was unreachable"
+        assert f["climax"][0]["scene_id"]
+        assert f["resolutions"], "plot resolutions are stored as relations and were unreachable"
+        assert f["resolutions"][0]["scene_id"]
 
     def test_scene_characters_are_readable(self, db):
         proj, vault = db
@@ -150,7 +155,7 @@ class TestRelationBackedFields:
         roles = r["entities"][0]["fields"]["plot_roles"]
         assert roles, "the scene's plot roles are unreachable"
         assert roles[0]["plot"] == "the-resistance"
-        assert roles[0]["role"] == "setup"
+        assert roles[0]["role"] == "inciting_incident"
         assert "description" in roles[0]
         assert "plot_roles" not in r["entities"][0]["unfilled_fields"]
 

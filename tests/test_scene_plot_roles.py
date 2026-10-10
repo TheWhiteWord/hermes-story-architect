@@ -274,7 +274,7 @@ class TestExportRoundTrip:
         scene = round_tripped / "scenes" / "Central Room - Day.md"
         text = scene.read_text()
         assert "plot_roles:" in text, "the scene note lost every plot role"
-        assert "the-resistance" in text and "setup" in text
+        assert "the-resistance" in text and "inciting_incident" in text
 
     def test_the_plot_note_no_longer_carries_the_six_fields(self, round_tripped):
         text = (round_tripped / "plots" / "The Resistance.md").read_text()
@@ -305,7 +305,8 @@ class TestExportRoundTrip:
         from core.db import get_dashboard_data
         plot = next(p for p in get_dashboard_data(round_tripped)["story_data"]["plots"]
                     if p["id"] == "the-resistance")
-        assert plot["setups"], "the plot reads empty after export → import"
+        assert plot["climax"], "the plot reads empty after export → import"
+        assert plot["inciting_incident"], "the plot reads empty after export → import"
 
 
 class TestSchema:

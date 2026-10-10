@@ -434,7 +434,7 @@ def test_import_export_round_trip(tmp_path):
 
 
 def test_import_preserves_all_plot_beats(tmp_path):
-    """plot crisis/climax beats are NOT silently dropped during import."""
+    """plot role beats are NOT silently dropped during import."""
     fixture = Path(__file__).parent / "fixtures" / "save-the-children"
     if not fixture.exists():
         pytest.skip("save-the-children fixture not available")
@@ -453,7 +453,8 @@ def test_import_preserves_all_plot_beats(tmp_path):
         ).fetchall()
         kinds = {r[0] for r in rows}
 
-        assert "plot_setup" in kinds, f"plot_setup missing: {kinds}"
+        assert "plot_inciting_incident" in kinds, f"plot_inciting_incident missing: {kinds}"
+        assert "plot_climax" in kinds, f"plot_climax missing: {kinds}"
         assert "plot_resolution" in kinds, f"plot_resolution missing: {kinds}"
 
         has_crisis_climax = False

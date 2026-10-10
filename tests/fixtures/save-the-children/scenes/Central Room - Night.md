@@ -5,13 +5,9 @@ conflict_levels: ['personal']
 dramatic_role: plot_role
 heading: INT. THE CENTRAL ROOM - NIGHT
 id: central-room-night
-is_act_climax: False
-is_inciting_incident: False
-is_sequence_climax: True
-is_story_climax: False
 location: the-central-room
 order: 2
-plot_roles: [{'description': 'The Administrator makes its final offer. Kael refuses.', 'plot': 'the-resistance', 'role': 'setup'}]
+plot_roles: [{'description': 'The Administrator makes its final offer. Kael refuses.', 'plot': 'the-resistance', 'role': 'climax'}]
 sequence_id: seq-discovery
 shift: doubt → chosen trust
 status: drafted

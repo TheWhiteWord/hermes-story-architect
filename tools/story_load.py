@@ -292,8 +292,6 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
             continue
         act_extra = json.loads(act_extra_json or "{}")
         act = {"id": act_id, "title": act_title}
-        if act_extra.get("act_climax_scene_id"):
-            act["act_climax_scene_id"] = act_extra["act_climax_scene_id"]
         seqs_out = []
         for seq_id, seq_title, seq_order, seq_extra_json in conn.execute(
                 "SELECT id, name, order_key, extra FROM entities "
@@ -301,8 +299,6 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                 {"p": act_id}).fetchall():
             seq_extra = json.loads(seq_extra_json or "{}")
             seq = {"id": seq_id, "title": seq_title}
-            if seq_extra.get("seq_climax_scene_id"):
-                seq["seq_climax_scene_id"] = seq_extra["seq_climax_scene_id"]
             if seq_extra.get("primary_plot"):
                 seq["primary_plot"] = seq_extra["primary_plot"]
             scenes_out = []

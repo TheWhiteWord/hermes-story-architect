@@ -182,8 +182,7 @@ class TestStorageLabelsAreTrue:
         needs to know the value is another entity's slug, not a display name."""
         out = _handler({})["entity_schemas"]
         for et, field in [("scene", "act_id"), ("arc_beat", "scene"),
-                          ("plot", "characters"),
-                          ("project", "story_climax_scene_id")]:
+                          ("plot", "characters")]:
             assert out[et][field]["is_reference"] is True, f"{et}.{field}"
 
     def test_an_id_is_not_a_reference(self):

@@ -85,12 +85,67 @@ Remove these fields from the schema:
 
 ## Checklist
 
-- [ ] Milestone flags removed from `ENTITY_SCHEMAS["scene"]`
-- [ ] Pointer fields removed from `ENTITY_SCHEMAS["project"]`
-- [ ] Pointer fields removed from `ENTITY_SCHEMAS["act"]`
-- [ ] Pointer fields removed from `ENTITY_SCHEMAS["sequence"]`
-- [ ] Fixture updated (all milestone fields removed from markdown files)
-- [ ] `test_phase2_db_reads.py` updated
-- [ ] `test_core.py` updated (climax_scene_id checks removed)
-- [ ] All other tests verified passing
-- [ ] Full suite green
+- [x] Milestone flags removed from `ENTITY_SCHEMAS["scene"]`
+- [x] Pointer fields removed from `ENTITY_SCHEMAS["project"]`
+- [x] Pointer fields removed from `ENTITY_SCHEMAS["act"]`
+- [x] Pointer fields removed from `ENTITY_SCHEMAS["sequence"]`
+- [x] Fixture updated (all milestone fields removed from markdown files)
+- [x] `test_phase2_db_reads.py` updated
+- [x] `test_core.py` updated (climax_scene_id checks removed)
+- [x] All other tests verified passing
+- [x] Full suite green
+
+## Final Brief
+
+### Changes made
+
+**`core/constants.py`** — Removed 7 fields from `ENTITY_SCHEMAS`:
+- Scene: `is_inciting_incident`, `is_sequence_climax`, `is_act_climax`, `is_story_climax`
+- Project: `inciting_incident_scene_id`, `story_climax_scene_id`
+- Act: `act_climax_scene_id`
+- Sequence: `seq_climax_scene_id`
+
+**`tools/story_load.py`** — Removed dead reads of `act_climax_scene_id` and
+`seq_climax_scene_id` from the `dramatic_elements` view. The project-level
+`story_climax_scene_id` and `inciting_incident_scene_id` keys remain as
+presentation-only output (derived from main-plot roles, not schema fields).
+
+**Fixture — `tests/fixtures/save-the-children/`**:
+- `project.md`: removed `inciting_incident_scene_id` and `story_climax_scene_id`
+- `Act One.md`: removed `act_climax_scene_id`
+- `The Discovery.md`: removed `seq_climax_scene_id`
+- All 3 scene files: removed all 4 milestone flags
+- `The Resistance.md`: added `plot_scope: main`
+- `The Scientists Last Stand.md`: added `plot_scope: sub`
+- `Central Room - Day.md`: changed role from `setup` to `inciting_incident`;
+  added a `setup` entry for `the-scientists-last-stand`
+- `Central Room - Night.md`: changed role from `setup` to `climax`
+
+**`src/dashboard/js/data-load.js`** — Removed `inciting_incident_scene_id` and
+`story_climax_scene_id` from the sample data.
+
+**Tests updated** (all adjustments for fixture role changes):
+- `test_core.py`: removed `act_climax_scene_id` from unfilled test
+- `test_story_describe.py`: removed `story_climax_scene_id` from reference test
+- `test_story_load_views.py`: updated 8 tests for new fixture roles
+- `test_dashboard.py`: updated role assertion from SETUP to CLIMAX
+- `test_draft_preview.py`: updated field count from 8 to 7
+- `test_field_coverage.py`: updated plot beat assertions
+- `test_retrieve_reading.py`: updated plot role assertions
+- `test_scene_plot_roles.py`: updated role assertions
+- `test_story_dashboard_stats.py`: updated role assertions
+- `test_unfilled_column_fields.py`: updated plot_scope assertion
+
+### Verification
+
+Full test suite: **1073 passed** in 107.74s.
+
+### No changes needed (verified)
+
+- `core/entity.py` — write paths use `ENTITY_SCHEMAS` for validation; removed
+  fields are automatically rejected
+- `tools/story_import.py` — `_extra_for` already validates against
+  `ENTITY_SCHEMAS`; removed fields are caught as "unknown field"
+- `tools/story_export.py` — no direct references to removed fields
+- `core/db.py` — `get_unfilled_map` derives from `ENTITY_SCHEMAS`
+- `tools/story_describe.py` — reads from `ENTITY_SCHEMAS`

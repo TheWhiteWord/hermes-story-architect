@@ -5,13 +5,9 @@ conflict_levels: ['inner', 'personal']
 dramatic_role: plot_role
 heading: INT. THE CENTRAL ROOM - DAY
 id: central-room-day
-is_act_climax: False
-is_inciting_incident: False
-is_sequence_climax: False
-is_story_climax: False
 location: the-central-room
 order: 1
-plot_roles: [{'description': "Kael discovers the door isn't locked — it was never locked.", 'plot': 'the-resistance', 'role': 'setup'}]
+plot_roles: [{'description': "Kael discovers the door isn't locked — it was never locked.", 'plot': 'the-resistance', 'role': 'inciting_incident'}, {'description': 'The scientists built the Institute to protect the children.', 'plot': 'the-scientists-last-stand', 'role': 'setup'}]
 sequence_id: seq-discovery
 shift: blind trust → first doubt
 status: drafted

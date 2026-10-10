@@ -85,12 +85,12 @@ def test_a_field_set_to_its_own_default_still_counts_as_set(fixture_path):
     assert "fields set" not in md.split("\n")[4]
 
     # `title`'s default is "", so it is not a set field — only `type` and
-    # `order` carry a value. 2 of 8, and both of those equal their defaults.
+    # `order` carry a value. 2 of 7, and both of those equal their defaults.
     thin = {f: act[f] for f in ("type", "order")}
     md = stage(fixture_path, [{"op": "create", "type": "act", "id": "a-thin",
                                "frontmatter": thin, "summary": "s"}],
                "a thin act")["preview_md"]
-    assert "2 of 8 fields set" in md
+    assert "2 of 7 fields set" in md
 
 
 def test_an_edit_renders_one_line_per_changed_field(fixture_path):

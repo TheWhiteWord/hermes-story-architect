@@ -146,9 +146,8 @@ class TestTheUnfilledMap:
         unfilled = get_unfilled_map(project)
         # The scientists plot has no complications — a real, deliberate gap.
         assert "the-scientists-last-stand" in unfilled.get("complications", [])
-        # Nobody set a plot_scope on either fixture plot.
-        assert set(unfilled.get("plot_scope", [])) == {
-            "the-resistance", "the-scientists-last-stand"}
+        # Both fixture plots have plot_scope set (main and sub).
+        assert "plot_scope" not in unfilled
 
 
 class TestScreenplayTitleIsARealGap:

@@ -63,7 +63,8 @@ class TestPlotBeatsLiveInTheirOwnView:
                  for act in result["acts"] for seq in act.get("sequences", [])
                  for scene in seq.get("scenes", []) for p in scene.get("plots", [])}
         assert roles, "dramatic_elements returned no plot references at all"
-        assert roles <= {"setup", "complication", "crisis", "climax", "resolution"}
+        from core.constants import PLOT_ROLES
+        assert roles <= set(PLOT_ROLES)
 
     def test_the_plot_index_sits_under_the_project(self, project):
         """A scene's `plots[]` entry is a bare slug; the index is what says
@@ -75,22 +76,25 @@ class TestPlotBeatsLiveInTheirOwnView:
         entry = by_id["the-resistance"]
         assert entry["name"] == "The Resistance"
         assert entry["plot_type"] == "Setup"
-        # The fixture leaves plot_scope unset on both plots; the key is present
-        # and empty so the shape does not change with the data.
-        assert entry["plot_scope"] == ""
+        # The fixture marks the-resistance as the main plot.
+        assert entry["plot_scope"] == "main"
 
     def test_plot_index_carries_per_plot_milestones(self, project):
         """Each plot's index entry reports its own role scenes — the main
         plot's are the story's milestones, every sub-plot's are its own.
-        The fixture gives the-resistance two setups and one resolution."""
+        The fixture gives the-resistance an inciting_incident, a climax, and
+        a resolution."""
         plots = load(project, view="dramatic_elements")["project"]["plots"]
         by_id = {p["id"]: p for p in plots}
         assert by_id["the-resistance"]["milestones"] == {
-            "setup": ["central-room-day", "central-room-night"],
+            "inciting_incident": ["central-room-day"],
+            "climax": ["central-room-night"],
             "resolution": ["the-core-day"],
         }
-        # A plot with no roles carries an empty milestone map, not a missing key.
-        assert by_id["the-scientists-last-stand"]["milestones"] == {}
+        # The sub-plot's own milestones are its own roles.
+        assert by_id["the-scientists-last-stand"]["milestones"] == {
+            "setup": ["central-room-day"],
+        }
 
     def test_every_scene_plot_slug_resolves_against_the_index(self, project):
         """The cross-check the index exists for: a role naming a plot absent
@@ -145,7 +149,7 @@ class TestPlotBeatsLiveInTheirOwnView:
         }))["entities"][0]["fields"]
         assert got["plot_roles"], "the scene's own plot roles are unreadable"
         assert got["plot_roles"][0] == {
-            "plot": "the-resistance", "role": "setup",
+            "plot": "the-resistance", "role": "inciting_incident",
             "description": got["plot_roles"][0]["description"]}
         assert got["plot_roles"][0]["description"]
 
@@ -253,10 +257,10 @@ class TestDramaticElementsView:
         out = load(project, view="dramatic_elements")
         project = out["project"]
         assert project["structure_type"] == "Classical"
-        # The fixture leaves plot_scope unset, so there is no main plot and
-        # the milestones are reported as unfilled.
-        assert project["story_climax_scene_id"] == "unfilled"
-        assert project["inciting_incident_scene_id"] == "unfilled"
+        # The fixture's main plot (the-resistance) holds central-room-day as
+        # its inciting incident and central-room-night as its climax.
+        assert project["story_climax_scene_id"] == ["central-room-night"]
+        assert project["inciting_incident_scene_id"] == ["central-room-day"]
         # The plot index lives here too, so the scene slugs below resolve.
         assert {p["id"] for p in project["plots"]}
 
@@ -264,44 +268,32 @@ class TestDramaticElementsView:
         """The whole reason it is in this view: filtering to one act must not
         remove the context that says what the act is part of."""
         out = load(project, view="dramatic_elements", act="act-1")
-        assert out["project"]["story_climax_scene_id"] == "unfilled"
+        assert out["project"]["story_climax_scene_id"] == ["central-room-night"]
         assert [a["id"] for a in out["acts"]] == ["act-1"]
 
-    def test_act_carries_its_own_climax_scene(self, project):
-        act = load(project, view="dramatic_elements")["acts"][0]
-        assert act["act_climax_scene_id"] == "central-room-night"
-
-    def test_sequence_carries_its_climax_and_primary_plot(self, project):
+    def test_sequence_carries_its_primary_plot(self, project):
         seq = (load(project, view="dramatic_elements")["acts"][0]
                ["sequences"][0])
-        assert seq["seq_climax_scene_id"] == "central-room-night"
         assert seq["primary_plot"] == "the-resistance"
 
-    def test_the_two_climax_keys_do_not_collide(self, project):
-        """They were ONE key on two types, so a reader could not tell an act's
-        climax from a sequence's. Same value in the fixture, which is exactly
-        the case that hid the collision."""
-        out = load(project, view="dramatic_elements")
-        act = out["acts"][0]
-        seq = act["sequences"][0]
-        assert "climax_scene_id" not in act and "climax_scene_id" not in seq
-        assert act["act_climax_scene_id"] == seq["seq_climax_scene_id"]
-
     def test_scene_reports_milestones_from_main_plot_roles(self, project):
-        """Milestones are the main plot's roles. The fixture leaves plot_scope
-        unset, so no scene carries a milestone."""
+        """Milestones are the main plot's roles. The fixture's main plot
+        (the-resistance) holds central-room-night as its climax."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
         night = scenes[1]
-        assert "milestone" not in night
+        assert "milestone" in night
+        assert "climax" in night["milestone"]
 
     def test_scene_reports_the_derived_milestone_label(self, project):
         """The milestone label is derived from the scene's plot_roles. A scene
-        with no main-plot roles carries no label."""
+        with a main-plot role carries the label."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
-        assert "milestone" not in scenes[1]
-        assert "milestone" not in scenes[0]
+        assert "milestone" in scenes[1]
+        assert "climax" in scenes[1]["milestone"]
+        assert "milestone" in scenes[0]
+        assert "inciting_incident" in scenes[0]["milestone"]
 
     def test_no_dead_markers_are_emitted(self, project):
         """The loop this replaced read is_setup / is_turning_point /
@@ -348,7 +340,7 @@ class TestDramaticElementsView:
         scenes = (load(project, view="dramatic_elements")
                   ["acts"][0]["sequences"][0]["scenes"])
         assert scenes[0]["plots"][0] == {"plot": "the-resistance",
-                                         "role": "setup"}
+                                         "role": "inciting_incident"}
         assert scenes[2]["plots"][0]["role"] == "resolution"
 
 

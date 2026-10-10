@@ -5,10 +5,6 @@ conflict_levels: ['extra-personal']
 dramatic_role: plot_role
 heading: EXT. THE CORE - DAY
 id: the-core-day
-is_act_climax: False
-is_inciting_incident: False
-is_sequence_climax: False
-is_story_climax: False
 location: the-garden
 order: 3
 plot_roles: [{'description': 'The children emerge into the real world for the first time.', 'plot': 'the-resistance', 'role': 'resolution'}]

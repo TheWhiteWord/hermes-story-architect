@@ -164,5 +164,6 @@ class TestStructuralStats:
         assert "unset" not in roles, f"unset is gone from the model: {roles}"
 
         # The fixture's scenes, counted by the role they actually play.
-        assert roles.get("setup", 0) >= 1
+        assert roles.get("inciting_incident", 0) >= 1
+        assert roles.get("climax", 0) >= 1
         assert roles.get("resolution", 0) >= 1

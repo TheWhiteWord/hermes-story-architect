@@ -325,9 +325,9 @@ class TestActuallyRenders:
         html = Path(url.replace("file://", "")).read_text()
         dom = self._dom(html, tmp_path, "site_role",
                         "DASH.showScenePanel('central-room-night')")
-        # The fixture gives that scene the-resistance in the `setup` role.
+        # The fixture gives that scene the-resistance in the `climax` role.
         assert "The Resistance" in dom, "the scene's plot never rendered"
-        assert "· SETUP" in dom, (
+        assert "· CLIMAX" in dom, (
             "the plot role did not render — the panel is reading a key the "
             "backend no longer emits")
         assert "· BEAT" not in dom, "the old key is still being read"

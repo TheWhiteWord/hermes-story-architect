@@ -2,6 +2,7 @@
 id: the-scientists-last-stand
 name: The Scientists' Last Stand
 one_sentence: 400 years earlier, the scientists race to complete Project Save the Children as the outsiders gather.
+plot_scope: sub
 plot_type: Contradictory
 status: active
 ---
