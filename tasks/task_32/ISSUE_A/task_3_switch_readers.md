@@ -33,7 +33,7 @@ from the main plot's roles.
 - The `milestone` field becomes a list of strings.
 - The `project` section no longer reads `story_climax_scene_id` or
   `inciting_incident_scene_id` from `pro` — instead, it reads the main plot's
-  `climax` and `inciting_incidents` roles and reports the scene slugs.
+  `climax` and `inciting_incident` roles and reports the scene slugs.
 - If there is no main plot, report `unfilled` for story-level milestones.
 
 ### 3.4 Dashboard — `src/dashboard/js/views/scenes.js` (lines 42-45)

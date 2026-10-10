@@ -37,7 +37,7 @@ These were agreed during design discussion and drive every decision below.
 ### 4.1 Execution layer
 
 - **Scenes are where structural roles are defined.** A role can only be recorded once a scene exists, because the theory's elements happen in scenes. `scene.dramatic_role` records the scene's own role in the story, and `scene.plot_roles` records its role in each plot (one scene can hold different roles in different plots, so a plot's role cannot live on the scene alone).
-- **Plots read their roles back from scenes.** The plot's role fields (`setups`, `complications`, `crisis`, `climax`, `resolutions`, and the new `inciting_incidents`) are computed and read-only. They organize what happened in each plot and are never written on the plot. This is already how the repository works.
+- **Plots read their roles back from scenes.** The plot's role fields (`setups`, `complications`, `crisis`, `climax`, `resolutions`, and the new `inciting_incident`) are computed and read-only. They organize what happened in each plot and are never written on the plot. This is already how the repository works.
 - **There are six roles:** `setup`, `inciting_incident`, `complication`, `crisis`, `climax`, `resolution`. The new one is `inciting_incident`.
 - **Story-level milestones are the main plot's roles.** The main plot is the plot with `plot_scope = main`. The story's inciting incident, crisis and climax are whatever scenes hold those roles in the main plot. Nothing separate is stored at project level.
 - **Act and sequence climaxes are not stored.** Position follows from the theory.
@@ -62,7 +62,7 @@ Nothing in the schema. The `story-theory` skill states the expectations (escalat
 | `project.story_climax_scene_id` | Remove |
 | `act.climax_scene_id` | Remove |
 | `sequence.climax_scene_id` | Remove |
-| Plot role `inciting_incident` | Add (field `inciting_incidents`, relation `plot_inciting_incident`) |
+| Plot role `inciting_incident` | Add (field `inciting_incident`, relation `plot_inciting_incident`) |
 | `scene.plot_roles` | Keep, with the role list extended to six |
 | `scene.dramatic_role` | Keep (scenes are where roles are defined) |
 | Plan fields | None added (planning lives in entity sections) |

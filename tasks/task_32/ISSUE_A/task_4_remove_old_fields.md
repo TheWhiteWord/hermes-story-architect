@@ -65,7 +65,7 @@ Remove these fields from the schema:
 - **`test_story_describe.py`:** Already updated in Task 1.
 - **`test_phase2_db_reads.py`:** The `test_plot_to_scenes` test reads
   `["setups", "complications", "crisis", "climax", "resolutions"]` — add
-  `"inciting_incidents"` to the fields list.
+  `"inciting_incident"` to the fields list.
 - **`test_draft_preview.py`:** No direct reference to milestone flags.
 - **`test_write_shape.py`:** Already updated in Task 1.
 - **`test_round_trip.py`:** No direct reference to milestone flags.
