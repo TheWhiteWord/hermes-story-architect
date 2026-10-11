@@ -218,7 +218,7 @@ ENTITY_COLUMN_MAP = {
     "location": {"name": "name", "one_sentence": "one_sentence", "world": "parent_id"},
     "world": {"name": "name", "one_sentence": "one_sentence"},
     "plot": {"name": "name", "one_sentence": "one_sentence", "status": "status"},
-    "scene": {"title": "name", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
+    "scene": {"title": "name", "one_sentence": "one_sentence", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
     "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},

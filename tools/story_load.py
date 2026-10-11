@@ -267,15 +267,14 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     plot_refs = {}
     for plot_id, in conn.execute(
             "SELECT id FROM entities WHERE type='plot' AND is_deleted=0 ORDER BY id"):
-        for to_id, kind in conn.execute(
-                "SELECT to_id, kind FROM relations "
+        for to_id, kind, note in conn.execute(
+                "SELECT to_id, kind, note FROM relations "
                 "WHERE from_id=:f AND kind LIKE 'plot\\_%' ESCAPE '\\'",
                 {"f": plot_id}):
-            # No description. It is the same prose the plot note already
-            # carries, this view is for checking structure, and the payload
-            # roughly doubles if every role brings its paragraph.
-            plot_refs.setdefault(to_id, []).append(
-                {"plot": plot_id, "role": kind[len("plot_"):]})
+            entry = {"plot": plot_id, "role": kind[len("plot_"):]}
+            if note:
+                entry["description"] = note
+            plot_refs.setdefault(to_id, []).append(entry)
 
     # Plot scopes, so milestone_label knows which plot is the main one.
     plot_scopes = {}
@@ -302,8 +301,8 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
             if seq_extra.get("primary_plot"):
                 seq["primary_plot"] = seq_extra["primary_plot"]
             scenes_out = []
-            for scene_id, scene_title, order_key, status, extra_json in conn.execute(
-                    "SELECT id, name, order_key, status, extra FROM entities "
+            for scene_id, scene_title, one_sentence, order_key, status, extra_json in conn.execute(
+                    "SELECT id, name, one_sentence, order_key, status, extra FROM entities "
                     "WHERE type='scene' AND parent_id=:p AND is_deleted=0 "
                     "ORDER BY order_key, id",
                     {"p": seq_id}).fetchall():
@@ -313,6 +312,8 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                     "title": scene_title,
                     "status": status,
                 }
+                if one_sentence:
+                    scene["one_sentence"] = one_sentence
                 # `dramatic_role` is emitted whenever it is set, INCLUDING
                 # "plot_role". That is the point of the view: "plot_role"
                 # beside a `plots[]` entry is the agreement, and a reader

@@ -570,12 +570,7 @@ def get_project_summary(project_path: Path) -> dict:
                 others = [c for c in rel["characters"] if c != char_id]
                 if not others:
                     continue
-                p = rel["perspectives"].get(char_id, {})
-                char_rel_summary.setdefault(char_id, []).append({
-                    "with": others[0],
-                    "label": p.get("label", ""),
-                    "type": p.get("type", ""),
-                })
+                char_rel_summary.setdefault(char_id, []).append(others[0])
 
         # ── Build character output ──
         def _build_character(char_id):
