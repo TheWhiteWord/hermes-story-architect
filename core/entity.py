@@ -163,9 +163,12 @@ def _validate_field(entity_type: str, field: str, value, meta: dict,
     the path, so a nested one is findable by index rather than by reading the
     whole field back.
 
-    `object` applies the sub-fields to each VALUE (a `perspectives` dict keyed
-    by character), not to the dict itself: the keys are the entities and the
-    values are the declarations' subjects.
+    `object` has two shapes, told apart by `keyed`:
+      * `keyed: True` (relationship.perspectives) — a map keyed by entity:
+        the keys are the entities and the values carry the declarations'
+        subjects, so the sub-fields apply to each VALUE.
+      * otherwise (a turn's inline `schema`) — a fixed record: the sub-fields
+        are the keys of the object itself, so they apply to the dict once.
     """
     sub_fields = meta.get("sub_fields") or {}
     keys = ", ".join(sub_fields)
@@ -192,15 +195,24 @@ def _validate_field(entity_type: str, field: str, value, meta: dict,
                 f"{at} must be an object with keys [{keys}] "
                 f"— got {type(value).__name__}")
             return
-        for key_name, entry in value.items():
-            entry_at = f"{at}.{key_name}"
-            if not isinstance(entry, dict):
-                warnings.append(
-                    f"{at} must be an object with keys [{keys}] "
-                    f"— {key_name} holds a {type(entry).__name__}")
-                continue
+        if meta.get("keyed"):
+            # A map keyed by entity (perspectives): the keys are the entities
+            # and the values carry the declarations' subjects, so the sub-
+            # fields apply to each VALUE.
+            for key_name, entry in value.items():
+                entry_at = f"{at}.{key_name}"
+                if not isinstance(entry, dict):
+                    warnings.append(
+                        f"{at} must be an object with keys [{keys}] "
+                        f"— {key_name} holds a {type(entry).__name__}")
+                    continue
+                for key, key_meta in sub_fields.items():
+                    _validate_sub_field(entry_at, entry, key, key_meta, warnings)
+        else:
+            # A fixed record (an inline `schema`): the sub-fields are the
+            # keys of the object itself, so they apply to the dict once.
             for key, key_meta in sub_fields.items():
-                _validate_sub_field(entry_at, entry, key, key_meta, warnings)
+                _validate_sub_field(at, value, key, key_meta, warnings)
 
 
 def _validate_sub_field(path: str, entry: dict, key: str, meta: dict,
@@ -396,11 +408,11 @@ def unfilled_fields(entity_type: str, extra: dict, row: dict | None = None) -> l
 
     Sub-field rule (generalized, driven by `sub_fields` in ENTITY_SCHEMAS):
     - Parent empty → report parent name (e.g. `perspectives`, `setups`)
-    - Parent present, object type → report missing expected keys as
+    - Parent present, object type, `keyed` → report missing expected keys as
       `parent.key` (e.g. `perspectives.kael`). Expected keys come from
-      `characters` — the only object-sub_fields field today.
-    - Parent present, list type → no per-entry tracking (an entry existing
-      = filled; entry notes are optional prose)
+      `characters` — the only keyed object-sub_fields field today.
+    - Parent present, list type or a fixed-record object → no per-entry
+      tracking (an entry existing = filled; entry notes are optional prose)
     """
     from .constants import ENTITY_SCHEMAS
     if row:
@@ -440,13 +452,16 @@ def unfilled_fields(entity_type: str, extra: dict, row: dict | None = None) -> l
             continue
         value = extra.get(field, meta["default"])
         if "sub_fields" in meta and not _is_empty(value, meta["default"]):
-            if meta["type"] == "object":
-                # Report missing expected entries as parent.key
+            if meta["type"] == "object" and meta.get("keyed"):
+                # Report missing expected entries as parent.key. Expected
+                # keys come from `characters` — the only keyed object field
+                # today.
                 expected = extra.get("characters", [])
                 for key in expected:
                     if key not in value:
                         unfilled.append(f"{field}.{key}")
-            # list type: parent present → filled, no per-entry tracking
+            # list type (and a fixed-record object): parent present → filled,
+            # no per-entry tracking
             continue
         if _is_empty(value, meta["default"]):
             unfilled.append(field)
@@ -725,10 +740,13 @@ def _collect_refs(meta: dict, value, path: str, refs: list) -> None:
     elif meta["type"] == "object":
         if not isinstance(value, dict):
             return
-        for key, entry in value.items():
-            if isinstance(entry, dict):
-                _collect_refs_entry(meta.get("sub_fields") or {}, entry,
-                                    f"{path}.{key}", refs)
+        if meta.get("keyed"):
+            for key, entry in value.items():
+                if isinstance(entry, dict):
+                    _collect_refs_entry(meta.get("sub_fields") or {}, entry,
+                                        f"{path}.{key}", refs)
+        else:
+            _collect_refs_entry(meta.get("sub_fields") or {}, value, path, refs)
 
 
 def _collect_refs_entry(sub_fields: dict, entry: dict, path: str, refs: list) -> None:

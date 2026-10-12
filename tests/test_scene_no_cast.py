@@ -30,12 +30,10 @@ def project(tmp_path, monkeypatch):
 def gaps(project, field):
     from tools.story_load import handler
     data = json.loads(
-        handler({"project": "save-the-children", "view": "unfilled"},
+        handler({"project": "save-the-children", "view": "unfilled",
+                 "field": field},
                 root_path=str(project.parent.parent)))
-    for item in data["unfilled"]:
-        if item["field"] == field:
-            return set(item["entities"])
-    return set()
+    return set(data.get("entities", []))
 
 
 def _scene_with_no_cast(project, scene_id):
@@ -61,7 +59,17 @@ def _set_no_cast(project, scene_id, value=True):
     conn.close()
 
 
-def test_a_castless_drafted_scene_is_flagged(project):
+def test_a_castless_drafted_scene_is_flagged(project, monkeypatch):
+    """The scene's own gap must survive the cap.
+
+    The regression this whole file exists for: `characters` fell past
+    UNFILLED_LIMIT at count 2 and vanished, so clearing one scene's cast
+    made the remaining gap look resolved. `field=` is the way past the cap
+    — a filtered answer is never truncated — so the assertion asks the
+    question a caller would ask rather than reading the capped list.
+    """
+    import tools.story_load as sl
+    monkeypatch.setattr(sl, "UNFILLED_LIMIT", 1)
     _scene_with_no_cast(project, "central-room-day")
     assert "central-room-day" in gaps(project, "characters")
 

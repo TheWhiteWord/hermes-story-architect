@@ -31,7 +31,7 @@
 - [ ] Checks each turn:
   - [ ] The plot exists (reference check from Phase 1 handles this)
   - [ ] The value has a schema on that plot (existing in `plot.value_schemas` or supplied inline in `schema`)
-  - [ ] If inline `schema` is supplied for a value that already has one: accepted if identical, refused if different (with a message showing the existing schema)
+  - [ ] If inline `schema` is supplied for a value the plot already has: refused, identical or not (message shows the existing schema and says to remove `schema` from the turn)
   - [ ] If no schema and no inline schema: refused with the plot's defined values and their words, saying to add a `schema`
   - [ ] `from` and `to` are words of that schema (case-insensitive, trimmed)
   - [ ] `effects` is not empty
@@ -67,8 +67,7 @@
 ### 3.6 — Write `tests/test_value_turns.py`
 - [ ] Test: a valid turn passes validation
 - [ ] Test: turn with no schema and no inline schema is refused with the plot's defined values
-- [ ] Test: turn with inline schema for an existing value, identical — accepted
-- [ ] Test: turn with inline schema for an existing value, different — refused with the existing schema
+- [ ] Test: turn with inline schema for an existing value — refused with the existing schema (identical or not)
 - [ ] Test: `from`/`to` not in schema words — refused
 - [ ] Test: empty `effects` — refused
 - [ ] Test: character not in plot's `characters` — refused

@@ -149,6 +149,19 @@ def test_every_sub_field_entry_has_a_type():
     assert not missing, f"sub_fields entries with no type: {sorted(missing)}"
 
 
+def test_every_object_declares_whether_it_is_keyed():
+    """`keyed` decides which shape an object holds — a keyed map or a fixed
+    record — and the two are validated differently. Leaving it unset makes
+    the record form (a turn's inline `schema`) fail its own validation on
+    every valid value, so a new object field must say which it is."""
+    undeclared = [
+        f"{et}.{field}"
+        for et, field, meta in SUBFIELD_FIELDS
+        if meta["type"] == "object" and "keyed" not in meta
+    ]
+    assert not undeclared, f"object fields that do not declare keyed: {sorted(undeclared)}"
+
+
 def test_every_enum_is_non_empty():
     empty = [
         f"{et}.{field}.{key}"

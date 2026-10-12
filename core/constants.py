@@ -23,6 +23,21 @@ PLOT_SCOPES = ["main", "sub"]
 # field↔kind map is `_RELATION_FIELDS["plot"]`, and tests/test_plot_roles.py
 # pins the two together so they cannot drift.
 PLOT_ROLES = ["setup", "inciting_incident", "complication", "crisis", "climax", "resolution"]
+# The value ladder — four rungs of opposition (design §3.1).
+# The rung is looked up from the word and never stored. The codes are the
+# schema field names on plot.value_schemas; the meanings are what the skill
+# teaches. C and CD are defined per the source file; the notes in ISSUES.md
+# have them swapped.
+VALUE_LADDER = {
+    "p": "Positive, the ideal",
+    "c": "Contrary: opposite, not absolute negation",
+    "cd": "Contradictory: direct negation of the positive",
+    "nn": "Negation of negation: perversion or false version of the positive",
+}
+
+# Where the opposition comes from, relative to one character.
+CONFLICT_LEVELS = ["inner", "personal", "extra-personal"]
+
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
 ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
@@ -106,7 +121,7 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
         "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
-        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of characters involved as protagonist/s in this plot", "ref": "character"},
+        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of this plot's protagonists only", "ref": "character"},
         "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
         "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup (required for sub plots only)"},
@@ -128,6 +143,26 @@ ENTITY_SCHEMAS = {
         "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
         "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
         "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        # The values this plot is written around, each with its own vocabulary:
+        # one word per rung of the value ladder (see VALUE_LADDER). Written
+        # when a value is first identified on the plot, or registered by the
+        # first scene turn that carries an inline `schema`. A turn can only
+        # use words of the plot's schema.
+        "value_schemas": {"type": "list", "default": [], "optional": True,
+                          "description": "Value schemas defined on this plot. Each entry defines one value and its four ladder words.",
+                          "sub_fields": {
+                              "value": {"type": "string", "required": True, "description": "The value at stake (e.g. 'trust')"},
+                              "p": {"type": "string", "required": True, "description": "The story's word for the positive, the ideal"},
+                              "c": {"type": "string", "required": True, "description": "The story's word for the contrary: opposite, not absolute negation"},
+                              "cd": {"type": "string", "required": True, "description": "The story's word for the contradictory: direct negation of the positive"},
+                              "nn": {"type": "string", "required": True, "description": "The story's word for the negation of negation: perversion or false version of the positive"},
+                              "note": {"type": "string", "description": "Optional: what the value means in this plot"},
+                          }},
+        # Computed read-back (Phase 4): for each value of the plot, its schema
+        # and its turns in story order. `computed` makes every write path
+        # refuse it.
+        "value_lines": {"type": "list", "default": [], "optional": True, "computed": True,
+                        "description": "Computed read-back: for each value of the plot, its schema and its turns in story order. (read-only, computed — do not set)"},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
@@ -181,6 +216,37 @@ ENTITY_SCHEMAS = {
                 "description": {"type": "string", "description": "What this scene does for that plot"},
             },
         },
+        # The value pass, recorded after the scene exists: one entry per
+        # shift of a value, with its effects on the protagonists nested
+        # inside. A scene is created without it; the value pass fills it in
+        # later by editing the scene. `from`/`to` name the states as words of
+        # the plot's schema; an inline `schema` on the first turn defines a
+        # value the plot has none for. See VALUE_LADDER and CONFLICT_LEVELS.
+        "value_turns": {"type": "list", "default": [], "optional": True,
+                        "description": "Value turns recorded on this scene. Each entry is one shift of a value, with its effects on the protagonists.",
+                        "sub_fields": {
+                            "plot": {"type": "string", "required": True, "ref": "plot", "description": "Slug of an existing plot"},
+                            "value": {"type": "string", "required": True, "description": "A value with a schema on that plot, existing or supplied in `schema`"},
+                            "from": {"type": "string", "required": True, "description": "The state when the scene opens, as a schema word"},
+                            "to": {"type": "string", "required": True, "description": "The state when the scene closes, as a schema word"},
+                            "schema": {"type": "object", "required": False, "description": "Defines a value the plot has not yet registered — this write registers it on the plot. Never repeat a schema the plot already has.",
+                                       "sub_fields": {
+                                           "p": {"type": "string", "required": True, "description": "The story's word for the positive, the ideal"},
+                                           "c": {"type": "string", "required": True, "description": "The story's word for the contrary: opposite, not absolute negation"},
+                                           "cd": {"type": "string", "required": True, "description": "The story's word for the contradictory: direct negation of the positive"},
+                                           "nn": {"type": "string", "required": True, "description": "The story's word for the negation of negation: perversion or false version of the positive"},
+                                           "note": {"type": "string", "description": "Optional: what the value means in this plot"},
+                                       }},
+                            "effects": {"type": "list", "required": True, "description": "One entry per protagonist the shift affects",
+                                        "sub_fields": {
+                                            "character": {"type": "string", "required": True, "ref": "character", "description": "A protagonist of the plot, whether or not present in the scene"},
+                                            "levels": {"type": "list", "required": True, "description": "One entry per conflict level through which the shift reaches that character",
+                                                       "sub_fields": {
+                                                           "conflict_level": {"type": "string", "required": True, "enum": CONFLICT_LEVELS, "description": "Where the opposition comes from, relative to that character"},
+                                                           "effect": {"type": "string", "required": True, "description": "One sentence: what the shift does to that character at that level"},
+                                                       }},
+                                        }},
+                        }},
     },
     "sequence": {
         "type": {"type": "string", "default": "sequence", "optional": False, "description": "Always 'sequence'"},
@@ -221,7 +287,7 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Display name (e.g. 'Kael & Mira')"},
         "type": {"type": "string", "default": "relationship", "optional": False, "description": "Always 'relationship'"},
         "characters": {"type": "list", "default": [], "optional": False, "description": "Exactly two character slugs"},
-        "perspectives": {"type": "object", "default": {}, "optional": True, "description": "Per-character relationship view", "sub_fields": {
+        "perspectives": {"type": "object", "default": {}, "optional": True, "description": "Per-character relationship view", "keyed": True, "sub_fields": {
             "label": {"type": "string", "description": "Relationship label from this character's POV"},
             "feeling": {"type": "string", "description": "Emotional stance"},
             "type": {"type": "string", "description": "Category: ally/enemy/family/romantic/professional/mentor/rival/custom/neutral"},
