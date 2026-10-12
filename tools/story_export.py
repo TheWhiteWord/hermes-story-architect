@@ -189,6 +189,15 @@ def _export_all(conn, project_path: Path) -> set:
             for field in list(PLOT_BEAT_FIELDS):
                 extra.pop(field, None)
 
+        # Nested value data is stored as JSON, so its key order is whatever the
+        # writer happened to produce — and the note is what a writer reads.
+        # Reorder it against the schema's declared `sub_fields`, recursively,
+        # so `value_turns` reads plot/value/from/to before its effects and the
+        # ladder reads p/c/cd/nn rather than alphabetically.
+        for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
+            if meta.get("sub_fields") and field in extra:
+                extra[field] = _ordered(extra[field], meta)
+
         fm = _frontmatter_for(entity_type, entity_id, name, one_sentence, order_key, status, parent_id, location_id, extra)
         # The filename is the title, so `id` is the only thing that survives a
         # rename — it has to be in the note for every type, not just the four
@@ -239,6 +248,33 @@ def _export_all(conn, project_path: Path) -> set:
         written.add(note)
 
     return written
+
+
+def _ordered(value, meta: dict):
+    """Reorder a field's entries and their nested entries to the schema's order.
+
+    Declared `sub_fields` come first, in declaration order, at every depth;
+    any key the declaration does not name is kept after them rather than
+    dropped, so an unrecognised key still reaches the note and is still refused
+    on the next import instead of vanishing silently.
+    """
+    subs = meta.get("sub_fields") or {}
+    if meta.get("type") == "list" and isinstance(value, list):
+        return [_ordered(v, meta) for v in value]
+    if isinstance(value, dict):
+        out = {}
+        if meta.get("type") == "object" and meta.get("keyed"):
+            # A map keyed by entity: the keys are data, only the values reorder.
+            return {k: _ordered(v, meta) for k, v in value.items()}
+        for key, sub_meta in subs.items():
+            if key in value:
+                out[key] = _ordered(value[key], sub_meta) if sub_meta.get(
+                    "sub_fields") else value[key]
+        for key, v in value.items():
+            if key not in out:
+                out[key] = v
+        return out
+    return value
 
 
 def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: str,
@@ -344,9 +380,16 @@ def _folder_for(entity_type: str) -> str:
 
 
 def _write_note(path: Path, fm: dict, body: str) -> None:
-    """Write a note file with frontmatter and body."""
+    """Write a note file with frontmatter and body.
+
+    `sort_keys=False` keeps the declared order, top level and nested: PyYAML
+    sorts by default, so a `value_turns` entry came out alphabetised — effects
+    before plot, and the ladder as c/cd/nn/note/p/value — which reads as noise
+    in the one file a writer actually edits. The schema's `sub_fields` order is
+    the intended reading order.
+    """
     import frontmatter
     path.parent.mkdir(parents=True, exist_ok=True)
     post = frontmatter.Post(body, **fm)
     with open(path, "w") as f:
-        frontmatter.dump(post, f)
+        frontmatter.dump(post, f, sort_keys=False)

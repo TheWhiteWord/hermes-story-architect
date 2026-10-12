@@ -9,19 +9,23 @@ id: central-room-day
 location: the-central-room
 order: 1
 plot_roles:
-- description: Kael discovers the door isn't locked — it was never locked.
-  plot: the-resistance
+- plot: the-resistance
   role: inciting_incident
-- description: The scientists built the Institute to protect the children.
-  plot: the-scientists-last-stand
+  description: Kael discovers the door isn't locked — it was never locked.
+- plot: the-scientists-last-stand
   role: setup
+  description: The scientists built the Institute to protect the children.
 sequence_id: seq-discovery
 status: drafted
 time_of_day: DAY
 title: Central Room - Day
 type: scene
 value_turns:
-- effects:
+- plot: the-resistance
+  value: freedom
+  from: imprisoned
+  to: free
+  effects:
   - character: kael
     levels:
     - conflict_level: inner
@@ -34,11 +38,11 @@ value_turns:
     - conflict_level: extra-personal
       effect: The system that holds the children is shown, for the first time, to
         be only a story they were told.
-  from: imprisoned
-  plot: the-resistance
-  to: free
-  value: freedom
-- effects:
+- plot: the-resistance
+  value: trust
+  from: deceived
+  to: open
+  effects:
   - character: kael
     levels:
     - conflict_level: inner
@@ -46,10 +50,6 @@ value_turns:
         which of his beliefs is his own.
     - conflict_level: personal
       effect: The Institute's authority over Kael collapses with the lock.
-  from: deceived
-  plot: the-resistance
-  to: open
-  value: trust
 ---
 
 ## Content

@@ -161,7 +161,7 @@ def apply(root: Path | None = None) -> list:
     plot_post = frontmatter.load(plot_file)
     if not plot_post.get("value_schemas"):
         plot_post["value_schemas"] = SCHEMAS
-        frontmatter.dump(plot_post, plot_file)
+        frontmatter.dump(plot_post, plot_file, sort_keys=False)
         changed.append(str(plot_file))
         print("wrote value_schemas on", plot_file.name)
 
@@ -171,7 +171,7 @@ def apply(root: Path | None = None) -> list:
         touched = _drop(post, SCENE_OLD)
         if not post.get("value_turns"):
             post["value_turns"] = TURNS[scene_id]
-            frontmatter.dump(post, path)
+            frontmatter.dump(post, path, sort_keys=False)
             touched = True
         if touched:
             changed.append(str(path))
@@ -185,7 +185,7 @@ def apply(root: Path | None = None) -> list:
         post = frontmatter.load(path)
         keys = PROJECT_OLD if rel == "project.md" else CONTAINER_OLD
         if _drop(post, keys):
-            frontmatter.dump(post, path)
+            frontmatter.dump(post, path, sort_keys=False)
             changed.append(str(path))
             print("removed retired keys from", rel)
 
@@ -199,7 +199,7 @@ def apply(root: Path | None = None) -> list:
         post["sequence_id"] = "seq-confrontation"
         post["act_id"] = "act-2"
         post["order"] = 5
-        frontmatter.dump(post, core)
+        frontmatter.dump(post, core, sort_keys=False)
         changed.append(str(core))
         print("moved the-core-day to the end of seq-confrontation")
 

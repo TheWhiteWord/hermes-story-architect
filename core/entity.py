@@ -269,7 +269,7 @@ def update_sections(note_path: Path, sections: list[str]) -> None:
     post = frontmatter.load(note_path)
     post["sections"] = sections
     with open(note_path, 'w') as f:
-        frontmatter.dump(post, f)
+        frontmatter.dump(post, f, sort_keys=False)
 
 
 # ─── DB column/relation mapping (Phase 3) ───

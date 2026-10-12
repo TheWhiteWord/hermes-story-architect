@@ -1,9 +1,17 @@
 ---
-characters: ['kael', 'the-administrator']
+characters:
+- kael
+- the-administrator
 id: kael-the-administrator
 name: Kael & The Administrator
-perspectives: {'kael': {'feeling': "Doesn't hate them; pities them. Which is worse.", 'label': 'Antagonist', 'strength': -0.3, 'type': 'rival'}}
-scenes: ['central-room-day']
+perspectives:
+  kael:
+    feeling: Doesn't hate them; pities them. Which is worse.
+    label: Antagonist
+    strength: -0.3
+    type: rival
+scenes:
+- central-room-day
 status: active
 ---
 

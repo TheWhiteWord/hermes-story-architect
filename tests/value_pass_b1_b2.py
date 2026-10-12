@@ -110,7 +110,7 @@ def apply_turns() -> list:
     plot_file = FIXTURE / "plots" / "The Resistance.md"
     post = frontmatter.load(plot_file)
     post["value_schemas"] = SCHEMAS
-    frontmatter.dump(post, plot_file)
+    frontmatter.dump(post, plot_file, sort_keys=False)
     print("wrote value_schemas on", plot_file.name)
 
     changed = []
@@ -121,7 +121,7 @@ def apply_turns() -> list:
         scene_file = FIXTURE / "scenes" / f"{name}.md"
         post = frontmatter.load(scene_file)
         post["value_turns"] = turns
-        frontmatter.dump(post, scene_file)
+        frontmatter.dump(post, scene_file, sort_keys=False)
         changed.append(str(scene_file))
         print("wrote value_turns on", scene_file.name)
     return changed

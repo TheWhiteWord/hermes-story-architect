@@ -1,9 +1,17 @@
 ---
-characters: ['mira', 'the-administrator']
+characters:
+- mira
+- the-administrator
 id: mira-the-administrator
 name: Mira & The Administrator
-perspectives: {'mira': {'feeling': 'Understands them better than Kael does, which makes her more dangerous', 'label': 'Understands them', 'strength': 0.0, 'type': 'rival'}}
-scenes: ['central-room-night']
+perspectives:
+  mira:
+    feeling: Understands them better than Kael does, which makes her more dangerous
+    label: Understands them
+    strength: 0.0
+    type: rival
+scenes:
+- central-room-night
 status: active
 ---
 

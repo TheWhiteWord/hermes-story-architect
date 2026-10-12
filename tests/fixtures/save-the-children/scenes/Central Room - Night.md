@@ -8,16 +8,20 @@ id: central-room-night
 location: the-central-room
 order: 2
 plot_roles:
-- description: The Administrator makes its final offer. Kael refuses.
-  plot: the-resistance
+- plot: the-resistance
   role: climax
+  description: The Administrator makes its final offer. Kael refuses.
 sequence_id: seq-discovery
 status: drafted
 time_of_day: NIGHT
 title: Central Room - Night
 type: scene
 value_turns:
-- effects:
+- plot: the-resistance
+  value: freedom
+  from: free
+  to: free
+  effects:
   - character: kael
     levels:
     - conflict_level: inner
@@ -31,20 +35,16 @@ value_turns:
     - conflict_level: inner
       effect: Mira, unseen in the room, is given the same choice and must answer it
         alone.
-  from: free
-  plot: the-resistance
-  to: free
-  value: freedom
-- effects:
+- plot: the-resistance
+  value: trust
+  from: open
+  to: open
+  effects:
   - character: kael
     levels:
     - conflict_level: inner
       effect: The Administrator speaks with a reasonable voice, so Kael's judgement
         of it has to become his own rather than borrowed.
-  from: open
-  plot: the-resistance
-  to: open
-  value: trust
 ---
 
 ## Content

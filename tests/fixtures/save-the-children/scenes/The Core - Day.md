@@ -9,16 +9,20 @@ id: the-core-day
 location: the-garden
 order: 3
 plot_roles:
-- description: The children emerge into the real world for the first time.
-  plot: the-resistance
+- plot: the-resistance
   role: resolution
+  description: The children emerge into the real world for the first time.
 sequence_id: seq-discovery
 status: written
 time_of_day: DAY
 title: The Core - Day
 type: scene
 value_turns:
-- effects:
+- plot: the-resistance
+  value: freedom
+  from: free
+  to: free
+  effects:
   - character: kael
     levels:
     - conflict_level: extra-personal
@@ -32,20 +36,16 @@ value_turns:
     - conflict_level: extra-personal
       effect: Mira steps into the sky she was told did not exist and inherits the
         burden of believing her own eyes.
-  from: free
-  plot: the-resistance
-  to: free
-  value: freedom
-- effects:
+- plot: the-resistance
+  value: trust
+  from: open
+  to: open
+  effects:
   - character: kael
     levels:
     - conflict_level: inner
       effect: 'The truth holds: the world outside is real, so the doubt earned in
         the Central Room is replaced by judgement.'
-  from: open
-  plot: the-resistance
-  to: open
-  value: trust
 ---
 
 ## Content
