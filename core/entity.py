@@ -8,6 +8,7 @@ from .constants import (
     SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
     VALUE_CHARGES, STRUCTURE_TYPES, PLOT_TYPES,
     PLOT_SCOPES, VALUE_ARCS, ARC_TYPES, PLOT_ROLES,
+    CONFLICT_LEVELS, VALUE_LADDER,
 )
 from .section_parser import list_sections
 
@@ -703,10 +704,9 @@ def validate_scene_location(project_path, location: str) -> None:
     scenes cannot reach anything it has. An empty location is a scene
     deliberately placed nowhere, and is left alone.
 
-    Ordering note: this runs on write, reading the DB, so a location created
-    in the SAME draft as the scene will not be visible here. Create the
-    location and commit it first — the same constraint an arc beat has on its
-    character and scene.
+    Reads committed state, so a location created in the same draft is visible:
+    commit applies a draft's ops one at a time, creates before edits, each
+    committed before the next.
     """
     if not location:
         return
@@ -867,6 +867,201 @@ def validate_scene_dramatic_role(dramatic_role, plot_roles) -> None:
     # `plot_role`: the roles themselves carry the meaning, so an empty list
     # is not an error — the scene may simply not be placed against a plot yet.
     return
+
+
+def validate_scene_value_turns(project_path, value_turns) -> None:
+    """Raise ValueError on the first value turn that breaks its plot's schema.
+
+    A turn is one shift of a value plus how it lands on each protagonist, and
+    every part of it has to resolve on the plot it names: the plot exists, the
+    value has a schema there (already registered or supplied inline by this
+    turn), `from` and `to` are words of that schema, and each effect names a
+    protagonist of that plot through one level per conflict circle.
+
+    The messages teach the vocabulary, because the agent that hits one is
+    holding a turn and needs to be told what the plot's words are rather than
+    that a rule was broken.
+
+    Runs on write only: it reads the plot's `characters` and `value_schemas`
+    from the database, so a plot created in the same draft is visible here —
+    commit applies a draft's ops one at a time, creates before edits.
+    """
+    from .db import get_db
+
+    if not isinstance(value_turns, list):
+        return
+
+    conn = get_db(project_path)
+    try:
+        plots = {}
+        for row in conn.execute(
+                "SELECT id, extra FROM entities WHERE type='plot'").fetchall():
+            extra = json.loads(row[1]) if row[1] else {}
+            plots[row[0]] = (extra.get("characters") or [],
+                             extra.get("value_schemas") or [])
+
+        # One value per turn: two shifts of the same value are two turns, so
+        # the same (plot, value) twice is a duplicate, not a second shift.
+        seen = set()
+        for i, turn in enumerate(value_turns):
+            at = f"value_turns[{i}]"
+            if not isinstance(turn, dict):
+                raise ValueError(
+                    f"{at} must be an object with keys [plot, value, from, "
+                    f"to, effects] — got {type(turn).__name__}")
+            plot = str(turn.get("plot") or "").strip()
+            if not plot:
+                raise ValueError(f"{at}.plot is required")
+            if plot not in plots:
+                raise ValueError(f"Plot not found: {plot} (at {at}.plot)")
+            characters, schemas = plots[plot]
+
+            value = str(turn.get("value") or "").strip()
+            if not value:
+                raise ValueError(f"{at}.value is required")
+
+            inline = turn.get("schema")
+            registered = next((s for s in schemas
+                               if str(s.get("value") or "").strip().lower()
+                               == value.lower()), None)
+            if registered is None and inline is None:
+                # A turn in THIS scene may have defined the value inline —
+                # the words it supplied are the schema the later turn uses.
+                inline = next((dict(other[2]) for other in seen
+                               if other[:2] == (plot, value.lower())), None)
+                if inline is None:
+                    raise ValueError(
+                        f"{value} has no schema on {plot}. "
+                        f"Defined values: {_defined_values(schemas)}. "
+                        f"Add a `schema` (p, c, cd, nn) to this turn to define it.")
+            if inline is not None and registered is not None:
+                raise ValueError(
+                    f"{value} already has a schema on {plot}: "
+                    f"{_schema_words(registered)}. "
+                    f"Remove schema from this turn and use these words.")
+
+            if registered is not None:
+                words = {rung: str(registered.get(rung) or "").strip()
+                         for rung in VALUE_LADDER}
+            else:
+                if not isinstance(inline, dict):
+                    raise ValueError(
+                        f"{at}.schema must be an object with keys "
+                        f"[p, c, cd, nn] — got {type(inline).__name__}")
+                for rung in VALUE_LADDER:
+                    if not str(inline.get(rung) or "").strip():
+                        raise ValueError(
+                            f"{at}.schema.{rung} is required — a schema is the "
+                            f"four words {', '.join(VALUE_LADDER)}")
+                words = {rung: str(inline[rung]).strip()
+                         for rung in VALUE_LADDER}
+                distinct = {w.lower() for w in words.values()}
+                if len(distinct) != len(VALUE_LADDER):
+                    raise ValueError(
+                        f"{at}.schema needs four distinct words — the rungs "
+                        f"are: {', '.join(f'{k} {v}' for k, v in words.items())}")
+                # Same value, same scene: the words must agree, or the scene
+                # defines its value two ways at once.
+                for other in seen:
+                    if (other[:2] == (plot, value.lower())
+                            and other[2] != frozenset(words.items())):
+                        raise ValueError(
+                            f"{at} defines {value} on {plot} differently from "
+                            f"an earlier turn in this scene: "
+                            f"{_schema_words(dict(other[2]))} vs "
+                            f"{_schema_words(words)}. The words must agree.")
+                seen.add((plot, value.lower(), frozenset(words.items())))
+
+            for key in ("from", "to"):
+                word = str(turn.get(key) or "").strip()
+                if not word:
+                    raise ValueError(f"{at}.{key} is required")
+                if word.lower() not in {w.lower() for w in words.values()}:
+                    raise ValueError(
+                        f"{at}.{key} '{word}' is not a word of the {value} "
+                        f"schema on {plot}: {_schema_words(words)}")
+
+            effects = turn.get("effects")
+            if not effects:
+                raise ValueError(
+                    f"{at}.effects is required and must list one entry per "
+                    f"protagonist the shift affects")
+            if not isinstance(effects, list):
+                raise ValueError(
+                    f"{at}.effects must be a list — got "
+                    f"{type(effects).__name__}")
+            allowed = characters
+            affected = set()
+            for j, effect in enumerate(effects):
+                where = f"{at}.effects[{j}]"
+                if not isinstance(effect, dict):
+                    raise ValueError(
+                        f"{where} must be an object with keys "
+                        f"[character, levels] — got {type(effect).__name__}")
+                character = str(effect.get("character") or "").strip()
+                if not character:
+                    raise ValueError(f"{where}.character is required")
+                if character in affected:
+                    raise ValueError(
+                        f"{character} appears twice in {at}.effects — one "
+                        f"entry per protagonist, with one level per circle")
+                affected.add(character)
+                if character not in allowed:
+                    raise ValueError(
+                        f"{character} is not a protagonist of {plot}: "
+                        f"{', '.join(allowed) or '(none defined)'}. "
+                        f"Add them to plot.characters, or name a protagonist.")
+                levels = effect.get("levels")
+                if not levels:
+                    raise ValueError(
+                        f"{where}.levels is required — one entry per conflict "
+                        f"level through which the shift reaches {character}")
+                if not isinstance(levels, list):
+                    raise ValueError(
+                        f"{where}.levels must be a list — got "
+                        f"{type(levels).__name__}")
+                circles = set()
+                for k, level in enumerate(levels):
+                    spot = f"{where}.levels[{k}]"
+                    if not isinstance(level, dict):
+                        raise ValueError(
+                            f"{spot} must be an object with keys "
+                            f"[conflict_level, effect] — got "
+                            f"{type(level).__name__}")
+                    conflict_level = str(level.get("conflict_level") or "").strip()
+                    if not conflict_level:
+                        raise ValueError(f"{spot}.conflict_level is required")
+                    if conflict_level not in CONFLICT_LEVELS:
+                        raise ValueError(
+                            f"{spot}.conflict_level '{conflict_level}' is not "
+                            f"one of: {', '.join(CONFLICT_LEVELS)}")
+                    if conflict_level in circles:
+                        raise ValueError(
+                            f"{character} has two '{conflict_level}' levels in "
+                            f"{where}.levels — one level per circle, with an "
+                            f"effect focused on that level")
+                    circles.add(conflict_level)
+                    sentence = str(level.get("effect") or "").strip()
+                    if not sentence:
+                        raise ValueError(
+                            f"{spot}.effect is required — one sentence: what "
+                            f"the shift does to {character} at the "
+                            f"{conflict_level} level")
+    finally:
+        conn.close()
+
+
+def _schema_words(schema) -> str:
+    """A schema (or a words dict) as `p x, c y, cd z, nn w` — the vocabulary
+    an error message hands over, so the fix is to use these words."""
+    return ", ".join(f"{rung} {schema[rung]}" for rung in VALUE_LADDER)
+
+
+def _defined_values(schemas) -> str:
+    """Every value the plot defines, with its words. Empty says why."""
+    if not schemas:
+        return "none"
+    return "; ".join(f"{s.get('value')}: {_schema_words(s)}" for s in schemas)
 
 
 def validate_arc_parents(project_path, character: str, scene: str) -> None:

@@ -66,6 +66,12 @@ def _sample_value(field, meta):
             # plot must exist for it to validate — the fixture's parents
             # provide that only when a scene is created after a plot.
             return []
+        if field == "value_turns":
+            # A turn names a plot and words of that plot's schema; this
+            # project holds no plot at all, so any turn would be refused for
+            # a missing plot. Empty is the shape this field has by default,
+            # and the turns themselves are covered by test_value_turns.py.
+            return []
         if field in ("conflict_levels",):
             return ["inner", "personal"]
         return [f"item-{i}" for i in range(1, 3)]

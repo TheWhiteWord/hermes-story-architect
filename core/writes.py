@@ -215,11 +215,14 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             columns["order_key"] = next_order
             merged["order"] = next_order
 
-        # Using autocommit mode (get_db sets isolation_level=None) — no explicit
-        # transaction needed
+        # Using autocommit mode (get_db sets isolation_level=None) — one
+        # explicit transaction so the scene, its sections, its relations and
+        # any inline schema registration on a plot land together or not at
+        # all.
         standard = standard_sections(entity_type)
         relations = relations_for_insert(entity_type, slug, merged)
 
+        conn.execute("BEGIN")
         try:
             conn.execute(
                 "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) "
@@ -235,6 +238,10 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             # into the message the check would have produced, so a lost race
             # reads the same as a caught duplicate instead of leaking
             # "UNIQUE constraint failed: entities.id" to the user.
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
             raise ValueError(
                 f"Entity already exists: {entity_type}/{slug}. "
                 f"Edit it instead of creating it.") from None
@@ -255,6 +262,14 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                 "INSERT INTO relations (from_id, to_id, kind, note, \"order\") VALUES (?, ?, ?, ?, ?)",
                 (rel["from_id"], rel["to_id"], rel["kind"], rel["note"], rel["order"]),
             )
+
+        # A turn that defines a value the plot had none for registers the
+        # schema on the plot — in this transaction, so scene and plot land
+        # together. Validated above; this is the writing half.
+        if entity_type == "scene":
+            _check_value_turns(conn, project_path, merged.get("value_turns", []))
+
+        conn.execute("COMMIT")
     except Exception:
         # Autocommit mode: there is no open transaction, so ROLLBACK itself
         # raises and would replace the real error with "cannot rollback - no
@@ -359,6 +374,22 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 f"Valid section examples: {', '.join(sorted(standard_sections)[:5])}."
             )
 
+        # ── Value turns: the MERGED state ──
+        # The same rule the dramatic_role contradiction check follows: an edit
+        # that touches only `location` must still refuse a scene whose stored
+        # turns name a schema word that no longer exists, or the plot edit
+        # that renamed the word silently orphaned them. Refused here, before
+        # BEGIN, so nothing is written — the plot's schemas cannot have moved
+        # inside this call, so reading them uncommitted is the same read.
+        value_turns = data.get("value_turns")
+        if value_turns is None:
+            stored = conn.execute(
+                "SELECT extra FROM entities WHERE id=?", (entity_id,)).fetchone()
+            value_turns = (json.loads(stored[0]) if stored and stored[0]
+                           else {}).get("value_turns", [])
+        _check_value_turns(conn, project_path, value_turns,
+                           register=False)
+
         # ── Reject a self-contradicting scene BEFORE writing anything ──
         # Checked against the MERGED state, not just `data`: an edit that sets
         # only `dramatic_role: transition` must be caught against the roles
@@ -412,6 +443,13 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 (json.dumps(extra), entity_id)
             )
             applied_fields.extend(extra_updates)
+
+        # A turn that defines a value the plot had none for registers the
+        # schema on the plot — inside THIS transaction, so the scene and the
+        # plot land together or not at all. Validated before BEGIN above;
+        # this is the writing half.
+        if entity_type == "scene" and value_turns:
+            _check_value_turns(conn, project_path, value_turns)
 
         # Create/update relation rows for all _RELATION_FIELDS of this entity type
         for field, (kind, is_list) in rel_fields.items():
@@ -778,6 +816,84 @@ def reorder(project_path: Path, entity_type: str, ordered_ids: list,
 
 
 # ─── shared helpers ───
+
+def _check_value_turns(conn, project_path, value_turns, register=True) -> None:
+    """Validate a scene's value turns, and register any new inline schemas
+    on the plots they name.
+
+    The validator raises before anything is written, so a bad turn leaves no
+    schema behind. Registration is the other half: a turn whose value the
+    plot has not yet defined carries the words in `schema`, and once the turn
+    is stored the plot must know them, or every later turn for that value is
+    told to add a schema that is already spoken for.
+
+    `register=False` is the pre-transaction pass on edit: validation only,
+    because the write that would register is the caller's BEGIN/COMMIT block
+    and a plot UPDATE outside it would commit on its own. The registering
+    pass runs inside that block.
+    """
+    from .entity import validate_scene_value_turns
+
+    if not value_turns:
+        return
+    if not isinstance(value_turns, list):
+        return  # the shape validator reported it
+
+    # A STORED turn may still carry the inline `schema` that registered its
+    # value; the plot now defines that value, so the validator would refuse
+    # every later edit of the scene with "already has a schema". The schema
+    # key is what the validator checks against, so the re-validation pass
+    # drops it from any turn whose value the plot already defines — the
+    # words are on the plot now, which is where they belong.
+    def _as_stored(turns):
+        out = []
+        for turn in turns:
+            if not (isinstance(turn, dict)
+                    and isinstance(turn.get("schema"), dict)):
+                out.append(turn)
+                continue
+            row = conn.execute(
+                "SELECT extra FROM entities WHERE id=? AND type='plot'",
+                (str(turn.get("plot") or "").strip(),)).fetchone()
+            extra = json.loads(row[0]) if row and row[0] else {}
+            if any(str(s.get("value") or "").strip().lower()
+                   == str(turn.get("value") or "").strip().lower()
+                   for s in (extra.get("value_schemas") or [])):
+                turn = {k: v for k, v in turn.items() if k != "schema"}
+            out.append(turn)
+        return out
+
+    validate_scene_value_turns(project_path, _as_stored(value_turns))
+    if not register:
+        return
+
+    # Register: every inline schema whose value the plot does not define yet.
+    for turn in value_turns:
+        inline = turn.get("schema")
+        if not isinstance(inline, dict):
+            continue
+        plot = str(turn.get("plot") or "").strip()
+        value = str(turn.get("value") or "").strip()
+        if not plot or not value:
+            continue
+        row = conn.execute(
+            "SELECT extra FROM entities WHERE id=? AND type='plot'",
+            (plot,)).fetchone()
+        extra = json.loads(row[0]) if row and row[0] else {}
+        schemas = extra.get("value_schemas") or []
+        if any(str(s.get("value") or "").strip().lower() == value.lower()
+               for s in schemas):
+            continue  # the plot already defines it; validation refused the
+                     # turn otherwise
+        schemas.append({"value": value,
+                        **{rung: str(inline[rung]).strip() for rung in
+                           ("p", "c", "cd", "nn")},
+                        **({"note": str(inline["note"]).strip()}
+                           if inline.get("note") else {})})
+        extra["value_schemas"] = schemas
+        conn.execute("UPDATE entities SET extra=? WHERE id=?",
+                     (json.dumps(extra), plot))
+
 
 def _check_slug(slug: str) -> None:
     """Reject anything that is not a plain id.
