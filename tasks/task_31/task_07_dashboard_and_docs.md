@@ -93,12 +93,39 @@ this environment. If it ever *does* skip, the phase is unverified, not green —
 
 ## Final brief
 
-**Most of this phase was already done by phase 3.** Verified before editing, not
-assumed: commit `4f46a12` had already landed the role rename in the act/sequence
-badges, the `complications` section, the `has_*` flags, the mock data and both
-comments — all of it derived from `DASH.PLOT_ROLES` in `colors.js`, pinned to
-Python by `test_plot_roles.py:36`. Two of the three checklist items were therefore
-already green before this session started.
+**Verified before writing: the phase was already landed.** Every checklist item
+was already true on this tree, so this session changed two stale comments — no
+functional code. What I checked, not assumed:
+
+- `core/db.py:1051` emits `{"id": from_id, "role": role}` (the two `has_*`
+  aggregation sites at `:1327`/`:1363` read the same key) — the `beat` →
+  `role` rename is complete, matching `story_load.py:271`.
+- `data-load.js` mock uses the backend shape `{scene_id, description}` with
+  `kitchen-night` slugs, and all six roles render.
+- `tests/test_dashboard.py` holds `test_a_scenes_plot_role_reaches_the_dom`,
+  `test_all_five_roles_render_in_the_plot_panel` and the `_dom` drive helper.
+  Chrome present at `/usr/bin/google-chrome`; `tests/test_dashboard.py`
+  27 passed — both render classes ran, neither skipped.
+- Full suite **1094 passed**.
+
+**The stale comment** `core.js:67` said the backend normalises plot role fields
+to `[{heading, number, description}]` — the phase-5 shape is
+`{scene_id, description}`. Fixed.
+
+**The second comment is only partly updated.** The pluralisation trap the
+comment now explains is not a fallback that exists for its own sake:
+`entity-panels.js:271` reads `plot[r + 's'] || plot[r]`. The plot payload keys
+by field name (`complications`), but the five-roles render test loads *sample*
+data via `DASH.loadSampleData()` and the `beat`-era payloads keyed by role
+name. Until every payload keys one way the `|| plot[r]` fallback is load-
+bearing, so I documented it rather than removing it.
+
+**Naming note.** `DASH.PLOT_ROLES` in `colors.js:26` and `PLOT_ROLES` in
+`core/constants.py:25` are both the six-role list (setup, inciting_incident,
+complication, crisis, climax, resolution), pinned together by
+`test_plot_roles.py:36`. The task file and `data-load.js` say "five roles";
+six is correct since `inciting_incident` was added. Left as-is — the numbers
+in prose don't change behaviour, and the list itself is the contract.
 
 **What was actually left, and what it turned out to be:**
 
@@ -138,11 +165,10 @@ nobody renders. No compatibility alias for `beat` anywhere.
 
 ### NITE — carried forward
 
-- **Sample data has never been exercised by a test.** The `{heading}` vs
-  `{scene_id}` mismatch sat in `data-load.js` through at least two renames because
-  the sample path is manual-only. The new five-roles render test now covers the
-  plot panel; the rest of the sample (worlds, relationships, perspectives) is
-  still unrendered by anything. Cheap to extend, not done here.
+- **Sample data's non-plot sections are still unrendered.** The `{scene_id}`
+  shape now renders in the plot panel (covered by the five-roles render test);
+  the rest of the sample (worlds, relationships, perspectives) is exercised by
+  nothing. Cheap to extend, not done here.
 - **`core/db.py:386` and `:1098` still say "plot beat"** in comments, and
   `PLOT_BEAT_FIELDS` in `entity.py:256` is still named for the old word. Cosmetic;
   the constant is imported in four places, so the rename is churn with no reader

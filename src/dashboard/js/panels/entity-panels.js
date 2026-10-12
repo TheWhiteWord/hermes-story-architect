@@ -267,6 +267,8 @@ DASH.showPlotPanel = function(plotId) {
   }
 
   // Plot role sections, one per role — must match PLOT_ROLES in core/constants.py.
+  // The plot's field is the pluralised role (`complications` for `complication`);
+  // the singular is the fallback for payloads that key by role name directly.
   const roleSections = DASH.PLOT_ROLES.map(r => {
     const html = renderBeats(plot[r + 's'] || plot[r] || []);
     return html ? `<div>
