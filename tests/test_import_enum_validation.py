@@ -168,6 +168,59 @@ class TestTheValueCheck:
         assert result.get("success") is not True
         assert "Invalid character frontmatter" in result.get("error", "")
 
+    def test_a_bad_story_role_is_still_refused(self, tmp_path):
+        """`empty_ok` must not swallow the whole check: an unrecognised ROLE
+        is still a value the schema forbids, and a retired one must not import
+        as a silent corruption."""
+        def mutate(proj):
+            note = proj / "characters" / "Kael.md"
+            text = note.read_text()
+            assert "story_role: Protagonist" in text, "fixture changed"
+            note.write_text(text.replace("story_role: Protagonist",
+                                         "story_role: Sidekick"))
+        result = import_project(tmp_path, mutate)
+        assert result.get("success") is not True
+        assert "Invalid character frontmatter" in result.get("error", "")
+
+    def test_an_empty_story_role_imports(self, tmp_path):
+        """Since B12 an unfilled field is stored empty, and story_export
+        writes `story_role: ''` — so the importer must accept exactly what
+        the write path stores and the exporter writes. Without this a
+        DB -> markdown -> DB round-trip failed on a value the write path
+        had already accepted."""
+        def mutate(proj):
+            note = proj / "characters" / "Kael.md"
+            text = note.read_text()
+            note.write_text(text.replace("story_role: Protagonist",
+                                         "story_role: ''"))
+        result = import_project(tmp_path, mutate)
+        assert result.get("success") is True, result
+        # Empty is DROPPED, not stored: `_extra_for` skips "" like every
+        # other write path. `story_role` is `optional: False`, so
+        # `unfilled_fields` never reports it — the role gap is caught by the
+        # missing-required-field check at stage time instead, which is where
+        # it belongs. What this test pins is that the import SUCCEEDS: the
+        # refusal is gone, and nothing is stored for a role that was blank.
+        db = tmp_path / "projects" / "stc" / ".story" / "story.db"
+        conn = sqlite3.connect(str(db))
+        extra = conn.execute(
+            "SELECT extra FROM entities WHERE id='kael'").fetchone()[0]
+        conn.close()
+        assert not json.loads(extra).get("story_role")
+
+    def test_an_exported_character_reimports(self, tmp_path):
+        """The full round trip the empty-role fix is for: export writes the
+        note, the DB is wiped, the note imports back. A DB -> markdown -> DB
+        cycle must be stable, or the export tool publishes a project the
+        importer refuses to take back."""
+        proj = make_project(tmp_path)
+        assert run_import(proj, tmp_path).get("success") is True
+        from tools.story_export import handler as export_handler
+        export_handler({"project": str(proj)}, root_path=str(tmp_path))
+        shutil.rmtree(proj / ".story")
+        result = run_import(proj, tmp_path)
+        assert result.get("success") is True, result
+
 
 class TestTheStructuralChecksAreNotFatal:
     """The half that must NOT be filtered in.

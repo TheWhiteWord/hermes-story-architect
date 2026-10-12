@@ -44,8 +44,12 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
             _validate_field(entity_type, field, frontmatter[field], meta, warnings)
 
     if entity_type == "character":
-        if "story_role" in frontmatter and frontmatter["story_role"] not in VALID_ROLES:
-            warnings.append(f"Invalid story_role: {frontmatter['story_role']}")
+        # `empty_ok` like the four enum checks below: since B12 an unfilled
+        # field is stored empty, so an exported note carries `story_role: ''`
+        # and the write path accepts it. Without this the importer refused
+        # exactly what story_export writes, and a DB -> markdown -> DB
+        # round-trip failed while the write path stored the same value.
+        _validate_enum(frontmatter, "story_role", VALID_ROLES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "arc_type", ARC_TYPES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "character_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "character_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
