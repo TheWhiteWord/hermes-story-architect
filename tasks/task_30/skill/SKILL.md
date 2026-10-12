@@ -67,7 +67,7 @@ authoritative. → `model/entity-sections.md`
 | Tool | For |
 |---|---|
 | `story_describe` | what fields and sections a type has |
-| `story_load` | what exists in the project, and one of five views |
+| `story_load` | what exists in the project, and one of four views |
 | `story_retrieve` | one entity's fields and sections, batched |
 | `story_search` | where a term is mentioned, across all prose |
 | `story_draft` | propose, then commit, then discard |
@@ -95,7 +95,7 @@ matches the task, not the folder.*
 | File | Read when |
 |---|---|
 | `references/model/entity-sections.md` | choosing between a field and a section; what goes in a section |
-| `references/model/value-system.md` | the story's value or a character's; the two tracks |
+| `references/model/value-system.md` | a character's value or an arc beat's; the character track (the story/plot value pass is `craft/value-pass.md`) |
 | `references/model/story-memory.md` | recording a decision; resolving a contradiction |
 
 ### `references/craft/` — the writing work
@@ -111,6 +111,7 @@ craft file is where the theory becomes a decision.*
 | `references/craft/character-and-arc/arc-beats.md` | a character's turn, in beats | `references/theory/character-and-arc.md` |
 | `references/craft/character-and-arc/relationships.md` | who a character is bonded to | `references/theory/character-and-arc.md` |
 | `references/craft/scene-design.md` | a scene's purpose, turn, and dramaturgy | `references/theory/scene-and-beat.md` |
+| `references/craft/value-pass.md` | recording a scene's value turns after it exists | `references/theory/values.md` |
 | `references/craft/world-and-place.md` | a world or a location | `references/theory/world-and-place.md` |
 
 ### `references/mechanics/` — the tools
@@ -119,7 +120,7 @@ craft file is where the theory becomes a decision.*
 
 | File | Read when |
 |---|---|
-| `references/mechanics/reading-the-project.md` | orienting, or choosing between the five views |
+| `references/mechanics/reading-the-project.md` | orienting, or choosing between the four views |
 | `references/mechanics/staging-changes.md` | writing anything, and what a draft can and cannot do |
 | `references/mechanics/ids-and-links.md` | naming an entity, or following a reference |
 | `references/mechanics/screenplay-format.md` | writing a scene's `## Content` in Fountain |

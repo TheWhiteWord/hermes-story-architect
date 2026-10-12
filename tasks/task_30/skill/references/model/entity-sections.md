@@ -89,8 +89,8 @@ home for.
 - **Premise** — the "what if" that started it.
 - **Spine** — the protagonist's story-long want. Every scene relates to it.
 - **Controlling Idea** — how and why life changes; the argument the story makes.
-- **Value Arc** — the value at stake and its sweep. Pairs with the value fields;
-  does not set them. → `value-system.md`
+- **Value Arc** — the value at stake and its sweep. The stored read-back is the
+  plots' `value_lines`; the recording pass is `craft/value-pass.md`.
 - **Structure** — design type, act count, where the turning points sit.
 - **Genre** — the contract with the audience: what this world owes them.
 - **Notes** — everything that does not fit above.
@@ -157,7 +157,8 @@ home for.
 - **Summary** — what this act accomplishes.
 - **Objective** — the protagonist's immediate goal for it. Pairs with
   `act_objective`.
-- **Value Arc** — the charge entering and leaving.
+- **Value Arc** — the value entering and leaving this act, read from the scenes'
+  value turns. → `../craft/value-pass.md`
 - **Reversal** — the climax scene and why it is irreversible.
 - **Notes**
 
@@ -167,7 +168,8 @@ home for.
 
 - **Summary** — what it accomplishes.
 - **Purpose** — why it exists, what it builds toward.
-- **Value Arc** — entering and leaving charge.
+- **Value Arc** — entering and leaving, read from the scenes' value turns. →
+  `../craft/value-pass.md`
 - **Progression** — how the scenes escalate.
 - **Sequence Climax** — the scene that recontextualises everything before it.
 - **Plots** — which plot(s) it serves.
@@ -182,7 +184,9 @@ home for.
 - **Objective** — what the character wants here, against the story-long want.
 - **Conflict** — the antagonism: inner, personal, extra-personal.
 - **Beats** — the action/reaction exchanges.
-- **Value Turn** — opening charge, closing charge, the turn between.
+- **Value Turn** — what this scene does to each value it touches. The turn
+  itself is recorded as `value_turns` after the scene exists; this section holds
+  the reasoning. → `../craft/value-pass.md`
 - **Dramatic Function** — its role in the larger structure, and the flags.
 - **Production** — location, time, heading. Screenplay-facing.
 - **Notes**

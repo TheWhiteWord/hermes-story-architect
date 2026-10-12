@@ -25,22 +25,18 @@ promises. A real project with a full cast will be larger.*
 - *The views below are all opt-in on top of this.* None of them is needed to
   begin.
 
-## The five views
+## The four views
 
 *Each answers one question. Asking a view the wrong question costs a second
 call, so the routing is worth holding.*
 
-| View | Answers | Needs |
+|| View | Answers | Needs |
 |---|---|---|
-| `story_value` | where the story's value moves, act → sequence → scene | — |
-| `arc` | one character's arc, beat by beat | `character` |
-| `dramatic_elements` | each scene's role and its milestones | — |
+|| `arc` | one character's arc, beat by beat | `character` |
+|| `dramatic_elements` | each scene's role and its milestones | — |
 | `relationship` | every bond and both sides of each | — |
 | `unfilled` | what is still missing | — or `field`, or `entity` |
 
-- **`story_value`** states the value word **once, at the top**, and the charges
-  down the hierarchy. There is no word per container, because there is no field
-  for one — its absence is not a gap. → `value-system.md`
 - **`arc`** is the only view that needs a parameter, and it needs a character id.
   Without one it returns every character's arc, which is a much larger answer to
   a question nobody asked. **Pass the character.**
@@ -64,9 +60,8 @@ call, so the routing is worth holding.*
   tells you it is a partial list — **read the flag before treating the absence
   of a field as its absence from the project.**
 - **By `field`** it answers *"who else is missing this?"* — a lookup across the
-  whole project. One field, a short list. Both value prefixes are worth knowing,
-  so `character_value_at_close` finds the character track and `value_at_close`
-  the story's.
+  whole project. One field, a short list. A value field worth knowing is
+  `character_value_at_close`, on the character track.
 - **By `entity`** it answers *"what did I skip on this one?"* — the same lookup
   the other way round.
 - **These two are the cheap ones** — a few hundred characters against two and a

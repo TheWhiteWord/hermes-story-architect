@@ -3,7 +3,8 @@
 *Mined from `docs/research/McKee_Story/Good_Writing.md`. It stands on its own:
 no fields, no tools, no store.*
 
-*→ carried in the store by `model/value-system.md`, and read from
+*→ carried in the store by `model/value-system.md` (the character track) and
+`craft/value-pass.md` (the story and plot values), and read from
 `craft/scene-design.md` and the arc files.*
 
 ---

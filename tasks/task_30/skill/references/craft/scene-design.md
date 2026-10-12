@@ -30,6 +30,9 @@ needs here may be one of these or none of them:
 - **The character values themselves.** A character's value is what the scene
   serves for them, and it points at what would be relevant to that character
   here.
+- **The plots' value schemas.** The words each plot has for its values, read with
+  `value_schemas`, and where each stands, with `value_lines`. This is the
+  vocabulary the scene's turns will be recorded in. → `value-pass.md`
 
 **Other things may rightly drive the scene instead** — the story value, the
 structure, what the scene has to accomplish technically. A story progresses on
@@ -61,17 +64,16 @@ separate operation that renumbers the whole list. → `plot-and-structure.md`
 that genuinely has nobody in it is recorded with `no_cast`, so the absence
 reads as chosen rather than as an oversight.
 
-**What turns here — the value pair and the shift.** The scene's job is the
-turn, and it is three records of that one fact:
-- `value_at_open` and `value_at_close` are the charge entering and leaving.
-- `shift` is how the value turns *in the story's language* — the finding, the
-  thing a writer uses. It is not the pair of charge words restated.
-- `y` is that shift measured, read only to draw the curve.
+**What turns here — the value.** The scene's job is the turn, and it is
+**recorded after the scene exists**, as `value_turns` — never while creating the
+scene. One entry per shift of a value, with its effects on the protagonists. How
+and when to record it, how to choose the opening state, and how to read the
+value line back, are the whole of `value-pass.md`.
 
-**A scene that does not turn is not a scene.** If the two charges are the
-same, the scene is exposition, and that is a thing to find out before writing
-it rather than after. The turn need not be the loudest thing in the scene —
-it is the point where the value differs on the way out.
+**A scene that does not turn is not a scene.** If nothing shifts, the scene is
+exposition, and that is a thing to find out before writing it rather than after.
+The turn need not be the loudest thing in the scene — it is the point where the
+value differs on the way out.
 
 **What the scene is for — `dramatic_role` and `plot_roles`.** These answer
 different questions and are not interchangeable:
@@ -88,10 +90,9 @@ different questions and are not interchangeable:
 - **Climaxes nest, so a scene can carry several, or one, or none.** The story
   has one climax, each act one, each sequence one. Which level a climax belongs
   to is decided by the container, not stored on the scene. → `structure-and-plot.md`
-- **A climax is as large as its level, and no larger.** A scene that is only
-  its sequence's climax must be smaller than its act's climax, and the act's
-  smaller than the story's. So the `shift` of a lower climax is a smaller turn
-  than the `shift` of a higher one — same field, different magnitude. → `values.md`
+- **A climax is as large as its level, and no larger.** A scene that is only its
+  sequence's climax must be a smaller turn than its act's climax, and the act's
+  smaller than the story's — same value, different magnitude. → `values.md`
 - **Every other scene is trajectory toward a culmination.** A scene that is
   not a climax is not a failed climax: it moves the value toward the one that
   is coming, and the size of its turn is set by that distance. → `values.md`
@@ -127,7 +128,7 @@ character's value is two records disagreeing about who is present — and
 `no_cast` does not cover it, because that flag records a scene with nobody in
 it, not a scene whose turn belongs to someone who is absent.
 
-**A scene's shift against its beats and its objective.** The shift is what the
-gap and the choice add up to. A `Value Turn` that no `Conflict` produces is a
+**A scene's value turns against its beats and its objective.** The turn is what
+the gap and the choice add up to. A `Value Turn` that no `Conflict` produces is a
 turn the scene has not earned, and reading the two sections together is the
 cheapest way to find it.
