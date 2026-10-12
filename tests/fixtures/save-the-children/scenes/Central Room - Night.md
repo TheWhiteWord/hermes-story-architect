@@ -16,6 +16,35 @@ status: drafted
 time_of_day: NIGHT
 title: Central Room - Night
 type: scene
+value_turns:
+- effects:
+  - character: kael
+    levels:
+    - conflict_level: inner
+      effect: 'Refusing the offer is the deepening: the change is in how the choice
+        lands, not in the state — freedom now has a cost attached to it.'
+    - conflict_level: personal
+      effect: The offer makes the known world real again by putting a price on leaving
+        it.
+  - character: mira
+    levels:
+    - conflict_level: inner
+      effect: Mira, unseen in the room, is given the same choice and must answer it
+        alone.
+  from: free
+  plot: the-resistance
+  to: free
+  value: freedom
+- effects:
+  - character: kael
+    levels:
+    - conflict_level: inner
+      effect: The Administrator speaks with a reasonable voice, so Kael's judgement
+        of it has to become his own rather than borrowed.
+  from: open
+  plot: the-resistance
+  to: open
+  value: trust
 ---
 
 ## Content

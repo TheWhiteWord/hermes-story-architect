@@ -247,11 +247,24 @@ class TestOneVocabularyAcrossReadAndWrite:
         # nowhere else — `character.relationships.sub_fields` — so a top-level-only
         # set rejects a name story_describe in fact reports, and this test failed on
         # a correct payload for three phases before anyone read what it was asserting.
-        known |= {sub for fields in out.values() for f in fields.values()
-                  for sub in (f.get("sub_fields") or {})}
+        # Recursive: a nested field (value_turns.effects[].levels[]) declares its
+        # own sub_fields, and the load payload carries them, so one level is not
+        # enough now that fields nest.
+        def collect_sub_names(fields):
+            for meta in fields.values():
+                for sub, sub_meta in (meta.get("sub_fields") or {}).items():
+                    known.add(sub)
+                    collect_sub_names({sub: sub_meta})
+        for fields in out.values():
+            collect_sub_names(fields)
         # Entity containers, not fields: they hold other entities.
         known |= {"acts", "sequences", "scenes", "worlds", "locations",
                   "plots", "characters"}
+        # `value_lines` is a computed read-back (plot.value_lines): its own shape
+        # is {value, schema, turns} and each turn is {scene_id, from, to,
+        # effects}, with effects/levels reusing the turn's declared sub_fields.
+        # None of these are stored fields — they are derived, like `milestone`.
+        known |= {"value_lines", "turns", "scene_id", "from", "to", "schema"}
         # `milestone` is the load payload's own climax marker, deliberately not
         # a stored field — the spec derives it from four scene booleans.
         known |= {"milestone"}

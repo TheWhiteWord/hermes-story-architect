@@ -344,7 +344,8 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 ) else value
 
         from .entity import (REVERSED_RELATION_KINDS, _RELATION_FIELDS,
-                             relation_endpoints, relation_entry, relation_fields)
+                             _validate_field, relation_endpoints, relation_entry,
+                             relation_fields)
         # Computed relation fields are read-only, so they are not writable
         # either — the plot's five role fields are the case today. Dropped here
         # rather than in each write path: they are still listed in
@@ -372,6 +373,29 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                 f"directly, not nested under frontmatter/sections. "
                 f"Valid field examples: {', '.join(examples)}. "
                 f"Valid section examples: {', '.join(sorted(standard_sections)[:5])}."
+            )
+
+        # ── Shape of a structured field, BEFORE writing anything ──
+        # create_entity, the importer and the draft stager all run the shape
+        # validator; edit did not, so a wrong-typed value landed verbatim in
+        # `extra` and broke the next reader. `value_schemas: "PROBE"` on a plot
+        # stored a string, and the next scene edit crashed reading it as a list
+        # of dicts. Same findings the other write paths report, as a hard error.
+        #
+        # `plot_roles` is excluded: validate_scene_plot_roles owns it with its
+        # own messages (a role outside the six, an entry with no plot), which
+        # these tests pin. The generic check would only duplicate them.
+        shape_findings = []
+        for key, value in data.items():
+            meta = schema.get(key, {})
+            if meta.get("computed") or key == "plot_roles":
+                continue  # computed: never written; plot_roles: bespoke validator owns it
+            if meta.get("sub_fields"):
+                _validate_field(entity_type, key, value, meta, shape_findings)
+        if shape_findings:
+            raise ValueError(
+                f"Invalid {entity_type} field shape: {'; '.join(shape_findings)}. "
+                f"story_describe lists the shape each field expects."
             )
 
         # ── Value turns: the MERGED state ──

@@ -20,6 +20,36 @@ status: drafted
 time_of_day: DAY
 title: Central Room - Day
 type: scene
+value_turns:
+- effects:
+  - character: kael
+    levels:
+    - conflict_level: inner
+      effect: Kael realises the lock was never engaged, and his own acceptance of
+        it was the cage.
+    - conflict_level: personal
+      effect: Kael's hand on the handle is a public refusal to stay.
+  - character: mira
+    levels:
+    - conflict_level: extra-personal
+      effect: The system that holds the children is shown, for the first time, to
+        be only a story they were told.
+  from: imprisoned
+  plot: the-resistance
+  to: free
+  value: freedom
+- effects:
+  - character: kael
+    levels:
+    - conflict_level: inner
+      effect: Every guard Kael had been told about is a lie; he can no longer tell
+        which of his beliefs is his own.
+    - conflict_level: personal
+      effect: The Institute's authority over Kael collapses with the lock.
+  from: deceived
+  plot: the-resistance
+  to: open
+  value: trust
 ---
 
 ## Content

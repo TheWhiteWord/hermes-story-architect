@@ -17,6 +17,35 @@ status: written
 time_of_day: DAY
 title: The Core - Day
 type: scene
+value_turns:
+- effects:
+  - character: kael
+    levels:
+    - conflict_level: extra-personal
+      effect: The real world is wider than the system ever let them imagine, so freedom
+        stops being an idea and becomes weather.
+    - conflict_level: inner
+      effect: Kael has to become someone who lives outside the system, not someone
+        who left it.
+  - character: mira
+    levels:
+    - conflict_level: extra-personal
+      effect: Mira steps into the sky she was told did not exist and inherits the
+        burden of believing her own eyes.
+  from: free
+  plot: the-resistance
+  to: free
+  value: freedom
+- effects:
+  - character: kael
+    levels:
+    - conflict_level: inner
+      effect: 'The truth holds: the world outside is real, so the doubt earned in
+        the Central Room is replaced by judgement.'
+  from: open
+  plot: the-resistance
+  to: open
+  value: trust
 ---
 
 ## Content

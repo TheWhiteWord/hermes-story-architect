@@ -1,11 +1,26 @@
 ---
-characters: ['kael', 'mira']
+characters:
+- kael
+- mira
 id: the-resistance
 name: The Resistance
 one_sentence: Kael and Mira organize the children to breach the Central Room.
 plot_scope: main
 plot_type: Setup
 status: active
+value_schemas:
+- c: dependent
+  cd: imprisoned
+  nn: gilded cage
+  note: Whether the children may choose their own life.
+  p: free
+  value: freedom
+- c: wary
+  cd: deceived
+  nn: exploited
+  note: Whether the system they live in tells them the truth.
+  p: open
+  value: trust
 ---
 
 ## Summary

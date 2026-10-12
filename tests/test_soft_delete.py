@@ -118,8 +118,21 @@ class TestDeletedEntitiesAreInvisible:
     def test_story_load_omits_it(self, vault):
         from tools.story_load import handler
         _delete(vault)
-        assert "kael" not in json.dumps(
-            json.loads(handler({"project": "stc"}, root_path=str(vault))))
+        payload = json.loads(handler({"project": "stc"}, root_path=str(vault)))
+        # Scoped to the character's own nodes, not the whole JSON: a value turn
+        # legitimately names a character in its `effects` prose, so a deleted
+        # character can still appear as a *mention* while being absent as an
+        # entity. The invariant is "no entity node for it", not "no text".
+        def walk(node):
+            if isinstance(node, dict):
+                if node.get("id") == "kael":
+                    pytest.fail("deleted character still present as an entity node")
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for x in node:
+                    walk(x)
+        walk(payload)
 
     def test_search_cannot_reach_its_prose(self, vault):
         from tools.story_search import handler
