@@ -160,9 +160,9 @@ ENTITY_SCHEMAS = {
                           }},
         # Computed read-back (Phase 4): for each value of the plot, its schema
         # and its turns in story order. `computed` makes every write path
-        # refuse it.
+        # refuse it. story_describe appends the read-only suffix itself.
         "value_lines": {"type": "list", "default": [], "optional": True, "computed": True,
-                        "description": "Computed read-back: for each value of the plot, its schema and its turns in story order. (read-only, computed — do not set)"},
+                        "description": "Computed read-back: for each value of the plot, its schema and its turns in story order."},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},

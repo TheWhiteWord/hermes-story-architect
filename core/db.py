@@ -283,6 +283,90 @@ def get_memory_block(project_path: Path) -> dict:
     }
 
 
+def compute_value_lines(project_path: Path, plot_id: str) -> list[dict]:
+    """The plot's value schemas with their turns, in story order (design §3.4).
+
+    Read-back for the values of one plot: each value the plot defines, its
+    vocabulary, and every turn of it across the scenes — scene id, the state
+    the scene opened on and the state it closed on, and for each protagonist
+    the shift landed on the conflict levels it reached and what it did there.
+
+    Story order is the scene's position inside its sequence, not the order the
+    turns were written: a scene inserted later still reads where it happens,
+    which is the whole point of reading the line back.
+
+    One pass over every scene, so a plot's line costs the same to build as the
+    project's — this is called once per plot in `get_project_summary`, where
+    the scan can be hoisted out later if it ever matters.
+    """
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return []
+    conn = get_db(project_path)
+    try:
+        row = conn.execute(
+            "SELECT extra FROM entities WHERE id=? AND type='plot' AND is_deleted=0",
+            (plot_id,)).fetchone()
+        if not row:
+            return []
+        schemas = (json.loads(row[0]) if row[0] else {}).get("value_schemas") or []
+        if not schemas:
+            return []
+        by_value = {str(s.get("value") or "").strip().lower(): s for s in schemas}
+
+        # scene order_key is per parent sequence, so the sort key needs the
+        # sequence's own key in front of it — the same composite `_build_scene`
+        # uses. A scene with no sequence sorts first, as it has nowhere else
+        # to sit.
+        scenes = conn.execute(
+            "SELECT e.id, e.order_key, e.extra, p.order_key "
+            "FROM entities e LEFT JOIN entities p ON e.parent_id = p.id "
+            "WHERE e.type='scene' AND e.is_deleted=0").fetchall()
+
+        lines: dict[str, dict] = {}
+        for value, schema in by_value.items():
+            lines[value] = {"value": schema.get("value", ""), "schema": schema,
+                            "turns": []}
+        for scene_id, order_key, extra_json, parent_order in scenes:
+            extra = json.loads(extra_json) if extra_json else {}
+            for turn in extra.get("value_turns") or []:
+                if not isinstance(turn, dict):
+                    continue
+                key = str(turn.get("value") or "").strip().lower()
+                line = lines.get(key)
+                if not line:
+                    continue  # a value the plot no longer defines
+                effects = []
+                for effect in turn.get("effects") or []:
+                    if not isinstance(effect, dict):
+                        continue
+                    effects.append({
+                        "character": effect.get("character", ""),
+                        "levels": [
+                            {"conflict_level": lvl.get("conflict_level", ""),
+                             "effect": lvl.get("effect", "")}
+                            for lvl in effect.get("levels") or []
+                            if isinstance(lvl, dict)]})
+                line["turns"].append({
+                    "scene_id": scene_id,
+                    "from": turn.get("from", ""),
+                    "to": turn.get("to", ""),
+                    "effects": effects,
+                    "_sort": (parent_order if parent_order is not None else -1,
+                              order_key, scene_id)})
+        out = []
+        for schema in schemas:
+            line = lines[str(schema.get("value") or "").strip().lower()]
+            line["turns"].sort(key=lambda t: t["_sort"])
+            for turn in line["turns"]:
+                del turn["_sort"]
+            if line["turns"]:
+                out.append(line)
+        return out
+    finally:
+        conn.close()
+
+
 def get_project_memory(project_path: Path) -> dict:
     """Read project.extra.memory from the DB; missing memory is empty."""
     db_path = project_path / ".story" / "story.db"
@@ -521,8 +605,9 @@ def get_project_summary(project_path: Path) -> dict:
                 "characters": chars,
                 "location": scene_loc.get(sid),
                 "milestone": milestone_label(scene_plot_roles.get(sid, []), plot_scopes),
+                "value_turns": s["_extra"].get("value_turns", []),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": []},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": [], "value_turns": []},
                          always_keep={"status"})
 
         # ── Build sequence output ──
@@ -594,6 +679,15 @@ def get_project_summary(project_path: Path) -> dict:
                                   "relationships": []})
 
         # ── Build plot output ──
+        # The value read-back, once per plot: every plot's line needs every
+        # scene's turns, so building it per plot scans the same scenes N times.
+        # `get_project_summary` opens its own connection inside, so this is a
+        # pass over an in-memory snapshot of the same DB rather than a second
+        # connection — ponytail: hoist the scan into one shared pass if a real
+        # project makes this the load's hot path.
+        plot_value_lines = {pid: compute_value_lines(project_path, pid)
+                            for pid in plots}
+
         def _build_plot(plot_id):
             plot = plots[plot_id]
             result = {
@@ -605,13 +699,14 @@ def get_project_summary(project_path: Path) -> dict:
                 "plot_scope": plot["plot_scope"],
                 "value_arc": plot["value_arc"],
                 "characters": plot["characters"],
+                "value_lines": plot_value_lines[plot_id],
             }
             # No setups/complications/crisis/climax/resolutions: view='dramatic_elements' with
             # add_plot carries all four per scene, with the beat's own prose,
             # and story_retrieve returns the plot whole. Repeating the bare
             # scene ids here bought nothing in the view that must stay small.
             return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "",
-                                  "characters": []},
+                                  "characters": [], "value_lines": []},
                          always_keep={"status"})
 
         # ── Build location/world output ──
@@ -1087,6 +1182,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                     d["locations"].append(e[7])
                 d["plots"] = scene_plots.get(eid, [])
                 d["milestone"] = milestone_label(scene_plots.get(eid, []), plot_scopes)
+                d["value_turns"] = extra.get("value_turns", [])
                 scenes.append(d)
 
             elif etype == "location":
@@ -1134,6 +1230,8 @@ def get_dashboard_data(project_path: Path) -> dict:
                     d[field] = _normalize_beats(rel_map.get(eid, {}).get(kind, []))
                 # characters from character list (stored in extra.characters)
                 d["characters"] = extra.get("characters", [])
+                d["value_schemas"] = extra.get("value_schemas", [])
+                d["value_lines"] = compute_value_lines(project_path, eid)
                 plots.append(d)
 
             elif etype == "world":

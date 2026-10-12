@@ -72,6 +72,13 @@ def _sample_value(field, meta):
             # a missing plot. Empty is the shape this field has by default,
             # and the turns themselves are covered by test_value_turns.py.
             return []
+        if field == "value_schemas":
+            # The same rule one level up: an entry declares one value and its
+            # four ladder words, all required. A placeholder string list is
+            # refused by the shape validator, so the sample is a real entry —
+            # the plot fixture in test_value_turns.py defines the same shape.
+            return [{"value": "trust", "p": "loyalty", "c": "complicity",
+                     "cd": "betrayal", "nn": "fanatic love"}]
         if field in ("conflict_levels",):
             return ["inner", "personal"]
         return [f"item-{i}" for i in range(1, 3)]

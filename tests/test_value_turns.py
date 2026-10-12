@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from core.db import compute_value_lines
 from core.entity import validate_scene_value_turns
 from core.writes import create_entity, create_project, edit_entity
 
@@ -263,3 +264,75 @@ class TestRegistrationOnWrite:
                            (eid,)).fetchone()
         conn.close()
         return row[0] if row else None
+
+
+class TestTheReadBack:
+    """`plot.value_lines`: the turns of one plot, read back in story order.
+
+    Registration in Phase 3 guarantees every turn's value has a schema on its
+    plot, so the line can render `from`/`to` and the vocabulary with no
+    lookup of its own. What it adds is ORDER — the scene's position in the
+    story, which is the whole reason to read the line back rather than the
+    turns one scene at a time.
+    """
+
+    def _scenes(self, project, *titles):
+        for title, turns in titles:
+            create_entity(project, "scene", title,
+                          {"title": title, "value_turns": turns})
+
+    def test_the_line_carries_the_schema_and_the_turns(self, project):
+        self._scenes(project, ("s1", [_turn()]))
+        lines = compute_value_lines(project, "main-plot")
+        assert len(lines) == 1
+        line = lines[0]
+        assert line["value"] == "trust"
+        assert line["schema"]["nn"] == "fanatic love"
+        assert line["turns"] == [{
+            "scene_id": "s1", "from": "loyalty", "to": "betrayal",
+            "effects": [{"character": "kael", "levels": [
+                {"conflict_level": "personal",
+                 "effect": "Kael feels betrayed."}]}]}]
+
+    def test_turns_read_in_story_order_not_write_order(self, project):
+        """A scene written later still reads where it happens."""
+        # Written in reverse: the scene that happens FIRST is created LAST.
+        self._scenes(project, ("s3", [_turn(**{"from": "complicity",
+                                               "to": "betrayal"})]),
+                     ("s2", [_turn(**{"from": "loyalty",
+                                      "to": "complicity"})]))
+        lines = compute_value_lines(project, "main-plot")
+        assert [t["scene_id"] for t in lines[0]["turns"]] == ["s2", "s3"]
+
+    def test_a_value_with_no_turns_yet_is_not_a_line(self, project):
+        """The read-back lists what exists: a registered value with no scene
+        turn has no line, not an empty one."""
+        create_entity(project, "scene", "s1", {"title": "S1"})
+        assert compute_value_lines(project, "main-plot") == []
+
+    def test_retrieve_returns_the_computed_field(self, project):
+        """The exposure contract: `value_lines` is computed, not stored, so a
+        retrieve asking for it must still answer."""
+        from tools.story_retrieve import handler as retrieve_handler
+        self._scenes(project, ("s1", [_turn()]))
+        out = json.loads(retrieve_handler({
+            "project": str(project), "entity_type": "plot", "id": ["main-plot"],
+            "fields": ["value_lines"]}, root_path=str(project.parent.parent)))
+        line = out["entities"][0]["fields"]["value_lines"]
+        assert line[0]["value"] == "trust"
+        assert line[0]["turns"][0]["scene_id"] == "s1"
+
+    def test_retrieve_returns_the_stored_field(self, project):
+        from tools.story_retrieve import handler as retrieve_handler
+        out = json.loads(retrieve_handler({
+            "project": str(project), "entity_type": "plot", "id": ["main-plot"],
+            "fields": ["value_schemas"]}, root_path=str(project.parent.parent)))
+        assert out["entities"][0]["fields"]["value_schemas"][0]["p"] == "loyalty"
+
+    def test_a_value_the_plot_no_longer_defines_is_dropped(self, project):
+        """A plot edited to remove a value leaves the scene's turn behind, and
+        the line reads the plot's vocabulary — an orphan turn is not a line."""
+        self._scenes(project, ("s1", [_turn()]))
+        edit_entity(project, "plot", "main-plot",
+                    {"value_schemas": []}, "drop the value")
+        assert compute_value_lines(project, "main-plot") == []
