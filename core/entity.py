@@ -38,7 +38,9 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         if field not in frontmatter:
             warnings.append(f"Missing required field: {field}")
 
-    _validate_shapes(entity_type, frontmatter, warnings)
+    for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
+        if meta.get("sub_fields") and field in frontmatter:
+            _validate_field(entity_type, field, frontmatter[field], meta, warnings)
 
     if entity_type == "character":
         if "story_role" in frontmatter and frontmatter["story_role"] not in VALID_ROLES:
@@ -135,37 +137,90 @@ def value_problems(entity_type: str, frontmatter: dict) -> list[str]:
             if not w.startswith(STRUCTURAL_WARNINGS)]
 
 
-def _validate_shapes(entity_type: str, frontmatter: dict, warnings: list[str]) -> None:
-    """A field that declares a shape must actually hold it.
+# ─── Shape validation ───
 
-    Six fields declare `sub_fields`, and everything downstream trusts that: a
-    `perspectives` string makes `.items()` raise, and a `setups` string is
-    iterated one *character* at a time into relation rows — eight rows pointing
-    at `' '`, `'e'`, `'f'` for the plot "the first scene". Both were measured,
-    and both are silent until something downstream trips.
+# The Python type each declared sub-field `type` means. A `boolean` is listed
+# because `secret` is one; `int` is not accepted where `number` is declared,
+# so a count is a float like everything else in a JSON blob.
+_SUBFIELD_TYPES = {
+    "string": str,
+    "number": (int, float),
+    "boolean": bool,
+}
 
-    Checked here, at stage time, because that is the last point where the agent
-    is still looking at a preview and can be told what is wrong.
+
+def _validate_field(entity_type: str, field: str, value, meta: dict,
+                    warnings: list[str], path: str = "") -> None:
+    """A field that declares `sub_fields` must hold them, at every depth.
+
+    The declaration is one form: a `{type, description}` sub-field dict, plus
+    optional `required`, `enum`, `ref` and nested `sub_fields`. This walks the
+    value against it — container type, entries being objects, required keys,
+    scalar types, enum membership — and recurses into nested `sub_fields`.
+
+    The container message is unchanged on purpose: it names the keys, which is
+    what lets an agent fix the value without a lookup. Per-entry findings carry
+    the path, so a nested one is findable by index rather than by reading the
+    whole field back.
+
+    `object` applies the sub-fields to each VALUE (a `perspectives` dict keyed
+    by character), not to the dict itself: the keys are the entities and the
+    values are the declarations' subjects.
     """
-    for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
-        sub = meta.get("sub_fields")
-        if not sub or field not in frontmatter:
-            continue
-        value = frontmatter[field]
-        keys = ", ".join(sub)
-        if meta["type"] == "list":
-            if not isinstance(value, list):
-                warnings.append(
-                    f"{field} must be a list of objects with keys [{keys}] "
-                    f"— got {type(value).__name__}")
-            elif any(not isinstance(i, dict) for i in value):
-                warnings.append(
-                    f"{field} must be a list of objects with keys [{keys}] "
-                    f"— got a list containing a non-object")
-        elif not isinstance(value, dict):
+    sub_fields = meta.get("sub_fields") or {}
+    keys = ", ".join(sub_fields)
+    at = f"{field}" if not path else f"{path}.{field}"
+
+    if meta["type"] == "list":
+        if not isinstance(value, list):
             warnings.append(
-                f"{field} must be an object with keys [{keys}] "
+                f"{at} must be a list of objects with keys [{keys}] "
                 f"— got {type(value).__name__}")
+            return
+        for i, entry in enumerate(value):
+            entry_at = f"{at}[{i}]"
+            if not isinstance(entry, dict):
+                warnings.append(
+                    f"{at} must be a list of objects with keys [{keys}] "
+                    f"— got a list containing a non-object")
+                continue
+            for key, key_meta in sub_fields.items():
+                _validate_sub_field(entry_at, entry, key, key_meta, warnings)
+    elif meta["type"] == "object":
+        if not isinstance(value, dict):
+            warnings.append(
+                f"{at} must be an object with keys [{keys}] "
+                f"— got {type(value).__name__}")
+            return
+        for key_name, entry in value.items():
+            entry_at = f"{at}.{key_name}"
+            if not isinstance(entry, dict):
+                warnings.append(
+                    f"{at} must be an object with keys [{keys}] "
+                    f"— {key_name} holds a {type(entry).__name__}")
+                continue
+            for key, key_meta in sub_fields.items():
+                _validate_sub_field(entry_at, entry, key, key_meta, warnings)
+
+
+def _validate_sub_field(path: str, entry: dict, key: str, meta: dict,
+                        warnings: list[str]) -> None:
+    """One declared key inside one entry: required, type, enum, recursion."""
+    at = f"{path}.{key}"
+    if key not in entry:
+        if meta.get("required"):
+            warnings.append(f"{at} is required")
+        return
+    value = entry[key]
+    if "enum" in meta and value not in meta["enum"]:
+        warnings.append(
+            f"{at} must be one of: {', '.join(meta['enum'])} — got {value!r}")
+    declared = meta.get("type")
+    if meta.get("sub_fields"):
+        _validate_field("", key, value, meta, warnings, path=path)
+    elif declared in _SUBFIELD_TYPES and not isinstance(value, _SUBFIELD_TYPES[declared]):
+        warnings.append(
+            f"{at} must be a {declared} — got {type(value).__name__}")
 
 
 def _validate_enum(frontmatter: dict, field: str, valid: list[str], warnings: list[str], empty_ok: bool = False) -> None:
@@ -653,43 +708,106 @@ def validate_scene_location(project_path, location: str) -> None:
         conn.close()
 
 
+def _collect_refs(meta: dict, value, path: str, refs: list) -> None:
+    """Every `(ref_type, target, path)` a sub_fields declaration names.
+
+    Walks the value the way `_validate_field` does, so the paths in a
+    reference error match the paths in a shape finding — an agent fixing
+    `plot_roles[1].plot` sees the same name in both.
+    """
+    if meta["type"] == "list":
+        if not isinstance(value, list):
+            return
+        for i, entry in enumerate(value):
+            if isinstance(entry, dict):
+                _collect_refs_entry(meta.get("sub_fields") or {}, entry,
+                                    f"{path}[{i}]", refs)
+    elif meta["type"] == "object":
+        if not isinstance(value, dict):
+            return
+        for key, entry in value.items():
+            if isinstance(entry, dict):
+                _collect_refs_entry(meta.get("sub_fields") or {}, entry,
+                                    f"{path}.{key}", refs)
+
+
+def _collect_refs_entry(sub_fields: dict, entry: dict, path: str, refs: list) -> None:
+    for key, key_meta in sub_fields.items():
+        if key not in entry:
+            continue
+        at = f"{path}.{key}"
+        if key_meta.get("sub_fields"):
+            _collect_refs(key_meta, entry[key], at, refs)
+        elif key_meta.get("ref"):
+            refs.append((key_meta["ref"], str(entry[key]), at))
+
+
+def check_references(project_path, entity_type: str, frontmatter: dict) -> None:
+    """Raise ValueError on the first `ref` that names no existing record.
+
+    Reads the database, so this is write-time only — the same constraint
+    `validate_scene_location` and `validate_arc_parents` carry. A `ref` is a
+    slug of another entity, and an unresolvable one is invisible to every
+    reader: they filter on `to_id`, so the scene looks like it serves no plot
+    and the plot looks unpopulated, with nothing to say so.
+
+    Two declaration forms: a field-level `ref` (a flat list of slugs, like
+    `plot.characters`) and a sub-field `ref` (nested inside entries, like
+    `plot_roles.plot`).
+    """
+    from core.db import get_db
+    from .constants import ENTITY_SCHEMAS
+
+    refs = []
+    for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
+        if field not in frontmatter:
+            continue
+        value = frontmatter[field]
+        if meta.get("ref"):
+            if isinstance(value, list):
+                for i, item in enumerate(value):
+                    refs.append((meta["ref"], str(item), f"{field}[{i}]"))
+            elif value:
+                refs.append((meta["ref"], str(value), field))
+        elif meta.get("sub_fields"):
+            _collect_refs(meta, value, field, refs)
+    if not refs:
+        return
+    conn = get_db(project_path)
+    try:
+        for ref_type, target, path in refs:
+            if not conn.execute(
+                    "SELECT 1 FROM entities WHERE id=? AND type=?",
+                    (target, ref_type)).fetchone():
+                raise ValueError(f"{ref_type.capitalize()} not found: {target} "
+                                 f"(at {path})")
+    finally:
+        conn.close()
+
+
 def validate_scene_plot_roles(project_path, entries) -> None:
-    """Raise ValueError if a scene's `plot_roles` names a plot that doesn't exist,
-    or a role that is not a dramatic plot role.
+    """Raise ValueError if a scene's `plot_roles` holds an invalid role or
+    names no plot.
 
-    Same class of defect as an unresolvable `location`: a role recorded against
-    a plot that does not exist is invisible to every reader (they filter on
-    `to_id`), so the scene looks like it serves no plot and the plot looks
-    unpopulated — with nothing to say so.
-
-    Ordering note: this reads the DB on write, so a plot created in the SAME
-    draft is not visible here. Commit the plot first — the same constraint
-    `validate_scene_location` has.
+    The plot existence check is the generic reference check (`ref: "plot"` on
+    `plot_roles.plot`); what remains here is the rule the schema cannot say:
+    the role must be one of the six dramatic plot roles, and an entry must
+    name a plot at all — `check_references` skips an absent key, and an entry
+    with no plot is not a row, it is a reference that resolves to nothing.
     """
     if not isinstance(entries, list):
         return
-    from core.db import get_db
-    conn = get_db(project_path)
-    try:
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            role = str(entry.get("role") or "")
-            if role not in PLOT_ROLES:
-                raise ValueError(
-                    f"Invalid plot role: {role or '(empty)'}. "
-                    f"One of: {', '.join(PLOT_ROLES)}")
-            plot = str(entry.get("plot") or "")
-            if not plot:
-                raise ValueError(
-                    f"plot_roles entry needs a plot slug: {entry!r}")
-            row = conn.execute(
-                "SELECT id FROM entities WHERE id=? AND type='plot'", (plot,)
-            ).fetchone()
-            if not row:
-                raise ValueError(f"Plot not found: {plot}")
-    finally:
-        conn.close()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        role = str(entry.get("role") or "")
+        if role not in PLOT_ROLES:
+            raise ValueError(
+                f"Invalid plot role: {role or '(empty)'}. "
+                f"One of: {', '.join(PLOT_ROLES)}")
+        if not entry.get("plot"):
+            raise ValueError(
+                f"plot_roles entry needs a plot slug: {entry!r}")
 
 
 def validate_scene_dramatic_role(dramatic_role, plot_roles) -> None:
@@ -752,23 +870,5 @@ def validate_arc_parents(project_path, character: str, scene: str) -> None:
             ).fetchone()
             if not row:
                 raise ValueError(f"Scene not found: {scene}")
-    finally:
-        conn.close()
-
-
-def validate_plot_characters(project_path, characters: list) -> None:
-    """Raise ValueError if any character slug doesn't exist in DB."""
-    from core.db import get_db
-    if not characters:
-        return
-    conn = get_db(project_path)
-    try:
-        for char_slug in characters:
-            row = conn.execute(
-                "SELECT id FROM entities WHERE id=? AND type='character'",
-                (char_slug,),
-            ).fetchone()
-            if not row:
-                raise ValueError(f"Character not found: {char_slug}")
     finally:
         conn.close()

@@ -331,11 +331,13 @@ class TestSchema:
         assert any("plot_roles must be a list" in w for w in warnings), warnings
         assert any("plot, role, description" in w for w in warnings), warnings
 
-    def test_a_role_outside_the_six_is_not_caught_by_the_shape_check(self):
-        """The shape is fine; only `validate_scene_plot_roles` can judge the
-        role, because the same call also resolves the plot. Stated so the
-        division of labour is not mistaken for a gap."""
+    def test_a_role_outside_the_six_is_caught_by_the_shape_check(self):
+        """The enum is declared, so the shape validator judges it.
+
+        `validate_scene_plot_roles` still checks the same enum at write time —
+        that is not duplication: it raises, and the shape validator warns.
+        """
         from core.entity import validate_entity
         warnings = validate_entity("scene", {
             "plot_roles": [{"plot": "p", "role": "transition", "description": "d"}]})
-        assert not [w for w in warnings if "plot_roles" in w]
+        assert any("role" in w and "one of" in w for w in warnings), warnings

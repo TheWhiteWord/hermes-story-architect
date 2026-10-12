@@ -188,7 +188,10 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
 
         # Parent validation for scene (act_id consistency, location exists)
         if entity_type == "scene":
-            from .entity import validate_scene_act_id, validate_scene_location
+            from .entity import (check_references, validate_scene_act_id,
+                                 validate_scene_dramatic_role,
+                                 validate_scene_location,
+                                 validate_scene_plot_roles)
             sequence_id = merged.get("sequence_id", "")
             act_id = merged.get("act_id", "")
             if sequence_id:
@@ -196,16 +199,15 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                 if act_id:
                     validate_scene_act_id(project_path, sequence_id, act_id)
             validate_scene_location(project_path, merged.get("location", ""))
-            from core.entity import (validate_scene_dramatic_role,
-                                     validate_scene_plot_roles)
             validate_scene_plot_roles(project_path, merged.get("plot_roles", []))
             validate_scene_dramatic_role(merged.get("dramatic_role", ""),
                                          merged.get("plot_roles", []))
+            check_references(project_path, entity_type, merged)
 
         # Validate plot characters reference existing entities
         if entity_type == "plot":
-            from .entity import validate_plot_characters
-            validate_plot_characters(project_path, merged.get("characters", []))
+            from .entity import check_references
+            check_references(project_path, entity_type, merged)
 
         # Auto-order if not provided
         if entity_type in ("scene", "sequence") and merged.get("order", 0) == 0 and columns["parent_id"]:
@@ -471,8 +473,11 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
         # delete-then-reinsert contract: an entry removed from `plot_roles`
         # leaves no row behind. See entity.plot_role_relations.
         if entity_type == "scene" and "plot_roles" in data:
-            from .entity import plot_role_relations, validate_scene_plot_roles
+            from .entity import (check_references, plot_role_relations,
+                                 validate_scene_plot_roles)
             validate_scene_plot_roles(project_path, data["plot_roles"])
+            check_references(project_path, entity_type,
+                             {"plot_roles": data["plot_roles"]})
             conn.execute(
                 "DELETE FROM relations WHERE to_id=? AND kind LIKE 'plot_%'",
                 (entity_id,),

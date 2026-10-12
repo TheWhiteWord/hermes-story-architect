@@ -106,7 +106,7 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
         "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
-        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of characters involved as protagonist/s in this plot"},
+        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of characters involved as protagonist/s in this plot", "ref": "character"},
         "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
         "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup (required for sub plots only)"},
@@ -122,12 +122,12 @@ ENTITY_SCHEMAS = {
         # complications is plural and sits third, not last. A test pins the
         # two so they cannot drift, because the field names are not the role
         # names.
-        "setups": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is established (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "inciting_incident": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is incited (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "setups": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is established (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "inciting_incident": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is incited (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
@@ -176,8 +176,8 @@ ENTITY_SCHEMAS = {
             "type": "list", "default": [], "optional": True,
             "description": "Which plots run through this scene, and in what role. One entry per plot. This is where a plot role is written — never on the plot itself.",
             "sub_fields": {
-                "plot": {"type": "string", "description": "Slug of an existing plot"},
-                "role": {"type": "string", "description": "One of: setup, inciting_incident, complication, crisis, climax, resolution"},
+                "plot": {"type": "string", "description": "Slug of an existing plot", "required": True, "ref": "plot"},
+                "role": {"type": "string", "description": "One of: setup, inciting_incident, complication, crisis, climax, resolution", "required": True, "enum": PLOT_ROLES},
                 "description": {"type": "string", "description": "What this scene does for that plot"},
             },
         },

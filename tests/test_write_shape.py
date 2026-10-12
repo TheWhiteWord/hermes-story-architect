@@ -1,8 +1,7 @@
-"""D4: a field that declares a shape must hold it at write time.
+"""A field that declares a shape must hold it at write time.
 
-Six fields declare `sub_fields`, and before this nothing checked the value
-against that declaration. Two measured consequences, both silent until
-something downstream tripped:
+Before this nothing checked a value against its `sub_fields` declaration. Two
+measured consequences, both silent until something downstream tripped:
 
 * `plot.setups: "the first scene"` was iterated one **character** at a time into
   relation rows — eight rows pointing at `' '`, `'e'`, `'f'` — and the commit
@@ -12,6 +11,9 @@ something downstream tripped:
 
 The read side (B7/B9/D1) shows the shape; this is the other half — catching the
 mistake when the display is not consulted.
+
+Driven from the schema, so a field added with `sub_fields` is covered by the
+walk below without anyone writing a case for it.
 """
 import json
 import sqlite3
@@ -20,6 +22,7 @@ from pathlib import Path
 import pytest
 
 
+from core.constants import ENTITY_SCHEMAS
 from core.entity import validate_entity
 from core.writes import create_entity, create_project
 
@@ -38,6 +41,44 @@ def _relations(project):
     conn.close()
     return rows
 
+
+# ─── Schema-driven: every field with sub_fields is checked ──────────────────
+#
+# The walk derives its cases from ENTITY_SCHEMAS, so a field declared with
+# `sub_fields` is covered without a hand-written case. The one thing the test
+# supplies per field is a wrong value: the container type declared, fed the
+# other container or a scalar.
+
+def _fields_with_sub_fields():
+    """(entity_type, field, meta) for every field that declares sub_fields."""
+    return [(et, field, meta)
+            for et, fields in ENTITY_SCHEMAS.items()
+            for field, meta in fields.items()
+            if meta.get("sub_fields")]
+
+
+SUBFIELD_FIELDS = _fields_with_sub_fields()
+
+
+@pytest.mark.parametrize("entity_type, field, meta", SUBFIELD_FIELDS)
+def test_a_wrong_container_type_is_reported(entity_type, field, meta):
+    """A list where an object is declared, and vice versa — both reported."""
+    wrong = "just a string" if meta["type"] == "list" else "not an object"
+    warnings = validate_entity(entity_type, {field: wrong})
+    assert any(f"{field} must be" in w for w in warnings), \
+        f"{entity_type}.{field} accepted a {meta['type']} as {type(wrong).__name__}"
+
+
+@pytest.mark.parametrize("entity_type, field, meta", SUBFIELD_FIELDS)
+def test_a_correct_container_is_not_reported(entity_type, field, meta):
+    """The container itself is fine — no finding about the field's type."""
+    good = [] if meta["type"] == "list" else {}
+    warnings = validate_entity(entity_type, {field: good})
+    assert not [w for w in warnings if field in w], \
+        f"{entity_type}.{field} reported on an empty {meta['type']}: {warnings}"
+
+
+# ─── Specific behaviours, driven from the schema ────────────────────────────
 
 def test_a_string_where_a_list_is_declared_is_reported():
     warnings = validate_entity("plot", {"setups": "the first scene"})
@@ -92,6 +133,50 @@ def test_a_string_writes_no_relation_rows(vault):
     assert len(rows) == before, f"a string wrote relation rows: {rows}"
     assert all(len(to_id) > 1 for _, to_id, _ in rows), \
         f"single-character relation targets: {rows}"
+
+
+# ─── Schema consistency: every declaration is well-formed ───────────────────
+
+def test_every_sub_field_entry_has_a_type():
+    """A sub-field without a `type` cannot be validated — the declaration
+    itself is the bug, and it is silent."""
+    missing = [
+        f"{et}.{field}.{key}"
+        for et, field, meta in SUBFIELD_FIELDS
+        for key, key_meta in meta["sub_fields"].items()
+        if not isinstance(key_meta, dict) or "type" not in key_meta
+    ]
+    assert not missing, f"sub_fields entries with no type: {sorted(missing)}"
+
+
+def test_every_enum_is_non_empty():
+    empty = [
+        f"{et}.{field}.{key}"
+        for et, field, meta in SUBFIELD_FIELDS
+        for key, key_meta in meta["sub_fields"].items()
+        if key_meta.get("enum") is not None and not key_meta["enum"]
+    ]
+    assert not empty, f"sub_fields with an empty enum: {sorted(empty)}"
+
+
+def test_every_ref_names_a_valid_entity_type():
+    bad = [
+        f"{et}.{field}.{key}"
+        for et, field, meta in SUBFIELD_FIELDS
+        for key, key_meta in meta["sub_fields"].items()
+        if key_meta.get("ref") and key_meta["ref"] not in ENTITY_SCHEMAS
+    ]
+    assert not bad, f"sub_fields with a ref to an unknown type: {sorted(bad)}"
+
+
+def test_every_field_level_ref_names_a_valid_entity_type():
+    bad = [
+        f"{et}.{field}"
+        for et, fields in ENTITY_SCHEMAS.items()
+        for field, meta in fields.items()
+        if meta.get("ref") and meta["ref"] not in ENTITY_SCHEMAS
+    ]
+    assert not bad, f"fields with a ref to an unknown type: {sorted(bad)}"
 
 
 # ─── One dict→row rule, on all three write paths ─────────────────────────────
@@ -201,7 +286,6 @@ CREATE_PATH_CASES = [
 
 def _writable_relation_fields():
     """Every relation field a create may write — computed ones are read-only."""
-    from core.constants import ENTITY_SCHEMAS
     from core.entity import relation_fields
     # `computed` only, and via .get: writes.py accepts a relation field that has no
     # schema entry (valid = schema | sections | rel_fields), so filtering on schema

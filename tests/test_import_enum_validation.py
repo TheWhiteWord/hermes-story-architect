@@ -12,6 +12,7 @@ VALUE checks are fatal to an import; the structural ones are build-order
 constraints (a required field not yet written, a relationship still missing
 one of its two perspectives) and a note is allowed to be mid-shape. Filtering
 too much turns the check into a no-op that still looks present.
+
 """
 import json
 import shutil
@@ -62,6 +63,31 @@ def import_project(tmp_path, mutate=None):
     return run_import(proj, tmp_path)
 
 
+def _strip_yaml_block(text: str, key: str) -> str:
+    """Drop a top-level YAML key and its whole block value.
+
+    `plot_roles:` is a block sequence, whose items sit at the SAME indentation
+    as every other top-level key — so "indented under the key" is not the
+    boundary. An item is any line that is another mapping entry (`key:`), a
+    sequence item (`- `), or a continuation (indented); the value ends at the
+    first line that is none of those. Removing only the `key:` line leaves the
+    items dangling, which is a YAML syntax error: it is what made the three
+    `test_every_current_value_still_imports` cases fail on a document no
+    parser could read, with the check itself never once running.
+    """
+    lines = text.splitlines()
+    fm_end = lines.index("---", 1)
+    start = lines.index(f"{key}:", 0, fm_end)
+    end = start + 1
+    while end < fm_end:
+        line = lines[end]
+        if line.startswith("- ") or line.startswith(" ") or not line.strip():
+            end += 1
+            continue
+        break
+    return "\n".join(lines[:start] + lines[end:fm_end] + lines[fm_end:])
+
+
 def set_dramatic_role(value, clear_roles=False):
     def mutate(proj):
         note = proj / "scenes" / "Central Room - Day.md"
@@ -73,9 +99,7 @@ def set_dramatic_role(value, clear_roles=False):
             # non-event is refused by the CROSS-FIELD rule — correctly, and
             # tested in test_scene_dramatic_role.py. These cases are about the
             # value vocabulary, so the roles go too.
-            text = "\n".join(
-                line for line in text.splitlines()
-                if not line.startswith("plot_roles:"))
+            text = _strip_yaml_block(text, "plot_roles")
         note.write_text(text)
     return mutate
 
