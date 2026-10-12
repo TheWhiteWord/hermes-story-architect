@@ -58,39 +58,8 @@ memory categories: `decisions`, `open_questions`, `continuity_warnings`."
 
 ## Checklist
 
-- [x] Theory guidance added to skill
-- [x] Planning instruction added
-- [x] Verification layer guidance added
-- [x] Skill file saved
-- [x] Full suite green (skill is not tested, but verify nothing breaks)
-
-## Final brief
-
-Updated two files to remove stale descriptions of fields deleted in the
-Issue A refactor, and added the theory guidance from design §4.2–4.3.
-
-**scene-design.md** — two sections had drifted from the code:
-
-1. "What the scene is for" bullet: `dramatic_role` no longer carries
-   structural roles (setup, complication, crisis, climax, resolution).
-   It now only says whether a scene serves a plot (`plot_role`,
-   `transition`, `non-event`). The structural roles live in `plot_roles`,
-   one entry per plot, with six roles including `inciting_incident`.
-   Removed all references to the deleted `is_inciting_incident`,
-   `is_sequence_climax`, `is_act_climax`, `is_story_climax` flags.
-
-2. "The couplings" section: dropped the two bullets about
-   `climax_scene_id` pointers and the incident flag/pointer pattern —
-   both removed in the refactor. Remaining couplings (beat/cast,
-   heading/Fountain first line) are unchanged.
-
-**NOTES_SKILL.md** — appended the Issue A skill update notes:
-
-- Theory guidance (7 rules from design §4.2–4.3)
-- Planning instruction (record plans in entity sections, never name a scene)
-- Verification layer guidance (findings go in `decisions`,
-  `open_questions`, `continuity_warnings`)
-- Change log for scene-design.md with verification against `core/constants.py`
-  and `core/entity.py`
-
-Skill files are not tested; the suite stays green without changes.
+- [ ] Theory guidance added to skill
+- [ ] Planning instruction added
+- [ ] Verification layer guidance added
+- [ ] Skill file saved
+- [ ] Full suite green (skill is not tested, but verify nothing breaks)

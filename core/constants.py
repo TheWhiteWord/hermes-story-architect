@@ -106,10 +106,10 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
         "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
-        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
+        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of characters involved as protagonist/s in this plot"},
         "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
         "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
-        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
+        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup (required for sub plots only)"},
         # The six role fields are READ-ONLY: they are the same `plot_<role>`
         # rows the scene writes as `plot_roles`, read back from the plot side.
         # The agent records a role where it is writing the scene, and never has

@@ -58,6 +58,7 @@ tests/test_story_describe.py
 tests/test_story_draft_tool.py
 tests/test_story_load_views.py
 tests/test_story_memory.py
+tests/test_story_view_subplot_milestones.py
 tests/test_unfilled_column_fields.py
 tests/test_unfilled_fields.py
 tests/test_unfilled_truncation.py
