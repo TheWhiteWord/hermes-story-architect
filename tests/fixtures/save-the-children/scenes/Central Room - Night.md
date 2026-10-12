@@ -1,22 +1,21 @@
 ---
 act_id: act-1
-characters: ['kael']
-conflict_levels: ['personal']
+characters:
+- kael
 dramatic_role: plot_role
 heading: INT. THE CENTRAL ROOM - NIGHT
 id: central-room-night
 location: the-central-room
 order: 2
-plot_roles: [{'description': 'The Administrator makes its final offer. Kael refuses.', 'plot': 'the-resistance', 'role': 'climax'}]
+plot_roles:
+- description: The Administrator makes its final offer. Kael refuses.
+  plot: the-resistance
+  role: climax
 sequence_id: seq-discovery
-shift: doubt → chosen trust
 status: drafted
 time_of_day: NIGHT
 title: Central Room - Night
 type: scene
-value_at_close: positive
-value_at_open: negative
-y: 0.6
 ---
 
 ## Content

@@ -1,22 +1,22 @@
 ---
 act_id: act-1
-characters: ['kael', 'mira']
-conflict_levels: ['extra-personal']
+characters:
+- kael
+- mira
 dramatic_role: plot_role
 heading: EXT. THE CORE - DAY
 id: the-core-day
 location: the-garden
 order: 3
-plot_roles: [{'description': 'The children emerge into the real world for the first time.', 'plot': 'the-resistance', 'role': 'resolution'}]
+plot_roles:
+- description: The children emerge into the real world for the first time.
+  plot: the-resistance
+  role: resolution
 sequence_id: seq-discovery
-shift: fragile trust → trust earned
 status: written
 time_of_day: DAY
 title: The Core - Day
 type: scene
-value_at_close: positive
-value_at_open: positive
-y: 0.4
 ---
 
 ## Content

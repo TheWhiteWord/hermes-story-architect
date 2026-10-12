@@ -5,8 +5,6 @@ order: 1
 status: in-progress
 title: Act One
 type: act
-value_at_close: negative
-value_at_open: positive
 ---
 
 ## Summary

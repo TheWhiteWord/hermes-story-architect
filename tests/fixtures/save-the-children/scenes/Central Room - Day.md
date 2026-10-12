@@ -1,22 +1,25 @@
 ---
 act_id: act-1
-characters: ['kael', 'mira']
-conflict_levels: ['inner', 'personal']
+characters:
+- kael
+- mira
 dramatic_role: plot_role
 heading: INT. THE CENTRAL ROOM - DAY
 id: central-room-day
 location: the-central-room
 order: 1
-plot_roles: [{'description': "Kael discovers the door isn't locked — it was never locked.", 'plot': 'the-resistance', 'role': 'inciting_incident'}, {'description': 'The scientists built the Institute to protect the children.', 'plot': 'the-scientists-last-stand', 'role': 'setup'}]
+plot_roles:
+- description: Kael discovers the door isn't locked — it was never locked.
+  plot: the-resistance
+  role: inciting_incident
+- description: The scientists built the Institute to protect the children.
+  plot: the-scientists-last-stand
+  role: setup
 sequence_id: seq-discovery
-shift: blind trust → first doubt
 status: drafted
 time_of_day: DAY
 title: Central Room - Day
 type: scene
-value_at_close: negative
-value_at_open: positive
-y: -0.3
 ---
 
 ## Content

@@ -7,8 +7,6 @@ purpose: Kael discovers the truth about the door and chooses to act.
 status: in-progress
 title: The Discovery
 type: sequence
-value_at_close: negative
-value_at_open: positive
 ---
 
 ## Summary
