@@ -18,12 +18,9 @@ SCHEMA = {
         },
         "view": {
             "type": "string",
-            "enum": ["arc", "story_value", "dramatic_elements", "relationship", "unfilled"],
+            "enum": ["arc", "dramatic_elements", "relationship", "unfilled"],
             "description": "Optional focused view. Omit for the base structural map. "
                            "'arc' = one character's arc beats, pass character. "
-                           "'story_value' = the story's own value across the structure "
-                           "(project → act → sequence → scene): each container's charge, and on "
-                           "each scene the shift and curve point. "
                            "'dramatic_elements' = per-scene dramatic roles and milestones. "
                            "'relationship' = the full relationship graph with perspectives. "
                            "'unfilled' = what is still incomplete, to answer 'what next?'."
@@ -34,7 +31,7 @@ SCHEMA = {
         },
         "act": {
             "type": "string",
-            "description": "For view='dramatic_elements' and 'story_value': limit to one act id. "
+            "description": "For view='dramatic_elements': limit to one act id. "
                            "Defaults to all."
         },
         "field": {
@@ -110,15 +107,13 @@ def _extended_view(conn, project_path, view: str, args: dict):
     """One focused domain. Returns None for an unknown view name."""
     if view == "arc":
         return _view_arc(conn, args)
-    if view == "story_value":
-        return _view_story_value(conn, args)
     if view == "dramatic_elements":
         return _view_dramatic_elements(conn, args)
     if view == "relationship":
         return _view_relationship(conn)
     if view == "unfilled":
         return _view_unfilled(project_path, args)
-    return {"error": f"Unknown view: {view}. Valid: arc, story_value, "
+    return {"error": f"Unknown view: {view}. Valid: arc, "
                      f"dramatic_elements, relationship, unfilled."}
 
 
@@ -145,106 +140,6 @@ def _view_arc(conn, args: dict) -> dict:
                          "beats": beats})
     return {"view": "arc", "arcs": arcs,
             "hint": "Pass character=<id> for one arc in full."}
-
-
-# A scene is where a turn actually happens, so it carries the reading of that
-# turn (`shift`) and the point the curve passes through (`y`). An act or a
-# sequence states an *expectation* — where the stretch is meant to land — which
-# is knowable in advance and has no observed turn behind it, so it takes the
-# charges only. The project states neither: it opens and closes the story.
-_CONTAINER_CHARGES = ("value_at_open", "value_at_close")
-_SCENE_CURVE = _CONTAINER_CHARGES + ("shift", "y")
-
-
-def _value_fields(extra: dict, entity_type: str, fields: tuple) -> dict:
-    """The named value fields of one story entity, default-silent.
-
-    No value *word* here: the project's story_value is stated once and inherited
-    downward, so repeating it per container would be a copy, not data.
-
-    A field still at its schema default is reported as absent rather than as its
-    placeholder — the same rule every payload builder in core/db.py follows via
-    `_omit`. Printing a placeholder on 40 unfilled scenes is 800 chars of
-    noise that reads as if the shift had been written down.
-
-    A number at its default reports "" too, not 0.0. 0.0 is a charge a writer can
-    legitimately choose; an unrecorded curve point is not the same statement, and
-    the graph already honours that (get_dashboard_data omits the key, so
-    storySeries skips the point). Emitting 0.0 here made the view contradict the
-    plot it feeds.
-    """
-    from core.constants import ENTITY_SCHEMAS
-
-    def at_default(field: str):
-        """The stored value, or the type's empty when it is still the default."""
-        default = ENTITY_SCHEMAS[entity_type][field]["default"]
-        value = extra.get(field, default)
-        return "" if value == default else value
-
-    return {field: at_default(field) for field in fields}
-
-
-def _view_story_value(conn, args: dict) -> dict:
-    """The value's journey: project, then act → sequence → scene.
-
-    This view owns the value at every level — the base structural map carries
-    only the project's own value, so nothing is lost by not repeating it there.
-    Act and sequence state an expectation: where the stretch is meant to land,
-    knowable while the structure is being designed. Only scenes record what
-    happened, so only they carry the reading of the turn (`shift`) and the
-    ending charge (`y`) the story-value curve is drawn through.
-    """
-    act_filter = args.get("act")
-
-    scene_sql = ("SELECT id, parent_id, order_key, name, extra FROM entities "
-                 "WHERE type='scene' AND is_deleted=0 ORDER BY order_key, id")
-    scenes_by_seq: dict[str, list] = {}
-    for scene_id, parent_id, _ok, name, extra_json in conn.execute(scene_sql).fetchall():
-        extra = json.loads(extra_json or "{}")
-        scenes_by_seq.setdefault(parent_id, []).append({
-            "id": scene_id,
-            "title": name,
-            **_value_fields(extra, "scene", _SCENE_CURVE),
-        })
-
-    seq_sql = ("SELECT id, parent_id, name, order_key, extra FROM entities "
-               "WHERE type='sequence' AND is_deleted=0 ORDER BY order_key, id")
-    seq_by_act: dict[str, list] = {}
-    for seq_id, parent_id, name, _ok, extra_json in conn.execute(seq_sql).fetchall():
-        extra = json.loads(extra_json or "{}")
-        seq_by_act.setdefault(parent_id, []).append({
-            "id": seq_id,
-            "title": name,
-            **_value_fields(extra, "sequence", _CONTAINER_CHARGES),
-            "scenes": scenes_by_seq.get(seq_id, []),
-        })
-
-    sql = ("SELECT id, name, order_key, extra FROM entities "
-           "WHERE type='act' AND is_deleted=0 "
-           "ORDER BY order_key, id")
-    acts = []
-    for act_id, title, _order_key, extra_json in conn.execute(sql).fetchall():
-        if act_filter and act_id != act_filter:
-            continue
-        extra = json.loads(extra_json or "{}")
-        acts.append({
-            "id": act_id,
-            "title": title,
-            **_value_fields(extra, "act", _CONTAINER_CHARGES),
-            "sequences": seq_by_act.get(act_id, []),
-        })
-
-    project = conn.execute(
-        "SELECT extra FROM entities WHERE type='project' AND is_deleted=0 LIMIT 1").fetchone()
-    pro = json.loads(project[0]) if project and project[0] else {}
-    return {
-        "view": "story_value",
-        "act": act_filter or "all",
-        "story_value": pro.get("story_value", ""),
-        "story_value_at_open": pro.get("story_value_at_open", ""),
-        "story_value_at_close": pro.get("story_value_at_close", ""),
-        "acts": acts,
-    }
 
 
 def _view_dramatic_elements(conn, args: dict) -> dict:
@@ -449,7 +344,7 @@ def _view_unfilled(project_path, args: dict) -> dict:
     high because nothing writes it, not because it matters more. To ask about
     a specific one, filter — a filtered answer is never truncated.
     """
-    from core.db import get_unfilled_map, get_value_drift
+    from core.db import get_unfilled_map
 
     unfilled = get_unfilled_map(project_path)
     field = args.get("field")
@@ -470,12 +365,6 @@ def _view_unfilled(project_path, args: dict) -> dict:
         "gap_types": len(items),
         "unfilled": shown,
     }
-    # A container with no charge is already a gap row above. This adds the part
-    # that row cannot state: that its children do carry one, so the gap is a
-    # scope decision rather than an untouched act.
-    drift = get_value_drift(project_path)
-    if drift:
-        out["value_drift"] = drift
     if len(items) > UNFILLED_LIMIT:
         out["truncated"] = True
         out["shown_types"] = UNFILLED_LIMIT

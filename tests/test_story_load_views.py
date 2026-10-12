@@ -214,18 +214,6 @@ class TestArcView:
         assert "note" in r
 
 
-class TestStoryValueView:
-    def test_returns_value_at_project_and_act_level(self, project):
-        r = load(project, view="story_value")
-        assert r["story_value"] == "Trust"
-        assert r["story_value_at_open"] and r["story_value_at_close"]
-        assert [a["id"] for a in r["acts"]] == ["act-1"]
-
-    def test_act_filter_narrows(self, project):
-        assert load(project, view="story_value", act="act-1")["acts"]
-        assert load(project, view="story_value", act="act-99")["acts"] == []
-
-
 class TestDramaticElementsView:
     def test_nests_scenes_under_sequence_under_act(self, project):
         scenes = (load(project, view="dramatic_elements")["acts"][0]
@@ -406,10 +394,10 @@ class TestDispatch:
     def test_unknown_view_lists_the_valid_ones(self, project):
         r = load(project, view="nonsense")
         assert "unfilled" in r["error"]
-        for v in ("arc", "story_value", "dramatic_elements", "relationship"):
+        for v in ("arc", "dramatic_elements", "relationship"):
             assert v in r["error"]
 
     def test_every_view_is_documented_in_the_schema(self, project):
         from tools.story_load import SCHEMA
         assert set(SCHEMA["properties"]["view"]["enum"]) == {
-            "arc", "story_value", "dramatic_elements", "relationship", "unfilled"}
+            "arc", "dramatic_elements", "relationship", "unfilled"}

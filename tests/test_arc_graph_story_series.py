@@ -83,7 +83,7 @@ def render(story, tail=None, setup=None):
 def _story(**kw):
     """A minimal DASH.story: one project header, acts, scenes, no characters."""
     return {
-        "project": {"act_count": 3, "story_value": "Trust"},
+        "project": {"act_count": 3},
         "acts": [], "scenes": [], "characters": [],
         **kw,
     }
@@ -110,32 +110,6 @@ def story_project():
     finally:
         core.config.load_plugin_config = old
     return data
-
-
-def test_dashboard_payload_gives_scenes_a_plottable_y(story_project):
-    """The curve needs data the backend actually sends.
-
-    `_entity_dict` merges `extra` to top level, so this holds structurally —
-    but the graph is dead without it, and nothing else asserts it for scenes.
-    """
-    ys = [s.get("y") for s in story_project["scenes"]]
-    assert any(isinstance(y, (int, float)) for y in ys), ys
-    assert any(s.get("shift") for s in story_project["scenes"])
-
-
-def test_story_series_is_a_polyline_through_scenes(story_project):
-    svg = render(story_project)
-    assert 'class="arc-line story-line"' in svg
-    assert svg.count("story-point") >= 2, "story curve needs at least two points"
-
-
-def test_story_points_carry_the_tooltip_data(story_project):
-    """`shift` already has a tooltip element — verify it is fed, not added."""
-    svg = render(story_project)
-    for circle in (seg for seg in svg.split("<circle") if "story-point" in seg):
-        assert "data-shift=" in circle
-        assert "data-y=" in circle
-        assert "data-label=" in circle
 
 
 def test_story_points_are_in_story_order():
@@ -290,32 +264,6 @@ def test_character_warnings_still_fire():
     )
     warnings = render(story, tail="els['arc-warnings'].innerHTML")
     assert "flat" in warnings, warnings
-
-
-def test_character_and_story_series_coexist(story_project):
-    """One engine, two sources: both lines in one SVG."""
-    svg = render(story_project)
-    assert "story-line" in svg
-    assert 'class="arc-line' in svg
-    assert svg.count("<polyline") + svg.count("<path") >= 2
-
-
-def test_the_story_arc_can_be_muted(story_project):
-    """Muting the story must drop its line and its points, and nothing else.
-
-    The character arcs already mute this way; the story curve is the other half
-    of one graph, so it needs the same switch — otherwise a story line crossing
-    six character lines cannot be read on its own.
-    """
-    on = render(story_project)
-    assert "story-line" in on and "story-point" in on
-
-    off = render(story_project, setup="DASH.arcStoryMuted = true;")
-    assert "story-line" not in off, "the story polyline survived muting"
-    assert "story-point" not in off, "story points survived muting"
-    # Muting one track must not empty the graph or silence the other.
-    assert 'class="arc-line' in off, "muting the story removed the character arcs"
-    assert "arc-beat-dot" in off, "muting the story removed the beat dots"
 
 
 def test_a_muted_story_arc_does_not_claim_the_project_has_no_curve():

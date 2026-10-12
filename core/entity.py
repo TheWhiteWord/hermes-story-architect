@@ -62,29 +62,20 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "value_arc", VALUE_ARCS, warnings, empty_ok=True)
 
     if entity_type == "project":
-        _validate_enum(frontmatter, "story_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "story_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
 
     if entity_type == "scene":
         _validate_enum(frontmatter, "status", SCENE_STATUSES, warnings)
         _validate_enum(frontmatter, "time_of_day", SCENE_TIMES_OF_DAY, warnings, empty_ok=True)
         _validate_enum(frontmatter, "dramatic_role", SCENE_DRAMATIC_ROLES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
-        _validate_y(frontmatter, warnings)
 
     if entity_type == "sequence":
         _validate_enum(frontmatter, "status", SEQUENCE_STATUSES, warnings)
-        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 
     if entity_type == "act":
         _validate_enum(frontmatter, "status", ACT_STATUSES, warnings)
-        _validate_enum(frontmatter, "value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 
@@ -254,8 +245,8 @@ def _validate_enum(frontmatter: dict, field: str, valid: list[str], warnings: li
 def _validate_y(frontmatter: dict, warnings: list[str]) -> None:
     """Append warnings if `y` is present, non-numeric, or outside -1.0…+1.0.
 
-    Every entity carrying a charge curve has a `y`, so the range check lives
-    here rather than being repeated per entity type.
+    Only arc_beat carries a curve now (a scene's turn is `value_turns`), so the
+    range check lives here rather than being repeated per entity type.
     """
     if "y" not in frontmatter:
         return

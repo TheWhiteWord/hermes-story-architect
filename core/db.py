@@ -617,9 +617,9 @@ def get_project_summary(project_path: Path) -> dict:
                 [sid for sid, s in scenes.items() if s["_parent_id"] == seq_id],
                 key=lambda sid: (scenes[sid]["_order_key"], sid)
             )
-            # No value here: the sequence's shift is its own, and view='story_value'
-            # is where every container's value lives. Repeating it here cost tokens
-            # in the view whose job is to stay small.
+            # No value here: a value turn lives on its scene (value_turns), and
+            # the plot's value_lines read them back. Repeating them here cost
+            # tokens in the view whose job is to stay small.
             return {
                 "id": seq["id"],
                 "title": seq["title"],
@@ -901,65 +901,6 @@ def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
             }
             for row in rows
         ]
-    except Exception:
-        return []
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
-
-
-def _has_charge(extra: dict) -> bool:
-    return bool(extra.get("value_at_open") or extra.get("value_at_close"))
-
-
-def get_value_drift(project_path: Path) -> list[dict]:
-    """Return story containers with no charge whose children carry one.
-
-    A missing charge is already a gap row in `get_unfilled_map` — this reports
-    the fact that row cannot: that the container is empty *while its children
-    are not*. Filling the container is then a judgement call about scope, not a
-    mechanical copy, and this deliberately stops short of proposing a value.
-
-    Not a continuity check: it never compares a child's charge to its
-    container's, only whether one was recorded. See the Continuity section of
-    tasks/task_27/implementation-plan.md for why no such check ships.
-    """
-    db_path = project_path / ".story" / "story.db"
-    if not db_path.exists():
-        return []
-    conn = None
-    try:
-        conn = sqlite3.connect(str(db_path))
-        # child_id -> number of its own children that carry a charge
-        charged_children = {}
-        for cid, _ok, extra_json in conn.execute(
-            "SELECT id, order_key, extra FROM entities "
-            "WHERE type IN ('sequence','scene') AND is_deleted=0"
-        ):
-            if _has_charge(json.loads(extra_json or "{}")):
-                charged_children[cid] = 1
-        containers = conn.execute(
-            "SELECT id, type, extra FROM entities "
-            "WHERE type IN ('act','sequence') AND is_deleted=0"
-        ).fetchall()
-        drift = []
-        for cid, ctype, extra_json in containers:
-            if _has_charge(json.loads(extra_json or "{}")):
-                continue
-            # An act is charged by its sequences, a sequence by its scenes.
-            child_type = "sequence" if ctype == "act" else "scene"
-            n = 0
-            for (kid,) in conn.execute(
-                "SELECT id FROM entities WHERE type=? AND parent_id=? AND is_deleted=0",
-                (child_type, cid),
-            ):
-                n += charged_children.get(kid, 0)
-            if n:
-                drift.append({"id": cid, "type": ctype, "descendants_with_charges": n})
-        return drift
     except Exception:
         return []
     finally:

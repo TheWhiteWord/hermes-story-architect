@@ -6,8 +6,8 @@ and write nothing until the user says so — so "save it" means the user is
 looking at the thing that was saved.
 
 Per-entity staging would not work here. A new scene implies a location, two
-character-appearance relations, a sequence order_key and a value_at_close:
-one decision, six changes, five entities, and five confirmations.
+character-appearance relations and a sequence order_key: one decision, six
+changes, five entities, and five confirmations.
 
 A batch draft spans a create, an edit and a reorder at once, so it has no
 single target entity and no single action — which is why staging is a tool

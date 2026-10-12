@@ -85,12 +85,12 @@ def test_a_field_set_to_its_own_default_still_counts_as_set(fixture_path):
     assert "fields set" not in md.split("\n")[4]
 
     # `title`'s default is "", so it is not a set field — only `type` and
-    # `order` carry a value. 2 of 7, and both of those equal their defaults.
+    # `order` carry a value. 2 of 5, and both of those equal their defaults.
     thin = {f: act[f] for f in ("type", "order")}
     md = stage(fixture_path, [{"op": "create", "type": "act", "id": "a-thin",
                                "frontmatter": thin, "summary": "s"}],
                "a thin act")["preview_md"]
-    assert "2 of 7 fields set" in md
+    assert "2 of 5 fields set" in md
 
 
 def test_an_edit_renders_one_line_per_changed_field(fixture_path):
@@ -343,20 +343,6 @@ def test_a_restage_re_reports_findings(fixture_path):
                                               status="nonsense"))]
     again = stage(fixture_path, broken, "ok", draft_id=first["draft_id"])
     assert any("Invalid status: nonsense" in f for f in again["validation"])
-
-
-# ─── the mock in chat-preview.md is not valid input ───
-
-def test_the_chat_preview_mock_would_not_pass_validation():
-    """`chat-preview.md` writes value_at_open="hope". VALUE_CHARGES is
-    positive/negative/mixed/ironic. The mock is illustrative; the validator
-    is right. Recorded so nobody 'fixes' the validator to match the mock."""
-    from core.constants import VALUE_CHARGES
-    assert "hope" not in VALUE_CHARGES
-    findings = validate_shape([_create({
-        "title": "The Telling", "sequence_id": "seq-discovery", "act_id": "act-1",
-        "value_at_open": "hope", "value_at_close": "doubt"})])
-    assert any("Invalid value_at_open: hope" in f for f in findings)
 
 
 # ─── I2: a structured field must not render as a Python repr ───
