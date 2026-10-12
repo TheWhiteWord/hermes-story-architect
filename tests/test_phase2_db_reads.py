@@ -194,9 +194,14 @@ class TestEmbeddedCrossReferences:
                             assert isinstance(scene["location"], str)
 
     def test_character_has_rel(self, db_project):
-        """character.relationships populated from relationship entities."""
+        """character.relationships populated from relationship entities.
+
+        `story_load` emits bare slugs there; `get_dashboard_data` emits the
+        {with, label, type, strength} shape the schema declares.
+        """
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
+        from core.db import get_dashboard_data
+        result = get_dashboard_data(proj)["story_data"]
         for char in result["characters"]:
             if "relationships" in char:
                 for rel in char["relationships"]:

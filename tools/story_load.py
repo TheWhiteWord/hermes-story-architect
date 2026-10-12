@@ -267,14 +267,12 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     plot_refs = {}
     for plot_id, in conn.execute(
             "SELECT id FROM entities WHERE type='plot' AND is_deleted=0 ORDER BY id"):
-        for to_id, kind, note in conn.execute(
-                "SELECT to_id, kind, note FROM relations "
+        for to_id, kind in conn.execute(
+                "SELECT to_id, kind FROM relations "
                 "WHERE from_id=:f AND kind LIKE 'plot\\_%' ESCAPE '\\'",
                 {"f": plot_id}):
-            entry = {"plot": plot_id, "role": kind[len("plot_"):]}
-            if note:
-                entry["description"] = note
-            plot_refs.setdefault(to_id, []).append(entry)
+            plot_refs.setdefault(to_id, []).append(
+                {"plot": plot_id, "role": kind[len("plot_"):]})
 
     # Plot scopes, so milestone_label knows which plot is the main one.
     plot_scopes = {}

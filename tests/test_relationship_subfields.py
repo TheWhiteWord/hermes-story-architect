@@ -14,9 +14,14 @@ from core.constants import ENTITY_SCHEMAS
 
 
 def _load(project_dir):
-    from core.db import get_project_summary
+    """The payload that carries `character.relationships` as OBJECTS.
 
-    return get_project_summary(project_dir)
+    `get_project_summary` emits bare slug strings there; `get_dashboard_data`
+    emits the {with, label, type, strength} shape the schema declares.
+    """
+    from core.db import get_dashboard_data
+
+    return get_dashboard_data(project_dir)["story_data"]
 
 
 def test_declared_sub_fields_match_the_load_payload(fixture_path):
