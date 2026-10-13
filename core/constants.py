@@ -57,6 +57,7 @@ ENTITY_LABELS = {
     "act": "Act",
     "arc_beat": "Arc Beat",
     "relationship": "Relationship",
+    "value": "Value",
 }
 
 # Full field schemas — used by the write path to ensure all fields
@@ -285,6 +286,23 @@ ENTITY_SCHEMAS = {
         "scenes": {"type": "list", "default": [], "optional": True, "description": "Scenes where this relationship is featured"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "active/resolved/complex"},
         "history": {"type": "string", "default": "", "optional": True, "description": "How this relationship evolved"},
+    },
+    # One value, shared by every plot that uses it. The four rungs are
+    # VALUE_LADDER, and a value names itself by its positive pole — the id is
+    # the slug of `name`, which is what makes a scene's turn able to name it.
+    "value": {
+        "name": {"type": "string", "default": "", "optional": False,
+                 "description": "The value, named by its positive pole (e.g. 'trust'). The id is the slug of this name."},
+        "p": {"type": "string", "default": "", "optional": False,
+              "description": "Positive: the story's word for the ideal (rung p)."},
+        "c": {"type": "string", "default": "", "optional": False,
+              "description": "Contrary: the story's word for the opposite, not absolute negation (rung c)."},
+        "cd": {"type": "string", "default": "", "optional": False,
+               "description": "Contradictory: the story's word for the direct negation of the positive (rung cd)."},
+        "nn": {"type": "string", "default": "", "optional": False,
+               "description": "Negation of negation: the story's word for the perversion or false version of the positive (rung nn)."},
+        "note": {"type": "string", "default": "", "optional": True,
+                 "description": "Optional: what this value means."},
     },
 }
 

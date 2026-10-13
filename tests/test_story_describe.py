@@ -54,7 +54,7 @@ class TestEntityFields:
         assert list(_handler({"entity_type": "character"})["entity_schemas"]) == ["character"]
 
     def test_all_entity_types_by_default(self):
-        assert len(_handler({})["entity_schemas"]) == 10
+        assert len(_handler({})["entity_schemas"]) == 11
 
     def test_relation_backed_fields_are_flagged(self):
         fields = _handler({"entity_type": "plot"})["entity_schemas"]["plot"]

@@ -13,6 +13,7 @@ used to travel in an `error` key is lost, because the key only ever named what
 the sentence now says.
 """
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -180,6 +181,11 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
                 f"Entity ids are unique across all types — "
                 f"choose a different slug for this {entity_type}.")
 
+        # A value is validated on its own terms before anything is written:
+        # a refused create leaves no row, no sections, no relations.
+        if entity_type == "value":
+            validate_value(project_path, slug, merged)
+
         # Parent validation for arc type
         if entity_type == "arc_beat":
             from .entity import validate_arc_parents
@@ -306,7 +312,7 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
         if not entity_id:
             raise ValueError(f"Entity not found: {entity_type}/{slug}")
 
-        from .entity import (ENTITY_COLUMN_MAP, coerce_number,
+        from .entity import (ENTITY_COLUMN_MAP, coerce_number, distinct_ladder_words,
                              standard_sections as get_std_sections)
         standard_sections = set(get_std_sections(entity_type))
         # The one column map, owned by core.entity. An out-of-tree copy that
@@ -413,6 +419,22 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                            else {}).get("value_turns", [])
         _check_value_turns(conn, project_path, value_turns,
                            register=False)
+
+        # ── A value, checked on its MERGED state ──
+        # The id is fixed at create (there is no id-rename path), so an edit
+        # that renames the value must keep the name slugging to the same id —
+        # otherwise the stored id no longer names the value and a turn cannot
+        # find it. Every other rule (distinct words, name uniqueness) is the
+        # same check create runs, on what will actually be stored.
+        if entity_type == "value":
+            stored = conn.execute(
+                "SELECT extra, name FROM entities WHERE id=?", (entity_id,)).fetchone()
+            stored_extra = json.loads(stored[0]) if stored and stored[0] else {}
+            # `name` is a column, not extra: read the stored value from the row.
+            merged_value = {**stored_extra, "name": stored[1] if stored else "",
+                            **{k: v for k, v in data.items()
+                               if k in ENTITY_SCHEMAS["value"]}}
+            validate_value(project_path, entity_id, merged_value)
 
         # ── Reject a self-contradicting scene BEFORE writing anything ──
         # Checked against the MERGED state, not just `data`: an edit that sets
@@ -840,6 +862,65 @@ def reorder(project_path: Path, entity_type: str, ordered_ids: list,
 
 
 # ─── shared helpers ───
+
+def _slug_of(name: str) -> str:
+    """`name` as an id: lowercased, whitespace to hyphens, nothing else kept.
+
+    A value names itself by its positive pole and the id IS the slug of that
+    name, so a turn can name the value it means without a lookup table. The
+    rule is checked, not assumed: a value whose id drifted from its name is a
+    value no turn can reliably find.
+    """
+    slug = re.sub(r"[^\w\s-]", "", name.strip().lower())
+    return re.sub(r"[\s_]+", "-", slug).strip("-")
+
+
+def validate_value(project_path, entity_id: str, fm: dict) -> None:
+    """Raise ValueError if this value does not hold the shape a value needs.
+
+    One entity per value, so the rules are the ones that make a value
+    findable and unambiguous wherever a scene's turn names it:
+      * a name — the value is named by its positive pole;
+      * four distinct words, one per ladder rung;
+      * a unique name — a value has ONE schema wherever it is used, so two
+        values with the same name are the same value defined twice;
+      * an id that is the slug of the name.
+    """
+    name = str(fm.get("name") or "").strip()
+    if not name:
+        raise ValueError("A value needs a name — the value, named by its "
+                         "positive pole (e.g. 'trust').")
+
+    from .entity import distinct_ladder_words
+    words = {rung: str(fm.get(rung) or "").strip() for rung in ("p", "c", "cd", "nn")}
+    if not distinct_ladder_words(words):
+        raise ValueError(
+            f"{name} needs four distinct words — the rungs are: "
+            f"{', '.join(f'{k} {v}' for k, v in words.items())}. "
+            f"Two rungs naming one state collapses the ladder.")
+
+    if entity_id != _slug_of(name):
+        raise ValueError(
+            f"Value id must be the slug of its name: '{name}' → "
+            f"'{_slug_of(name)}', got '{entity_id}'. A turn names the value "
+            f"by that slug, so the id and the name cannot drift apart.")
+
+    from .db import get_db
+    conn = get_db(project_path)
+    try:
+        for row in conn.execute(
+                "SELECT id, name FROM entities WHERE type='value' AND is_deleted=0"
+        ).fetchall():
+            if row[0] == entity_id:
+                continue  # this value, being edited
+            if str(row[1] or "").strip().lower() == name.lower():
+                raise ValueError(
+                    f"A value named '{name}' already exists ({row[0]}). A value "
+                    f"has one schema wherever it is used — a different meaning "
+                    f"needs a different value (loyalty rather than trust).")
+    finally:
+        conn.close()
+
 
 def _check_value_turns(conn, project_path, value_turns, register=True) -> None:
     """Validate a scene's value turns, and register any new inline schemas

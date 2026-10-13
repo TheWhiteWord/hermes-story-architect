@@ -30,6 +30,9 @@ def _sample_value(field, meta):
     if ftype == "string":
         if field in ("id", "type"):
             return "sample"
+        if field in ("p", "c", "cd", "nn"):
+            # Four distinct ladder words — the value's shape rule.
+            return f"{field}-word"
         if "slug" in field or field.endswith("_id"):
             return f"ref-{field}"
         if field == "order":
@@ -91,6 +94,10 @@ def _sample_frontmatter(entity_type):
         if field in ("id", "type"):
             continue
         fm[field] = _sample_value(field, meta)
+    if entity_type == "value":
+        # A value's id IS the slug of its name, and this test creates the
+        # entity under `test-value`, so the sample name must slug to that.
+        fm["name"] = "Test value"
     return fm
 
 
@@ -224,6 +231,16 @@ def test_create_load_retrieve(entity_type, project):
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "relationship",
+            "id": [slug],
+            "sections": ["all"],
+        }))
+        found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
+    elif entity_type == "value":
+        # Values are not in the load tree (they are the values view's, phase 3);
+        # verify via retrieve, like arc_beat and relationship.
+        retrieve_result = json.loads(retrieve_handler({
+            "project": str(project),
+            "entity_type": "value",
             "id": [slug],
             "sections": ["all"],
         }))

@@ -85,6 +85,9 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "character_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
         _validate_y(frontmatter, warnings)
 
+    if entity_type == "value":
+        _validate_value(frontmatter, warnings)
+
     if entity_type == "relationship":
         chars = frontmatter.get("characters", [])
         if len(chars) != 2:
@@ -264,6 +267,34 @@ def _validate_numeric(frontmatter: dict, field: str, warnings: list[str]) -> Non
         warnings.append(f"Field {field} must be a number, got {type(frontmatter[field]).__name__}")
 
 
+def _validate_value(frontmatter: dict, warnings: list[str]) -> None:
+    """The shape of one value: a name, four distinct rung words, optional note.
+
+    Same rule a scene's inline `schema` is held to — the four words must be
+    pairwise distinct, or two rungs name one state and the ladder collapses.
+    `p/c/cd/nn` non-empty is the required-field check, which runs before this.
+    """
+    words = {rung: str(frontmatter.get(rung) or "").strip()
+             for rung in VALUE_LADDER}
+    if any(words.values()) and len({w.lower() for w in words.values()}) != len(VALUE_LADDER):
+        warnings.append(
+            f"a value needs four distinct words — the rungs are: "
+            f"{', '.join(f'{k} {v}' for k, v in words.items())}")
+
+
+def distinct_ladder_words(words: dict) -> bool:
+    """True when the four rung words are all non-empty and pairwise distinct.
+
+    The one rule the inline `schema` path and a `value` entity both enforce,
+    so it is asked here rather than restated — two copies is how a rule ends
+    up enforced on one path only.
+    """
+    vals = [str(words.get(rung) or "").strip() for rung in VALUE_LADDER]
+    if any(not v for v in vals):
+        return False
+    return len({v.lower() for v in vals}) == len(VALUE_LADDER)
+
+
 def update_sections(note_path: Path, sections: list[str]) -> None:
     """Update the sections field in a note's frontmatter."""
     post = frontmatter.load(note_path)
@@ -286,6 +317,7 @@ ENTITY_COLUMN_MAP = {
     "act": {"title": "name", "order": "order_key", "status": "status"},
     "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
     "relationship": {"name": "name", "type": "type", "status": "status"},
+    "value": {"name": "name"},
 }
 
 FIELDS_TO_SKIP = {"id", "type"}
@@ -339,6 +371,7 @@ _RELATION_FIELDS = {
     "world": {"variant_of": ("world_variant", False)},
     "arc_beat": {},
     "relationship": {},
+    "value": {},
 }
 
 # Plot beat fields → relation kinds, read from the map above rather than
@@ -477,6 +510,7 @@ def standard_sections(entity_type: str) -> list[str]:
         "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],
         "arc_beat": ["Action", "The Gap", "Choice", "Value Shift", "Notes"],
         "relationship": ["Nature", "Perspectives", "Tension", "History", "Scenes to Write", "Notes"],
+        "value": ["Definition", "Notes"],
     }
     return sections.get(entity_type, [])
 
@@ -950,8 +984,7 @@ def validate_scene_value_turns(project_path, value_turns) -> None:
                             f"four words {', '.join(VALUE_LADDER)}")
                 words = {rung: str(inline[rung]).strip()
                          for rung in VALUE_LADDER}
-                distinct = {w.lower() for w in words.values()}
-                if len(distinct) != len(VALUE_LADDER):
+                if not distinct_ladder_words(words):
                     raise ValueError(
                         f"{at}.schema needs four distinct words — the rungs "
                         f"are: {', '.join(f'{k} {v}' for k, v in words.items())}")
