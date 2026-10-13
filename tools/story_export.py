@@ -62,6 +62,12 @@ _FOLDERS = {
 }
 
 
+# A value is not a folder note: every value lives in one file at the project
+# root, one frontmatter block per value, so a writer reads the whole set at
+# once instead of opening one note per value. Everything else is per-note.
+VALUE_FILE = "values.md"
+
+
 def _filename(title: str, folder: Path, used: set) -> str:
     """A readable, unique `.md` stem for one entity, for a folder being written.
 
@@ -140,6 +146,7 @@ def _export_all(conn, project_path: Path) -> set:
     # character id -> the folder name their beats are filed under
     arc_dirs = {}
     written = set()
+    value_blocks = []
     entity_rows = conn.execute(
         "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
         "FROM entities WHERE is_deleted=0 ORDER BY type, id"
@@ -215,6 +222,10 @@ def _export_all(conn, project_path: Path) -> set:
                 parts.append(f"## {heading}\n\n{body_text.rstrip()}")
             body = "\n\n".join(parts)
 
+        if entity_type == "value":
+            value_blocks.append(_value_block(entity_id, name, extra, body))
+            continue
+
         if entity_type == "project":
             _write_note(project_path / "project.md", fm, body)
             written.add(project_path / "project.md")
@@ -246,6 +257,17 @@ def _export_all(conn, project_path: Path) -> set:
         note = folder / f"{_filename(name, folder, used)}.md"
         _write_note(note, fm, body)
         written.add(note)
+
+    # One file for every value, always written — an empty `values.md` is a
+    # stable, present file rather than a file that appears and disappears.
+    # `entity_rows` is `ORDER BY type, id`, so the blocks come out in id order.
+    # Written directly rather than through `_write_note`: the file is a
+    # concatenation of blocks that already carry their own `---` fences, so a
+    # wrapper frontmatter block would be a leading `--- {} ---` the parser has
+    # to skip.
+    values_path = project_path / VALUE_FILE
+    values_path.write_text("\n\n".join(value_blocks) + ("\n" if value_blocks else ""))
+    written.add(values_path)
 
     return written
 
@@ -373,6 +395,23 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
 
     fm.update(extra)
     return fm
+
+
+def _value_block(entity_id: str, name: str, extra: dict, body: str) -> str:
+    """One value as a frontmatter block for the concatenated `values.md`.
+
+    Field order is `id, name, p, c, cd, nn, note` — the schema order, so the
+    ladder reads p/c/cd/nn rather than alphabetically. `note` is skipped when
+    empty. The block carries no wrapper frontmatter of its own: the file is a
+    concatenation of these, and the importer splits on the `---` fences.
+    """
+    import frontmatter
+    fm = {"id": entity_id, "name": name}
+    for rung in ("p", "c", "cd", "nn"):
+        fm[rung] = str(extra.get(rung) or "")
+    if extra.get("note"):
+        fm["note"] = extra["note"]
+    return frontmatter.dumps(frontmatter.Post(body, **fm), sort_keys=False).rstrip("\n")
 
 
 def _folder_for(entity_type: str) -> str:

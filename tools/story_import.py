@@ -72,6 +72,15 @@ def _diff(project_path: Path) -> dict:
                    "sequences", "acts", "relationships"):
         markdown_ids |= _ids_in(project_path / folder)
 
+    # Values live in one root file, not a folder, so they would otherwise be
+    # reported as database-only and destroyed on every import. Parse their ids
+    # from that file with the same block parser the import uses.
+    values_file = project_path / "values.md"
+    if values_file.exists():
+        for fm, _ in _iter_value_blocks(values_file.read_text()):
+            if fm.get("id"):
+                markdown_ids.add(str(fm["id"]))
+
     # Arc beats live in arcs/{character}/{beat}.md. They do not appear in the
     # flat folders above, and a database may hold them typed as 'character', so
     # match them by the note tree as well.
@@ -228,6 +237,9 @@ def _clear_all(conn) -> None:
 def _import_all(conn, project_path: Path) -> None:
     """Walk all entity folders and import."""
     _import_project(conn, project_path)
+    # Values first: a scene's value turn names a value, and that value must
+    # exist before the scene naming it is imported.
+    _import_values(conn, project_path)
     _import_folder(conn, project_path, "characters", "character")
     _import_folder(conn, project_path, "locations", "location")
     _import_folder(conn, project_path, "worlds", "world")
@@ -272,6 +284,64 @@ def _import_project(conn, project_path: Path) -> None:
             "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
             (project_path.name, h, body_text),
         )
+
+
+def _iter_value_blocks(text: str):
+    """Yield `(frontmatter, body)` per value from the concatenated `values.md`.
+
+    The one non-reused piece: `values.md` is a concatenation of per-value
+    frontmatter blocks separated by `---`, not a single note, so `frontmatter`
+    parses only the first block. Split on the fences and parse each block's
+    YAML. An empty or absent file yields nothing — "no values", not an error.
+    A trailing fence with no closing one ends the walk rather than yielding a
+    half block.
+    """
+    import yaml
+    lines = text.split("\n")
+    i, n = 0, len(lines)
+    while i < n:
+        if lines[i].strip() != "---":
+            i += 1
+            continue
+        j = i + 1
+        fm_lines = []
+        while j < n and lines[j].strip() != "---":
+            fm_lines.append(lines[j])
+            j += 1
+        if j >= n:
+            break  # an unterminated block; ignore it
+        fm = yaml.safe_load("\n".join(fm_lines)) or {}
+        k = j + 1
+        body_lines = []
+        while k < n and lines[k].strip() != "---":
+            body_lines.append(lines[k])
+            k += 1
+        yield fm, "\n".join(body_lines).strip("\n")
+        i = k
+
+
+def _import_values(conn, project_path: Path) -> None:
+    """Import every value from the single `values.md` at the project root."""
+    values_file = project_path / "values.md"
+    if not values_file.exists():
+        return
+    text = values_file.read_text()
+    if not text.strip():
+        return
+    from core.writes import validate_value
+    for fm, body in _iter_value_blocks(text):
+        entity_id = str(fm.get("id") or "").strip()
+        name = str(fm.get("name") or "").strip()
+        if not entity_id or not name:
+            raise ValueError(
+                f"A value block in {values_file.name} is missing an id or name "
+                f"(got id={entity_id!r}, name={name!r}). Every value needs both.")
+        # Same checks the write path runs, so a hand-edited values.md is
+        # refused exactly as story_draft would refuse it. validate_value opens
+        # its own read connection, so it sees the values already inserted in
+        # this pass — the name-uniqueness rule holds across the file.
+        validate_value(project_path, entity_id, fm)
+        _insert_entity(conn, "value", entity_id, fm, body)
 
 
 def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str) -> None:
@@ -445,6 +515,13 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": None, "location_id": None,
             "extra": _extra_for("relationship", fm),
         }
+    elif entity_type == "value":
+        return {
+            "id": slug, "type": "value",
+            "name": fm.get("name", ""), "one_sentence": "",
+            "order_key": 0, "status": "", "parent_id": None, "location_id": None,
+            "extra": _extra_for("value", fm),
+        }
     return {"id": slug, "type": entity_type, "name": "", "one_sentence": "",
             "order_key": 0, "status": "", "parent_id": None, "location_id": None, "extra": {}}
 
@@ -489,6 +566,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "act": {"title", "order", "status", "id"},
         "arc_beat": {"id", "label", "order", "character"},
         "relationship": {"name", "status", "id"},
+        "value": {"name", "id"},
     }
     s = skip.get(entity_type, set())
     valid = set(s) | set(ENTITY_SCHEMAS.get(entity_type, {})) | {"id", "type"}
