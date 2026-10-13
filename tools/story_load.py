@@ -18,12 +18,14 @@ SCHEMA = {
         },
         "view": {
             "type": "string",
-            "enum": ["arc", "dramatic_elements", "relationship", "unfilled"],
+            "enum": ["arc", "dramatic_elements", "relationship", "unfilled", "values"],
             "description": "Optional focused view. Omit for the base structural map. "
                            "'arc' = one character's arc beats, pass character. "
                            "'dramatic_elements' = per-scene dramatic roles and milestones. "
                            "'relationship' = the full relationship graph with perspectives. "
-                           "'unfilled' = what is still incomplete, to answer 'what next?'."
+                           "'unfilled' = what is still incomplete, to answer 'what next?'. "
+                           "'values' = the value schemas and their turns, for a scene, "
+                           "unit, or the whole project."
         },
         "character": {
             "type": "string",
@@ -31,8 +33,27 @@ SCHEMA = {
         },
         "act": {
             "type": "string",
-            "description": "For view='dramatic_elements': limit to one act id. "
+            "description": "For view='dramatic_elements' or 'values': limit to one act id. "
                            "Defaults to all."
+        },
+        "plot": {
+            "type": "string",
+            "description": "For view='values': limit to one plot id. Defaults to all."
+        },
+        "sequence": {
+            "type": "string",
+            "description": "For view='values': limit to one sequence id. Defaults to all."
+        },
+        "scene": {
+            "type": "string",
+            "description": "For view='values': one scene id. Returns the values it "
+                           "serves, where each was last left and its next turn — "
+                           "used before evaluating a scene."
+        },
+        "value": {
+            "type": "string",
+            "description": "For view='values' with plot/sequence/act: narrow to one "
+                           "value name. Defaults to all the unit's values."
         },
         "field": {
             "type": "string",
@@ -113,8 +134,10 @@ def _extended_view(conn, project_path, view: str, args: dict):
         return _view_relationship(conn)
     if view == "unfilled":
         return _view_unfilled(project_path, args)
+    if view == "values":
+        return _view_values(conn, project_path, args)
     return {"error": f"Unknown view: {view}. Valid: arc, "
-                     f"dramatic_elements, relationship, unfilled."}
+                     f"dramatic_elements, relationship, unfilled, values."}
 
 
 def _view_arc(conn, args: dict) -> dict:
@@ -407,6 +430,194 @@ def _unfilled_focused(unfilled: dict, field: str | None, entity: str | None) -> 
         out["fields"] = sorted(f for f, ids in unfilled.items() if entity in ids)
         if not out["fields"]:
             out["message"] = f"'{entity}' has every optional field filled."
+    return out
+
+
+def _value_schemas(conn) -> dict:
+    """Value name → schema, read from the value entities.
+
+    Keyed by the lowercased trimmed name: a turn names the value it means and
+    a value's uniqueness is case/whitespace-insensitive, so a turn's name
+    resolves to the same entity whether or not it matches the casing written.
+    """
+    schemas = {}
+    for vid, name, extra_json in conn.execute(
+            "SELECT id, name, extra FROM entities WHERE type='value' "
+            "AND is_deleted=0"):
+        extra = json.loads(extra_json) if extra_json else {}
+        key = str(name or "").strip().lower()
+        if key:
+            schemas[key] = {
+                "id": vid,
+                "p": str(extra.get("p") or ""),
+                "c": str(extra.get("c") or ""),
+                "cd": str(extra.get("cd") or ""),
+                "nn": str(extra.get("nn") or ""),
+                "note": str(extra.get("note") or ""),
+            }
+    return schemas
+
+
+def _view_values(conn, project_path, args: dict) -> dict:
+    """The value schemas and their turns, for three uses.
+
+    One `get_scene_value_turns` pass feeds all three branches — they filter it
+    in memory rather than re-querying per value. The shapes:
+
+      no scene/unit  → every value with its schema, the one call to see what exists.
+      scene=<id>     → the sequence and act's major/minor, and for each plot the
+                       scene serves: that plot's values with where each was last
+                       left and its next turn. Read before evaluating a scene.
+      plot/sequence/act (opt. value) → the unit's major/minor, and per value its
+                       turns in story order (scene, plot, from, to).
+    """
+    from core.db import get_scene_value_turns
+    from core.value_focus import for_act, for_plot, for_project, for_sequence
+
+    turns = get_scene_value_turns(project_path)
+    schemas = _value_schemas(conn)
+
+    scene = args.get("scene")
+    if scene:
+        return _values_for_scene(conn, project_path, scene, turns, schemas)
+
+    plot = args.get("plot")
+    sequence = args.get("sequence")
+    act = args.get("act")
+    if plot or sequence or act:
+        return _values_for_unit(
+            project_path, plot, sequence, act, args.get("value"),
+            turns, schemas, for_plot, for_sequence, for_act, for_project)
+
+    out = {"view": "values",
+           "values": [{"value": name, **schema}
+                      for name, schema in sorted(schemas.items())]}
+    if not schemas:
+        out["message"] = "No values defined yet."
+    return out
+
+
+def _values_for_scene(conn, project_path, scene_id, turns, schemas) -> dict:
+    """What a scene needs before it is written: the major/minor of its sequence
+    and act, and for each plot it serves, where each of the plot's values was
+    last left and where it turns next.
+    """
+    from core.value_focus import for_act, for_sequence
+
+    row = conn.execute(
+        "SELECT id, parent_id FROM entities "
+        "WHERE id=? AND type='scene' AND is_deleted=0", (scene_id,)).fetchone()
+    if not row:
+        return {"view": "values", "scene": scene_id,
+                "error": f"Scene not found: {scene_id}"}
+    _, seq_id = row
+    act_id = None
+    seq_extra = {}
+    if seq_id:
+        seq = conn.execute(
+            "SELECT parent_id, extra FROM entities WHERE id=?", (seq_id,)).fetchone()
+        if seq:
+            act_id = seq[0]
+            seq_extra = json.loads(seq[1]) if seq[1] else {}
+
+    out = {"view": "values", "scene": scene_id, "sequence": seq_id, "act": act_id}
+    if seq_id:
+        out["sequence_focus"] = for_sequence(project_path, seq_id)
+    if act_id:
+        out["act_focus"] = for_act(project_path, act_id)
+
+    # The plots the scene serves: its plot_roles relations, else its sequence's
+    # primary_plot. A scene can serve more than one; both sources can be empty.
+    plot_ids = [p for p, in conn.execute(
+        'SELECT DISTINCT from_id FROM relations '
+        "WHERE to_id=? AND kind LIKE 'plot\\_%' ESCAPE '\\'", (scene_id,))]
+    if not plot_ids and seq_id and seq_extra.get("primary_plot"):
+        plot_ids = [seq_extra["primary_plot"]]
+
+    plots = {}
+    for plot_id in plot_ids:
+        # This plot's turns, grouped per value. Each value's last_left/next is
+        # the turn immediately before/after the scene within THAT value's own
+        # line — never another value's turn that happens to sit nearer.
+        by_value = {}
+        for t in turns:
+            if t["plot"] == plot_id:
+                by_value.setdefault(t["value"], []).append(t)
+
+        values = []
+        for value in sorted(by_value):
+            line = sorted(by_value[value], key=lambda t: t["order"])
+            scene_order = next((t["order"] for t in line
+                                if t["scene_id"] == scene_id), None)
+            before = [t for t in line if scene_order is None
+                      or t["order"] < scene_order]
+            after = [t for t in line
+                     if scene_order is not None and t["order"] > scene_order]
+            entry = {"value": value, "schema": schemas.get(value.strip().lower())}
+            last = before[-1] if before else None
+            nxt = after[0] if after else None
+            if last:
+                entry["last_left"] = {"scene": last["scene_id"], "to": last["to"]}
+            if nxt:
+                entry["next"] = {"scene": nxt["scene_id"], "from": nxt["from"]}
+            values.append(entry)
+        plots[plot_id] = {"values": values}
+    out["plots"] = plots
+    return out
+
+
+def _values_for_unit(project_path, plot, sequence, act, value, turns, schemas,
+                     for_plot, for_sequence, for_act, for_project) -> dict:
+    """A plot, sequence or act: its major/minor values, and each value's turns
+    in story order. `value` narrows to one. Acts aggregate every plot; a plot
+    is its own scope.
+
+    # ponytail: the full turn history scales with turn count (~45KB on a
+    # 270-scene / 540-turn main plot). That is the content the call exists to
+    # return, so no cap — add one only if a real caller can't act on it.
+    """
+    if plot:
+        unit_type, unit_id = "plot", plot
+        focus = for_plot(project_path, plot)
+        match = lambda t: t["plot"] == plot  # noqa: E731
+    elif sequence:
+        unit_type, unit_id = "sequence", sequence
+        focus = for_sequence(project_path, sequence)
+        match = lambda t: t["sequence_id"] == sequence  # noqa: E731
+    elif act:
+        unit_type, unit_id = "act", act
+        focus = for_act(project_path, act)
+        match = lambda t: t["act_id"] == act  # noqa: E731
+    else:
+        unit_type, unit_id = "project", None
+        focus = for_project(project_path)
+        match = lambda t: True  # noqa: E731
+
+    out: dict = {"view": "values", "unit": unit_type}
+    if unit_id:
+        out[unit_type] = unit_id
+    out["value_focus"] = focus
+
+    if value:
+        wanted = {value.strip().lower()}
+    else:
+        wanted = {item["value"].strip().lower()
+                  for item in focus["major"] + focus["minor"]}
+
+    by_value = {}
+    for t in turns:
+        if match(t) and t["value"].strip().lower() in wanted:
+            by_value.setdefault(t["value"], []).append(t)
+    values = []
+    for name in sorted(by_value):
+        rows = sorted(by_value[name], key=lambda t: t["order"])
+        values.append({
+            "value": name,
+            "schema": schemas.get(name.strip().lower()),
+            "turns": [{"scene": t["scene_id"], "plot": t["plot"],
+                       "from": t["from"], "to": t["to"]} for t in rows],
+        })
+    out["values"] = values
     return out
 
 
