@@ -9,23 +9,17 @@ DASH.showActPanel = function(actId) {
 
   const seqRows = (act.sequences_list || []).map(sid => {
     const seq = (DASH.story.sequences || []).find(s => s.id === sid);
-    return seq ? `<div class="entity-row" onclick="DASH.showSequencePanel('${sid}')">
-      <span class="entity-row-name">${seq.title || sid}</span>
-      <span class="entity-row-sub">${seq.scene_count || 0} scenes</span>
-    </div>` : '';
+    return seq ? `<button class="entity-link" onclick="DASH.showSequencePanel('${sid}')">${seq.title || sid}<span style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-left:4px">${seq.scene_count || 0} scenes</span></button>` : '';
   }).join('');
 
-  // Plot threads in this act with scope/type
+  // Plot threads in this act — same chip style as the scene panel
   const plotRows = (act.plots || []).map(p => {
     const pl = (DASH.story.plots || []).find(x => x.id === p.id);
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
-    const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    return `<div class="entity-row" onclick="DASH.showPlotPanel('${pl.id}')">
-      <span class="entity-row-name" style="color:${col}">${pl.name}</span>
-      ${scope ? `<span class="entity-row-sub" style="color:${col}">${scope}</span>` : ''}
-      ${DASH.plotRoleBadges(p)}
-    </div>`;
+    const col = DASH.plotColor(pl.id);
+    const badges = DASH.plotRoleBadges(p);
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scope}${badges ? ' · ' + badges : ''}</span></button>`;
   }).join('');
 
   document.getElementById('panel-body').innerHTML = `
@@ -39,12 +33,12 @@ DASH.showActPanel = function(actId) {
         ${actObj ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground)">Act objective: <span style="color:var(--foreground);font-weight:500">${actObj}</span></div>` : ''}
       </div>`;
     })()}
-    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
     <div>
       <div class="panel-section-title">Value focus</div>
       ${DASH.valueFocusHtml(act.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
     </div>
-    ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div>${seqRows}</div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
+    ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${seqRows}</div></div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
     ${DASH.renderSectionsHtml('act', actId)}
   `;
 
@@ -541,33 +535,27 @@ DASH.showSequencePanel = function(seqId) {
   const sceneRows = (seq.scenes_list || []).map((sid, i) => {
     const scene = (DASH.story.scenes || []).find(s => s.id === sid);
     if (!scene) return '';
-    return `<div class="entity-row" onclick="DASH.showScenePanel('${sid}')">
-      <span class="entity-row-name">${i + 1}. ${scene.title || sid}</span>
-      ${scene.heading ? `<span class="entity-row-sub">${DASH.escapeHtml(scene.heading)}</span>` : ''}
-    </div>`;
+    return `<button class="entity-link" onclick="DASH.showScenePanel('${sid}')">${i + 1}. ${scene.title || sid}</button>`;
   }).join('');
 
-  // Plot threads in this sequence with scope/type
+  // Plot threads in this sequence — same chip style as the scene panel
   const plotRows = (seq.plots || []).map(p => {
     const pl = (DASH.story.plots || []).find(x => x.id === p.id);
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
-    const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    return `<div class="entity-row" onclick="DASH.showPlotPanel('${pl.id}')">
-      <span class="entity-row-name" style="color:${col}">${pl.name}</span>
-      ${scope ? `<span class="entity-row-sub" style="color:${col}">${scope}</span>` : ''}
-      ${DASH.plotRoleBadges(p)}
-    </div>`;
+    const col = DASH.plotColor(pl.id);
+    const badges = DASH.plotRoleBadges(p);
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scope}${badges ? ' · ' + badges : ''}</span></button>`;
   }).join('');
 
   document.getElementById('panel-body').innerHTML = `
     <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
-    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
     <div>
       <div class="panel-section-title">Value focus</div>
       ${DASH.valueFocusHtml(seq.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
     </div>
-    ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div>${sceneRows}</div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
+    ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${sceneRows}</div></div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
     ${DASH.renderSectionsHtml('sequence', seqId)}
   `;
 

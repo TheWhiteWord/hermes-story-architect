@@ -29,8 +29,8 @@ DASH.PLOT_ROLES = ['setup', 'inciting_incident', 'complication', 'crisis', 'clim
 DASH.plotRoleBadges = function(p) {
   return DASH.PLOT_ROLES
     .filter(r => p['has_' + r])
-    .map(r => `<span class="entity-row-sub">${r}</span>`)
-    .join('');
+    .map(r => `<span class="entity-row-sub">${r.replace(/_/g, ' ')}</span>`)
+    .join(' ');
 }
 
 DASH.PLOT_TYPE_COLORS = {
@@ -38,6 +38,16 @@ DASH.PLOT_TYPE_COLORS = {
   Resonant: '#7b9cf0',
   Complicating: '#e0a86b',
   Setup: '#6bbfb0',
+};
+
+// The colour of a plot: main is purple, subplots use their plot_type's
+// colour from PLOT_TYPE_COLORS — the same rule the plot threads and
+// value-turn chips already use, so a value's chips match its plot.
+DASH.plotColor = function(pid) {
+  const pl = (DASH.story.plots || []).find(x => x.id === pid);
+  if (!pl) return '#888';
+  if (pl.plot_scope === 'main') return '#b07be0';
+  return DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888';
 };
 
 DASH.roleColor = function(role) {

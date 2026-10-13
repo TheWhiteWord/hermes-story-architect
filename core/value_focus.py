@@ -19,20 +19,25 @@ from .db import get_scene_value_turns
 
 
 def _counts(rows, key) -> dict:
-    """Distinct scenes per value among the rows matching `key`'s value.
+    """Distinct scenes and plots per value among the rows matching `key`.
 
     A scene counts once per value: two turns of the same value in one scene
     are one scene. `rows` are the turns from `get_scene_value_turns`.
+    `plots` is the sorted list of plot ids that contributed turns of this
+    value — the dashboard uses it to colour multi-plot values.
     """
     scenes = defaultdict(set)
+    plots = defaultdict(set)
     for row in rows:
         if key(row):
             scenes[row["value"]].add(row["scene_id"])
-    return {value: len(scene_ids) for value, scene_ids in scenes.items()}
+            plots[row["value"]].add(row["plot"])
+    return {value: {"scenes": len(scene_ids), "plots": sorted(plots[value])}
+            for value, scene_ids in scenes.items()}
 
 
 def _major_minor(counts: dict) -> dict:
-    """Split value→scene-count into the major/minor shape, by frequency.
+    """Split value→{scenes, plots} into the major/minor shape, by frequency.
 
     Ties at the cut are all major: if the 3rd and 4th most frequent values
     have the same count, both are major (design §4). Order is count desc,
@@ -40,15 +45,17 @@ def _major_minor(counts: dict) -> dict:
     VALUE_MAJOR_COUNT values means every value is major; none means both
     lists are empty.
     """
-    ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ordered = sorted(counts.items(), key=lambda kv: (-kv[1]["scenes"], kv[0]))
     if len(ordered) < VALUE_MAJOR_COUNT:
         major = ordered
     else:
-        cut = ordered[VALUE_MAJOR_COUNT - 1][1]
-        major = [kv for kv in ordered if kv[1] >= cut]
+        cut = ordered[VALUE_MAJOR_COUNT - 1][1]["scenes"]
+        major = [kv for kv in ordered if kv[1]["scenes"] >= cut]
     minor = [kv for kv in ordered if kv not in major]
-    return {"major": [{"value": v, "scenes": n} for v, n in major],
-            "minor": [{"value": v, "scenes": n} for v, n in minor]}
+    def _entry(v, n):
+        return {"value": v, "scenes": n["scenes"], "plots": n["plots"]}
+    return {"major": [_entry(v, n) for v, n in major],
+            "minor": [_entry(v, n) for v, n in minor]}
 
 
 def _plot_scopes(project_path) -> dict:
@@ -90,7 +97,9 @@ def for_project(project_path) -> dict:
     major values that are not already major as minor (design §4).
 
     With no main plot every plot is treated as one subplot, so the story
-    still reports the subplots' major values rather than nothing.
+    still reports the subplots' major values rather than nothing. Minor
+    entries carry the subplots that contributed them, so the dashboard can
+    colour a value shared across subplots.
     """
     rows = get_scene_value_turns(project_path)
     scopes = _plot_scopes(project_path)
@@ -98,6 +107,7 @@ def for_project(project_path) -> dict:
         rows, lambda r: scopes.get(r["plot"]) == "main"))
     major_names = {item["value"] for item in main["major"]}
     minor_counts = {}
+    minor_plots = defaultdict(set)
     for plot_id, scope in scopes.items():
         if scope == "main":
             continue
@@ -106,6 +116,7 @@ def for_project(project_path) -> dict:
             if item["value"] not in major_names:
                 minor_counts[item["value"]] = max(
                     minor_counts.get(item["value"], 0), item["scenes"])
-    minor = [{"value": v, "scenes": n} for v, n in sorted(
-        minor_counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+                minor_plots[item["value"]].add(plot_id)
+    minor = [{"value": v, "scenes": n, "plots": sorted(minor_plots[v])}
+             for v, n in sorted(minor_counts.items(), key=lambda kv: (-kv[1], kv[0]))]
     return {"major": main["major"], "minor": minor}
