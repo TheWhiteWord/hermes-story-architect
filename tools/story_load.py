@@ -434,7 +434,7 @@ def _unfilled_focused(unfilled: dict, field: str | None, entity: str | None) -> 
 
 
 def _value_schemas(conn) -> dict:
-    """Value name → schema, read from the value entities.
+    """Value name to schema, read from the value entities.
 
     Keyed by the lowercased trimmed name: a turn names the value it means and
     a value's uniqueness is case/whitespace-insensitive, so a turn's name
