@@ -102,7 +102,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_describe",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_describe.SCHEMA),
         handler=story_describe.handler,
         check_fn=_requirements_met,
@@ -111,7 +111,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_load",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_load.SCHEMA),
         handler=story_load.handler,
         check_fn=_requirements_met,
@@ -119,7 +119,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_retrieve",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_retrieve.SCHEMA),
         handler=story_retrieve.handler,
         check_fn=_requirements_met,
@@ -127,7 +127,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_search",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_search.SCHEMA),
         handler=story_search.handler,
         check_fn=_requirements_met,
@@ -135,7 +135,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_admin",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_admin.SCHEMA),
         handler=story_admin.handler,
         check_fn=_requirements_met,
@@ -144,7 +144,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_memory",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_memory.SCHEMA),
         handler=story_memory.handler,
         check_fn=_requirements_met,
@@ -153,7 +153,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_draft",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_draft.SCHEMA),
         handler=story_draft.handler,
         check_fn=_requirements_met,
@@ -165,7 +165,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_import",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_import.SCHEMA),
         handler=story_import.handler,
         check_fn=_requirements_met,
@@ -173,7 +173,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_export",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_export.SCHEMA),
         handler=story_export.handler,
         check_fn=_requirements_met,
@@ -181,7 +181,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_backup",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_backup.SCHEMA),
         handler=story_backup.handler,
         check_fn=_requirements_met,
@@ -192,7 +192,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_dashboard",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_dashboard.SCHEMA),
         handler=story_dashboard.handler,
         check_fn=_requirements_met,
