@@ -143,14 +143,16 @@ SCHEMA = {
             "description": "Project slug or path",
         },
         "ops": {
-            "type": "array",
-            "description": "For action=\"stage\": the changes to propose, in any order — commit "
-                           "sorts them into create, edit, delete, reorder itself. Relations "
-                           "such as a scene's characters ride INSIDE frontmatter, there is no "
-                           "separate relations key. Staging again with the same draft_id "
-                           "REPLACES the proposal, and the response says what was added, "
-                           "dropped or changed.",
-            "items": _op_schemas(),
+            "type": "string",
+            "description": "For action=\"stage\": the ops as a JSON-encoded string, e.g. "
+                           "'[{\"op\":\"create\",\"type\":\"value\",\"id\":\"trust\","
+                           "\"frontmatter\":{\"name\":\"trust\",\"p\":\"open\"},\"summary\":\"...\"}]'. "
+                           "A string, not an array, because the agent tool-call channel cannot "
+                           "serialize an array of objects. The four op kinds and their fields "
+                           "are in the tool description of story_describe; relations ride INSIDE "
+                           "frontmatter, there is no separate relations key. commit sorts the "
+                           "ops into create, edit, delete, reorder itself. Staging again with "
+                           "the same draft_id REPLACES the proposal.",
         },
         "draft_id": {
             "type": "string",
@@ -182,9 +184,21 @@ def handler(args: dict, **kwargs) -> str:
 
     try:
         if action == "stage":
+            # ops arrives as a JSON-encoded string: the agent tool-call channel
+            # cannot serialize an array of objects, so the batch is carried as
+            # text and parsed here. A list is still accepted for direct calls.
+            ops = args.get("ops")
+            if isinstance(ops, str):
+                try:
+                    ops = json.loads(ops)
+                except json.JSONDecodeError as e:
+                    return json.dumps(
+                        {"error": f"ops is not valid JSON: {e}. Pass the ops as a "
+                                  f"JSON-encoded string, e.g. "
+                                  f"'[{{\"op\":\"create\",...}}]'."})
             return json.dumps(stage(
                 project_path,
-                args.get("ops"),
+                ops,
                 summary=args.get("summary", ""),
                 draft_id=args.get("draft_id"),
             ))
