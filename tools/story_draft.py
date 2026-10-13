@@ -115,7 +115,6 @@ def _op_schemas() -> list[dict]:
 
 
 SCHEMA = {
-    "name": "story_draft",
     "description": "Propose a batch of entity changes, show them to the user, and write them "
                    "only when the user confirms. This is the only way to create, edit or "
                    "reorder an entity — every write goes through a draft, so use it "
@@ -146,12 +145,12 @@ SCHEMA = {
         "ops": {
             "type": "array",
             "description": "For action=\"stage\": the changes to propose, in any order — commit "
-                           "sorts them into create, edit, delete, reorder itself. The four "
-                           "kinds and their fields are in `items`. Relations such as a "
-                           "scene's characters ride INSIDE frontmatter, there is no separate "
-                           "relations key. Staging again with the same draft_id REPLACES the "
-                           "proposal, and the response says what was added, dropped or changed.",
-            "items": {"oneOf": _op_schemas()},
+                           "sorts them into create, edit, delete, reorder itself. Relations "
+                           "such as a scene's characters ride INSIDE frontmatter, there is no "
+                           "separate relations key. Staging again with the same draft_id "
+                           "REPLACES the proposal, and the response says what was added, "
+                           "dropped or changed.",
+            "items": _op_schemas(),
         },
         "draft_id": {
             "type": "string",

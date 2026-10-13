@@ -40,6 +40,10 @@ DASH.showActPanel = function(actId) {
       </div>`;
     })()}
     ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
+    <div>
+      <div class="panel-section-title">Value focus</div>
+      ${DASH.valueFocusHtml(act.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
     ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div>${seqRows}</div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
     ${DASH.renderSectionsHtml('act', actId)}
   `;
@@ -287,6 +291,10 @@ DASH.showPlotPanel = function(plotId) {
       <span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span>
     </div>
     ${arcHtml}
+    <div>
+      <div class="panel-section-title">Value focus</div>
+      ${DASH.valueFocusHtml(plot.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
     ${chars ? `<div>
       <div class="panel-section-title">Characters involved</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
@@ -555,6 +563,10 @@ DASH.showSequencePanel = function(seqId) {
   document.getElementById('panel-body').innerHTML = `
     <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
     ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
+    <div>
+      <div class="panel-section-title">Value focus</div>
+      ${DASH.valueFocusHtml(seq.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
     ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div>${sceneRows}</div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
     ${DASH.renderSectionsHtml('sequence', seqId)}
   `;

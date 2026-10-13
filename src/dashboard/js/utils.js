@@ -47,3 +47,21 @@ DASH.setBar = function(baseId, count, total) {
   const bar = document.getElementById(baseId + '_bar');
   if (bar) bar.style.width = pct + '%';
 }
+
+// Major/minor value chips for a computed `value_focus` on a unit
+// (plot/sequence/act/project). Major is purple (the unit's spine values),
+// minor is the muted default tag. `scenes` is the count of scenes in which
+// the value shifts, shown only when > 1 — a single scene needs no number.
+DASH.valueFocusHtml = function(focus) {
+  const f = focus || {};
+  const chips = (list) => (list || []).map(it =>
+    `<span class="tag tag-mood" style="font-size:var(--font-size-xs)">${DASH.escapeHtml(it.value || '')}${it.scenes > 1 ? ' ×' + it.scenes : ''}</span>`
+  ).join('');
+  const majors = chips(f.major);
+  const minors = chips(f.minor);
+  if (!majors && !minors) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px">
+    ${majors}
+    ${minors ? `<span style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin:0 2px">minor:</span>${minors}` : ''}
+  </div>`;
+}

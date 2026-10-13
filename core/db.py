@@ -1363,15 +1363,37 @@ def get_dashboard_data(project_path: Path) -> dict:
                 _coerce_number(proj_dict.get("act_count"), 3), len(acts))
             proj_dict["arc_count"] = len(story_arcs)
 
+        # Computed value focus: major/minor values per unit, recounted from
+        # the scenes' value_turns on every load (nothing stored). The
+        # dashboard reads these off the entity it already opens, so the
+        # value view needs no extra round-trip. Recomputed once per call —
+        # get_scene_value_turns scans the whole project, and four scopes
+        # over one scan beats four scans.
+        focus_by_plot = {}
+        focus_by_sequence = {}
+        focus_by_act = {}
+        try:
+            from .value_focus import (for_act, for_plot, for_project,
+                                      for_sequence)
+            for pl in plots:
+                focus_by_plot[pl["id"]] = for_plot(project_path, pl["id"])
+            for sq in sequences:
+                focus_by_sequence[sq["id"]] = for_sequence(project_path, sq["id"])
+            for ac in acts:
+                focus_by_act[ac["id"]] = for_act(project_path, ac["id"])
+            story_focus = for_project(project_path)
+        except Exception:
+            story_focus = {"major": [], "minor": []}
+
         story_data = {
-            "project": proj_dict,
+            "project": {**proj_dict, "value_focus": story_focus},
             "characters": characters,
             "scenes": scenes,
             "locations": locations,
-            "plots": plots,
+            "plots": [{**pl, "value_focus": focus_by_plot.get(pl["id"], {"major": [], "minor": []})} for pl in plots],
             "worlds": worlds,
-            "acts": acts,
-            "sequences": sequences,
+            "acts": [{**ac, "value_focus": focus_by_act.get(ac["id"], {"major": [], "minor": []})} for ac in acts],
+            "sequences": [{**sq, "value_focus": focus_by_sequence.get(sq["id"], {"major": [], "minor": []})} for sq in sequences],
             "arcs": story_arcs,
             "relationships": relationships,
             "story_memory": story_memory,
