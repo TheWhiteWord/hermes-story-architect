@@ -119,12 +119,12 @@ ENTITY_SCHEMAS = {
     # the order a reader scans them in.
     "plot": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
-        "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
-        "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
-        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
-        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup (required for sub plots only)"},
-        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of this plot's protagonists only", "ref": "character"},
         "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
+        "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
+        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of this plot's protagonists only", "ref": "character"},
+        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
+        "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
+        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup (required for sub plots only)"},
         # The six role fields are READ-ONLY: they are the same `plot_<role>`
         # rows the scene writes as `plot_roles`, read back from the plot side.
         # The agent records a role where it is writing the scene, and never has
