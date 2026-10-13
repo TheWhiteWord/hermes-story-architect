@@ -38,6 +38,10 @@ VALUE_LADDER = {
 # Where the opposition comes from, relative to one character.
 CONFLICT_LEVELS = ["inner", "personal", "extra-personal"]
 
+# How many values are major in a unit. Ties at the cut are all major, so a
+# unit can carry more than three (design §4).
+VALUE_MAJOR_COUNT = 3
+
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
 ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
@@ -144,6 +148,14 @@ ENTITY_SCHEMAS = {
         "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
         "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
         "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the values that shift in this plot's scenes, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the most frequent, ties at the cut all major (VALUE_MAJOR_COUNT); scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The most frequent values in this unit, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The remaining values, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
@@ -161,6 +173,14 @@ ENTITY_SCHEMAS = {
         "contact": {"type": "string", "default": "", "optional": True, "description": "Title page: contact info (bottom-right)"},
         "draft_date": {"type": "string", "default": "", "optional": True, "description": "Title page: draft date (bottom-left)"},
         "draft": {"type": "string", "default": "", "optional": True, "description": "Title page: draft label (e.g. 'First Draft')"},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the story's major and minor values, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the main plot's major values; minor is the subplots' major values not already major (design §4). scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The main plot's most frequent values, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The subplots' major values not already major, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
     },
     "scene": {
         "type": {"type": "string", "default": "scene", "optional": False, "description": "Always 'scene'"},
@@ -222,6 +242,14 @@ ENTITY_SCHEMAS = {
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug"},
         "primary_plot": {"type": "string", "default": "", "optional": True, "description": "Primary plot slug this sequence serves"},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the values that shift in this sequence's scenes, all plots together, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the most frequent, ties at the cut all major (VALUE_MAJOR_COUNT); scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The most frequent values in this unit, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The remaining values, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
         "purpose": {"type": "string", "default": "", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
     },
     "act": {
@@ -230,6 +258,14 @@ ENTITY_SCHEMAS = {
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within story (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "act_objective": {"type": "string", "default": "", "label": "Objective", "optional": True, "description": "Protagonist's immediate goal for this act"},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the values that shift in this act's scenes, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the most frequent, ties at the cut all major (VALUE_MAJOR_COUNT); scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The most frequent values in this unit, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The remaining values, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
     },
     "arc_beat": {
         "character": {"type": "string", "default": "", "optional": False, "description": "Character slug this beat belongs to"},

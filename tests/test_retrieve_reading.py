@@ -89,7 +89,7 @@ class TestRelationBackedFields:
             "name", "one_sentence", "status", "characters", "value_arc",
             "plot_scope", "plot_type",
             "setups", "inciting_incident", "complications",
-            "crisis", "climax", "resolutions"]
+            "crisis", "climax", "resolutions", "value_focus"]
 
     def test_the_order_is_the_same_whatever_subset_is_asked_for(self, db):
         """Naming fields explicitly must not reorder them — a caller that asks

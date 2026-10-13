@@ -10,10 +10,22 @@ Three defects this replaces:
   * one entity per call, forcing a round trip per id.
 """
 import json
+from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
 from core.entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS as REVERSED_KINDS,
                           _RELATION_FIELDS)
+from core.value_focus import for_act, for_plot, for_project, for_sequence
+
+# The computed `value_focus` read-back per unit type, with the project beside
+# it: the project row is a singleton, so `_resolve` ignores its id and its
+# scope function takes none.
+VALUE_FOCUS_SCOPES = {
+    "plot": for_plot,
+    "sequence": for_sequence,
+    "act": for_act,
+    "project": for_project,
+}
 
 SCHEMA = {
     "description": "Read one or more entities: their field values and section prose, plus which "
@@ -84,6 +96,12 @@ def _row_data(conn, row) -> dict:
     return dict(zip(_columns(conn), row))
 
 
+def _project_path(conn) -> Path:
+    """Recover the project folder from the database file the connection is on."""
+    # ponytail: sqlite exposes the file path; the plugin always uses .story/story.db.
+    return Path(conn.execute("PRAGMA database_list").fetchone()[2]).parent.parent
+
+
 def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
     """Field values: columns, extra JSON, and relation-backed fields merged in."""
     extra = json.loads(data.get("extra") or "{}")
@@ -105,6 +123,16 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
             values[field] = data.get(column_map[field], "")
         else:
             values[field] = extra.get(field, meta["default"])
+    # A computed field is derived, not stored: `value_focus` is the major and
+    # minor values counted from the scenes' value_turns. Nothing to read from
+    # `extra`, so it is built here — the first loop above already reserved the
+    # key in schema position. The project row is a singleton, so `_resolve`
+    # ignores its id and its scope function takes none.
+    if "value_focus" in wanted and entity_type in VALUE_FOCUS_SCOPES:
+        values["value_focus"] = (
+            for_project(_project_path(conn)) if entity_type == "project"
+            else VALUE_FOCUS_SCOPES[entity_type](_project_path(conn), data["id"]))
+
     # Relation-backed fields: plot beats are rows linking to scenes, not
     # columns. Their position in the output is wherever the schema puts them,
     # so the first loop above reserves the key and this one fills it.
