@@ -969,7 +969,7 @@ class TestUnfilledFields:
 # Field → the value it charges. A description must name it, or the model is
 # left guessing which value the charge belongs to. Only the character-side
 # fields survive the B1/B2 redesign: the story-side charges moved to
-# `scene.value_turns`, whose words come from the plot's `value_schemas`.
+# `scene.value_turns`, whose words come from `value` entities.
 _VALUE_FIELDS = {
     "character": ["character_value_at_open", "character_value_at_close"],
     "arc_beat": ["character_value_at_open", "character_value_at_close", "y"],
@@ -977,7 +977,7 @@ _VALUE_FIELDS = {
 
 # The curve fields live on arc_beat only now: they describe a turn, and a turn
 # is only observable once the beat exists. A scene's turn is `value_turns`,
-# whose words come from the plot's schema.
+# whose words come from a `value` entity.
 _CURVE_ENTITIES = ("arc_beat",)
 
 

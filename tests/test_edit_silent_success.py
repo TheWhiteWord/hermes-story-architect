@@ -228,6 +228,12 @@ class TestValidKeysStillWork:
                 # from the field's declared type so the sweep tests acceptance
                 # of a valid value rather than tolerance of a wrong one.
                 probe = _probe_value(schema.get(key, {}))
+                # A value's id is fixed at create and must stay the slug of
+                # its name (validate_value), so renaming a value is only
+                # accepted for a name that slugs back to the same id. The
+                # sweep's sample id IS that slug, so the probe renames to it.
+                if etype == "value" and key == "name":
+                    probe = sample
                 # A field whose entries carry a `ref` needs a real entity of that
                 # type; the sweep cannot synthesise one, so those fields are out
                 # of scope for the acceptance check (their ref is validated

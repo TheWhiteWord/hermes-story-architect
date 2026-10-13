@@ -170,15 +170,6 @@ class TestNestedFieldsKeepTheirDeclaredOrder:
                  if k in turn]
         assert order == ["plot:", "value:", "from:", "to:", "effects:"], order
 
-    def test_a_schema_reads_value_p_c_cd_nn(self, proj):
-        p, vault = proj
-        _export(p, vault)
-        text = note_for(p, "plots", "the-resistance").read_text()
-        schema = text.split("value_schemas:", 1)[1]
-        order = [k for k in ("value:", "p:", "c:", "cd:", "nn:", "note:")
-                 if k in schema]
-        assert order[:5] == ["value:", "p:", "c:", "cd:", "nn:"], order
-
     def test_nested_effects_and_levels_keep_their_order(self, proj):
         p, vault = proj
         _export(p, vault)

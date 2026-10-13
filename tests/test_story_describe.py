@@ -260,11 +260,6 @@ class TestOneVocabularyAcrossReadAndWrite:
         # Entity containers, not fields: they hold other entities.
         known |= {"acts", "sequences", "scenes", "worlds", "locations",
                   "plots", "characters"}
-        # `value_lines` is a computed read-back (plot.value_lines): its own shape
-        # is {value, schema, turns} and each turn is {scene_id, from, to,
-        # effects}, with effects/levels reusing the turn's declared sub_fields.
-        # None of these are stored fields — they are derived, like `milestone`.
-        known |= {"value_lines", "turns", "scene_id", "from", "to", "schema"}
         # `milestone` is the load payload's own climax marker, deliberately not
         # a stored field — the spec derives it from four scene booleans.
         known |= {"milestone"}

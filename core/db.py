@@ -354,66 +354,6 @@ def get_scene_value_turns(project_path: Path) -> list[dict]:
         conn.close()
 
 
-def compute_value_lines(project_path: Path, plot_id: str) -> list[dict]:
-    """The plot's value schemas with their turns, in story order (design §3.4).
-
-    Read-back for the values of one plot: each value the plot defines, its
-    vocabulary, and every turn of it across the scenes — scene id, the state
-    the scene opened on and the state it closed on, and for each protagonist
-    the shift landed on the conflict levels it reached and what it did there.
-
-    Story order is the scene's position in the story — act, then sequence,
-    then scene — not the order the turns were written: a scene inserted later
-    still reads where it happens, which is the whole point of reading the
-    line back.
-
-    Turns are the plot's own: a value the plot shares with another plot reads
-    only the turns that name this plot.
-    """
-    db_path = project_path / ".story" / "story.db"
-    if not db_path.exists():
-        return []
-    conn = get_db(project_path)
-    try:
-        row = conn.execute(
-            "SELECT extra FROM entities WHERE id=? AND type='plot' AND is_deleted=0",
-            (plot_id,)).fetchone()
-        if not row:
-            return []
-        schemas = (json.loads(row[0]) if row[0] else {}).get("value_schemas") or []
-        if not schemas:
-            return []
-        by_value = {str(s.get("value") or "").strip().lower(): s for s in schemas}
-
-        lines: dict[str, dict] = {}
-        for value, schema in by_value.items():
-            lines[value] = {"value": schema.get("value", ""), "schema": schema,
-                            "turns": []}
-        for turn in get_scene_value_turns(project_path):
-            if turn["plot"] != plot_id:
-                continue
-            line = lines.get(str(turn["value"]).strip().lower())
-            if not line:
-                continue  # a value the plot no longer defines
-            line["turns"].append({
-                "scene_id": turn["scene_id"],
-                "from": turn["from"],
-                "to": turn["to"],
-                "effects": turn["effects"],
-                "_order": turn["order"]})
-        out = []
-        for schema in schemas:
-            line = lines[str(schema.get("value") or "").strip().lower()]
-            line["turns"].sort(key=lambda t: t["_order"])
-            for turn in line["turns"]:
-                del turn["_order"]
-            if line["turns"]:
-                out.append(line)
-        return out
-    finally:
-        conn.close()
-
-
 def get_project_memory(project_path: Path) -> dict:
     """Read project.extra.memory from the DB; missing memory is empty."""
     db_path = project_path / ".story" / "story.db"
@@ -664,8 +604,8 @@ def get_project_summary(project_path: Path) -> dict:
                 [sid for sid, s in scenes.items() if s["_parent_id"] == seq_id],
                 key=lambda sid: (scenes[sid]["_order_key"], sid)
             )
-            # No value here: a value turn lives on its scene (value_turns), and
-            # the plot's value_lines read them back. Repeating them here cost
+            # No value here: a value turn lives on its scene (value_turns),
+            # and the values view reads them back. Repeating them here cost
             # tokens in the view whose job is to stay small.
             return {
                 "id": seq["id"],
@@ -726,15 +666,6 @@ def get_project_summary(project_path: Path) -> dict:
                                   "relationships": []})
 
         # ── Build plot output ──
-        # The value read-back, once per plot: every plot's line needs every
-        # scene's turns, so building it per plot scans the same scenes N times.
-        # `get_project_summary` opens its own connection inside, so this is a
-        # pass over an in-memory snapshot of the same DB rather than a second
-        # connection — ponytail: hoist the scan into one shared pass if a real
-        # project makes this the load's hot path.
-        plot_value_lines = {pid: compute_value_lines(project_path, pid)
-                            for pid in plots}
-
         def _build_plot(plot_id):
             plot = plots[plot_id]
             result = {
@@ -746,14 +677,13 @@ def get_project_summary(project_path: Path) -> dict:
                 "plot_scope": plot["plot_scope"],
                 "value_arc": plot["value_arc"],
                 "characters": plot["characters"],
-                "value_lines": plot_value_lines[plot_id],
             }
             # No setups/complications/crisis/climax/resolutions: view='dramatic_elements' with
             # add_plot carries all four per scene, with the beat's own prose,
             # and story_retrieve returns the plot whole. Repeating the bare
             # scene ids here bought nothing in the view that must stay small.
             return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "",
-                                  "characters": [], "value_lines": []},
+                                  "characters": []},
                          always_keep={"status"})
 
         # ── Build location/world output ──
@@ -1218,8 +1148,6 @@ def get_dashboard_data(project_path: Path) -> dict:
                     d[field] = _normalize_beats(rel_map.get(eid, {}).get(kind, []))
                 # characters from character list (stored in extra.characters)
                 d["characters"] = extra.get("characters", [])
-                d["value_schemas"] = extra.get("value_schemas", [])
-                d["value_lines"] = compute_value_lines(project_path, eid)
                 plots.append(d)
 
             elif etype == "world":

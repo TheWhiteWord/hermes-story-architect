@@ -25,9 +25,9 @@ PLOT_SCOPES = ["main", "sub"]
 PLOT_ROLES = ["setup", "inciting_incident", "complication", "crisis", "climax", "resolution"]
 # The value ladder — four rungs of opposition (design §3.1).
 # The rung is looked up from the word and never stored. The codes are the
-# schema field names on plot.value_schemas; the meanings are what the skill
-# teaches. C and CD are defined per the source file; the notes in ISSUES.md
-# have them swapped.
+# field names on a `value` entity; the meanings are what the skill teaches.
+# C and CD are defined per the source file; the notes in ISSUES.md have them
+# swapped.
 VALUE_LADDER = {
     "p": "Positive, the ideal",
     "c": "Contrary: opposite, not absolute negation",
@@ -144,26 +144,6 @@ ENTITY_SCHEMAS = {
         "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
         "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
         "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
-        # The values this plot is written around, each with its own vocabulary:
-        # one word per rung of the value ladder (see VALUE_LADDER). Written
-        # when a value is first identified on the plot, or registered by the
-        # first scene turn that carries an inline `schema`. A turn can only
-        # use words of the plot's schema.
-        "value_schemas": {"type": "list", "default": [], "optional": True,
-                          "description": "Value schemas defined on this plot. Each entry defines one value and its four ladder words.",
-                          "sub_fields": {
-                              "value": {"type": "string", "required": True, "description": "The value at stake (e.g. 'trust')"},
-                              "p": {"type": "string", "required": True, "description": "The story's word for the positive, the ideal"},
-                              "c": {"type": "string", "required": True, "description": "The story's word for the contrary: opposite, not absolute negation"},
-                              "cd": {"type": "string", "required": True, "description": "The story's word for the contradictory: direct negation of the positive"},
-                              "nn": {"type": "string", "required": True, "description": "The story's word for the negation of negation: perversion or false version of the positive"},
-                              "note": {"type": "string", "description": "Optional: what the value means in this plot"},
-                          }},
-        # Computed read-back (Phase 4): for each value of the plot, its schema
-        # and its turns in story order. `computed` makes every write path
-        # refuse it. story_describe appends the read-only suffix itself.
-        "value_lines": {"type": "list", "default": [], "optional": True, "computed": True,
-                        "description": "Computed read-back: for each value of the plot, its schema and its turns in story order."},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
@@ -212,24 +192,18 @@ ENTITY_SCHEMAS = {
         # The value pass, recorded after the scene exists: one entry per
         # shift of a value, with its effects on the protagonists nested
         # inside. A scene is created without it; the value pass fills it in
-        # later by editing the scene. `from`/`to` name the states as words of
-        # the plot's schema; an inline `schema` on the first turn defines a
-        # value the plot has none for. See VALUE_LADDER and CONFLICT_LEVELS.
+        # later by editing the scene. `value` names an existing value entity
+        # (create it first with story_draft — it can go in the same draft);
+        # `from`/`to` are words of THAT value's four rungs. A value has one
+        # schema wherever it is used, so there is nothing to define here. See
+        # VALUE_LADDER and CONFLICT_LEVELS.
         "value_turns": {"type": "list", "default": [], "optional": True,
                         "description": "Value turns recorded on this scene. Each entry is one shift of a value, with its effects on the protagonists.",
                         "sub_fields": {
                             "plot": {"type": "string", "required": True, "ref": "plot", "description": "Slug of an existing plot"},
-                            "value": {"type": "string", "required": True, "description": "A value with a schema on that plot, existing or supplied in `schema`"},
-                            "from": {"type": "string", "required": True, "description": "The state when the scene opens, as a schema word"},
-                            "to": {"type": "string", "required": True, "description": "The state when the scene closes, as a schema word"},
-                            "schema": {"type": "object", "required": False, "description": "Defines a value the plot has not yet registered — this write registers it on the plot. Never repeat a schema the plot already has.",
-                                       "sub_fields": {
-                                           "p": {"type": "string", "required": True, "description": "The story's word for the positive, the ideal"},
-                                           "c": {"type": "string", "required": True, "description": "The story's word for the contrary: opposite, not absolute negation"},
-                                           "cd": {"type": "string", "required": True, "description": "The story's word for the contradictory: direct negation of the positive"},
-                                           "nn": {"type": "string", "required": True, "description": "The story's word for the negation of negation: perversion or false version of the positive"},
-                                           "note": {"type": "string", "description": "Optional: what the value means in this plot"},
-                                       }},
+                            "value": {"type": "string", "required": True, "description": "The name of an existing value entity — the value, named by its positive pole (e.g. 'trust')"},
+                            "from": {"type": "string", "required": True, "description": "The state when the scene opens, as a word of that value's four rungs"},
+                            "to": {"type": "string", "required": True, "description": "The state when the scene closes, as a word of that value's four rungs"},
                             "effects": {"type": "list", "required": True, "description": "One entry per protagonist the shift affects",
                                         "sub_fields": {
                                             "character": {"type": "string", "required": True, "ref": "character", "description": "A protagonist of the plot, whether or not present in the scene"},

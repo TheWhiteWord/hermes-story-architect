@@ -8,19 +8,6 @@ one_sentence: Kael and Mira organize the children to breach the Central Room.
 plot_scope: main
 plot_type: Setup
 status: active
-value_schemas:
-- value: freedom
-  p: free
-  c: dependent
-  cd: imprisoned
-  nn: gilded cage
-  note: Whether the children may choose their own life.
-- value: trust
-  p: open
-  c: wary
-  cd: deceived
-  nn: exploited
-  note: Whether the system they live in tells them the truth.
 ---
 
 ## Summary

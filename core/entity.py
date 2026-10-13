@@ -162,12 +162,9 @@ def _validate_field(entity_type: str, field: str, value, meta: dict,
     the path, so a nested one is findable by index rather than by reading the
     whole field back.
 
-    `object` has two shapes, told apart by `keyed`:
-      * `keyed: True` (relationship.perspectives) — a map keyed by entity:
-        the keys are the entities and the values carry the declarations'
-        subjects, so the sub-fields apply to each VALUE.
-      * otherwise (a turn's inline `schema`) — a fixed record: the sub-fields
-        are the keys of the object itself, so they apply to the dict once.
+    `object` is a map keyed by entity (relationship.perspectives): the keys
+    are the entities and the values carry the declarations' subjects, so the
+    sub-fields apply to each VALUE.
     """
     sub_fields = meta.get("sub_fields") or {}
     keys = ", ".join(sub_fields)
@@ -194,24 +191,18 @@ def _validate_field(entity_type: str, field: str, value, meta: dict,
                 f"{at} must be an object with keys [{keys}] "
                 f"— got {type(value).__name__}")
             return
-        if meta.get("keyed"):
-            # A map keyed by entity (perspectives): the keys are the entities
-            # and the values carry the declarations' subjects, so the sub-
-            # fields apply to each VALUE.
-            for key_name, entry in value.items():
-                entry_at = f"{at}.{key_name}"
-                if not isinstance(entry, dict):
-                    warnings.append(
-                        f"{at} must be an object with keys [{keys}] "
-                        f"— {key_name} holds a {type(entry).__name__}")
-                    continue
-                for key, key_meta in sub_fields.items():
-                    _validate_sub_field(entry_at, entry, key, key_meta, warnings)
-        else:
-            # A fixed record (an inline `schema`): the sub-fields are the
-            # keys of the object itself, so they apply to the dict once.
+        # A map keyed by entity (perspectives): the keys are the entities
+        # and the values carry the declarations' subjects, so the sub-fields
+        # apply to each VALUE.
+        for key_name, entry in value.items():
+            entry_at = f"{at}.{key_name}"
+            if not isinstance(entry, dict):
+                warnings.append(
+                    f"{at} must be an object with keys [{keys}] "
+                    f"— {key_name} holds a {type(entry).__name__}")
+                continue
             for key, key_meta in sub_fields.items():
-                _validate_sub_field(at, value, key, key_meta, warnings)
+                _validate_sub_field(entry_at, entry, key, key_meta, warnings)
 
 
 def _validate_sub_field(path: str, entry: dict, key: str, meta: dict,
@@ -270,13 +261,13 @@ def _validate_numeric(frontmatter: dict, field: str, warnings: list[str]) -> Non
 def _validate_value(frontmatter: dict, warnings: list[str]) -> None:
     """The shape of one value: a name, four distinct rung words, optional note.
 
-    Same rule a scene's inline `schema` is held to — the four words must be
-    pairwise distinct, or two rungs name one state and the ladder collapses.
-    `p/c/cd/nn` non-empty is the required-field check, which runs before this.
+    The four words must be pairwise distinct, or two rungs name one state and
+    the ladder collapses. `p/c/cd/nn` non-empty is the required-field check,
+    which runs before this.
     """
     words = {rung: str(frontmatter.get(rung) or "").strip()
              for rung in VALUE_LADDER}
-    if any(words.values()) and len({w.lower() for w in words.values()}) != len(VALUE_LADDER):
+    if any(words.values()) and not distinct_ladder_words(words):
         warnings.append(
             f"a value needs four distinct words — the rungs are: "
             f"{', '.join(f'{k} {v}' for k, v in words.items())}")
@@ -285,9 +276,8 @@ def _validate_value(frontmatter: dict, warnings: list[str]) -> None:
 def distinct_ladder_words(words: dict) -> bool:
     """True when the four rung words are all non-empty and pairwise distinct.
 
-    The one rule the inline `schema` path and a `value` entity both enforce,
-    so it is asked here rather than restated — two copies is how a rule ends
-    up enforced on one path only.
+    The one rule a `value` entity is held to — asked here rather than restated,
+    because two copies is how a rule ends up enforced on one path only.
     """
     vals = [str(words.get(rung) or "").strip() for rung in VALUE_LADDER]
     if any(not v for v in vals):
@@ -899,21 +889,26 @@ def validate_scene_dramatic_role(dramatic_role, plot_roles) -> None:
 
 
 def validate_scene_value_turns(project_path, value_turns) -> None:
-    """Raise ValueError on the first value turn that breaks its plot's schema.
+    """Raise ValueError on the first value turn that breaks a rule.
 
     A turn is one shift of a value plus how it lands on each protagonist, and
-    every part of it has to resolve on the plot it names: the plot exists, the
-    value has a schema there (already registered or supplied inline by this
-    turn), `from` and `to` are words of that schema, and each effect names a
-    protagonist of that plot through one level per conflict circle.
+    every part of it has to resolve: the plot exists, the value names an
+    existing `value` entity, `from` and `to` are words of that value's four
+    rungs, and each effect names a protagonist of the plot through one level
+    per conflict circle.
+
+    A value has one schema wherever it is used, so there is nothing to define
+    on the scene: a turn names a value, and the words are that entity's. A
+    value that does not exist yet must be created (with `story_draft`, and it
+    can go in the same draft as the scene edit — a draft applies creates
+    before edits).
 
     The messages teach the vocabulary, because the agent that hits one is
-    holding a turn and needs to be told what the plot's words are rather than
+    holding a turn and needs to be told what the value's words are rather than
     that a rule was broken.
 
-    Runs on write only: it reads the plot's `characters` and `value_schemas`
-    from the database, so a plot created in the same draft is visible here —
-    commit applies a draft's ops one at a time, creates before edits.
+    Runs on write only: it reads the plots and the value entities from the
+    database, so entities created in the same draft are visible here.
     """
     from .db import get_db
 
@@ -922,16 +917,21 @@ def validate_scene_value_turns(project_path, value_turns) -> None:
 
     conn = get_db(project_path)
     try:
-        plots = {}
-        for row in conn.execute(
-                "SELECT id, extra FROM entities WHERE type='plot'").fetchall():
-            extra = json.loads(row[1]) if row[1] else {}
-            plots[row[0]] = (extra.get("characters") or [],
-                             extra.get("value_schemas") or [])
+        plots = {row[0]: json.loads(row[1]) if row[1] else {}
+                 for row in conn.execute(
+                     "SELECT id, extra FROM entities WHERE type='plot'")}
+        # One value per entity, its four rung words. Keyed case-insensitively:
+        # a turn names the value it means, so the name is matched as written,
+        # trimmed and lowercased, exactly as a value entity's uniqueness is.
+        values = {}
+        for _, name, extra in conn.execute(
+                "SELECT id, name, extra FROM entities WHERE type='value' "
+                "AND is_deleted=0").fetchall():
+            extra = json.loads(extra) if extra else {}
+            values[str(name or "").strip().lower()] = {
+                rung: str(extra.get(rung) or "").strip()
+                for rung in VALUE_LADDER}
 
-        # One value per turn: two shifts of the same value are two turns, so
-        # the same (plot, value) twice is a duplicate, not a second shift.
-        seen = set()
         for i, turn in enumerate(value_turns):
             at = f"value_turns[{i}]"
             if not isinstance(turn, dict):
@@ -943,62 +943,19 @@ def validate_scene_value_turns(project_path, value_turns) -> None:
                 raise ValueError(f"{at}.plot is required")
             if plot not in plots:
                 raise ValueError(f"Plot not found: {plot} (at {at}.plot)")
-            characters, schemas = plots[plot]
+            characters = plots[plot].get("characters") or []
 
             value = str(turn.get("value") or "").strip()
             if not value:
                 raise ValueError(f"{at}.value is required")
 
-            inline = turn.get("schema")
-            registered = next((s for s in schemas
-                               if str(s.get("value") or "").strip().lower()
-                               == value.lower()), None)
-            if registered is None and inline is None:
-                # A turn in THIS scene may have defined the value inline —
-                # the words it supplied are the schema the later turn uses.
-                inline = next((dict(other[2]) for other in seen
-                               if other[:2] == (plot, value.lower())), None)
-                if inline is None:
-                    raise ValueError(
-                        f"{value} has no schema on {plot}. "
-                        f"Defined values: {_defined_values(schemas)}. "
-                        f"Add a `schema` (p, c, cd, nn) to this turn to define it.")
-            if inline is not None and registered is not None:
+            words = values.get(value.lower())
+            if words is None:
                 raise ValueError(
-                    f"{value} already has a schema on {plot}: "
-                    f"{_schema_words(registered)}. "
-                    f"Remove schema from this turn and use these words.")
-
-            if registered is not None:
-                words = {rung: str(registered.get(rung) or "").strip()
-                         for rung in VALUE_LADDER}
-            else:
-                if not isinstance(inline, dict):
-                    raise ValueError(
-                        f"{at}.schema must be an object with keys "
-                        f"[p, c, cd, nn] — got {type(inline).__name__}")
-                for rung in VALUE_LADDER:
-                    if not str(inline.get(rung) or "").strip():
-                        raise ValueError(
-                            f"{at}.schema.{rung} is required — a schema is the "
-                            f"four words {', '.join(VALUE_LADDER)}")
-                words = {rung: str(inline[rung]).strip()
-                         for rung in VALUE_LADDER}
-                if not distinct_ladder_words(words):
-                    raise ValueError(
-                        f"{at}.schema needs four distinct words — the rungs "
-                        f"are: {', '.join(f'{k} {v}' for k, v in words.items())}")
-                # Same value, same scene: the words must agree, or the scene
-                # defines its value two ways at once.
-                for other in seen:
-                    if (other[:2] == (plot, value.lower())
-                            and other[2] != frozenset(words.items())):
-                        raise ValueError(
-                            f"{at} defines {value} on {plot} differently from "
-                            f"an earlier turn in this scene: "
-                            f"{_schema_words(dict(other[2]))} vs "
-                            f"{_schema_words(words)}. The words must agree.")
-                seen.add((plot, value.lower(), frozenset(words.items())))
+                    f"{value} is not a defined value. Defined values: "
+                    f"{_defined_values(values)}. Create the value first "
+                    f"(story_draft create type='value'), then name it here — "
+                    f"a value has one schema wherever it is used.")
 
             for key in ("from", "to"):
                 word = str(turn.get(key) or "").strip()
@@ -1007,7 +964,7 @@ def validate_scene_value_turns(project_path, value_turns) -> None:
                 if word.lower() not in {w.lower() for w in words.values()}:
                     raise ValueError(
                         f"{at}.{key} '{word}' is not a word of the {value} "
-                        f"schema on {plot}: {_schema_words(words)}")
+                        f"schema: {_schema_words(words)}")
 
             effects = turn.get("effects")
             if not effects:
@@ -1079,17 +1036,22 @@ def validate_scene_value_turns(project_path, value_turns) -> None:
         conn.close()
 
 
-def _schema_words(schema) -> str:
-    """A schema (or a words dict) as `p x, c y, cd z, nn w` — the vocabulary
-    an error message hands over, so the fix is to use these words."""
-    return ", ".join(f"{rung} {schema[rung]}" for rung in VALUE_LADDER)
+def _schema_words(words) -> str:
+    """A words dict as `p x, c y, cd z, nn w` — the vocabulary an error message
+    hands over, so the fix is to use these words."""
+    return ", ".join(f"{rung} {words[rung]}" for rung in VALUE_LADDER)
 
 
-def _defined_values(schemas) -> str:
-    """Every value the plot defines, with its words. Empty says why."""
-    if not schemas:
+def _defined_values(values) -> str:
+    """Every defined value with its words. Empty says why.
+
+    `values` is the name-keyed map the validator builds, so each entry shows
+    the value name and the four rung words the turn must use.
+    """
+    if not values:
         return "none"
-    return "; ".join(f"{s.get('value')}: {_schema_words(s)}" for s in schemas)
+    return "; ".join(f"{name}: {_schema_words(words)}"
+                     for name, words in values.items())
 
 
 def validate_arc_parents(project_path, character: str, scene: str) -> None:

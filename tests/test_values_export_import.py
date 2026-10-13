@@ -151,17 +151,14 @@ class TestRoundTrip:
     def test_values_import_before_scenes(self, fixture_path, tmp_path):
         """A scene's turn names a value, so the value must exist first.
 
-        The fixture already carries a value turn (`freedom`), which the
-        still-live Phase 4 schema path names by plot schema — so order is
-        asserted directly by watching the import walk.
+        The fixture carries a value turn (`freedom`) and its value in
+        `values.md`, so order is asserted directly by watching the import
+        walk.
         """
         vault = tmp_path / "vault"
         p = vault / "projects" / "save-the-children"
         p.parent.mkdir(parents=True)
         shutil.copytree(str(fixture_path), str(p))
-        create_entity(p, "value", "freedom",
-                      {"name": "freedom", "p": "free", "c": "imprisoned",
-                       "cd": "caged", "nn": "unfree"})
         _export(p, vault)
 
         import tools.story_import as si

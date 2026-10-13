@@ -70,18 +70,11 @@ def _sample_value(field, meta):
             # provide that only when a scene is created after a plot.
             return []
         if field == "value_turns":
-            # A turn names a plot and words of that plot's schema; this
-            # project holds no plot at all, so any turn would be refused for
-            # a missing plot. Empty is the shape this field has by default,
+            # A turn names a plot and a value entity, both of which this
+            # project holds none of, so any turn would be refused for a
+            # missing plot. Empty is the shape this field has by default,
             # and the turns themselves are covered by test_value_turns.py.
             return []
-        if field == "value_schemas":
-            # The same rule one level up: an entry declares one value and its
-            # four ladder words, all required. A placeholder string list is
-            # refused by the shape validator, so the sample is a real entry —
-            # the plot fixture in test_value_turns.py defines the same shape.
-            return [{"value": "trust", "p": "loyalty", "c": "complicity",
-                     "cd": "betrayal", "nn": "fanatic love"}]
         return [f"item-{i}" for i in range(1, 3)]
     return f"sample-{field}"
 

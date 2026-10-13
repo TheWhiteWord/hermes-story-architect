@@ -10,7 +10,6 @@ Three defects this replaces:
   * one entity per call, forcing a round trip per id.
 """
 import json
-from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
 from core.entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS as REVERSED_KINDS,
@@ -85,12 +84,6 @@ def _row_data(conn, row) -> dict:
     return dict(zip(_columns(conn), row))
 
 
-def _project_path(conn) -> Path:
-    """Recover the project folder from the database file the connection is on."""
-    # ponytail: sqlite exposes the file path; the plugin always uses .story/story.db.
-    return Path(conn.execute("PRAGMA database_list").fetchone()[2]).parent.parent
-
-
 def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
     """Field values: columns, extra JSON, and relation-backed fields merged in."""
     extra = json.loads(data.get("extra") or "{}")
@@ -112,15 +105,6 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
             values[field] = data.get(column_map[field], "")
         else:
             values[field] = extra.get(field, meta["default"])
-    # A computed field is derived, not stored: `value_lines` is the plot's
-    # schemas with their turns, which live on the scenes. Nothing to read from
-    # `extra`, so it is built here — the first loop already reserved the key in
-    # schema position.
-    if entity_type == "plot" and "value_lines" in wanted:
-        from core.db import compute_value_lines
-        values["value_lines"] = compute_value_lines(
-            _project_path(conn), data["id"])
-
     # Relation-backed fields: plot beats are rows linking to scenes, not
     # columns. Their position in the output is wherever the schema puts them,
     # so the first loop above reserves the key and this one fills it.

@@ -58,12 +58,12 @@ class TestVocabulary:
         order = list(ENTITY_SCHEMAS["plot"])
         assert order[:7] == ["name", "one_sentence", "status", "characters",
                              "value_arc", "plot_scope", "plot_type"]
-        # The roles sit after the identity block; the value fields follow
-        # them (value_schemas, then computed value_lines).
+        # The roles sit after the identity block. The plot no longer carries
+        # value fields — the values moved onto `value` entities.
         roles = [f for f in order if f in PLOT_BEAT_FIELDS]
         assert roles == ["setups", "inciting_incident", "complications",
                          "crisis", "climax", "resolutions"]
-        assert order.index("resolutions") < order.index("value_schemas") < order.index("value_lines")
+        assert order.index("resolutions") > order.index("plot_type")
 
     def test_the_dashboard_role_list_is_the_same_list(self):
         """The JS copy is hand-written like PLOT_ROLES was — so pin it.
