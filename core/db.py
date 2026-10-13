@@ -283,6 +283,77 @@ def get_memory_block(project_path: Path) -> dict:
     }
 
 
+def get_scene_value_turns(project_path: Path) -> list[dict]:
+    """Every scene's value turns, each tagged with plot/act/sequence and story order.
+
+    One pass over every scene; callers filter in Python (one scan for the
+    whole project beats one scan per plot). Each turn carries the act,
+    sequence and scene it sits in, resolved from the parent chain, and an
+    `order` key of (act, sequence, scene) — the true story order, because
+    sequence order keys restart in every act.
+
+    Fixes two defects of the per-plot scan this replaces: turns are tagged
+    with the plot they name, so a plot never sees another plot's turns of a
+    value it shares, and the order key includes the act, so a scene in act 2
+    cannot sort before an act 1 scene.
+
+    One row per turn: `{scene_id, plot, act_id, sequence_id, order, value,
+    from, to, effects}`. A scene with no sequence has none, and none of its
+    turns name an act — it still reads, ordered first.
+    """
+    db_path = project_path / ".story" / "story.db"
+    if not db_path.exists():
+        return []
+    conn = get_db(project_path)
+    try:
+        rows = conn.execute(
+            "SELECT e.id, e.extra, p.id, p.parent_id, "
+            "e.order_key, p.order_key, pp.order_key "
+            "FROM entities e "
+            "LEFT JOIN entities p ON e.parent_id = p.id "
+            "LEFT JOIN entities pp ON p.parent_id = pp.id "
+            "WHERE e.type='scene' AND e.is_deleted=0").fetchall()
+        out: list[dict] = []
+        for scene_id, extra_json, seq_id, act_id, scene_order, \
+                seq_order, act_order in rows:
+            extra = json.loads(extra_json) if extra_json else {}
+            order = (act_order if act_order is not None else 0,
+                     seq_order if seq_order is not None else 0,
+                     scene_order if scene_order is not None else 0,
+                     scene_id)
+            for turn in extra.get("value_turns") or []:
+                if not isinstance(turn, dict):
+                    continue
+                value = str(turn.get("value") or "").strip()
+                if not value:
+                    continue  # a turn naming no value is not a turn
+                effects = []
+                for effect in turn.get("effects") or []:
+                    if not isinstance(effect, dict):
+                        continue
+                    effects.append({
+                        "character": effect.get("character", ""),
+                        "levels": [
+                            {"conflict_level": lvl.get("conflict_level", ""),
+                             "effect": lvl.get("effect", "")}
+                            for lvl in effect.get("levels") or []
+                            if isinstance(lvl, dict)]})
+                out.append({
+                    "scene_id": scene_id,
+                    "plot": str(turn.get("plot") or "").strip(),
+                    "act_id": act_id,
+                    "sequence_id": seq_id,
+                    "order": order,
+                    "value": value,
+                    "from": turn.get("from", ""),
+                    "to": turn.get("to", ""),
+                    "effects": effects,
+                })
+        return out
+    finally:
+        conn.close()
+
+
 def compute_value_lines(project_path: Path, plot_id: str) -> list[dict]:
     """The plot's value schemas with their turns, in story order (design §3.4).
 
@@ -291,13 +362,13 @@ def compute_value_lines(project_path: Path, plot_id: str) -> list[dict]:
     the scene opened on and the state it closed on, and for each protagonist
     the shift landed on the conflict levels it reached and what it did there.
 
-    Story order is the scene's position inside its sequence, not the order the
-    turns were written: a scene inserted later still reads where it happens,
-    which is the whole point of reading the line back.
+    Story order is the scene's position in the story — act, then sequence,
+    then scene — not the order the turns were written: a scene inserted later
+    still reads where it happens, which is the whole point of reading the
+    line back.
 
-    One pass over every scene, so a plot's line costs the same to build as the
-    project's — this is called once per plot in `get_project_summary`, where
-    the scan can be hoisted out later if it ever matters.
+    Turns are the plot's own: a value the plot shares with another plot reads
+    only the turns that name this plot.
     """
     db_path = project_path / ".story" / "story.db"
     if not db_path.exists():
@@ -314,52 +385,28 @@ def compute_value_lines(project_path: Path, plot_id: str) -> list[dict]:
             return []
         by_value = {str(s.get("value") or "").strip().lower(): s for s in schemas}
 
-        # scene order_key is per parent sequence, so the sort key needs the
-        # sequence's own key in front of it — the same composite `_build_scene`
-        # uses. A scene with no sequence sorts first, as it has nowhere else
-        # to sit.
-        scenes = conn.execute(
-            "SELECT e.id, e.order_key, e.extra, p.order_key "
-            "FROM entities e LEFT JOIN entities p ON e.parent_id = p.id "
-            "WHERE e.type='scene' AND e.is_deleted=0").fetchall()
-
         lines: dict[str, dict] = {}
         for value, schema in by_value.items():
             lines[value] = {"value": schema.get("value", ""), "schema": schema,
                             "turns": []}
-        for scene_id, order_key, extra_json, parent_order in scenes:
-            extra = json.loads(extra_json) if extra_json else {}
-            for turn in extra.get("value_turns") or []:
-                if not isinstance(turn, dict):
-                    continue
-                key = str(turn.get("value") or "").strip().lower()
-                line = lines.get(key)
-                if not line:
-                    continue  # a value the plot no longer defines
-                effects = []
-                for effect in turn.get("effects") or []:
-                    if not isinstance(effect, dict):
-                        continue
-                    effects.append({
-                        "character": effect.get("character", ""),
-                        "levels": [
-                            {"conflict_level": lvl.get("conflict_level", ""),
-                             "effect": lvl.get("effect", "")}
-                            for lvl in effect.get("levels") or []
-                            if isinstance(lvl, dict)]})
-                line["turns"].append({
-                    "scene_id": scene_id,
-                    "from": turn.get("from", ""),
-                    "to": turn.get("to", ""),
-                    "effects": effects,
-                    "_sort": (parent_order if parent_order is not None else -1,
-                              order_key, scene_id)})
+        for turn in get_scene_value_turns(project_path):
+            if turn["plot"] != plot_id:
+                continue
+            line = lines.get(str(turn["value"]).strip().lower())
+            if not line:
+                continue  # a value the plot no longer defines
+            line["turns"].append({
+                "scene_id": turn["scene_id"],
+                "from": turn["from"],
+                "to": turn["to"],
+                "effects": turn["effects"],
+                "_order": turn["order"]})
         out = []
         for schema in schemas:
             line = lines[str(schema.get("value") or "").strip().lower()]
-            line["turns"].sort(key=lambda t: t["_sort"])
+            line["turns"].sort(key=lambda t: t["_order"])
             for turn in line["turns"]:
-                del turn["_sort"]
+                del turn["_order"]
             if line["turns"]:
                 out.append(line)
         return out

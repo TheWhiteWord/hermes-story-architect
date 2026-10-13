@@ -266,6 +266,98 @@ class TestRegistrationOnWrite:
         return row[0] if row else None
 
 
+def _project(root, *plots):
+    """A project with the given plots and two protagonists (shared chars)."""
+    (root / "projects").mkdir(parents=True)
+    assert create_project("stc", {"name": "STC"}, root)["success"]
+    proj = root / "projects" / "stc"
+    create_entity(proj, "character", "kael", {"name": "Kael"})
+    create_entity(proj, "character", "mira", {"name": "Mira"})
+    for pid, schemas in plots:
+        create_entity(proj, "plot", pid, {
+            "name": pid, "characters": ["kael", "mira"],
+            "value_schemas": schemas})
+    return proj
+
+
+def _scene(project, slug, turns, **kw):
+    return create_entity(project, "scene", slug,
+                         {"title": slug, "value_turns": turns, **kw})
+
+
+def _scene_ids(lines, value="trust"):
+    line = next(l for l in lines if l["value"] == value)
+    return [t["scene_id"] for t in line["turns"]]
+
+
+class TestSharedValueAcrossPlots:
+    """Defect 1: a value two plots both define must not mix their turns."""
+
+    def test_each_plot_reads_only_its_own_turns(self, tmp_path):
+        project = _project(tmp_path / "v",
+                           ("main-plot", [{"value": "trust", **SCHEMA}]),
+                           ("sub-plot", [{"value": "trust", **SCHEMA}]))
+        _scene(project, "s-main", [_turn(plot="main-plot")])
+        _scene(project, "s-sub", [_turn(plot="sub-plot")])
+        assert _scene_ids(compute_value_lines(project, "main-plot")) == ["s-main"]
+        assert _scene_ids(compute_value_lines(project, "sub-plot")) == ["s-sub"]
+
+
+class TestTurnsReadAcrossActs:
+    """Defect 2: sequence order keys restart in each act, so the act leads."""
+
+    def _in_two_acts(self, tmp_path):
+        """Act 2's sequence gets a lower order_key than act 1's scene."""
+        project = _project(tmp_path / "v",
+                           ("main-plot", [{"value": "trust", **SCHEMA}]))
+        create_entity(project, "act", "act-1", {"title": "A1", "order": 1})
+        create_entity(project, "act", "act-2", {"title": "A2", "order": 2})
+        create_entity(project, "sequence", "seq-1", {"title": "S1", "order": 5,
+                                                     "act_id": "act-1"})
+        create_entity(project, "sequence", "seq-2", {"title": "S2", "order": 1,
+                                                     "act_id": "act-2"})
+        # The act-1 scene happens later inside its sequence than the act-2
+        # scene does, so scene order alone would put it second — the act must
+        # lead the key, or act 2 reads before act 1.
+        _scene(project, "s-early", [_turn()], order=1,
+               sequence_id="seq-2", act_id="act-2")
+        _scene(project, "s-late", [_turn()], order=2,
+               sequence_id="seq-1", act_id="act-1")
+        return project
+
+    def test_act_one_scene_reads_before_act_two(self, tmp_path):
+        project = self._in_two_acts(tmp_path)
+        assert _scene_ids(compute_value_lines(project, "main-plot")) == [
+            "s-late", "s-early"]
+
+    def test_turns_carry_their_placement(self, tmp_path):
+        from core.db import get_scene_value_turns
+        project = self._in_two_acts(tmp_path)
+        rows = get_scene_value_turns(project)
+        by_scene = {r["scene_id"]: r for r in rows}
+        assert set(by_scene) == {"s-late", "s-early"}
+        for scene_id, act, seq in (("s-late", "act-1", "seq-1"),
+                                   ("s-early", "act-2", "seq-2")):
+            row = by_scene[scene_id]
+            assert row["plot"] == "main-plot"
+            assert row["act_id"] == act
+            assert row["sequence_id"] == seq
+            assert row["order"] == (
+                {"s-late": (1, 5, 2), "s-early": (2, 1, 1)}[scene_id]
+                + (scene_id,))
+            assert row["value"] == "trust"
+
+    def test_two_plots_are_distinguishable_in_the_helper(self, tmp_path):
+        from core.db import get_scene_value_turns
+        project = _project(tmp_path / "v",
+                           ("main-plot", [{"value": "trust", **SCHEMA}]),
+                           ("sub-plot", [{"value": "trust", **SCHEMA}]))
+        _scene(project, "s-main", [_turn(plot="main-plot")])
+        _scene(project, "s-sub", [_turn(plot="sub-plot")])
+        rows = get_scene_value_turns(project)
+        assert {r["plot"] for r in rows} == {"main-plot", "sub-plot"}
+
+
 class TestTheReadBack:
     """`plot.value_lines`: the turns of one plot, read back in story order.
 
