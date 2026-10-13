@@ -452,16 +452,41 @@ DASH.showScenePanel = function(sceneId) {
   }
   (scene.milestone || []).forEach(m => dramaTags.push({ l: m, v: m }));
 
-  const valueArc = [scene.value_at_open, scene.value_at_close].filter(Boolean);
   const conflicts = (scene.conflict_levels || []).filter(Boolean);
 
-  const dramaHtml = (dramaTags.length || valueArc.length || conflicts.length) ? `
+  // Value turns: the value pass recorded on this scene, one row per shift
+  // (value, from → to), tagged with the plot it serves. Nothing here is
+  // stored on the scene itself — the words belong to the value entity, so
+  // the row names the value and leaves the rungs implicit.
+  const turnRows = (scene.value_turns || []).map(t => {
+    const pl = (DASH.story.plots || []).find(x => x.id === t.plot);
+    const plotLabel = pl ? pl.name : (t.plot || '');
+    const col = pl
+      ? (pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888'))
+      : '#888';
+    const from = DASH.escapeHtml(t.from || '');
+    const to = DASH.escapeHtml(t.to || '');
+    const shift = from && to ? `${from} <span style="opacity:0.5">→</span> ${to}`
+                 : from || to || '';
+    const sub = [shift, plotLabel ? DASH.escapeHtml(plotLabel) : ''].filter(Boolean)
+      .join('<span style="opacity:0.5;margin:0 4px">·</span>');
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${t.plot || ''}')" style="border-left:2px solid ${col}">
+      <span style="font-weight:500;margin-right:6px">${DASH.escapeHtml(t.value || '')}</span>
+      <span style="font-size:var(--font-size-xs);color:var(--muted-foreground)">${sub}</span>
+    </button>`;
+  }).join('');
+
+  const turnsHtml = turnRows ? `<div>
+    <div class="panel-section-title">Value turns</div>
+    <div style="display:flex;flex-direction:column;gap:4px;">${turnRows}</div>
+  </div>` : '';
+
+  const dramaHtml = (dramaTags.length || conflicts.length) ? `
     <div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
         ${dramaTags.map(t => `<span class="tag tag-struct">${t.v}</span>`).join('')}
         ${conflicts.map(c => `<span class="tag tag-char" style="font-size:var(--font-size-xs)">${c}</span>`).join('')}
       </div>
-      ${valueArc.length ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:8px">Value arc: ${valueArc.join(' → ')}</div>` : ''}
     </div>` : '';
 
   document.getElementById('panel-body').innerHTML = `
@@ -478,6 +503,7 @@ DASH.showScenePanel = function(sceneId) {
       <div class="panel-section-title">Plot threads</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${plots}</div>
     </div>` : ''}
+    ${turnsHtml}
     ${scene.heading ? `<div>
       <div class="panel-section-title">Screenplay heading</div>
       <div class="panel-muted">${DASH.escapeHtml(scene.heading)}</div>
