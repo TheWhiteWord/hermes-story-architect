@@ -5,13 +5,15 @@ from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS, UNFILLED
 
-CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css", "graph.css"]
+CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css",
+             "graph.css", "value-graph.css"]
 JS_ORDER = [
     "core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
     "views/scenes.js", "views/locations.js", "views/plots.js",
     "views/relationships.js", "views/worlds.js", "views/story.js",
     "panels/panel-manager.js", "panels/entity-panels.js", "panels/memory-dialog.js",
     "graph/network.js", "graph/arc-graph.js",
+    "graph/value-graph.js",
     "statistics/statistics.js", "statistics/charts.js",
     "script-view.js",
 ]

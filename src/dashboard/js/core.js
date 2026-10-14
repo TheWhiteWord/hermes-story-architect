@@ -77,6 +77,7 @@ DASH.normalise = function(data) {
   });
 
   d.worlds = d.worlds || [];
+  d.values = d.values || [];
   d.story_memory = d.story_memory || { status: "ready", usage: "0/3000", counts: {}, categories: {} };
   d.story_memory.categories = d.story_memory.categories || {};
 
@@ -90,6 +91,7 @@ DASH.initStory = function(data) {
   DASH.story.plots      = DASH.story.plots      || [];
   DASH.story.scenes     = DASH.story.scenes     || [];
   DASH.story.worlds     = DASH.story.worlds     || [];
+  DASH.story.values     = DASH.story.values     || [];
   DASH.story.story_memory = DASH.story.story_memory || {};
   DASH.story.relationships = DASH.story.relationships || [];
 
@@ -102,5 +104,6 @@ DASH.initStory = function(data) {
   DASH.buildRelationshipsView();
   DASH.buildWorldsView();
   DASH.buildStoryView();
+  DASH.buildValuesView();
   DASH.buildScriptView();
 }

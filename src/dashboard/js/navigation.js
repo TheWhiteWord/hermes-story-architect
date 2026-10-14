@@ -4,6 +4,9 @@ let sidebarExpanded = false;
 
 let currentView = 'graph';
 
+DASH._viewOpenedHooks = [];
+DASH.onViewOpened = function(fn) { DASH._viewOpenedHooks.push(fn); };
+
 DASH.switchView = function(view, btn) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
@@ -14,6 +17,7 @@ DASH.switchView = function(view, btn) {
     DASH.network.redraw();
     DASH.network.fit();
   }
+  DASH._viewOpenedHooks.forEach(fn => fn(view));
   DASH.closePanel();
 }
 

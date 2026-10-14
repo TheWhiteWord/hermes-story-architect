@@ -110,6 +110,13 @@
 
 
 
+    <button class="nav-btn" data-view="values" onclick="DASH.switchView('values', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M2 12l3-4 3 2 3-6 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="nav-label">Values</span>
+    </button>
+
     <button class="nav-btn" data-view="worlds" onclick="DASH.switchView('worlds', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
         <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.4"/>
@@ -273,6 +280,15 @@
       <div class="view-body">
         <div class="entity-grid" id="world-list"></div>
       </div>
+    </div>
+
+    <!-- Values View -->
+    <div class="view" id="values-view">
+      <div class="view-header">
+        <div class="view-title">Values</div>
+        <div class="view-subtitle" id="values-subtitle">—</div>
+      </div>
+      <div class="view-body" id="values-body"></div>
     </div>
 
     <!-- Script View -->
