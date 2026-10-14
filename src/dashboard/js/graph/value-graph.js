@@ -20,7 +20,7 @@ window.DASH = window.DASH || {};
 
   const MILESTONES = {
     setup:              { label: 'Setup',            color: '#6bbfb0', shape: 'dot' },
-    inciting_incident:  { label: 'Inciting Incident', color: '#e0c96b', shape: 'ring' },
+    inciting_incident:  { label: 'Inciting Incident', color: '#e0c96b', shape: 'square' },
     complication:        { label: 'Complication',      color: '#e0a86b', shape: 'dot' },
     crisis:             { label: 'Crisis',           color: '#e0707d', shape: 'dot' },
     climax:             { label: 'Climax',           color: '#ffd93d', shape: 'ring' },
@@ -157,6 +157,8 @@ window.DASH = window.DASH || {};
         const x = X(i), y = 46 + j * 10;
         if (cfg.shape === 'ring') {
           p.push(`<circle class="vg-ring" cx="${x}" cy="${y}" r="3.5" stroke="${cfg.color}"/>`);
+        } else if (cfg.shape === 'square') {
+          p.push(`<rect x="${x - 3}" y="${y - 3}" width="6" height="6" fill="none" stroke="${cfg.color}" stroke-width="1.5"/>`);
         } else {
           p.push(`<circle cx="${x}" cy="${y}" r="2.5" fill="${cfg.color}"/>`);
         }
@@ -279,6 +281,8 @@ window.DASH = window.DASH || {};
     ${Object.entries(MILESTONES).map(([key, m]) =>
       m.shape === 'ring'
         ? `<span class="vg-legend-item"><svg width="10" height="10"><circle class="vg-ring" cx="5" cy="5" r="3.5" stroke="${m.color}"/></svg>${m.label}</span>`
+        : m.shape === 'square'
+        ? `<span class="vg-legend-item"><svg width="10" height="10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="${m.color}" stroke-width="1.5"/></svg>${m.label}</span>`
         : `<span class="vg-legend-item"><svg width="10" height="10"><circle cx="5" cy="5" r="2.5" fill="${m.color}"/></svg>${m.label}</span>`
     ).join('')}
   </div>`;
