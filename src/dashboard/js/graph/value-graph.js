@@ -183,7 +183,6 @@ window.DASH = window.DASH || {};
     const labelCls = compact ? 'vg-label vg-label-compact' : 'vg-label';
     for (let r = 0; r < 4; r++) {
       p.push(`<line class="vg-lane-line" x1="${geo.labelW}" y1="${Y(r)}" x2="${geo.W - GEO.padR + 6}" y2="${Y(r)}"/>`);
-      p.push(`<text class="vg-code" x="6" y="${Y(r) + 3}">${LANES[r].toUpperCase()}</text>`);
       p.push(`<text class="${labelCls}" x="${geo.labelW - 8}" y="${Y(r) + 3}" text-anchor="end">${DASH.escapeHtml(cut(schema[LANES[r]] || (r === 0 ? o.value : ''), 17))}</text>`);
     }
     model.seqs.forEach(q => { if (q.start > 0) p.push(`<line class="vg-seq-line" x1="${geo.labelW + q.start * geo.slot}" y1="0" x2="${geo.labelW + q.start * geo.slot}" y2="${H}"/>`); });
@@ -336,7 +335,7 @@ window.DASH = window.DASH || {};
     const geo = D.valueGeometry(model, el.clientWidth);
     const o = { strip: true };
     const pnl = names => names.map(n => panel(model, geo, n, v.lines.filter(l => norm(l.value) === norm(n)), o)).join('');
-    el.innerHTML = `<div class="vg-stack">${legendHtml()}<div class="vg-legend-note vg-note-block">The strip under each chart shows the conflict levels each shift touches. Hover a scene for the effect on each character.</div>
+    el.innerHTML = `<div class="vg-stack">${legendHtml()}
       <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo)}</div>
       ${v.major.length ? `<div class="vg-section">Major values</div>${pnl(v.major)}` : ''}
       ${v.minor.length ? `<div class="vg-section">Minor values</div>${pnl(v.minor)}` : ''}
