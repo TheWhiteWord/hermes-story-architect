@@ -1060,6 +1060,7 @@ def get_dashboard_data(project_path: Path) -> dict:
         sequences = []
         arcs = []
         relationships = []
+        values = []
 
         for e in ent_rows:
             etype = e[1]
@@ -1206,6 +1207,17 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["scenes"] = extra.get("scenes", [])
                 d["history"] = extra.get("history", "")
                 relationships.append(d)
+
+            elif etype == "value":
+                values.append({
+                    "id": eid,
+                    "name": e[2],
+                    "p": extra.get("p", ""),
+                    "c": extra.get("c", ""),
+                    "cd": extra.get("cd", ""),
+                    "nn": extra.get("nn", ""),
+                    "note": extra.get("note", ""),
+                })
 
         # Group arcs by character and attach as arc_beats_list (dashboard reads c.arc_beats_list)
         # Derived from arc entities directly — no separate arc_beat relations needed
@@ -1397,6 +1409,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             "arcs": story_arcs,
             "relationships": relationships,
             "story_memory": story_memory,
+            "values": values,
         }
 
         # 2. sections — {entity_type: {slug: {heading: body}}}
