@@ -215,84 +215,30 @@ window.DASH = window.DASH || {};
     });
 
     const k = compact ? 0.7 : 1;
-    // Collect all turns by scene index for overlap handling
-    const turnsByScene = new Map();
+    // several shifts in one scene (two plots, or two characters) sit side by side, not on top of each other
+    const totals = new Map(); o.lines.forEach(l => l.turns.forEach(t => totals.set(t.i, (totals.get(t.i) || 0) + 1)));
+    const seen = new Map();
     o.lines.forEach(line => {
       const col = plotColor(line.plot);
+      let prev = null;
       line.turns.forEach(t => {
-        if (!turnsByScene.has(t.i)) turnsByScene.set(t.i, []);
-        turnsByScene.get(t.i).push({ line, t, col });
-      });
-    });
-    // Sort each scene's turns by span size (larger first), then draw
-    const drawn = new Set();
-    const prevByLine = new Map();
-    turnsByScene.forEach((items, i) => {
-      items.sort((a, b) => {
-        const aSpan = a.t.fromRung != null && a.t.toRung != null ? Math.abs(a.t.toRung - a.t.fromRung) : 0;
-        const bSpan = b.t.fromRung != null && b.t.toRung != null ? Math.abs(b.t.toRung - b.t.fromRung) : 0;
-        return bSpan - aSpan;
-      });
-      items.forEach((item, idx) => {
-        if (drawn.has(`${i}-${idx}`)) return;
-        const { line, t, col } = item;
-        const x = X(i);
+        const n = seen.get(t.i) || 0; seen.set(t.i, n + 1);
+        const x = X(t.i) + (n - (totals.get(t.i) - 1) / 2) * 5;
         const yF = t.fromRung == null ? null : Y(t.fromRung);
         const yT = t.toRung == null ? null : Y(t.toRung);
-        // Carry/jump line from previous turn of same line
-        const prev = prevByLine.get(line.key);
+        // carried: from where the line ended to where this scene opens
         if (prev && prev.y != null && yF != null) {
+          // flat: the line carried on. Slanted: this scene opens somewhere else (a flashback, a time skip, a break)
           const jump = prev.rung !== t.fromRung;
           p.push(`<line class="${jump ? 'vg-jump' : 'vg-carry'}" x1="${prev.x}" y1="${prev.y}" x2="${x}" y2="${yF}" stroke="${col}"/>`);
         }
-        // Check for a matching partner (same from/to or reverse)
-        let partner = null, partnerIdx = -1;
-        for (let j = idx + 1; j < items.length; j++) {
-          if (drawn.has(`${i}-${j}`)) continue;
-          const o = items[j];
-          const oYF = o.t.fromRung == null ? null : Y(o.t.fromRung);
-          const oYT = o.t.toRung == null ? null : Y(o.t.toRung);
-          if ((yF === oYF && yT === oYT) || (yF === oYT && yT === oYF)) {
-            partner = o; partnerIdx = j; break;
-          }
-        }
-        if (partner) drawn.add(`${i}-${partnerIdx}`);
-        drawn.add(`${i}-${idx}`);
-        // Draw span
         if (yF != null && yT != null && t.fromRung === t.toRung) {
+          // same state: a dashed pill, a real state and not "nothing happened"
           p.push(`<rect class="vg-hold" x="${x - 6 * k}" y="${yT - 3 * k}" width="${12 * k}" height="${6 * k}" rx="${3 * k}" stroke="${col}"/>`);
         } else if (yF != null && yT != null) {
-          if (partner && partner.t.fromRung != null && partner.t.toRung != null) {
-            const gradId = `${uid}-g${i}`;
-            const pCol = plotColor(partner.line.plot);
-            const oYF = Y(partner.t.fromRung), oYT = Y(partner.t.toRung);
-            p.push(`<defs><linearGradient id="${gradId}" x1="0" y1="${oYF}" x2="0" y2="${oYT}"><stop offset="0" stop-color="${col}"/><stop offset="1" stop-color="${pCol}"/></linearGradient></defs>`);
-            p.push(`<line class="vg-span" x1="${x}" y1="${oYF}" x2="${x}" y2="${oYT}" stroke="url(#${gradId})" stroke-width="${5 * k}"/>`);
-            // concentric markers at each end: from = hollow rings, to = filled dots
-            const fromIsA = t.fromRung === partner.t.fromRung;
-            const toIsA = t.toRung === partner.t.toRung;
-            // at oYF: one plot's from (ring) + possibly other's to (dot)
-            if (fromIsA) {
-              p.push(`<circle cx="${x}" cy="${oYF}" r="3.5" fill="none" stroke="${col}" stroke-width="1.4"/>`);
-              if (!toIsA) p.push(`<circle cx="${x}" cy="${oYF}" r="4.4" fill="${pCol}"/>`);
-              p.push(`<circle cx="${x}" cy="${oYF}" r="2" fill="none" stroke="${pCol}" stroke-width="1"/>`);
-            } else {
-              p.push(`<circle cx="${x}" cy="${oYF}" r="4.4" fill="${col}"/>`);
-              p.push(`<circle cx="${x}" cy="${oYF}" r="3.5" fill="none" stroke="${pCol}" stroke-width="1.4"/>`);
-            }
-            // at oYT: one plot's to (dot) + possibly other's from (ring)
-            if (toIsA) {
-              p.push(`<circle cx="${x}" cy="${oYT}" r="4.4" fill="${col}"/>`);
-              if (!fromIsA) p.push(`<circle cx="${x}" cy="${oYT}" r="3.5" fill="none" stroke="${pCol}" stroke-width="1.4"/>`);
-            } else {
-              p.push(`<circle cx="${x}" cy="${oYT}" r="4.4" fill="${col}"/>`);
-              p.push(`<circle cx="${x}" cy="${oYT}" r="3.5" fill="none" stroke="${pCol}" stroke-width="1.4"/>`);
-            }
-          } else {
-            p.push(`<line class="vg-span" x1="${x}" y1="${yF}" x2="${x}" y2="${yT}" stroke="${col}" stroke-width="${5 * k}"/>`);
-            p.push(dot(x, yF, 2.7 * k, col, t.fromRung === 3, true));
-            p.push(dot(x, yT, 4.4 * k, col, t.toRung === 3, false));
-          }
+          p.push(`<line class="vg-span" x1="${x}" y1="${yF}" x2="${x}" y2="${yT}" stroke="${col}" stroke-width="${5 * k}"/>`);
+          p.push(dot(x, yF, 2.7 * k, col, t.fromRung === 3, true));
+          p.push(dot(x, yT, 4.4 * k, col, t.toRung === 3, false));
         } else if (yT != null) {
           p.push(dot(x, yT, 4.4 * k, col, t.toRung === 3, false));
         } else if (yF != null) {
@@ -300,8 +246,6 @@ window.DASH = window.DASH || {};
         } else {
           p.push(`<text class="vg-unknown" x="${x}" y="${top + 2 * laneH + 4}" text-anchor="middle"><title>The word is not in this value's schema</title>?</text>`);
         }
-        prevByLine.set(line.key, { x, y: yT, rung: t.toRung });
-        // Level strip
         if (useStrip) {
           LEVELS.forEach((lv, m) => {
             if (!t.levels.has(lv)) return;
@@ -309,6 +253,7 @@ window.DASH = window.DASH || {};
             p.push(`<rect class="vg-lvl" x="${x - Math.min(geo.slot * 0.34, 7)}" y="${stripTop + m * rowH + 1}" width="${Math.min(geo.slot * 0.68, 14)}" height="8" rx="2.5" fill="${col}"><title>${DASH.escapeHtml(`${LEVEL_SHORT[lv]}\n${txt}`)}</title></rect>`);
           });
         }
+        prev = { x, y: yT, rung: t.toRung };
       });
     });
 
