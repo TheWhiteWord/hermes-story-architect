@@ -127,7 +127,7 @@ window.DASH = window.DASH || {};
     for (let i = 0; i < model.n; i++) {
       if (i === 0 || (i + 1) % 5 === 0) p.push(`<text class="vg-num" x="${X(i)}" y="35" text-anchor="middle">${i + 1}</text>`);
     }
-    return `<svg class="vg-svg vg-axis" width="${geo.W}" height="${H}" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
+    return `<svg class="vg-svg vg-axis" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
   };
 
   // ---------- one value: four lanes, shifts as spans, optional level strip
@@ -223,7 +223,7 @@ window.DASH = window.DASH || {};
       });
     });
 
-    return `<svg class="vg-svg" width="${geo.W}" height="${H}" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
+    return `<svg class="vg-svg" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
   };
 
   // end marker of a shift: a dot, or a hollow ring in the negation-of-negation lane

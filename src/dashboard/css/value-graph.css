@@ -35,7 +35,7 @@
 .vg-plot { display: inline-flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-size: var(--font-size-xs); }
 .vg-plot i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 
-.vg-svg { display: block; overflow: visible; }
+.vg-svg { display: block; width: 100%; height: auto; }
 .vg-band.even { fill: rgba(255,255,255,0.02); }
 .vg-band.odd  { fill: rgba(255,255,255,0.045); }
 .vg-lane-line { stroke: rgba(255,255,255,0.09); stroke-width: 1; }
