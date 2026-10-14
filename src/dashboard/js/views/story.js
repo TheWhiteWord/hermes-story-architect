@@ -35,6 +35,7 @@ DASH.buildStoryView = function() {
   if (p.spine) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Spine</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.spine}</div></div>`);
 
   if (p.controlling_idea) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Controlling Idea</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.controlling_idea}</div></div>`);
+  if (p.setting) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Setting</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.setting}</div></div>`);
 
   const valueArc = [];
   if (p.story_value) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value}</span>`);
@@ -54,10 +55,10 @@ DASH.buildStoryView = function() {
   const inciting = mainMilestoneScenes.find(s => (s.plots || []).some(p => mainPlotIds.has(p.id) && p.role === 'inciting_incident'));
   const climax = mainMilestoneScenes.find(s => (s.plots || []).some(p => mainPlotIds.has(p.id) && p.role === 'climax'));
   if (inciting) {
-    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${inciting.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${inciting.title}</button></div></div>`);
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${inciting.title}</div>${inciting.one_sentence ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-top:2px">${inciting.one_sentence}</div>` : ''}<div style="margin-top:4px"><button class="entity-link" onclick="DASH.showScenePanel('${inciting.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${inciting.title}</button></div></div>`);
   }
   if (climax) {
-    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${climax.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${climax.title}</button></div></div>`);
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${climax.title}</div>${climax.one_sentence ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-top:2px">${climax.one_sentence}</div>` : ''}<div style="margin-top:4px"><button class="entity-link" onclick="DASH.showScenePanel('${climax.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${climax.title}</button></div></div>`);
   }
 
   const structureHtml = (structure.length || keyScenes.length) ? `
@@ -93,37 +94,6 @@ DASH.buildStoryView = function() {
       </div>
     </div>` : '';
 
-  // Subplot milestones: each sub-plot's own role scenes, in story order.
-  // The main plot's roles are the story-level ones (shown under Structure
-  // above); every sub-plot is tracked the same way, on its own.
-  const subMilestoneHtml = subPlots.map(pl => {
-    const byRole = {};
-    (DASH.story.scenes || []).forEach(s => {
-      (s.plots || []).forEach(pr => {
-        if (pr.id !== pl.id) return;
-        (byRole[pr.role] = byRole[pr.role] || []).push(s);
-      });
-    });
-    const roles = DASH.PLOT_ROLES.filter(r => (byRole[r] || []).length);
-    if (!roles.length) return '';
-    const roleRows = roles.map(r => {
-      const links = byRole[r]
-        .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map(s => `<button class="entity-link" onclick="DASH.showScenePanel('${s.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${DASH.escapeHtml(s.title || s.id)}</button>`)
-        .join(', ');
-      return `<div style="margin-bottom:4px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">${r.replace(/_/g, ' ')}</span><div style="margin-top:2px">${links}</div></div>`;
-    }).join('');
-    return `<div style="margin-bottom:10px"><div style="font-size:var(--font-size-sm);font-weight:500;margin-bottom:4px">${DASH.escapeHtml(pl.name)}</div>${roleRows}</div>`;
-  }).filter(Boolean).join('');
-
-  const subMilestonesHtml = subMilestoneHtml ? `
-    <div>
-      <div class="DASH.story-section-title">Subplot milestones</div>
-      <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
-        ${subMilestoneHtml}
-      </div>
-    </div>` : '';
-
   // Continuity risks
   const risks = mem.continuity_risks || [];
   const risksHtml = risks.length ? `
@@ -140,5 +110,5 @@ DASH.buildStoryView = function() {
       <button class="btn btn-hermes" data-hermes-send="Give me an overview of ${p.name}.">Ask Hermes about this DASH.story</button>
     </div>` : '';
 
-  body.innerHTML = statsHtml + structureHtml + plotsHtml + subMilestonesHtml + risksHtml + hermesHtml;
+  body.innerHTML = statsHtml + structureHtml + plotsHtml + risksHtml + hermesHtml;
 };
