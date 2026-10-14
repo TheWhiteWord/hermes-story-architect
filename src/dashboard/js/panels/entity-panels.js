@@ -35,7 +35,7 @@ DASH.showActPanel = function(actId) {
     })()}
     ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
     <div>
-      <div class="panel-section-title">Value focus</div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink('story')}</div>
       ${DASH.valueFocusHtml(act.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
     </div>
     ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${seqRows}</div></div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
@@ -286,7 +286,7 @@ DASH.showPlotPanel = function(plotId) {
     </div>
     ${arcHtml}
     <div>
-      <div class="panel-section-title">Value focus</div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink(plot.id)}</div>
       ${DASH.valueFocusHtml(plot.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
     </div>
     ${chars ? `<div>
@@ -479,7 +479,7 @@ DASH.showScenePanel = function(sceneId) {
   }).join('');
 
   const turnsHtml = turnRows ? `<div>
-    <div class="panel-section-title">Value turns</div>
+    <div class="panel-section-title">Value turns ${DASH.valueGraphLink('story')}</div>
     <div style="display:flex;flex-direction:column;gap:4px;">${turnRows}</div>
   </div>` : '';
 
@@ -552,7 +552,7 @@ DASH.showSequencePanel = function(seqId) {
     <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
     ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
     <div>
-      <div class="panel-section-title">Value focus</div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink('story')}</div>
       ${DASH.valueFocusHtml(seq.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
     </div>
     ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${sceneRows}</div></div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}

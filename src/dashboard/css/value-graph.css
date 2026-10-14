@@ -17,7 +17,7 @@
 
 .vg-content { padding: 0 16px 24px; overflow: auto; }
 .vg-stack { min-width: min-content; }
-.vg-axis-wrap { margin-top: 4px; }
+.vg-axis-wrap { margin-top: 2px; border: 1px solid var(--border); border-radius: 4px; padding: 2px 4px; }
 .vg-section {
   position: sticky; left: 0; margin: 16px 0 4px; font-size: var(--font-size-xs);
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground);
@@ -61,10 +61,12 @@
 .vg-lvl   { opacity: 0.8; }
 
 .vg-legend {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin: 6px 0 4px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin: 6px 0 10px;
   font-size: var(--font-size-xs); color: var(--muted-foreground);
 }
 .vg-legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .vg-legend-note { font-size: var(--font-size-xs); color: var(--muted-foreground); }
-.vg-legend-milestones { margin-bottom: 2px; }
+.vg-legend-milestones { margin-bottom: 10px; }
+.vg-link { background: none; border: none; padding: 2px; cursor: pointer; color: var(--muted-foreground); display: inline-flex; align-items: center; }
+.vg-link:hover { color: var(--foreground); }
 .vg-note-block { margin: 2px 0 6px; }
