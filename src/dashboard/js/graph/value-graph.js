@@ -226,6 +226,7 @@ window.DASH = window.DASH || {};
     });
     // Sort each scene's turns by span size (larger first), then draw
     const drawn = new Set();
+    const prevByLine = new Map();
     turnsByScene.forEach((items, i) => {
       items.sort((a, b) => {
         const aSpan = a.t.fromRung != null && a.t.toRung != null ? Math.abs(a.t.toRung - a.t.fromRung) : 0;
@@ -234,10 +235,16 @@ window.DASH = window.DASH || {};
       });
       items.forEach((item, idx) => {
         if (drawn.has(`${i}-${idx}`)) return;
-        const { t, col } = item;
+        const { line, t, col } = item;
         const x = X(i);
         const yF = t.fromRung == null ? null : Y(t.fromRung);
         const yT = t.toRung == null ? null : Y(t.toRung);
+        // Carry/jump line from previous turn of same line
+        const prev = prevByLine.get(line.key);
+        if (prev && prev.y != null && yF != null) {
+          const jump = prev.rung !== t.fromRung;
+          p.push(`<line class="${jump ? 'vg-jump' : 'vg-carry'}" x1="${prev.x}" y1="${prev.y}" x2="${x}" y2="${yF}" stroke="${col}"/>`);
+        }
         // Check for a matching partner (same from/to or reverse)
         let partner = null, partnerIdx = -1;
         for (let j = idx + 1; j < items.length; j++) {
@@ -293,6 +300,7 @@ window.DASH = window.DASH || {};
         } else {
           p.push(`<text class="vg-unknown" x="${x}" y="${top + 2 * laneH + 4}" text-anchor="middle"><title>The word is not in this value's schema</title>?</text>`);
         }
+        prevByLine.set(line.key, { x, y: yT, rung: t.toRung });
         // Level strip
         if (useStrip) {
           LEVELS.forEach((lv, m) => {
