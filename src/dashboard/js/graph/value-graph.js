@@ -16,7 +16,7 @@ window.DASH = window.DASH || {};
   const LANES = ['p', 'c', 'cd', 'nn'];                       // rung 0..3, top to bottom: distance from the ideal
   const LEVELS = ['inner', 'personal', 'extra-personal'];
   const LEVEL_SHORT = { inner: 'inner', personal: 'personal', 'extra-personal': 'extra-pers.' };
-  const GEO = { labelW: 100, minSlot: 10, padR: 14 };
+  const GEO = { labelW: 50, minSlot: 10, padR: 14 };
 
   const MILESTONES = {
     setup:              { label: 'Setup',            color: '#6bbfb0', shape: 'dot' },
