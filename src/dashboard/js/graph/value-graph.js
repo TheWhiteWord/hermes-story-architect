@@ -132,31 +132,31 @@ window.DASH = window.DASH || {};
 
   // ---------- axis: acts, sequences, scene numbers
   D.valueAxisSvg = function (model, geo) {
-    const H = 48, X = i => geo.labelW + (i + 0.5) * geo.slot, p = [];
+    const H = 52, X = i => geo.labelW + (i + 0.5) * geo.slot, p = [];
     // milestone markers (top row)
     model.scenes.forEach((s, i) => {
       (s.milestone || []).forEach(m => {
         const cfg = MILESTONES[m];
         if (!cfg) return;
-        const x = X(i), y = 6;
+        const x = X(i), y = 5;
         if (cfg.shape === 'star') {
-          p.push(`<path d="${starPath(x, y, 5, 2)}" fill="${cfg.color}"/>`);
+          p.push(`<path d="${starPath(x, y, 4, 1.8)}" fill="${cfg.color}"/>`);
         } else if (cfg.shape === 'diamond') {
-          p.push(`<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" transform="rotate(45 ${x} ${y})" fill="${cfg.color}"/>`);
+          p.push(`<rect x="${x - 3}" y="${y - 3}" width="6" height="6" transform="rotate(45 ${x} ${y})" fill="${cfg.color}"/>`);
         } else {
-          p.push(`<circle cx="${x}" cy="${y}" r="3" fill="${cfg.color}"/>`);
+          p.push(`<circle cx="${x}" cy="${y}" r="2.5" fill="${cfg.color}"/>`);
         }
       });
     });
     model.acts.forEach((a, k) => {
       const x = geo.labelW + a.start * geo.slot, w = (a.end - a.start + 1) * geo.slot;
-      p.push(`<rect class="vg-band ${k % 2 ? 'odd' : 'even'}" x="${x}" y="10" width="${w}" height="${H - 10}"/>`);
-      p.push(`<text class="vg-act-label" x="${x + 5}" y="20">${DASH.escapeHtml(cut(a.name, Math.max(3, Math.floor(w / 6))))}</text>`);
+      p.push(`<rect class="vg-band ${k % 2 ? 'odd' : 'even'}" x="${x}" y="10" width="${w}" height="20"/>`);
+      p.push(`<text class="vg-act-label" x="${x + 5}" y="23">${DASH.escapeHtml(cut(a.name, Math.max(3, Math.floor(w / 6))))}</text>`);
     });
     model.seqs.forEach(q => {
       const x = geo.labelW + q.start * geo.slot, w = (q.end - q.start + 1) * geo.slot;
-      if (q.start > 0) p.push(`<line class="vg-seq-line" x1="${x}" y1="26" x2="${x}" y2="${H}"/>`);
-      p.push(`<text class="vg-seq-label" x="${x + 4}" y="33">${DASH.escapeHtml(cut(q.name, Math.max(3, Math.floor(w / 5))))}</text>`);
+      if (q.start > 0) p.push(`<line class="vg-seq-line" x1="${x}" y1="30" x2="${x}" y2="${H}"/>`);
+      p.push(`<text class="vg-seq-label" x="${x + 4}" y="42">${DASH.escapeHtml(cut(q.name, Math.max(3, Math.floor(w / 5))))}</text>`);
     });
     return `<svg class="vg-svg vg-axis" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
   };
