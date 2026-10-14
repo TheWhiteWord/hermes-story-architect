@@ -125,7 +125,8 @@ window.DASH = window.DASH || {};
   // ---------- geometry
   D.valueGeometry = function (model, width) {
     const n = Math.max(model.n, 1);
-    const slot = GEO.minSlot;
+    const avail = Math.max((width || 900) - GEO.labelW - GEO.padR, n * GEO.minSlot);
+    const slot = Math.max(GEO.minSlot, avail / n);
     return { slot, labelW: GEO.labelW, W: GEO.labelW + n * slot + GEO.padR };
   };
 
@@ -163,7 +164,7 @@ window.DASH = window.DASH || {};
         }
       });
     });
-    return `<svg class="vg-svg" width="${geo.W}" height="${H}" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
+    return `<svg class="vg-svg vg-axis" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
   };
 
   // ---------- one value: four lanes, shifts as spans, optional level strip
@@ -256,7 +257,7 @@ window.DASH = window.DASH || {};
       });
     });
 
-    return `<svg class="vg-svg" width="${geo.W}" height="${H}" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
+    return `<svg class="vg-svg" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
   };
 
   // end marker of a shift: a dot, or a hollow ring in the negation-of-negation lane
