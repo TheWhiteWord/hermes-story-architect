@@ -272,8 +272,6 @@ window.DASH = window.DASH || {};
   const legendHtml = () => `<div class="vg-legend">
     <span class="vg-legend-item"><svg width="16" height="26"><line class="vg-span" x1="8" y1="5" x2="8" y2="20" stroke="var(--accent)" stroke-width="5"/><circle class="vg-from" cx="8" cy="5" r="2.7" stroke="var(--accent)"/><circle cx="8" cy="20" r="4.4" fill="var(--accent)"/></svg>shift in a scene</span>
     <span class="vg-legend-item"><svg width="18" height="26"><rect class="vg-hold" x="3" y="10" width="12" height="6" rx="3" stroke="var(--accent)"/></svg>stayed in the same state</span>
-    <span class="vg-legend-item"><svg width="22" height="26"><line class="vg-carry" x1="2" y1="13" x2="20" y2="13" stroke="var(--accent)"/></svg>carried on between scenes</span>
-    <span class="vg-legend-item"><svg width="22" height="26"><line class="vg-jump" x1="2" y1="5" x2="20" y2="21" stroke="var(--accent)"/></svg>the next scene opens elsewhere</span>
     <span class="vg-legend-item"><svg width="18" height="26"><circle class="vg-ring" cx="9" cy="13" r="4.4" stroke="var(--accent)"/></svg>negation of the negation</span>
   </div>`;
 

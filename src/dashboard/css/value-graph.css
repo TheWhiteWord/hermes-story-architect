@@ -61,8 +61,8 @@
 .vg-lvl   { opacity: 0.8; }
 
 .vg-legend {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin: 6px 0 10px;
-  font-size: var(--font-size-xs); color: var(--muted-foreground);
+  position: sticky; left: 0; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin: 6px 0 10px;
+  font-size: var(--font-size-xs); color: var(--muted-foreground); background: var(--background);
 }
 .vg-legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .vg-legend-note { font-size: var(--font-size-xs); color: var(--muted-foreground); }
