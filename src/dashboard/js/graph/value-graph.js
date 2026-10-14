@@ -141,7 +141,7 @@ window.DASH = window.DASH || {};
   };
 
   // ---------- axis: 3 sections — acts, sequences, milestones
-  D.valueAxisSvg = function (model, geo) {
+  D.valueAxisSvg = function (model, geo, plotId) {
     const H = 62, X = i => geo.labelW + (i + 0.5) * geo.slot, p = [];
     // Section 1: acts (y 0-18)
     model.acts.forEach((a, k) => {
@@ -156,18 +156,21 @@ window.DASH = window.DASH || {};
       const label = model.seqNums.get(q.id) || q.name;
       p.push(`<text class="vg-seq-label" x="${x + 4}" y="33">${DASH.escapeHtml(label)}</text>`);
     });
-    // Section 3: milestones (y 44-62)
+    // Section 3: milestones (y 44-62) — filter by plotId in plot view
     model.scenes.forEach((s, i) => {
-      (s.milestone || []).forEach(m => {
+      const milestones = plotId
+        ? (s.plots || []).filter(e => e.id === plotId).map(e => e.role)
+        : (s.milestone || []);
+      milestones.forEach((m, j) => {
         const cfg = MILESTONES[m.replace(/^plot_/, '')];
         if (!cfg) return;
-        const x = X(i), y = 50;
+        const x = X(i), y = 46 + j * 10;
         if (cfg.shape === 'star') {
-          p.push(`<path d="${starPath(x, y, 5, 2.2)}" fill="${cfg.color}"/>`);
+          p.push(`<path d="${starPath(x, y, 4, 1.8)}" fill="${cfg.color}"/>`);
         } else if (cfg.shape === 'diamond') {
-          p.push(`<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" transform="rotate(45 ${x} ${y})" fill="${cfg.color}"/>`);
+          p.push(`<rect x="${x - 2.5}" y="${y - 2.5}" width="5" height="5" transform="rotate(45 ${x} ${y})" fill="${cfg.color}"/>`);
         } else {
-          p.push(`<circle cx="${x}" cy="${y}" r="3" fill="${cfg.color}"/>`);
+          p.push(`<circle cx="${x}" cy="${y}" r="2.5" fill="${cfg.color}"/>`);
         }
       });
     });
@@ -349,7 +352,7 @@ window.DASH = window.DASH || {};
     const o = { strip: true };
     const pnl = names => names.map(n => panel(model, geo, n, v.lines.filter(l => norm(l.value) === norm(n)), o)).join('');
     el.innerHTML = `<div class="vg-stack">${legendHtml()}
-      <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo)}</div>
+      <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo, plotId)}</div>
       ${v.major.length ? `<div class="vg-section">Major values</div>${pnl(v.major)}` : ''}
       ${v.minor.length ? `<div class="vg-section">Minor values</div>${pnl(v.minor)}` : ''}
     </div>`;
