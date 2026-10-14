@@ -350,6 +350,10 @@ window.DASH = window.DASH || {};
   D.renderValues = function () {
     const el = document.getElementById('vg-content');
     if (!el) return;
+    document.querySelectorAll('#values-view .vg-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
+    document.querySelectorAll('#values-view .vg-plot-only').forEach(n => { n.style.display = state.tab === 'plot' ? '' : 'none'; });
+    const sel = document.querySelector('#vg-plot-select');
+    if (sel) sel.value = state.plot || '';
     if (state.tab === 'plot') D.renderValuePlot(el, state.plot); else D.renderValueStory(el);
   };
 
