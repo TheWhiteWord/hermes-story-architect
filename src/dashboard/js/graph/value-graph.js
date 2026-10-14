@@ -16,7 +16,7 @@ window.DASH = window.DASH || {};
   const LANES = ['p', 'c', 'cd', 'nn'];                       // rung 0..3, top to bottom: distance from the ideal
   const LEVELS = ['inner', 'personal', 'extra-personal'];
   const LEVEL_SHORT = { inner: 'inner', personal: 'personal', 'extra-personal': 'extra-pers.' };
-  const GEO = { labelW: 118, minSlot: 14, maxSlot: 38, padR: 14 };
+  const GEO = { labelW: 118, minSlot: 14, padR: 14 };
 
   const state = { tab: 'story', plot: null };
   D.valueGraphState = state;
@@ -107,7 +107,7 @@ window.DASH = window.DASH || {};
   D.valueGeometry = function (model, width) {
     const n = Math.max(model.n, 1);
     const avail = Math.max((width || 900) - GEO.labelW - GEO.padR, n * GEO.minSlot);
-    const slot = Math.min(GEO.maxSlot, Math.max(GEO.minSlot, avail / n));
+    const slot = Math.max(GEO.minSlot, avail / n);
     return { slot, labelW: GEO.labelW, W: GEO.labelW + n * slot + GEO.padR };
   };
 
@@ -337,6 +337,10 @@ window.DASH = window.DASH || {};
       const t = e.target.closest ? e.target.closest('[data-scene]') : null;
       if (t && D.showScenePanel) D.showScenePanel(t.getAttribute('data-scene'));
     });
+    const content = body.querySelector('#vg-content');
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => D.renderValues()).observe(content);
+    }
     D.switchValuesTab(state.tab);
   };
 
