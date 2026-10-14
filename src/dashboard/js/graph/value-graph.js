@@ -159,7 +159,7 @@ window.DASH = window.DASH || {};
     // Section 3: milestones (y 44-62)
     model.scenes.forEach((s, i) => {
       (s.milestone || []).forEach(m => {
-        const cfg = MILESTONES[m];
+        const cfg = MILESTONES[m.replace(/^plot_/, '')];
         if (!cfg) return;
         const x = X(i), y = 50;
         if (cfg.shape === 'star') {
