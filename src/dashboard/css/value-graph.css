@@ -67,4 +67,5 @@
 }
 .vg-legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .vg-legend-note { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.vg-legend-milestones { margin-bottom: 2px; }
 .vg-note-block { margin: 2px 0 6px; }

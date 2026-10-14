@@ -18,6 +18,25 @@ window.DASH = window.DASH || {};
   const LEVEL_SHORT = { inner: 'inner', personal: 'personal', 'extra-personal': 'extra-pers.' };
   const GEO = { labelW: 118, minSlot: 14, padR: 14 };
 
+  const MILESTONES = {
+    setup:              { label: 'Setup',            color: '#6bbfb0', shape: 'dot' },
+    inciting_incident:  { label: 'Inciting Incident', color: '#7b9cf0', shape: 'diamond' },
+    complication:        { label: 'Complication',      color: '#e0a86b', shape: 'dot' },
+    crisis:             { label: 'Crisis',           color: '#e0707d', shape: 'dot' },
+    climax:             { label: 'Climax',           color: '#ffd93d', shape: 'star' },
+    resolution:         { label: 'Resolution',       color: '#b07be0', shape: 'dot' },
+  };
+
+  const starPath = (cx, cy, outerR, innerR) => {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 === 0 ? outerR : innerR;
+      const a = (i * Math.PI / 5) - Math.PI / 2;
+      pts.push(`${i === 0 ? 'M' : 'L'}${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+    }
+    return pts.join(' ') + ' Z';
+  };
+
   const state = { tab: 'story', plot: null };
   D.valueGraphState = state;
   let vgUid = 0;
@@ -113,20 +132,32 @@ window.DASH = window.DASH || {};
 
   // ---------- axis: acts, sequences, scene numbers
   D.valueAxisSvg = function (model, geo) {
-    const H = 38, X = i => geo.labelW + (i + 0.5) * geo.slot, p = [];
+    const H = 48, X = i => geo.labelW + (i + 0.5) * geo.slot, p = [];
+    // milestone markers (top row)
+    model.scenes.forEach((s, i) => {
+      (s.milestone || []).forEach(m => {
+        const cfg = MILESTONES[m];
+        if (!cfg) return;
+        const x = X(i), y = 6;
+        if (cfg.shape === 'star') {
+          p.push(`<path d="${starPath(x, y, 5, 2)}" fill="${cfg.color}"/>`);
+        } else if (cfg.shape === 'diamond') {
+          p.push(`<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" transform="rotate(45 ${x} ${y})" fill="${cfg.color}"/>`);
+        } else {
+          p.push(`<circle cx="${x}" cy="${y}" r="3" fill="${cfg.color}"/>`);
+        }
+      });
+    });
     model.acts.forEach((a, k) => {
       const x = geo.labelW + a.start * geo.slot, w = (a.end - a.start + 1) * geo.slot;
-      p.push(`<rect class="vg-band ${k % 2 ? 'odd' : 'even'}" x="${x}" y="0" width="${w}" height="${H}"/>`);
-      p.push(`<text class="vg-act-label" x="${x + 5}" y="12">${DASH.escapeHtml(cut(a.name, Math.max(3, Math.floor(w / 6))))}</text>`);
+      p.push(`<rect class="vg-band ${k % 2 ? 'odd' : 'even'}" x="${x}" y="10" width="${w}" height="${H - 10}"/>`);
+      p.push(`<text class="vg-act-label" x="${x + 5}" y="20">${DASH.escapeHtml(cut(a.name, Math.max(3, Math.floor(w / 6))))}</text>`);
     });
     model.seqs.forEach(q => {
       const x = geo.labelW + q.start * geo.slot, w = (q.end - q.start + 1) * geo.slot;
-      if (q.start > 0) p.push(`<line class="vg-seq-line" x1="${x}" y1="16" x2="${x}" y2="${H}"/>`);
-      p.push(`<text class="vg-seq-label" x="${x + 4}" y="25">${DASH.escapeHtml(cut(q.name, Math.max(3, Math.floor(w / 5))))}</text>`);
+      if (q.start > 0) p.push(`<line class="vg-seq-line" x1="${x}" y1="26" x2="${x}" y2="${H}"/>`);
+      p.push(`<text class="vg-seq-label" x="${x + 4}" y="33">${DASH.escapeHtml(cut(q.name, Math.max(3, Math.floor(w / 5))))}</text>`);
     });
-    for (let i = 0; i < model.n; i++) {
-      if (i === 0 || (i + 1) % 5 === 0) p.push(`<text class="vg-num" x="${X(i)}" y="35" text-anchor="middle">${i + 1}</text>`);
-    }
     return `<svg class="vg-svg vg-axis" viewBox="0 0 ${geo.W} ${H}">${p.join('')}</svg>`;
   };
 
@@ -149,14 +180,12 @@ window.DASH = window.DASH || {};
       `<rect class="vg-band ${k % 2 ? 'odd' : 'even'}" x="${geo.labelW + a.start * geo.slot}" y="0" width="${(a.end - a.start + 1) * geo.slot}" height="${H}"/>`));
     // the negation-of-negation lane is hatched: a corrupted positive, not just "more negative"
     p.push(`<rect x="${geo.labelW}" y="${top + 3 * laneH}" width="${model.n * geo.slot}" height="${laneH}" fill="url(#${uid}-h)"/>`);
+    const labelCls = compact ? 'vg-label vg-label-compact' : 'vg-label';
     for (let r = 0; r < 4; r++) {
       p.push(`<line class="vg-lane-line" x1="${geo.labelW}" y1="${Y(r)}" x2="${geo.W - GEO.padR + 6}" y2="${Y(r)}"/>`);
-      if (!compact) {
-        p.push(`<text class="vg-code" x="6" y="${Y(r) + 3}">${LANES[r].toUpperCase()}</text>`);
-        p.push(`<text class="vg-label" x="${geo.labelW - 8}" y="${Y(r) + 3}" text-anchor="end">${DASH.escapeHtml(cut(schema[LANES[r]] || (r === 0 ? o.value : ''), 17))}</text>`);
-      }
+      p.push(`<text class="vg-code" x="6" y="${Y(r) + 3}">${LANES[r].toUpperCase()}</text>`);
+      p.push(`<text class="${labelCls}" x="${geo.labelW - 8}" y="${Y(r) + 3}" text-anchor="end">${DASH.escapeHtml(cut(schema[LANES[r]] || (r === 0 ? o.value : ''), 17))}</text>`);
     }
-    if (compact) p.push(`<text class="vg-label vg-label-compact" x="${geo.labelW - 8}" y="${top + 2 * laneH + 3}" text-anchor="end">${DASH.escapeHtml(cut(o.value, 18))}</text>`);
     model.seqs.forEach(q => { if (q.start > 0) p.push(`<line class="vg-seq-line" x1="${geo.labelW + q.start * geo.slot}" y1="0" x2="${geo.labelW + q.start * geo.slot}" y2="${H}"/>`); });
 
     if (useStrip) {
@@ -241,7 +270,18 @@ window.DASH = window.DASH || {};
     <span class="vg-legend-item"><svg width="22" height="26"><line class="vg-carry" x1="2" y1="13" x2="20" y2="13" stroke="var(--accent)"/></svg>carried on between scenes</span>
     <span class="vg-legend-item"><svg width="22" height="26"><line class="vg-jump" x1="2" y1="5" x2="20" y2="21" stroke="var(--accent)"/></svg>the next scene opens elsewhere</span>
     <span class="vg-legend-item"><svg width="18" height="26"><circle class="vg-ring" cx="9" cy="13" r="4.4" stroke="var(--accent)"/></svg>negation of the negation (hatched lane)</span>
-    <span class="vg-legend-note">Lanes run from the ideal (top) to its deepest negation (bottom). Up is not good and down is not bad.</span>
+  </div>`;
+
+  const milestoneLegendHtml = () => `<div class="vg-legend vg-legend-milestones">
+    <span class="vg-legend-note">Milestones:</span>
+    ${Object.entries(MILESTONES).map(([key, m]) => {
+      const icon = m.shape === 'star'
+        ? `<svg width="12" height="12"><path d="${starPath(6, 6, 5, 2)}" fill="${m.color}"/></svg>`
+        : m.shape === 'diamond'
+        ? `<svg width="10" height="10"><rect x="1.5" y="1.5" width="7" height="7" transform="rotate(45 5 5)" fill="${m.color}"/></svg>`
+        : `<svg width="10" height="10"><circle cx="5" cy="5" r="3" fill="${m.color}"/></svg>`;
+      return `<span class="vg-legend-item">${icon}${m.label}</span>`;
+    }).join('')}
   </div>`;
 
   const plotDots = (model, lines) => {
@@ -279,7 +319,7 @@ window.DASH = window.DASH || {};
     const geo = D.valueGeometry(model, el.clientWidth);
     const v = orderedValues(model, (S.project || {}).value_focus, null);
     const pnl = (names, o) => names.map(n => panel(model, geo, n, v.lines.filter(l => norm(l.value) === norm(n)), o)).join('');
-    el.innerHTML = `<div class="vg-stack">${legendHtml()}
+    el.innerHTML = `<div class="vg-stack">${legendHtml()}${milestoneLegendHtml()}
       <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo)}</div>
       ${v.major.length ? `<div class="vg-section">Major values</div>${pnl(v.major, {})}` : ''}
       ${v.minor.length ? `<div class="vg-section">Minor values</div>${pnl(v.minor, { compact: true })}` : ''}
