@@ -221,7 +221,7 @@ def milestone_label(plot_roles: list, plot_scopes: dict):
     milestones; sub-plot roles are tracked separately.
     """
     return [entry["role"] for entry in plot_roles
-            if plot_scopes.get(entry.get("plot")) == "main"]
+            if plot_scopes.get(entry.get("id") or entry.get("plot")) == "main"]
 
 
 def validate_memory(memory: dict) -> dict:
