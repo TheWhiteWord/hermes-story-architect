@@ -29,7 +29,6 @@
   position: sticky; left: 0; display: flex; align-items: center; gap: 8px;
   margin: 10px 0 2px; font-size: var(--font-size-sm);
 }
-.vg-panel.compact .vg-panel-head { display: none; }
 .vg-title { font-weight: 600; color: var(--foreground); }
 .vg-meta { color: var(--muted-foreground); font-size: var(--font-size-xs); }
 .vg-plot { display: inline-flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-size: var(--font-size-xs); }

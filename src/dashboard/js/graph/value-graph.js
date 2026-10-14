@@ -20,21 +20,11 @@ window.DASH = window.DASH || {};
 
   const MILESTONES = {
     setup:              { label: 'Setup',            color: '#6bbfb0', shape: 'dot' },
-    inciting_incident:  { label: 'Inciting Incident', color: '#7b9cf0', shape: 'diamond' },
+    inciting_incident:  { label: 'Inciting Incident', color: '#e0c96b', shape: 'ring' },
     complication:        { label: 'Complication',      color: '#e0a86b', shape: 'dot' },
     crisis:             { label: 'Crisis',           color: '#e0707d', shape: 'dot' },
-    climax:             { label: 'Climax',           color: '#ffd93d', shape: 'star' },
+    climax:             { label: 'Climax',           color: '#ffd93d', shape: 'ring' },
     resolution:         { label: 'Resolution',       color: '#b07be0', shape: 'dot' },
-  };
-
-  const starPath = (cx, cy, outerR, innerR) => {
-    const pts = [];
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 === 0 ? outerR : innerR;
-      const a = (i * Math.PI / 5) - Math.PI / 2;
-      pts.push(`${i === 0 ? 'M' : 'L'}${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
-    }
-    return pts.join(' ') + ' Z';
   };
 
   const state = { tab: 'story', plot: null };
@@ -165,10 +155,8 @@ window.DASH = window.DASH || {};
         const cfg = MILESTONES[m.replace(/^plot_/, '')];
         if (!cfg) return;
         const x = X(i), y = 46 + j * 10;
-        if (cfg.shape === 'star') {
-          p.push(`<path d="${starPath(x, y, 4, 1.8)}" fill="${cfg.color}"/>`);
-        } else if (cfg.shape === 'diamond') {
-          p.push(`<rect x="${x - 2.5}" y="${y - 2.5}" width="5" height="5" transform="rotate(45 ${x} ${y})" fill="${cfg.color}"/>`);
+        if (cfg.shape === 'ring') {
+          p.push(`<circle class="vg-ring" cx="${x}" cy="${y}" r="3.5" stroke="${cfg.color}"/>`);
         } else {
           p.push(`<circle cx="${x}" cy="${y}" r="2.5" fill="${cfg.color}"/>`);
         }
@@ -280,23 +268,19 @@ window.DASH = window.DASH || {};
 
   // ---------- html around the charts
   const legendHtml = () => `<div class="vg-legend">
-    <span class="vg-legend-item"><svg width="16" height="26"><line class="vg-span" x1="8" y1="5" x2="8" y2="20" stroke="var(--accent)" stroke-width="5"/><circle class="vg-from" cx="8" cy="5" r="2.7" stroke="var(--accent)"/><circle cx="8" cy="20" r="4.4" fill="var(--accent)"/></svg>shift in a scene (small ring = from, dot = to)</span>
+    <span class="vg-legend-item"><svg width="16" height="26"><line class="vg-span" x1="8" y1="5" x2="8" y2="20" stroke="var(--accent)" stroke-width="5"/><circle class="vg-from" cx="8" cy="5" r="2.7" stroke="var(--accent)"/><circle cx="8" cy="20" r="4.4" fill="var(--accent)"/></svg>shift in a scene</span>
     <span class="vg-legend-item"><svg width="18" height="26"><rect class="vg-hold" x="3" y="10" width="12" height="6" rx="3" stroke="var(--accent)"/></svg>stayed in the same state</span>
     <span class="vg-legend-item"><svg width="22" height="26"><line class="vg-carry" x1="2" y1="13" x2="20" y2="13" stroke="var(--accent)"/></svg>carried on between scenes</span>
     <span class="vg-legend-item"><svg width="22" height="26"><line class="vg-jump" x1="2" y1="5" x2="20" y2="21" stroke="var(--accent)"/></svg>the next scene opens elsewhere</span>
-    <span class="vg-legend-item"><svg width="18" height="26"><circle class="vg-ring" cx="9" cy="13" r="4.4" stroke="var(--accent)"/></svg>negation of the negation (hatched lane)</span>
+    <span class="vg-legend-item"><svg width="18" height="26"><circle class="vg-ring" cx="9" cy="13" r="4.4" stroke="var(--accent)"/></svg>negation of the negation</span>
   </div>`;
 
   const milestoneLegendHtml = () => `<div class="vg-legend vg-legend-milestones">
-    <span class="vg-legend-note">Milestones:</span>
-    ${Object.entries(MILESTONES).map(([key, m]) => {
-      const icon = m.shape === 'star'
-        ? `<svg width="12" height="12"><path d="${starPath(6, 6, 5, 2)}" fill="${m.color}"/></svg>`
-        : m.shape === 'diamond'
-        ? `<svg width="10" height="10"><rect x="1.5" y="1.5" width="7" height="7" transform="rotate(45 5 5)" fill="${m.color}"/></svg>`
-        : `<svg width="10" height="10"><circle cx="5" cy="5" r="3" fill="${m.color}"/></svg>`;
-      return `<span class="vg-legend-item">${icon}${m.label}</span>`;
-    }).join('')}
+    ${Object.entries(MILESTONES).map(([key, m]) =>
+      m.shape === 'ring'
+        ? `<span class="vg-legend-item"><svg width="10" height="10"><circle class="vg-ring" cx="5" cy="5" r="3.5" stroke="${m.color}"/></svg>${m.label}</span>`
+        : `<span class="vg-legend-item"><svg width="10" height="10"><circle cx="5" cy="5" r="2.5" fill="${m.color}"/></svg>${m.label}</span>`
+    ).join('')}
   </div>`;
 
   const plotDots = (model, lines) => {
@@ -351,7 +335,7 @@ window.DASH = window.DASH || {};
     const geo = D.valueGeometry(model, el.clientWidth);
     const o = { strip: true };
     const pnl = names => names.map(n => panel(model, geo, n, v.lines.filter(l => norm(l.value) === norm(n)), o)).join('');
-    el.innerHTML = `<div class="vg-stack">${legendHtml()}
+    el.innerHTML = `<div class="vg-stack">${legendHtml()}${milestoneLegendHtml()}
       <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo, plotId)}</div>
       ${v.major.length ? `<div class="vg-section">Major values</div>${pnl(v.major)}` : ''}
       ${v.minor.length ? `<div class="vg-section">Minor values</div>${pnl(v.minor)}` : ''}
