@@ -25,14 +25,21 @@ _HARNESS = r"""
 const fs = require('fs');
 global.window = global;
 global.DASH = {};
+const mk = () => ({
+  innerHTML: '', textContent: '', clientWidth: 800, value: '', style: {},
+  offsetTop: 0, offsetWidth: 0, offsetHeight: 0,
+  addEventListener: () => {}, appendChild: () => {}, querySelectorAll: () => [],
+  get querySelector() { return () => mk(); },
+});
 const els = {};
 global.document = {
-  getElementById: id => (els[id] || (els[id] = { innerHTML: '', textContent: '',
-    clientWidth: 800, value: '', addEventListener: () => {},
-    querySelectorAll: () => [], querySelector: () => ({ value: '', addEventListener: () => {} }) })),
+  getElementById: id => (els[id] || (els[id] = mk())),
   querySelectorAll: () => [],
-  querySelector: () => ({ value: '', addEventListener: () => {} }),
+  querySelector: () => mk(),
+  createElement: mk,
+  body: mk(),
 };
+global.getComputedStyle = () => ({ paddingLeft: '0px', paddingRight: '0px' });
 DASH.escapeHtml = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 DASH.onViewOpened = () => {};

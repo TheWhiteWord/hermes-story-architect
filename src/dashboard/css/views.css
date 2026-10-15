@@ -256,6 +256,12 @@
 }
 
 
+/* ─── Values View ─── */
+#values-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
 /* ─── Script View ─── */
 #script-view .view-body {
   flex: 1;
