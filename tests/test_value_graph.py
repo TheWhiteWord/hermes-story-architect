@@ -179,3 +179,141 @@ def test_no_turns_shows_empty_state():
                          "value_turns": [], "milestone": []}]
     html = render(story)
     assert "No value shifts recorded yet" in html
+
+
+# ---------- scroll zoom
+#
+# Same stub DOM, plus a recorded wheel listener and a controllable clock, so the
+# zoom state machine is driven the way a real gesture drives it: one gesture per
+# step, each clear of the 320ms lock. Ctrl is held on every gesture.
+
+_ZOOM_HARNESS = r"""
+const fs = require('fs');
+global.window = global;
+global.DASH = {};
+const listeners = {};
+const rect = () => ({ left: 0, top: 0, right: 800, bottom: 62, width: 800, height: 62 });
+const mk = () => ({
+  innerHTML: '', textContent: '', clientWidth: 800, value: '', style: {},
+  offsetTop: 0, offsetWidth: 0, offsetHeight: 0,
+  addEventListener: () => {}, appendChild: () => {}, querySelectorAll: () => [],
+  getBoundingClientRect: rect,
+  get querySelector() { return () => mk(); },
+});
+const els = {};
+const content = mk();
+content.addEventListener = (type, fn) => { listeners[type] = fn; };
+els['vg-content'] = content;
+// buildValuesView binds the wheel listener on body.querySelector('#vg-content'),
+// so the stub's view body must hand back that same element. A plain object, not
+// mk(): mk()'s querySelector is a getter, and assigning over a getter without a
+// setter fails silently.
+const bodyEl = Object.assign({}, mk());
+bodyEl.querySelector = sel => (sel === '#vg-content' ? content : mk());
+els['values-body'] = bodyEl;
+global.document = {
+  getElementById: id => (els[id] || (els[id] = mk())),
+  querySelectorAll: () => [],
+  querySelector: () => mk(),
+  createElement: mk,
+  body: mk(),
+};
+global.getComputedStyle = () => ({ paddingLeft: '0px', paddingRight: '0px' });
+DASH.escapeHtml = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+DASH.onViewOpened = () => {};
+DASH.plotColor = pid => pid === 'main' ? '#b07be0' : '#6bbfb0';
+
+let NOW = 1000;
+Date.now = () => NOW;
+
+eval(fs.readFileSync(process.argv[1], 'utf8'));
+DASH.story = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+DASH.buildValuesView();
+
+const S = DASH.valueGraphState;
+const steps = [];
+function gesture(dy) {
+  NOW += 1000;                                   // clear the gesture lock
+  let prevented = 0;
+  listeners.wheel({
+    ctrlKey: true, metaKey: false, deltaY: dy, deltaMode: 0,
+    clientX: 700, clientY: 100,                  // 700 lands in the second act
+    target: { closest: () => null },
+    currentTarget: content,
+    preventDefault: () => { prevented++; },
+  });
+  steps.push({ act: S.act, seq: S.seq, base: S.base,
+               crumbs: els['vg-crumbs'].innerHTML, prevented });
+}
+
+gesture(-300);      // All -> the act under the pointer
+gesture(-300);      // act -> the sequence under the pointer
+gesture(-300);      // deepest level: no further move
+gesture(300);       // back out to the act
+gesture(300);       // back out to All
+gesture(300);       // ceiling at All: no further move
+
+S.base = 'act-1'; S.act = 'act-1'; S.seq = null;   // an act chosen with the control
+DASH.renderValues();
+gesture(300);       // the chosen act is the ceiling
+
+process.stdout.write(JSON.stringify(steps));
+"""
+
+
+def zoom_steps(story):
+    """Drive the zoom gestures and return the state after each one."""
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(story, f)
+        data_path = f.name
+    try:
+        out = subprocess.run(
+            ["node", "-e", _ZOOM_HARNESS, str(VALUE_GRAPH), data_path],
+            capture_output=True, text=True, timeout=60,
+        )
+    finally:
+        Path(data_path).unlink()
+    assert out.returncode == 0, out.stderr[-2000:]
+    return json.loads(out.stdout)
+
+
+def test_zoom_in_goes_all_then_act_then_sequence():
+    s = zoom_steps(_story())
+    assert s[0]["act"] == "act-2" and s[0]["seq"] is None    # All -> act
+    assert s[1]["act"] == "act-2" and s[1]["seq"] == "seq-2"  # act -> sequence
+
+
+def test_zoom_in_stops_at_the_deepest_level():
+    s = zoom_steps(_story())
+    assert s[2]["seq"] == s[1]["seq"]
+
+
+def test_zoom_out_walks_back_one_level_at_a_time():
+    s = zoom_steps(_story())
+    assert s[3]["seq"] is None and s[3]["act"] == "act-2"
+    assert s[4]["act"] is None and s[4]["seq"] is None
+
+
+def test_zoom_out_does_not_go_above_all():
+    s = zoom_steps(_story())
+    assert s[5]["act"] is None and s[5]["seq"] is None
+
+
+def test_a_chosen_act_is_the_ceiling_for_zoom_out():
+    s = zoom_steps(_story())
+    assert s[6]["base"] == "act-1"
+    assert s[6]["act"] == "act-1" and s[6]["seq"] is None
+
+
+def test_every_zoom_gesture_suppresses_the_browser_zoom():
+    assert all(step["prevented"] == 1 for step in zoom_steps(_story()))
+
+
+def test_breadcrumb_tracks_the_zoom_level():
+    s = zoom_steps(_story())
+    # s[0] is after the first gesture (All -> act), so the root is already listed.
+    assert "All" in s[0]["crumbs"] and "Act II" in s[0]["crumbs"]
+    assert "S1" not in s[0]["crumbs"]                         # no sequence yet
+    assert "All" in s[1]["crumbs"] and "Act II" in s[1]["crumbs"]
+    assert "S1" in s[1]["crumbs"]

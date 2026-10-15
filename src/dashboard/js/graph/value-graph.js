@@ -27,7 +27,7 @@ window.DASH = window.DASH || {};
     resolution:         { label: 'Resolution',       color: '#b07be0', shape: 'dot' },
   };
 
-  const state = { tab: 'story', plot: null, act: null };
+  const state = { tab: 'story', plot: null, base: null, act: null, seq: null, animate: false };
   D.valueGraphState = state;
   let vgUid = 0;
 
@@ -328,15 +328,81 @@ window.DASH = window.DASH || {};
     return { major, minor: minor.concat(rest.map(nameOf)), lines };
   }
 
-  // ---------- what is on screen: the whole story, or one act of it (the answer to long stories, in place of a slider)
+  // ---------- what is on screen: the whole story, one act, or one sequence
   function currentModel(S) {
-    let model = D.valueModel(S);
-    state.total = model.n;
-    if (state.act) {
-      const band = model.acts.find(a => a.id === state.act);
-      if (band) model = D.valueSlice(model, band.start, band.end); else state.act = null;
+    const full = D.valueModel(S);
+    state.total = full.n;
+    const actBand = state.act ? full.acts.find(x => x.id === state.act) : null;
+    if (state.act && !actBand) { state.act = null; state.seq = null; }
+    const seqBand = state.seq ? full.seqs.find(x => x.id === state.seq) : null;
+    if (state.seq && !seqBand) state.seq = null;
+    const num = seqBand ? full.seqNums.get(seqBand.id) : '';
+    state.names = { act: actBand ? actBand.name : '', seq: seqBand ? (num ? num + ' ' : '') + (seqBand.name || '') : '' };
+    const band = seqBand || actBand;
+    return band ? D.valueSlice(full, band.start, band.end) : full;
+  }
+
+  // ---------- zoom: wheel in goes All -> act -> sequence under the pointer, wheel out goes back, never above the chosen level
+  const ZOOM = { plainWheelOnAxis: true, plainWheelOnCharts: false, step: 60, lockMs: 320 };
+  let viewCtx = null, wheelAcc = 0, wheelLock = 0;
+
+  function zoomIn(idx) {                                      // idx: scene index in the model on screen
+    if (!viewCtx) return false;
+    const full = D.valueModel(D.story || {});
+    const g = idx + (viewCtx.model.offset || 0);              // index in the whole story
+    const at = list => list.find(x => g >= x.start && g <= x.end);
+    if (!state.act) { const x = at(full.acts); if (!x) return false; state.act = x.id; state.seq = null; return true; }
+    if (!state.seq) { const x = at(full.seqs); if (!x) return false; state.seq = x.id; return true; }
+    return false;
+  }
+
+  function zoomOut() {
+    if (state.seq) { state.seq = null; return true; }
+    if (state.act && state.act !== state.base) { state.act = null; return true; }   // the chosen act is the ceiling
+    return false;
+  }
+
+  function onWheel(e) {
+    const overAxis = e.target.closest && e.target.closest('.vg-axis-wrap');
+    const wants = e.ctrlKey || e.metaKey || (overAxis && ZOOM.plainWheelOnAxis) || ZOOM.plainWheelOnCharts;
+    if (!wants || !viewCtx) return;
+    e.preventDefault();                                       // not the page scroll, not the browser zoom
+    const now = Date.now();
+    if (now < wheelLock) return;
+    wheelAcc += e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+    if (Math.abs(wheelAcc) < ZOOM.step) return;
+    const zoomingIn = wheelAcc < 0;                           // wheel forward, like a map
+    wheelAcc = 0;
+    let changed = false;
+    if (zoomingIn) {
+      const axis = e.currentTarget.querySelector('svg.vg-axis');
+      if (axis) {
+        const r = axis.getBoundingClientRect(), g = viewCtx.geo;
+        const raw = Math.floor(((e.clientX - r.left) * (g.W / r.width) - g.labelW) / g.slot);
+        changed = zoomIn(Math.max(0, Math.min(viewCtx.model.n - 1, raw)));
+      }
+    } else {
+      changed = zoomOut();
     }
-    return model;
+    if (changed) { wheelLock = now + ZOOM.lockMs; state.animate = true; D.renderValues(); }
+  }
+
+  // where you are: All > Act II > S3, each step clickable down to the chosen level
+  function renderCrumbs() {
+    const box = document.getElementById('vg-crumbs');
+    if (!box) return;
+    const n = state.names || {}, parts = [];
+    if (!state.base) parts.push({ label: 'All', go: () => { state.act = null; state.seq = null; } });
+    if (state.act) parts.push({ label: n.act, go: () => { state.seq = null; } });
+    if (state.seq) parts.push({ label: n.seq, go: null });
+    if (parts.length < 2) { box.innerHTML = ''; return; }
+    box.innerHTML = parts.map((x, k) => {
+      const last = k === parts.length - 1;
+      return `<span class="vg-crumb${last ? ' current' : ''}" data-k="${k}">${h(x.label)}</span>`;
+    }).join('<span class="vg-sep">\u203A</span>');
+    box.querySelectorAll('.vg-crumb:not(.current)').forEach(el => {
+      el.onclick = () => { parts[+el.dataset.k].go(); state.animate = true; D.renderValues(); };
+    });
   }
 
   // the drawing width: the container's width without its padding
@@ -347,7 +413,9 @@ window.DASH = window.DASH || {};
 
   function setHint(geo) {
     const el = document.getElementById('vg-hint');
-    if (el) el.textContent = (!state.act && geo.slot < 7) ? `${state.total} scenes: pick an act to see it in detail` : '';
+    const top = !state.act && !state.seq;
+    if (el) el.textContent = !top ? '' : (geo.slot < 7 ? `${state.total} scenes: Ctrl/\u2318 + scroll to zoom in` : 'Ctrl/\u2318 + scroll to zoom');
+    if (el) el.title = 'Scroll in to zoom from the whole story to the act, then the sequence under the pointer. Scroll out to go back. On the axis a plain scroll works too.';
   }
 
   // ---------- hover guide, one card for the whole scene, click-through to the scene panel
@@ -417,10 +485,10 @@ window.DASH = window.DASH || {};
     const S = D.story || {}, model = currentModel(S);
     if (!model.lines.length) { el.innerHTML = empty(); return; }
     const geo = D.valueGeometry(model, innerWidth(el));
-    setHint(geo);
+    setHint(geo); viewCtx = { model, geo };
     const v = orderedValues(model, (S.project || {}).value_focus, null);
     const pnl = (names, o) => names.map(n => panel(model, geo, n, v.lines.filter(l => norm(l.value) === norm(n)), o)).join('');
-    el.innerHTML = `<div class="vg-stack">${legendsHtml()}
+    el.innerHTML = `<div class="vg-stack${state.animate ? ' vg-enter' : ''}">${legendsHtml()}
       <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo)}</div>
       ${v.major.length ? `<div class="vg-section">Major values</div>${pnl(v.major, {})}` : ''}
       ${v.minor.length ? `<div class="vg-section">Minor values</div>${pnl(v.minor, { compact: true })}` : ''}
@@ -436,10 +504,10 @@ window.DASH = window.DASH || {};
     const v = orderedValues(model, plot.value_focus, plotId);
     if (!v.lines.length) { el.innerHTML = empty(); return; }
     const geo = D.valueGeometry(model, innerWidth(el));
-    setHint(geo);
+    setHint(geo); viewCtx = { model, geo };
     const o = { strip: true };
     const pnl = names => names.map(n => panel(model, geo, n, v.lines.filter(l => norm(l.value) === norm(n)), o)).join('');
-    el.innerHTML = `<div class="vg-stack">${legendsHtml()}
+    el.innerHTML = `<div class="vg-stack${state.animate ? ' vg-enter' : ''}">${legendsHtml()}
       <div class="vg-axis-wrap">${D.valueAxisSvg(model, geo, plotId)}</div>
       ${v.major.length ? `<div class="vg-section">Major values</div>${pnl(v.major)}` : ''}
       ${v.minor.length ? `<div class="vg-section">Minor values</div>${pnl(v.minor)}` : ''}
@@ -457,8 +525,8 @@ window.DASH = window.DASH || {};
     box.style.display = '';
     box.innerHTML = `<button data-act="">All</button>` + acts.map(a => `<button data-act="${h(a.id)}" title="${h(a.name || a.id)}">${h(cut(a.name || a.id, 14))}</button>`).join('');
     box.querySelectorAll('button').forEach(b => {
-      b.classList.toggle('active', (b.dataset.act || null) === state.act);
-      b.onclick = () => { state.act = b.dataset.act || null; D.renderValues(); };
+      b.classList.toggle('active', (b.dataset.act || null) === state.base);
+      b.onclick = () => { state.base = b.dataset.act || null; state.act = state.base; state.seq = null; state.animate = true; D.renderValues(); };
     });
   }
 
@@ -471,6 +539,8 @@ window.DASH = window.DASH || {};
     if (sel) sel.value = state.plot || '';
     renderActs();
     if (state.tab === 'plot') D.renderValuePlot(el, state.plot); else D.renderValueStory(el);
+    renderCrumbs();
+    state.animate = false;
     lastW = Math.round(el.clientWidth);
   };
 
@@ -491,6 +561,7 @@ window.DASH = window.DASH || {};
         <div class="vg-seg"><button class="vg-tab" data-tab="story">Story</button><button class="vg-tab" data-tab="plot">Plot</button></div>
         <select class="vg-select vg-plot-only" id="vg-plot-select">${plots.map(p => `<option value="${h(p.id)}">${h(p.name || p.id)}</option>`).join('')}</select>
         <div class="vg-seg vg-acts" id="vg-acts"></div>
+        <span class="vg-crumbs" id="vg-crumbs"></span>
         <span class="vg-hint" id="vg-hint"></span>
       </div><div id="vg-content" class="vg-content"></div>`;
     body.querySelectorAll('.vg-tab').forEach(b => b.addEventListener('click', () => D.switchValuesTab(b.dataset.tab)));
@@ -498,6 +569,7 @@ window.DASH = window.DASH || {};
     sel.value = state.plot || '';
     sel.addEventListener('change', () => { state.plot = sel.value; D.renderValues(); });
     const content = body.querySelector('#vg-content');
+    content.addEventListener('wheel', onWheel, { passive: false });
     if (typeof ResizeObserver !== 'undefined') {
       // redraw only when the width really changed, and once per frame: a redraw can add or remove a scrollbar
       let raf = 0;

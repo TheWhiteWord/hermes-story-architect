@@ -10,7 +10,15 @@
 .vg-seg button + button { border-left: 1px solid var(--border); }
 .vg-seg button:hover { color: var(--foreground); }
 .vg-seg button.active { background: var(--card); color: var(--foreground); }
-.vg-hint { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+.vg-hint { font-size: var(--font-size-xs); color: var(--muted-foreground); opacity: 0.8; }
+.vg-crumbs { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); }
+.vg-crumb { color: var(--muted-foreground); cursor: pointer; }
+.vg-crumb:hover { color: var(--foreground); }
+.vg-crumb.current { color: var(--foreground); font-weight: 600; cursor: default; }
+.vg-sep { color: var(--muted-foreground); opacity: 0.6; }
+@keyframes vg-fade { from { opacity: 0.35; } to { opacity: 1; } }
+.vg-stack.vg-enter { animation: vg-fade 0.16s ease-out; }
+@media (prefers-reduced-motion: reduce) { .vg-stack.vg-enter { animation: none; } }
 .vg-select {
   background: var(--card); color: var(--foreground); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 4px 8px; font: inherit; font-size: var(--font-size-sm);
