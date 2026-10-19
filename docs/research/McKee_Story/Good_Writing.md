@@ -589,7 +589,7 @@ Before crafting the Inciting Incident, define the story world:
 
 ### TECHNIQUE OF SCENE ANALYSIS - Step-by-Step
 
-1. **Step One: Define Conflict:** Identify who drives the scene and motivates actions (action/reaction = beat).
+1. **Step One: gap
 2. **Step Two: Note Opening Value:**  Identify value at stake and its positive/negative charge at scene start.
 3. **Step Three: Break Scene into Beats:**
     * Analyze first action on text (surface) and subtext (underlying action) levels.
