@@ -3,7 +3,7 @@
 *Mined from `docs/research/McKee_Story/Good_Writing.md`. It stands on its own:
 no fields, no tools, no store.*
 
-*→ carried in the store by `craft/character-and-arc.md`.*
+*→ carried in the store by `references/craft/character.md` and `references/craft/character-arc.md`.*
 
 ---
 
@@ -123,7 +123,7 @@ always achieved through conflict; nothing changes without it.
   not yet shaped.
 - **What forces the change is the structure** — the degrees of pressure, the
   size of each reversal, the crisis, the climax, the final action. Those are
-  in `structure-and-plot.md`. The interlock is the point: a character
+  in `references/theory/structure-and-plot.md`. The interlock is the point: a character
   designed apart from the structure that will pressure it is a design that
   cannot be enacted, and changing one requires changing the other.
 - **The self can be the antagonist.** Inner conflict is conflict with oneself,
@@ -149,7 +149,7 @@ locate, produces nothing.
 **A protagonist and the story are only as compelling as the forces of
 antagonism make them.** A character is defined as much by what pushes back.
 How values oppose each other, and how deep a reversal has to go before it
-reaches the person, is in `values.md`.
+reaches the person, is in `references/theory/values.md`.
 
 ## Cast
 

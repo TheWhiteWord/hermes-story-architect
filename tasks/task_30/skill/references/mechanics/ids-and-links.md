@@ -31,7 +31,11 @@ The field-by-field list is in `story_describe`.
 *No convention is enforced, so pick one and hold it.*
 
 - Lowercase, hyphenated, descriptive of the thing rather than of its role:
-  `kael-mira` for a bond, `water-archive` for a place, `first-doubt` for a beat.
+  `kael-mira` for a bond, `water-archive` for a place, `the-burning` for a
+  variant.
+- **A `scene_beats` record is named from its scene** — `{scene_id}-beats`. The
+  suffix is a convention, not a rule: the id is still chosen once and never
+  changed, and the write path refuses an id already in use.
 - **Match the display name where it is short enough to read.** A character named
   "Dr Elena Voss" and an id of `dr-elena-voss` line up on every screen, and
   nothing enforces it — so it is a decision, not a default.
@@ -49,8 +53,8 @@ The field-by-field list is in `story_describe`.
 - **A rename silently breaks every link to the entity.** Deleting the old id and
   creating a new one leaves every `climax_scene_id`, `primary_plot`,
   `location.world` and `variant_of` pointing at nothing — and, as established in
-  `plot-and-structure.md`, those references are **not checked on write**. Nothing
-  warns. Nothing reports it later.
+  `../craft/plot-and-structure.md`, those references are **not checked on write**.
+  Nothing warns. Nothing reports it later.
 - **The same applies to a delete.** Removing a scene does not clear the acts and
   sequences that pointed at it; it leaves them dangling.
 - So: **before renaming or deleting anything that other entities point at, find
@@ -61,15 +65,14 @@ The field-by-field list is in `story_describe`.
   through the same preview as any other change, and the user sees both halves.
   That is the safe way to do it: one draft, create and delete together, so the
   links are visibly part of the same decision.
-- *This is the gap recorded in `deferred-code-work.md`. A dangling-reference
+- *This is the gap recorded in the task notes. A dangling-reference
   check would make the rename safe; until then the ordering is the mitigation.*
 
 ## Fields you must never write
 
-- **`character.relationships` and `character.arc_beats_list` are computed** and
-  read-only — the only two in the system. Writing either is refused, because
-  they are derived from the relationship and arc-beat entities rather than
-  stored. → `relationships.md`, `arc-beats.md`
+- **`character.relationships` is computed** and read-only. Writing it is
+  refused, because it is derived from the `relationship` entities rather than
+  stored. → `references/craft/character-relationships.md`
 - **`id` and `type` are discarded** rather than rejected — passing them is
   accepted and ignored, which is quieter than a refusal and worth knowing.
 - So there are three different answers to "can I write this field": refused

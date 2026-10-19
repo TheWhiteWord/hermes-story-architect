@@ -57,7 +57,7 @@ path, so there is nothing to look up and nothing to guess.
   writing *now* is a judgement about what the user is currently deciding — the
   payload shows the state, it does not make the call.
 
-## `Notes` — the same on all ten types
+## Notes — the same on all eleven types
 
 *Stated once here rather than repeated in every block above.*
 
@@ -89,8 +89,8 @@ home for.
 - **Premise** — the "what if" that started it.
 - **Spine** — the protagonist's story-long want. Every scene relates to it.
 - **Controlling Idea** — how and why life changes; the argument the story makes.
-- **Value Arc** — the value at stake and its sweep. The stored read-back is the
-  plots' `value_lines`; the recording pass is `craft/value-pass.md`.
+- **Value Arc** — the value at stake and its sweep. The stored read-back is each
+  plot's `value_focus`; the recording pass is `references/craft/value-pass.md`.
 - **Structure** — design type, act count, where the turning points sit.
 - **Genre** — the contract with the audience: what this world owes them.
 - **Notes** — everything that does not fit above.
@@ -106,9 +106,9 @@ home for.
   fact someone else could act on.
 - **Contradictions** — what does not add up in them. Depth.
 - **Psychology** — the inner life: fears, secrets, the mental landscape.
-- **Arc** — where they end up different. The prose; the shape is → `arc-beats.md`
+- **Arc** — where they end up different. The prose; the shape is → `references/craft/character-arc.md`
 - **Relationships** — prose about bonds. The structured version is its own
-  entity → `relationships.md`
+  entity → `references/craft/character-relationships.md`
 - **Voice** — how they speak. No field for it at all; this section is the only
   place it can live.
 - **Notes**
@@ -145,7 +145,7 @@ home for.
 - **Role** — what kind of plot this is, main or sub. Pairs with `plot_type` /
   `plot_scope`.
 - **Threads** — how it weaves through scenes. Pairs with setups/crisis/climax/
-  payoffs; does not set them. → `plot-and-structure.md`
+  payoffs; does not set them. → `references/craft/plot-and-structure.md`
 - **Value** — the value at stake across this plot, and its journey.
 - **Characters** — who is in it, and their stake.
 - **Notes**
@@ -177,34 +177,36 @@ home for.
 
 ## Scene
 
-*Eight sections. The one with a special first section.*
+*Six sections. The one with a special first section.*
 
 - **Content** — **the scene itself, in Fountain.** Not prose about the scene; the
-  screenplay. → `screenplay-format.md`
+  screenplay. → `references/mechanics/screenplay-format.md`
 - **Objective** — what the character wants here, against the story-long want.
-- **Conflict** — the antagonism: inner, personal, extra-personal.
-- **Beats** — the action/reaction exchanges.
+  Pairs with the scene's own `scene_objective` field, which carries the same
+  fact.
 - **Value Turn** — what this scene does to each value it touches. The turn
   itself is recorded as `value_turns` after the scene exists; this section holds
   the reasoning. → `../craft/value-pass.md`
-- **Dramatic Function** — its role in the larger structure, and the flags.
+- **Dramatic Function** — its role in the larger structure.
 - **Production** — location, time, heading. Screenplay-facing.
 - **Notes**
 
-## Arc beat
+*The scene's `Conflict` and `Beats` sections are gone.* Both moved to the
+`scene_beats` record, which holds the beats and the evaluation of the scene.
+The scene keeps its own `Objective`.
 
-*Five sections. The clearest case of a field and a section working side by side.*
+## Scene beats
 
-- **Action** — what the character does. The field holds the short version; this
-  section holds the thinking behind it. → `arc-beats.md`
-- **The Gap** — the disconfirming reaction. Also a field, named `gap`.
-- **Choice** — what they do next. Also a field.
-- **Value Shift** — the resulting change. Also a field, named `shift`.
+*Three sections. The scene's beats, and the evaluation of the scene.*
+
+- **Conflict** — what resists the objective, and from which circle: inner,
+  personal, extra-personal. More than one at once is normal. The scene's own
+  `Conflict` section is gone; this is where it went.
+- **Findings** — the evaluation of the scene: missing conflict, repetition, a
+  turning point in the wrong place, on-the-nose dialogue. These are the
+  author's judgements, written here rather than computed, so the list is not a
+  closed one.
 - **Notes** — see below.
-- *No ruling needed here, and that is the point:* four of the five shadow a
-  field, and that is not a duplication to be resolved. The field is the fact
-  every other reader uses; the section is why the character did it. A beat can
-  be written either way round, and often only one of them is worth writing yet.
 
 ## Relationship
 
@@ -212,7 +214,7 @@ home for.
 
 - **Nature** — what defines the bond at its core.
 - **Perspectives** — each character's view. Pairs with the `perspectives` dict;
-  does not set it. → `relationships.md`
+  does not set it. → `references/craft/character-relationships.md`
 - **Tension** — the friction, and the dramatic potential.
 - **History** — how it evolved. Pairs with `history`.
 - **Scenes to Write** — what scenes this relationship *needs*, not where it
@@ -228,9 +230,8 @@ Answers to the four open questions, kept so the reasoning is not re-derived.
 - **Fields and sections.** A section is where thinking, decisions and extended
   detail are kept; the field holds the fact. Neither requires the other — no
   obligation to write one before the other, and nothing in the code couples
-  them. They work together naturally. On `arc_beat`, where four of five section
-  names shadow a field, that is the arrangement working, not a duplication to
-  resolve.
+  them. They work together naturally. On an entity where most sections shadow a
+  field, that is the arrangement working, not a duplication to resolve.
 - **The "which section informs which field" mapping.** Useful as a prompt, and
   deliberately **not** a rule. If a section has been written and its field is
   empty, that is a natural moment to notice — not an error and not a
@@ -239,6 +240,11 @@ Answers to the four open questions, kept so the reasoning is not re-derived.
   where content that belongs to the entity but fits nowhere else goes, instead
   of being lost or forced into a section about something else. Not a scratchpad
   and not a home for facts that have fields.
+- **Completeness is elastic, and one type is exempt.** `scene_beats` carries no
+  completeness bar: the beats can be absent, minimal, or full, and an empty
+  list is a valid state rather than a gap to close. The scene's computed
+  `scene_beats` field is what is reported as missing when the record does not
+  exist at all — the record, not its contents.
 - **Reporting blank sections.** Not a separate report. `story_retrieve` with
   `sections: ["all"]` returns each section's body, and a blank one is `""` —
   read it there. It also returns the headings the note uses under names of its

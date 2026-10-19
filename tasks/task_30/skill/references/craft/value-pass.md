@@ -1,7 +1,7 @@
 # The value pass
 
 *How the values of a scene are recorded after the scene exists, and read back.*
-→ `theory/values.md`
+→ `references/theory/values.md`
 
 **A separate step, never part of creating the scene.** Field shapes, types and
 defaults are not here — `story_describe` is the authority on those.
@@ -38,7 +38,7 @@ times on purpose.
   meant to be small enough to hold in mind. A second word for the same thing
   is a second line through the same story.
 - **If none fits, create the value, then record the shift.** Read
-  `theory/values.md` first — the four rungs are a design choice (what the
+  `references/theory/values.md` first — the four rungs are a design choice (what the
   positive is for this value, what its contrary/contradictory/negation-of-negation
   mean in this story), not a form to fill. Then use `story_draft` to create a
   `value` entity (the `name` plus four distinct words, and an optional

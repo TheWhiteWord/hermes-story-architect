@@ -6,10 +6,9 @@ The user has a dashboard, and the plugin drives it. Three things about it are
 not derivable from the data, and this file is those three things.
 
 Everything else on that surface is computed from the entities — the character
-web from relationships, the arc graph from beats, the statistics from value
-charges, the view list from what exists. The agent already knows all of it from
-what it has staged, so describing the views would be a second source of truth
-for something derived.
+web from relationships, the statistics from value charges, the scene list from
+what exists. The agent already knows all of it from what it has staged, so
+describing the views would be a second source of truth for something derived.
 
 ---
 
@@ -45,9 +44,9 @@ for something derived.
   making a decision about the story, and it is worth treating as one: ask what
   the new order does rather than performing the move mechanically.
 - It is also why `reorder` exists as an operation at all — it renumbers a whole
-  list, because the list is the thing being changed. → `staging-changes.md`
+  list, because the list is the thing being changed. → `references/mechanics/staging-changes.md`
 - *Not the same as a scene's own position within its sequence.* Order is per
-  parent, and the screenplay concatenates across all of them. → `scene-design.md`
+  parent, and the screenplay concatenates across all of them. → `references/craft/scene-design.md`
 
 ## It is generated from committed data, into a temporary file
 

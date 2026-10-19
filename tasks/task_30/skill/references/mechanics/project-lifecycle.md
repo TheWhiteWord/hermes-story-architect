@@ -41,7 +41,7 @@ agent.*
   wrong one is a decision the user did not make.
 - It is forgiving in the other direction: only `name` is required, and the rest
   fall back to defaults, so a project can be created nearly empty and filled in
-  later. → `project-design.md`
+  later. → `references/craft/project-design.md`
 
 ## Back up before anything irreversible
 
@@ -93,7 +93,7 @@ agent.*
   using it as a repair would destroy the thing being repaired.
 - *In practice, the correct answer is almost always that import is not the tool
   being wanted.* If the problem is a missing field, that is a draft; if it is a
-  broken link, that is `ids-and-links.md`; if it is a lost entity, that is
+  broken link, that is `references/mechanics/ids-and-links.md`; if it is a lost entity, that is
   `restore`.
 
 ## Restore is exact
@@ -122,7 +122,7 @@ agent.*
   database**, so it is safe to call when the name is uncertain — and worth
   calling before guessing, since every other call needs a project that resolves.
 - Note the resolution: a project name is matched **fuzzily**, silently above a
-  high threshold. A near-miss writes to the wrong project. → `story-memory.md`,
+  high threshold. A near-miss writes to the wrong project. → `references/model/story-memory.md`,
   which covers the same mechanism where it bites hardest.
 
 ---

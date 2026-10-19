@@ -1,7 +1,7 @@
 # World
 
 *The reality the story happens inside: its rules, its period, what it holds
-sacred, and who holds power in it.* → `theory/world-and-place.md`
+sacred, and who holds power in it.* → `references/theory/world-and-place.md`
 
 ## Requisites
 
@@ -16,7 +16,7 @@ None. A world is created on its own, before anything is placed in it.
   later break it without the break being a decision. One rule per entry, and
   each one a limit or a law rather than a description of the place.
   Everything in the story that is impossible in this world is impossible
-  because of what is written here. → `character.md`, `location.md`
+  because of what is written here. → `references/craft/character.md`, `references/craft/location.md`
 - **`period`** — where the world sits in history. A world is a *version* of a
   time, and this is what decides what its people take for granted.
 - **`values`** — what this world holds sacred: the concepts of good and evil,
@@ -39,11 +39,11 @@ None. A world is created on its own, before anything is placed in it.
   rules, values or power onto the characters and locations inside it. A
   character that breaks a world's rule, or a location that a world's power
   structure makes impossible, is a contradiction the world file cannot see. →
-  `character.md`, `location.md`
+  `references/craft/character.md`, `references/craft/location.md`
 
 - **A world may have variants**, and a variant is a diff on this one rather
   than a world invented from nothing. A base world has `variant_of` empty.
-  → `variant.md`
+  → `references/craft/variant.md`
 
 ## Consistency
 
@@ -52,4 +52,4 @@ records about the same reality, and nothing compares them. A world of magic
 under a genre of sci-fi is one of the two being out of date, and which one is
 the user's to say — the agent does not get to decide that the genre was
 loose. The project's `setting` and `period` are not a check: they describe the
-main story, and a story may hold worlds that are not its main one. → `project.md`
+main story, and a story may hold worlds that are not its main one. → `references/craft/project-design.md`

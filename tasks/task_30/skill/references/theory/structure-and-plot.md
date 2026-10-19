@@ -3,9 +3,8 @@
 *Mined from `docs/research/McKee_Story/Good_Writing.md`. It stands on its own:
 no fields, no tools, no store.*
 
-*→ carried in the store by `craft/plot-and-structure.md` and
-`craft/project-design.md`.*
-
+*→ carried in the store by `references/craft/plot-and-structure.md` and
+`references/craft/project-design.md`.*
 ---
 
 ## Change comes in degrees
@@ -122,7 +121,7 @@ Three designs, differing by what they reverse.
 
 - **The structure and the characters are one decision.** A passive design in
   a classical structure is a contradiction, and a structure whose pressures
-  do not fit its protagonist cannot be enacted. `character-and-arc.md` holds
+  do not fit its protagonist cannot be enacted. `references/theory/character-and-arc.md` holds
   the character side: what the pressures are for.
 
 ## Structure and character are interlocked

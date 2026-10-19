@@ -4,7 +4,7 @@
 
 A relationship is one record seen from two sides. It is not a property of
 either character alone, and the two views are allowed to disagree — that
-disagreement is usually the interesting part. → `theory/character-and-arc.md`
+disagreement is usually the interesting part. → `references/theory/character-and-arc.md`
 
 ## Requisites
 
@@ -67,7 +67,7 @@ the fields restated.
 - **`perspectives` is keyed by character slug, and both keys are required.**
   A perspective under a slug that is not one of the two characters is not
   checked against `characters` and is not what anyone reads — the reads go
-  through the two characters. → `character.md`
+  through the two characters. → `references/craft/character.md`
 
 - **`strength` exists on both sides and is a signed scale, so the two are
   read as one bond's tension from two ends.** Two characters at `+0.9` are
@@ -78,7 +78,7 @@ the fields restated.
   character's `relationships` is computed from these records, with `with`
   naming *the other* character. A character on one side only is a bond the
   other has not been told about yet, in the store and in the story alike. →
-  `character.md`
+  `references/craft/character.md`
 
 - **The same pair may hold more than one bond, and nothing objects.** A
   professional history and a personal one are two records, and both appear on

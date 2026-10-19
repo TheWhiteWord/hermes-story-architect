@@ -27,7 +27,7 @@ human is the author; the agent is the one holding the structure.
 document. Some decisions belong in fields, where they are queryable and can be
 contradicted later; some belong in sections, where they are free prose that
 explains itself. Both are the same kind of writing and neither is more
-authoritative. → `model/entity-sections.md`
+authoritative. → `references/model/entity-sections.md`
 
 ---
 
@@ -37,14 +37,14 @@ authoritative. → `model/entity-sections.md`
 
 1. **Never commit a draft the user has not approved.** `story_draft` proposes;
    `story_draft` with `action="commit"` is the user's decision to make. A
-   proposal is not a change. → `mechanics/staging-changes.md`
+   proposal is not a change. → `references/mechanics/staging-changes.md`
 2. **Never invent an id.** Ids are global, permanent, and never renamed. The
-   user names them, or they are read from something the user wrote. → `mechanics/ids-and-links.md`
+   user names them, or they are read from something the user wrote. → `references/mechanics/ids-and-links.md`
 3. **A blank field is a question, not a defect.** Do not fill a field to make
    the store look complete. The unfilled view exists to report, not to be
-   silenced. → `model/entity-sections.md`
+   silenced. → `references/model/entity-sections.md`
 4. **The database is the source of truth.** The Markdown files are an export of
-   it, not a second copy that can be edited. → `mechanics/project-lifecycle.md`
+   it, not a second copy that can be edited. → `references/mechanics/project-lifecycle.md`
 
 ## How a session runs
 
@@ -52,13 +52,13 @@ authoritative. → `model/entity-sections.md`
 
 - **Orient.** `story_load` with nothing else. It returns the structure, the
   project, and the whole story memory in one call — which is also how the agent
-  learns what has already been decided. → `mechanics/reading-the-project.md`
+  learns what has already been decided. → `references/mechanics/reading-the-project.md`
 - **Then narrow.** A view for the question, `story_retrieve` for the contents.
   Ids from the load are what both take.
-- **Then write**, as a proposal. → `mechanics/staging-changes.md`
+- **Then write**, as a proposal. → `references/mechanics/staging-changes.md`
 - **Memory is a separate kind of writing** — a fact about the project that
   outlives the entities, rather than a fact *in* one. Do not infer it from a
-  scene. → `model/story-memory.md`
+  scene. → `references/model/story-memory.md`
 
 ## The tools, in one line each
 
@@ -67,7 +67,7 @@ authoritative. → `model/entity-sections.md`
 | Tool | For |
 |---|---|
 | `story_describe` | what fields and sections a type has |
-| `story_load` | what exists in the project, and one of four views |
+| `story_load` | what exists in the project, and one of five views |
 | `story_retrieve` | one entity's fields and sections, batched |
 | `story_search` | where a term is mentioned, across all prose |
 | `story_draft` | propose, then commit, then discard |
@@ -95,7 +95,7 @@ matches the task, not the folder.*
 | File | Read when |
 |---|---|
 | `references/model/entity-sections.md` | choosing between a field and a section; what goes in a section |
-| `references/model/value-system.md` | a character's value or an arc beat's; the character track (the story/plot value pass is `craft/value-pass.md`) |
+| `references/model/value-system.md` | a character's value or the arc it moves on; the character track (the story/plot value pass is `references/craft/value-pass.md`) |
 | `references/model/story-memory.md` | recording a decision; resolving a contradiction |
 
 ### `references/craft/` — the writing work
@@ -105,14 +105,16 @@ craft file is where the theory becomes a decision.*
 
 | File | Read when | Theory |
 |---|---|---|
-| `references/craft/project-design.md` | shaping the premise, theme, or premise-vs-theme | — |
+| `references/craft/project-design.md` | shaping the premise, theme, or the shape the story takes | `references/theory/structure-and-plot.md` |
 | `references/craft/plot-and-structure.md` | acts, sequences, plots, milestones | `references/theory/structure-and-plot.md` |
-| `references/craft/character-and-arc.md` | creating or changing a character | `references/theory/character-and-arc.md` |
-| `references/craft/character-and-arc/arc-beats.md` | a character's turn, in beats | `references/theory/character-and-arc.md` |
-| `references/craft/character-and-arc/relationships.md` | who a character is bonded to | `references/theory/character-and-arc.md` |
-| `references/craft/scene-design.md` | a scene's purpose, turn, and dramaturgy | `references/theory/scene-and-beat.md` |
+| `references/craft/character.md` | creating or changing a character | `references/theory/character-and-arc.md` |
+| `references/craft/character-arc.md` | a character's arc, and the shape it takes | `references/theory/character-and-arc.md` |
+| `references/craft/character-relationships.md` | who a character is bonded to | `references/theory/character-and-arc.md` |
+| `references/craft/scene-design.md` | a scene's purpose, turn, beats and dramaturgy | `references/theory/scene-and-beat.md` |
 | `references/craft/value-pass.md` | recording a scene's value turns after it exists | `references/theory/values.md` |
-| `references/craft/world-and-place.md` | a world or a location | `references/theory/world-and-place.md` |
+| `references/craft/world.md` | a world, its rules and its power | `references/theory/world-and-place.md` |
+| `references/craft/location.md` | a place, and what it is there to do | `references/theory/world-and-place.md` |
+| `references/craft/variant.md` | a world or a place, varied | `references/theory/world-and-place.md` |
 
 ### `references/mechanics/` — the tools
 
@@ -120,7 +122,7 @@ craft file is where the theory becomes a decision.*
 
 | File | Read when |
 |---|---|
-| `references/mechanics/reading-the-project.md` | orienting, or choosing between the four views |
+| `references/mechanics/reading-the-project.md` | orienting, or choosing between the views |
 | `references/mechanics/staging-changes.md` | writing anything, and what a draft can and cannot do |
 | `references/mechanics/ids-and-links.md` | naming an entity, or following a reference |
 | `references/mechanics/screenplay-format.md` | writing a scene's `## Content` in Fountain |

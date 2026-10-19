@@ -3,7 +3,7 @@
 *Mined from `docs/research/McKee_Story/Good_Writing.md`. It stands on its own:
 no fields, no tools, no store.*
 
-*→ carried in the store by `craft/scene-design.md`.*
+*→ carried in the store by `references/craft/scene-design.md`.*
 
 ---
 

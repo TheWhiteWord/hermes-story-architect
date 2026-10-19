@@ -1,6 +1,6 @@
 # Location
 
-*A place in the story, and what it is there to do.* → `theory/world-and-place.md`
+*A place in the story, and what it is there to do.* → `references/theory/world-and-place.md`
 
 A location is not a set description. It is a specific place in a specific
 world, and it earns its record by what it does for the story — what it
@@ -20,7 +20,7 @@ None required. A location is created on its own, before any scene uses it.
   has to resolve to a location record, and if there is none, create it. A
   place that is only ever named in scenes and never recorded has no mood, no
   image system and no history, and the scenes cannot reach anything it holds.
-  → `scene-design.md`
+  → `references/craft/scene-design.md`
 
 ## Deciding it
 
@@ -36,10 +36,10 @@ None required. A location is created on its own, before any scene uses it.
   where the past catches up, or where a choice cannot be deferred any longer,
   is doing work. A place with no function is a backdrop, and the user decides
   whether they want one.
-- **`world`** — the world it belongs to. → `world.md`
+- **`world`** — the world it belongs to. → `references/craft/world.md`
 - **`variant_of`** — a variant is this same place with a change the story
   cares about, and the base stays a location in its own right. →
-  `variant.md`
+  `references/craft/variant.md`
 - **The sections** — `Description`, `Atmosphere`, `Image System`, `History`,
   `Dramatic Function`, `Notes`. The place in prose.
   - `Atmosphere` is the `mood` in words; `Description` is what is there.
@@ -58,11 +58,11 @@ None required. A location is created on its own, before any scene uses it.
   A scene's `location` is a slug or free text, and a location's own record is
   not required to be set on the scene. A location can exist with no scene in
   it, which is a place the story has not used yet or does not need — the user
-  decides which. → `scene-design.md`
+  decides which. → `references/craft/scene-design.md`
 
 - **A place is bounded by its world.** Its rules, its power structure and its
   period constrain what can happen in it, and a location that assumes a
-  different world is a contradiction the location file cannot see. → `world.md`
+  different world is a contradiction the location file cannot see. → `references/craft/world.md`
 
 ## Consistency
 
@@ -72,4 +72,4 @@ altered the world itself — a room that burned does not need a new world, a
 city that burned does, and the difference is the world's condition rather
 than the location's. So a variant naming a different world, or none, while its
 base names one is two records in conflict, and only the user can say which the
-story means. → `variant.md`
+story means. → `references/craft/variant.md`

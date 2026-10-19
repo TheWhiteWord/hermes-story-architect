@@ -792,18 +792,18 @@ lands after them.
 
 ### Tasks
 
-- [ ] **T5.1** Add a `scene_beats` section to the skill's model file
+- [x] **T5.1** Add a `scene_beats` section to the skill's model file
       (`references/model/entity-sections.md`): the three sections and what goes
       in each, and the rule that `scene_beats` is exempt from unfilled checks.
-- [ ] **T5.2** Update `references/craft/scene-design.md`: the scene's `Beats`
+- [x] **T5.2** Update `references/craft/scene-design.md`: the scene's `Beats`
       and `Conflict` sections move to `scene_beats`, the scene keeps
       `Objective`, and the two directions (structure-first, content-first) are
       stated. Verify: no reference to a scene `Beats` section remains.
-- [ ] **T5.3** Retire the `arc_beat` references in the skill: `character-arc.md`,
+- [x] **T5.3** Retire the `arc_beat` references in the skill: `character-arc.md`,
       `value-system.md`, `value-pass.md`, `ids-and-links.md`,
       `entity-sections.md`. Verify: `git grep arc_beat tasks/task_30/skill/`
       returns nothing.
-- [ ] **T5.4** Fix the `SKILL.md` file table to match the tree it lists.
+- [x] **T5.4** Fix the `SKILL.md` file table to match the tree it lists.
       Verify: every path in the table exists.
 
 ### Findings
@@ -813,9 +813,132 @@ by this design, and it is the one thing in the design's impact list that is
 not caused by `scene_beats`. Resolved by T5.4 as part of this phase, because
 a skill that cannot be navigated is worse than a skill that is out of date.
 
+**F5.2 — T5.3 and Phase 6 are one deletion, split across two phases.** T5.3
+retires the *prose* about `arc_beat` in the skill; T6.1–T6.11 retire the
+*entity* it describes. Doing both here would describe a record the next phase
+deletes, and doing neither would leave the skill teaching a type that no longer
+exists. Resolved by scope: **this phase retires the beat-as-record vocabulary,
+not the character's arc.** T6.2 removes all six character arc fields
+(`arc_type`, `character_value`, `character_value_at_open`,
+`character_value_at_close`, `arc_complete`, `arc_beats_list`), so
+`character-arc.md` was rewritten to the arc's *shape* (the sweep between two
+charges, read off the scenes) rather than deleted — it keeps the reasoning the
+theory file carries and drops the field list that T6.2 removes — and
+`value-system.md` lost the `shift`/`y`/charge-per-beat half of its field table
+while keeping the character track. The `-beats` id convention is carried by
+`ids-and-links.md` and the `scene_beats` naming it belongs to.
+
+**F5.3 — the skill's cross-references were inconsistent in three different
+conventions at once.** `craft/scene-design.md` was written `values.md`,
+`theory/scene-and-beat.md` and `screenplay-format.md`; `craft/character.md`
+wrote `world.md` and `theory/character-and-arc.md`; `mechanics/ids-and-links.md`
+wrote `plot-and-structure.md`. Each is readable in context and none resolves
+mechanically, so the tree had no convention to fix to. Resolved by normalising
+every pointer in the tree to the full root-relative form (`references/…`), which
+is the form `SKILL.md`'s own table already uses and the form the linter's link
+check matches. 105 pointers rewritten; 0 dangling. The alternative — inventing a
+shorter convention and rewriting the tree to it — was rejected because the
+linter checks the `references/` form and the table is the most-read file in the
+tree.
+
+**F5.4 — the tree held five working documents, not skill files.**
+`craft/OLD_plot-and-structure.md`, `craft/OLD_project-design.md`,
+`craft/OLD_scene-design.md`, `craft/SAMPLE.md` and `NOTES_SKILL.md` are drafts
+and process notes, each self-describing as not part of the deliverable
+("not read by the agent", "delete when SKILL.md is written", "not part of the
+skill"). Two of them were superseded *and their subject survived under another
+name*: `OLD_plot-and-structure.md` and `OLD_project-design.md` describe acts,
+sequences, plots and the project, which the `SKILL.md` table pointed at under
+`craft/plot-and-structure.md` and `craft/project-design.md` — paths that did not
+exist. Resolved by writing those two files, in the shape of the other craft
+files, and deleting all five. The `OLD_scene-design.md` material moved into the
+`scene-design.md` rewrite (T5.2) rather than being lost.
+
+**F5.5 — `view="arc"` was in the skill but is not retired by Phase 6's list.**
+T6.5 removes it from `story_load`. `reading-the-project.md` and
+`value-system.md` both described it, and `value-system.md`'s whole `shift`/`y`
+read-back was built on it. Removed with the arc-beat half, and the character
+track now reads back through `view="values"`, which Phase 6 leaves in place.
+
 ### FINAL BRIEF
 
----
+Phase 5 complete. Four tasks landed, plus five findings.
+
+**T5.1 — `scene_beats` in the model file.** `references/model/entity-sections.md`
+gained a `## Scene beats` block — `Conflict` (what resists the objective, from
+which circle), `Findings` (the evaluation: missing conflict, repetition,
+misplaced turning point, on-the-nose dialogue — the author's judgements, so not
+a closed list), `Notes` — and a ruling that completeness is elastic: the beats
+can be absent, minimal or full, an empty list is a valid state, and the scene's
+computed `scene_beats` field is what is reported missing when the record does
+not exist at all. The `## Scene` block dropped `Conflict` and `Beats`, now six
+sections, and says where they went.
+
+**T5.2 — the scene's beats moved.** `references/craft/scene-design.md` states
+both directions — **structure first** (scene created with intent, beats and
+turning point designed before the script, record revised, scene fields
+reconciled) and **content first** (script written, record read back out of the
+text, scene fields derived) — and the reconciliation rule: after writing or
+reworking `scene_beats`, check whether `scene_objective`, `effects` and `changes`
+still hold, fill `gap` and `risk` where something moved, and **leave the rest
+empty**. The scene keeps `Objective`; the couplings and consistency sections now
+point at the `scene_beats` record rather than at sections the scene no longer
+has. Verified: no reference to a scene `Beats` section remains anywhere in the
+tree.
+
+**T5.3 — `arc_beat` retired from the skill.** `git grep arc_beat
+tasks/task_30/skill/` returns nothing. `character-arc.md` was rewritten to the
+arc's shape (the sweep between two charges, read off the scenes; where a turn
+comes from is a structural question, not a per-character one) rather than
+deleted, because Phase 6 retires the *entity* and not the arc. `value-system.md`
+kept the character track and lost the `shift`/`y`/per-beat-charge half.
+`ids-and-links.md` and `entity-sections.md` lost the `arc_beats_list` computed
+field. `value-pass.md` needed no change — it never named the entity.
+
+**T5.4 — the file table matches the tree.** 24 paths in `SKILL.md`, 0 missing.
+The table now names the ten craft files, seven mechanics files, three model
+files and five theory files that exist, including the two new ones
+(`craft/plot-and-structure.md`, `craft/project-design.md`) and the files the old
+table omitted (`craft/character.md`, `craft/character-relationships.md`,
+`craft/world.md`, `craft/location.md`, `craft/variant.md`).
+
+**Also landed, as F5.3 and F5.4.** 105 cross-reference pointers normalised to
+the full root-relative form (0 dangling across the whole tree); the five working
+documents deleted; the two craft files whose subjects the old table pointed at
+written.
+
+**F5.6 — the naming sweep found two stale names, and one block I had left behind.**
+The task's good-practice clause asks for naming to be checked against the new
+state rather than lazily kept, so the sweep ran after the writes:
+
+- **`value_lines` did not exist in the code.** `craft/scene-design.md` and
+  `model/entity-sections.md` both pointed at it as the stored read-back of a
+  plot's values. It is retired work from another task (`tasks/task_32`'s B1/B2,
+  which built and then removed it) and no field of that name exists in
+  `ENTITY_SCHEMAS`. Both now name `value_focus`, which does.
+- **The `## Arc beat` block in `model/entity-sections.md` was still there.**
+  `entity-sections.md` is on T5.3's own file list, and the block described the
+  entity's five sections (`Action`, `The Gap`, `Choice`, `Value Shift`) and
+  named `shift` — a field that exists only on `arc_beat`. Removed. Its one
+  surviving point, that most of an entity's sections can shadow its fields,
+  moved into the rulings section as a general statement rather than a claim
+  about a type that is going.
+- **The record's own fields were named descriptively, not by name.**
+  `craft/scene-design.md` said "the turning point", "the true-character choices",
+  "the driver" — which the phase's own preamble says the skill names. Now names
+  `scene`, `driver`, `scene_objective`, `turning_point`, `true_character`
+  (with `dilemma` and `choice_reveals`), and every beat sub-field. A sweep
+  confirmed every one resolves against `ENTITY_SCHEMAS['scene_beats']`, and
+  that the section names claimed for all ten typed blocks match
+  `standard_sections` exactly.
+
+**Tests.** 1181 pass. No test reads the skill tree, so no test changed — the
+check is the mechanical sweep in T5.4, not the suite.
+
+**Not in this phase.** Phase 6 removes the `arc_beat` entity itself, `view="arc"`
+and the character arc fields the design retires. This phase describes the store
+*as it will be*, so a later edit to `character-arc.md` or `value-system.md` is
+expected if T6.2's field list moves.
 
 ## Phase 6 — legacy
 

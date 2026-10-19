@@ -2,7 +2,7 @@
 
 *The same world or the same place, with a change the story cares about.*
 
-Applies to `world` and `location` alike. → `theory/world-and-place.md`
+Applies to `world` and `location` alike. → `references/theory/world-and-place.md`
 
 **A variant is a diff on a base, and both records stay live.** The base is
 still a world, the variant is still a world, and the story uses each as the
@@ -76,7 +76,7 @@ meaning anything. The threshold is what makes the base worth having.
   depends on the forest being intact is reading a fact that the variant has
   invalidated. The variant is a different place as far as the store is
   concerned, and the story is what tells you which one the scene means. →
-  `scene-design.md`
+  `references/craft/scene-design.md`
 
 - **A world variant and a location variant are independent.** The forest
   burns and the world's climate does not change; a room burns inside a city

@@ -6,7 +6,7 @@ A scene's `Content` is **Fountain** — a screenplay, not prose about one. This
 file is what the format requires, and what happens when it is not followed.
 
 The worked examples are in `samples/`, read when the shape is wanted rather
-than the rule. → `scene-design.md` for what the section is *for*.
+than the rule. → `references/craft/scene-design.md` for what the section is *for*.
 
 ---
 
@@ -87,7 +87,7 @@ wrong place, which is a layout error the user will see.
   scene heading it draws comes from the token, not from a field.
 - **The `heading` field** is metadata for the user's own organisation — it shows
   in the scene list and is searchable. It is not the screenplay.
-- They can disagree and nothing checks it. → `scene-design.md`
+- They can disagree and nothing checks it. → `references/craft/scene-design.md`
 
 ## Before staging a scene
 
@@ -98,7 +98,7 @@ wrong place, which is a layout error the user will see.
 - [ ] A scene that is not a new heading does not need one — the flow is the
       user's call, but a scene entity whose text merges into its neighbour is
       almost never what was meant.
-- → `samples/scene-content-good.md` and `samples/scene-content-broken.md`
+- → `references/mechanics/screenplay-format/samples/scene-content-good.md` and `references/mechanics/screenplay-format/samples/scene-content-broken.md`
 
 ---
 

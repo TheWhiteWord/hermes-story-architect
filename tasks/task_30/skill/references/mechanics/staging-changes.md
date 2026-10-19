@@ -32,7 +32,7 @@ only the drafts table moves.*
 - So staging is genuinely inert. A proposal the user never confirms leaves **no
   trace in the story** — which is what makes it safe to propose freely.
 - The corollary: **the dashboard will not show a staged change.** It renders
-  committed data. → `dashboard.md`
+  committed data. → `references/mechanics/dashboard.md`
 - A consequence for the conversation: the user cannot inspect a proposal
   anywhere except the preview. It has to be relayed.
 

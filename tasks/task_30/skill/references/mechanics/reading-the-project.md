@@ -21,33 +21,33 @@ promises. A real project with a full cast will be larger.*
   else.** It is both "what exists" and "what has been decided", and the memory
   comes back every time rather than needing a separate fetch.
 - It is also the cheapest way to answer "where were we" — the memory is in it.
-- → `story-memory.md` for what to do with what comes back.
+- → `references/model/story-memory.md` for what to do with what comes back.
 - *The views below are all opt-in on top of this.* None of them is needed to
   begin.
 
-## The four views
+## The views
 
 *Each answers one question. Asking a view the wrong question costs a second
 call, so the routing is worth holding.*
 
-|| View | Answers | Needs |
+| View | Answers | Needs |
 |---|---|---|
-|| `arc` | one character's arc, beat by beat | `character` |
-|| `dramatic_elements` | each scene's role and its milestones | — |
+| `dramatic_elements` | each scene's role and its milestones | — |
 | `relationship` | every bond and both sides of each | — |
 | `unfilled` | what is still missing | — or `field`, or `entity` |
+| `values` | where each value stands, and where it turns next | — or `scene`, `unit`, `plot` |
 
-- **`arc`** is the only view that needs a parameter, and it needs a character id.
-  Without one it returns every character's arc, which is a much larger answer to
-  a question nobody asked. **Pass the character.**
 - **`dramatic_elements`** is the structural read: what each scene is *for*. This
   is where the milestone flags surface, and it nests act → sequence → scene.
   Add `act` to narrow it, and `add_plot` only when the plot cross-references are
   the point — they roughly double the response.
 - **`relationship`** is small and whole: every bond with both perspectives. It
-  is the fastest way to see the cast's web. → `relationships.md`
+  is the fastest way to see the cast's web. → `references/craft/character-relationships.md`
 - **`unfilled`** is the "what next?" view, and the only one that reports
   something about the project rather than about a part of it.
+- **`values`** is the value line read in story order: where each value was last
+  left, and where it turns next. It is the read for deciding what a scene turns,
+  and for reading an arc back. → `../model/value-system.md`
 
 ## `unfilled` has three shapes, and they are not the same call
 
