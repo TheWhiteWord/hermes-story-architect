@@ -1269,25 +1269,6 @@ def get_dashboard_data(project_path: Path) -> dict:
         # Rename arcs to story.arcs for dashboard compatibility
         story_arcs = arcs
 
-        # Build scene.arc_beats from arc entities (reverse lookup)
-        scene_beats = {}
-        for a in arcs:
-            sid = a.get("scene", "")
-            if not sid:
-                continue
-            if sid not in scene_beats:
-                scene_beats[sid] = []
-            scene_beats[sid].append({
-                "character": a.get("character", ""),
-                "beat_id": a.get("id", ""),
-                "label": a.get("label", ""),
-                "y": a.get("y", 0.0),
-                "is_crisis": a.get("is_crisis", False),
-                "is_climax": a.get("is_climax", False),
-            })
-        for s in scenes:
-            s["arc_beats"] = scene_beats.get(s["id"], [])
-
         # Build sequence.scenes_list, scene_count, and plots
         plot_lookup = {p["id"]: p for p in plots}
         for seq in sequences:

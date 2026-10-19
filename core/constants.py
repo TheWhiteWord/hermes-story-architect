@@ -62,6 +62,7 @@ ENTITY_LABELS = {
     "arc_beat": "Arc Beat",
     "relationship": "Relationship",
     "value": "Value",
+    "scene_beats": "Scene Beats",
 }
 
 # Full field schemas — used by the write path to ensure all fields

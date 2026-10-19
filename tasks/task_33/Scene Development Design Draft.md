@@ -1,4 +1,4 @@
-# scene\_beats: Design Draft
+DW# scene\_beats: Design Draft
 
 Draft for review, 19 October 2026. Entity name: `scene_beats`. Nothing here is implemented.
 
@@ -46,7 +46,7 @@ Replace `arc_beat` with `scene_beats`, a record of how a scene works: who drives
 - A beat changes behavior, not value. Every beat does, by definition.
 - A scene turns a value once, at the turning point: the moment of the major gap between expectation and result.
 - The source does not address several turning points in one scene, so the design allows one.
-- The gap is the break between what the actor expects and what comes back. Each gap raises the risk, and the next action is riskier. The adjustment is the next beat’s action.
+- The gap is the break between what the character expects and what comes back. Each gap raises the risk, and the next action is riskier. The adjustment is the next beat’s action.
 - A true choice is a dilemma, and it is where true character shows. The source gives no count per scene, so the design allows none, one or several.
 
 ## 5. The scene\_beats entity
@@ -80,8 +80,8 @@ beat
 | `by` | ref | Optional. A character, location or world. Must exist. The same character on both sides means inner conflict. |
 | `surface` | string | What is shown or said. |
 | `subtext` | string | The underlying action, as an active gerund phrase. |
-| `gap` | string | Evaluation of the exchange: what the actor expected and what came back. One sentence. Empty when the beat is mere activity. |
-| `risk` | string | Evaluation: what the actor now stands to lose, carried into the next action. One sentence. Escalation is read from the sequence. |
+| `gap` | string | Evaluation of the exchange: what the character expected and what came back. One sentence. Empty when the beat is mere activity. |
+| `risk` | string | Evaluation: what the character now stands to lose, carried into the next action. One sentence. Escalation is read from the sequence. |
 | `changes[].entity` | ref | Character, relationship, location or world. Must exist. |
 | `changes[].change` | string | One sentence: what this exchange changed for that entity. |
 
