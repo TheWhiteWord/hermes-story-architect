@@ -132,8 +132,8 @@ def validate_shape(ops: list) -> list[str]:
 
     `validate_entity` is a pure function of (entity_type, frontmatter), so a
     create can be checked before the row exists. Cross-entity references are
-    deliberately NOT checked here: validate_plot_characters, validate_scene_act_id
-    and validate_arc_parents each open their own connection and read committed
+    deliberately NOT checked here: validate_plot_characters and
+    validate_scene_act_id each open their own connection and read committed
     state, so a staged create's id is not there yet and every cross-op
     reference in a batch would report a false error. Those surface at commit,
     where the earlier op has already landed.

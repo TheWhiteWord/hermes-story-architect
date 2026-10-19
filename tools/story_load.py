@@ -53,7 +53,7 @@ SCHEMA = {
         },
         "field": {
             "type": "string",
-            "description": "For view='unfilled': one field name (e.g. 'character_value_at_close'). "
+            "description": "For view='unfilled': one field name (e.g. 'scene_objective'). "
                            "Answers 'who else is missing this?' — the unfiltered list is grouped by "
                            "field, so asking for one is a lookup, not a filter over the output."
         },

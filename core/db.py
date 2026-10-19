@@ -512,10 +512,6 @@ def get_project_summary(project_path: Path) -> dict:
                 characters[eid] = {
                     "id": eid, "name": name, "one_sentence": one_sentence,
                     "story_role": extra.get("story_role", ""),
-                    "arc_type": extra.get("arc_type", ""),
-                    "character_value": extra.get("character_value", ""),
-                    "character_value_at_open": extra.get("character_value_at_open", ""),
-                    "character_value_at_close": extra.get("character_value_at_close", ""),
                 }
             elif etype == "plot":
                 plots[eid] = {
@@ -672,18 +668,9 @@ def get_project_summary(project_path: Path) -> dict:
                 "name": char["name"],
                 "one_sentence": char["one_sentence"],
                 "story_role": char["story_role"],
-                "arc_type": char["arc_type"],
-                "character_value": char["character_value"],
-                "character_value_at_open": char["character_value_at_open"],
-                "character_value_at_close": char["character_value_at_close"],
                 "relationships": char_rel_summary.get(char_id, []),
             }
-            # The sentinel values are all "" now (B12): an unset field is empty,
-            # and _omit drops falsy values on its first branch, so a prose
-            # default would never match here anyway.
-            return _omit(result, {"arc_type": "", "character_value": "",
-                                  "character_value_at_open": "", "character_value_at_close": "",
-                                  "relationships": []})
+            return _omit(result, {"relationships": []})
 
         # ── Build plot output ──
         def _build_plot(plot_id):
@@ -783,8 +770,7 @@ def get_unfilled_map(project_path: Path) -> dict:
 
     Backend for the planned story_load view="unfilled" (tasks/task_21*/spec.md
     §3.5) — the "what to work on next" overview, on demand. Not yet wired to
-    any tool. Skips stubs (planned scenes, unlabeled arc beats) — maximally
-    unfilled by definition.
+    any tool. Skips stubs (planned scenes) — maximally unfilled by definition.
     """
     db_path = project_path / ".story" / "story.db"
     if not db_path.exists():
@@ -857,9 +843,6 @@ def get_unfilled_map(project_path: Path) -> dict:
                         (eid,)).fetchone()
                     if not has_sb:
                         unfilled_inv.setdefault("scene_beats", []).append(eid)
-            elif etype == "arc_beat":
-                if not name:
-                    continue  # stub — label stored in name column
             elif etype == "plot":
                 # Plot beats live in relations, not extra — merge for unfilled check
                 for beat_field, ids in plot_beats.get(eid, {}).items():
@@ -878,45 +861,6 @@ def get_unfilled_map(project_path: Path) -> dict:
             except Exception:
                 pass
 
-
-def get_character_arcs(project_path: Path, char_id: str) -> list[dict]:
-    """Return arc beats for a character, ordered by order_key then id.
-
-    Backend for the planned story_load view="arc" (tasks/task_21*/spec.md §3.1)
-    — one character's arc beats, on demand. Not yet wired to any tool.
-    """
-    db_path = project_path / ".story" / "story.db"
-    if not db_path.exists():
-        return []
-    conn = None
-    try:
-        conn = sqlite3.connect(str(db_path))
-        rows = conn.execute(
-            "SELECT id, name, extra, order_key FROM entities WHERE type='arc_beat' AND parent_id=? AND is_deleted=0 ORDER BY order_key, id",
-            (char_id,),
-        ).fetchall()
-        return [
-            {
-                "id": row[0],
-                "label": row[1],
-                "scene": json.loads(row[2]).get("scene", "") if row[2] else "",
-                "character_value_at_open": json.loads(row[2]).get("character_value_at_open", "") if row[2] else "",
-                "character_value_at_close": json.loads(row[2]).get("character_value_at_close", "") if row[2] else "",
-                "shift": json.loads(row[2]).get("shift", "") if row[2] else "",
-                "y": json.loads(row[2]).get("y", 0.0) if row[2] else 0.0,
-                "is_crisis": json.loads(row[2]).get("is_crisis", False) if row[2] else False,
-                "is_climax": json.loads(row[2]).get("is_climax", False) if row[2] else False,
-            }
-            for row in rows
-        ]
-    except Exception:
-        return []
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
 
 def get_entity_sections(project_path: Path, entity_id: str) -> dict:
@@ -1089,7 +1033,6 @@ def get_dashboard_data(project_path: Path) -> dict:
         worlds = []
         acts = []
         sequences = []
-        arcs = []
         relationships = []
         values = []
 
@@ -1208,26 +1151,6 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["act_id"] = e[6]  # alias for dashboard (reads seq.act_id)
                 sequences.append(d)
 
-            elif etype == "arc_beat":
-                d = _entity_dict({
-                    "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
-                    "status": e[5], "parent_id": e[6], "extra": extra,
-                })
-                # Denormalize all arc fields for dashboard (reads d.action, d.choice, etc.)
-                d["action"] = extra.get("action", "")
-                d["choice"] = extra.get("choice", "")
-                d["gap"] = extra.get("gap", "")
-                d["character_value_at_open"] = extra.get("character_value_at_open", "")
-                d["character_value_at_close"] = extra.get("character_value_at_close", "")
-                d["shift"] = extra.get("shift", "")
-                d["y"] = extra.get("y", 0.0)
-                d["is_crisis"] = extra.get("is_crisis", False)
-                d["is_climax"] = extra.get("is_climax", False)
-                d["character"] = extra.get("character", e[6] or "")
-                d["scene"] = extra.get("scene", "")
-                d["label"] = extra.get("label", e[2])  # label is stored in name column
-                arcs.append(d)
-
             elif etype == "relationship":
                 d = _entity_dict({
                     "id": eid, "name": e[2], "one_sentence": e[3], "order": e[4],
@@ -1250,36 +1173,6 @@ def get_dashboard_data(project_path: Path) -> dict:
                     "note": extra.get("note", ""),
                 })
 
-        # Group arcs by character and attach as arc_beats_list (dashboard reads c.arc_beats_list)
-        # Derived from arc entities directly — no separate arc_beat relations needed
-        for a in arcs:
-            char_id = a.get("character") or a.get("parent_id")
-            if not char_id:
-                continue
-            for c in characters:
-                if c["id"] == char_id:
-                    if "arc_beats_list" not in c:
-                        c["arc_beats_list"] = []
-                    c["arc_beats_list"].append({
-                        "id": a.get("id", ""),
-                        "label": a.get("label", ""),
-                        "scene": a.get("scene", ""),
-                        "character_value_at_open": a.get("character_value_at_open", ""),
-                        "character_value_at_close": a.get("character_value_at_close", ""),
-                        "shift": a.get("shift", ""),
-                        "y": a.get("y", 0.0),
-                        "order": a.get("order", 0),
-                        "is_crisis": a.get("is_crisis", False),
-                        "is_climax": a.get("is_climax", False),
-                    })
-                    break
-
-        # Sort each character's beats by order, set arc_beat_count
-        for c in characters:
-            if "arc_beats_list" in c:
-                c["arc_beats_list"].sort(key=lambda b: b.get("order", 0))
-                c["arc_beat_count"] = len(c["arc_beats_list"])
-
         # Computed character relationship summary for dashboard (richer than load — includes strength)
         char_rel_summary = {}
         for rel in relationships:
@@ -1296,9 +1189,6 @@ def get_dashboard_data(project_path: Path) -> dict:
                 })
         for c in characters:
             c["relationships"] = char_rel_summary.get(c["id"], [])
-
-        # Rename arcs to story.arcs for dashboard compatibility
-        story_arcs = arcs
 
         # Build sequence.scenes_list, scene_count, and plots
         plot_lookup = {p["id"]: p for p in plots}
@@ -1385,7 +1275,6 @@ def get_dashboard_data(project_path: Path) -> dict:
             # compares it. See _coerce_number.
             proj_dict["act_count"] = max(
                 _coerce_number(proj_dict.get("act_count"), 3), len(acts))
-            proj_dict["arc_count"] = len(story_arcs)
 
         # Computed value focus: major/minor values per unit, recounted from
         # the scenes' value_turns on every load (nothing stored). The
@@ -1418,7 +1307,6 @@ def get_dashboard_data(project_path: Path) -> dict:
             "worlds": worlds,
             "acts": [{**ac, "value_focus": focus_by_act.get(ac["id"], {"major": [], "minor": []})} for ac in acts],
             "sequences": [{**sq, "value_focus": focus_by_sequence.get(sq["id"], {"major": [], "minor": []})} for sq in sequences],
-            "arcs": story_arcs,
             "relationships": relationships,
             "story_memory": story_memory,
             "values": values,

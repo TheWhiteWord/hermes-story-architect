@@ -1006,12 +1006,7 @@ def _get_next_order_db(conn, entity_type: str, parent_id: str) -> int:
 def _find_entity_id_db(conn, entity_type: str, slug: str) -> str | None:
     """Map (entity_type, id) to the DB entity_id.
 
-    An exact match on the primary key, for every type. Arc beats used to be
-    stored as '{character}-{beat}' and looked up by a bare beat number through
-    `id LIKE '%-{slug}'` — which matched every character owning a beat of that
-    name and took the first, so an edit could silently rewrite the wrong beat.
-    A beat's id is now its own slug and its character link is `parent_id`, so
-    there is nothing left to match loosely.
+    An exact match on the primary key, for every type.
     """
     if entity_type == "project":
         row = conn.execute("SELECT id FROM entities WHERE type='project'").fetchone()

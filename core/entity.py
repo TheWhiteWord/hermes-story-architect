@@ -339,7 +339,6 @@ _RELATION_FIELDS = {
     },
     "location": {"variant_of": ("location_variant", False)},
     "world": {"variant_of": ("world_variant", False)},
-    "arc_beat": {},
     "scene_beats": {},
     "relationship": {},
     "value": {},

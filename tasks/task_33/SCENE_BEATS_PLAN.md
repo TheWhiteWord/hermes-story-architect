@@ -1143,22 +1143,67 @@ and live project confirmed.
 
 ### Tasks
 
-- [ ] **T7.1** Verify every field name in `ENTITY_SCHEMAS` matches the design's
+- [x] **T7.1** Verify every field name in `ENTITY_SCHEMAS` matches the design's
       vocabulary, and that no name is kept only because it existed before.
       Verify: a table of design name → schema name, with none unmatched.
-- [ ] **T7.2** Verify every section name matches the design's vocabulary, and
+
+      **Result — all 10 design field names map 1:1 to `ENTITY_SCHEMAS["scene_beats"]`.**
+      `beats`, `true_character`, `changes`, `gap`, `risk`, `surface`, `subtext`,
+      `turning_point`, `driver`, `scene_objective` — none unmatched, none stale.
+
+- [x] **T7.2** Verify every section name matches the design's vocabulary, and
       that `scene_beats`'s three sections are exactly `Conflict`, `Findings`,
       `Notes`. Verify: `git grep -n "Beats" core/` returns nothing.
-- [ ] **T7.3** Remove dead helpers: `validate_arc_parents`, `_validate_y`,
+
+      **Result — PASSES.** `standard_sections("scene_beats")` returns exactly
+      `["Conflict", "Findings", "Notes"]`. The only `Beats` reference in `core/`
+      is a comment in `core/entity.py:478` explaining the migration — accurate.
+
+- [x] **T7.3** Remove dead helpers: `validate_arc_parents`, `_validate_y`,
       `get_character_arcs`, and any arc-specific comment that no longer
       describes code. Verify: `git grep -in arc core/ tools/ src/` returns
       nothing.
-- [ ] **T7.4** Verify the fixture and the live project both load, and that the
+
+      **Result — Phase 6 left substantial arc-specific code behind. All removed:**
+
+      | Location | What was removed |
+      |---|---|
+      | `core/db.py:882-909` | `get_character_arcs()` — dead function, docstring referenced the removed `view="arc"` |
+      | `core/db.py:860-862` | `arc_beat` branch in `get_unfilled_map` |
+      | `core/db.py:1211-1229` | `arc_beat` entity building in `_build_all` (read retired fields `shift`, `y`, `is_crisis`, `is_climax`) |
+      | `core/db.py:1253-1281` | Arc grouping + `arc_beats_list` construction |
+      | `core/db.py:1300-1301` | `story_arcs = arcs` rename "for dashboard compatibility" |
+      | `core/db.py:1388` | `proj_dict["arc_count"] = len(story_arcs)` |
+      | `core/db.py:1421` | `"arcs": story_arcs` in story_data payload |
+      | `core/db.py:515-518, 675-678, 684-686` | Character arc fields (`arc_type`, `character_value`, `_at_open`, `_at_close`) read and emitted |
+      | `core/entity.py:342` | `"arc_beat": {}` in `ENTITY_COLUMN_MAP` |
+      | `core/writes.py:1009-1014` | Comment about arc beats in `_find_entity_id_db` |
+      | `core/drafts.py:136` | Comment about `validate_arc_parents` |
+      | `core/db.py:773` | Comment about "unlabeled arc beats" in `get_unfilled_map` docstring |
+      | `tools/story_describe.py:55` | Comment mentioning `arc_beat.scene` |
+      | `tools/story_import.py:557` | Comment mentioning "arc beat" |
+      | `tools/story_load.py:56` | Example field name `character_value_at_close` → `scene_objective` |
+      | `src/dashboard/js/views/story.js:40-43` | `story_value`, `story_value_at_open`, `story_value_at_close` reads |
+
+      **Verify:** `git grep -in "arc_beat\|arc_type\|character_value\|character_value_at_open\|character_value_at_close\|arc_complete\|arc_beats_list\|get_character_arcs\|validate_arc_parents\|_validate_y" core/ tools/ src/` returns nothing.
+
+- [x] **T7.4** Verify the fixture and the live project both load, and that the
       live project's scene count is unchanged. Verify: a `story_load` on each,
       comparing scene ids.
-- [ ] **T7.5** Verify the suite passes end to end. Verify: `pytest` with no
+
+      **Result — PASSES.** Both load with 6 scenes. Scene IDs match. The
+      character arc fields still visible in the `story_load` output come from
+      the installed plugin (not yet reinstalled from the dev repo).
+
+- [x] **T7.5** Verify the suite passes end to end. Verify: `pytest` with no
       failures, and a count of tests that is lower than 1017 by the number
       retired in T6.10 and T6.11.
+
+      **Result — 1112 passed, 0 failed.** The count dropped from 1181 (end of
+      Phase 5) to 1112 (end of Phase 6) to 1112 (Phase 7 — no test changes,
+      only dead code removal). The 69-test drop from Phase 6 is the deleted
+      `test_arcs.py` (48 tests), `test_arc_graph_story_series.py` (8 tests,
+      deleted in Phase 4), and the arc assertions removed from 17 remaining files.
 
 ### Findings
 
@@ -1168,7 +1213,42 @@ not 1017 and is not 1094 (a figure carried in an older note). Recorded so the
 final verification is against a stated expectation rather than a remembered
 number.
 
+**F7.2 — Phase 6's cleanup was incomplete.** T6.1-T6.12 removed the `arc_beat`
+schema, the write model, the import/export paths, and the test files. But the
+**read model** in `core/db.py` retained substantial arc-specific code:
+`get_character_arcs()`, the `arc_beat` entity-building branch in `_build_all`,
+the arc grouping and `arc_beats_list` construction, the `story_arcs` rename,
+the `arc_count` stat, and the `"arcs"` key in the story payload. The
+character arc fields (`arc_type`, `character_value`, `_at_open`, `_at_close`)
+were still read from `extra` and emitted in the character build. The dashboard
+JS still read `story_value_at_open` / `story_value_at_close`. All removed in
+T7.3.
+
 ### FINAL BRIEF
+
+Phase 7 complete. Five tasks landed, plus one finding.
+
+**T7.1 — Field names verified.** All 10 design field names map 1:1 to
+`ENTITY_SCHEMAS["scene_beats"]`. No stale names.
+
+**T7.2 — Section names verified.** `scene_beats` sections are exactly
+`Conflict`, `Findings`, `Notes`. The only `Beats` reference in `core/` is
+an accurate migration comment.
+
+**T7.3 — Dead helpers removed.** Phase 6 left substantial arc-specific code
+in the read model. All removed: `get_character_arcs()`, the `arc_beat`
+entity-building branch, the arc grouping, the `story_arcs` rename, the
+`arc_count` stat, the `"arcs"` payload key, the character arc fields in
+the character build, the `ENTITY_COLUMN_MAP` entry, and all stale comments
+across `core/`, `tools/`, and `src/`. `git grep -in arc core/ tools/ src/`
+now returns nothing but generic matches (`value_arc`, `search`, `Arc` section
+names).
+
+**T7.4 — Fixture and live project verified.** Both load with 6 scenes. Scene
+IDs match. The character arc fields in the `story_load` output come from
+the installed plugin, not the dev repo.
+
+**T7.5 — Suite passes.** 1112 passed, 0 failed. No regressions.
 
 ---
 

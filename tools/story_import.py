@@ -554,7 +554,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
             raise ValueError(
                 f"Unrecognised {entity_type} field(s) in frontmatter: {k}. "
                 f"It is read-only (computed) — set it on the scene as "
-                f"plot_roles, or on the arc beat / relationship that derives it.")
+                f"plot_roles, or on the relationship that derives it.")
         if k not in s and v not in (None, "", [], {}):
             extra[k] = v
     # The one cross-field rule a scene has. The importer is a write path like

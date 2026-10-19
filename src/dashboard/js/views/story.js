@@ -37,12 +37,8 @@ DASH.buildStoryView = function() {
   if (p.controlling_idea) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Controlling Idea</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.controlling_idea}</div></div>`);
   if (p.setting) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Setting</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.setting}</div></div>`);
 
-  const valueArc = [];
-  if (p.story_value) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value}</span>`);
-  if (p.story_value_at_open) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value_at_open}</span>`);
-  if (p.story_value_at_close) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value_at_close}</span>`);
   const storyFocus = (DASH.valueFocusHtml && DASH.valueFocusHtml(p.value_focus)) || '';
-  if (valueArc.length || storyFocus) structure.push(`<div style="margin-bottom:6px"><span style="display:inline-flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc${DASH.valueGraphLink('story')}</span>${valueArc.length ? `<div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px;display:flex;gap:6px;align-items:center">${valueArc.join(' → ')}</div>` : ''}${storyFocus}</div>`);
+  structure.push(`<div style="margin-bottom:6px"><span style="display:inline-flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc${DASH.valueGraphLink('story')}</span>${storyFocus ? `<div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${storyFocus}</div>` : ''}</div>`);
 
   if (p.structure_type) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Structure</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.structure_type}</div></div>`);
 
