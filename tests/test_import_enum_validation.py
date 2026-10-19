@@ -155,19 +155,6 @@ class TestTheValueCheck:
         assert result.get("success") is not True
         assert snapshot() == before, "a refused import changed the project"
 
-    def test_another_enum_field_is_caught_too(self, tmp_path):
-        """It is not a dramatic_role special case — the check is per type, and
-        `arc_type` is a character enum with its own vocabulary."""
-        def mutate(proj):
-            note = proj / "characters" / "Dr Elena Voss.md"
-            text = note.read_text()
-            assert "arc_type: negative" in text, "fixture changed; pick another"
-            note.write_text(text.replace("arc_type: negative",
-                                         "arc_type: sideways"))
-        result = import_project(tmp_path, mutate)
-        assert result.get("success") is not True
-        assert "Invalid character frontmatter" in result.get("error", "")
-
     def test_a_bad_story_role_is_still_refused(self, tmp_path):
         """`empty_ok` must not swallow the whole check: an unrecognised ROLE
         is still a value the schema forbids, and a retired one must not import

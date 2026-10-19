@@ -324,7 +324,7 @@ def _restore_entity(args: dict, project_path: Path) -> dict:
         # Children come back with their parent. The restore is meant to be the
         # exact inverse of the delete, and the delete cascades on `parent_id` —
         # so leaving a child deleted would restore a scene with no scene_beats,
-        # or a character with no arc beats, silently.
+        # silently.
         #
         # Keyed on `parent_id` for every type rather than a per-type branch: the
         # cascade is one fact (this row owned that row), and the list is what the

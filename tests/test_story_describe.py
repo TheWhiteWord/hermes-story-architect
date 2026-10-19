@@ -185,7 +185,7 @@ class TestStorageLabelsAreTrue:
         """The nine `extra` links have no special storage, but the agent still
         needs to know the value is another entity's slug, not a display name."""
         out = _handler({})["entity_schemas"]
-        for et, field in [("scene", "act_id"), ("arc_beat", "scene"),
+        for et, field in [("scene", "act_id"),
                           ("plot", "characters")]:
             assert out[et][field]["is_reference"] is True, f"{et}.{field}"
 
@@ -198,7 +198,7 @@ class TestStorageLabelsAreTrue:
         left to act on today, and stays only as a backstop should one reappear.
         """
         from core.constants import ENTITY_SCHEMAS
-        for et in ("scene", "act", "arc_beat"):
+        for et in ("scene", "act"):
             assert "id" not in ENTITY_SCHEMAS[et], (
                 f"{et} declares an id field, which the write path discards "
                 f"and the read path can only render empty")

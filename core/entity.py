@@ -6,8 +6,8 @@ from .constants import (
     REQUIRED_FIELDS, ENTITY_SCHEMAS, VALID_ROLES, VALID_STATUSES,
     SCENE_STATUSES, SEQUENCE_STATUSES, ACT_STATUSES,
     SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
-    VALUE_CHARGES, STRUCTURE_TYPES, PLOT_TYPES,
-    PLOT_SCOPES, VALUE_ARCS, ARC_TYPES, PLOT_ROLES,
+    STRUCTURE_TYPES, PLOT_TYPES,
+    PLOT_SCOPES, VALUE_ARCS, PLOT_ROLES,
     CONFLICT_LEVELS, VALUE_LADDER,
 )
 from .section_parser import list_sections
@@ -44,15 +44,12 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
             _validate_field(entity_type, field, frontmatter[field], meta, warnings)
 
     if entity_type == "character":
-        # `empty_ok` like the four enum checks below: since B12 an unfilled
+        # `empty_ok` like the enum check below: since B12 an unfilled
         # field is stored empty, so an exported note carries `story_role: ''`
         # and the write path accepts it. Without this the importer refused
         # exactly what story_export writes, and a DB -> markdown -> DB
         # round-trip failed while the write path stored the same value.
         _validate_enum(frontmatter, "story_role", VALID_ROLES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "arc_type", ARC_TYPES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "character_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "character_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
 
     if entity_type == "plot" and "status" in frontmatter:
         if frontmatter["status"] not in VALID_STATUSES:
@@ -78,12 +75,6 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
         _validate_enum(frontmatter, "status", ACT_STATUSES, warnings)
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
-
-    if entity_type == "arc_beat":
-        _validate_numeric(frontmatter, "order", warnings)
-        _validate_enum(frontmatter, "character_value_at_open", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_enum(frontmatter, "character_value_at_close", VALUE_CHARGES, warnings, empty_ok=True)
-        _validate_y(frontmatter, warnings)
 
     if entity_type == "value":
         _validate_value(frontmatter, warnings)
@@ -236,20 +227,6 @@ def _validate_enum(frontmatter: dict, field: str, valid: list[str], warnings: li
         warnings.append(f"Invalid {field}: {val}")
 
 
-def _validate_y(frontmatter: dict, warnings: list[str]) -> None:
-    """Append warnings if `y` is present, non-numeric, or outside -1.0…+1.0.
-
-    Only arc_beat carries a curve now (a scene's turn is `value_turns`), so the
-    range check lives here rather than being repeated per entity type.
-    """
-    if "y" not in frontmatter:
-        return
-    _validate_numeric(frontmatter, "y", warnings)
-    y_val = frontmatter["y"]
-    if isinstance(y_val, (int, float)) and not (-1.0 <= float(y_val) <= 1.0):
-        warnings.append(f"y out of range: {y_val} (must be -1.0 to +1.0)")
-
-
 def _validate_numeric(frontmatter: dict, field: str, warnings: list[str]) -> None:
     """Append warning if frontmatter[field] is present and not int/float."""
     if field not in frontmatter:
@@ -305,7 +282,6 @@ ENTITY_COLUMN_MAP = {
     "scene": {"title": "name", "one_sentence": "one_sentence", "order": "order_key", "status": "status", "sequence_id": "parent_id", "location": "location_id"},
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
-    "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
     # `scene` is the structural link the delete cascade reads (`parent_id`), so
     # deleting a scene takes its scene_beats with it and restore brings it back.
     # The frontmatter field is `scene`; columns_for_insert maps between them.
@@ -458,9 +434,8 @@ def unfilled_fields(entity_type: str, extra: dict, row: dict | None = None) -> l
         # absent key and an empty one both read as unfulfilled — which is what
         # "this plot has no crisis scene" should say.
         #
-        # Other computed fields (a scene's arc_beats_list, a character's
-        # relationships) are summaries of entities that exist elsewhere and are
-        # reported there, so they stay out.
+        # Other computed fields (a character's relationships) are summaries of
+        # entities that exist elsewhere and are reported there, so they stay out.
         if meta.get("computed") and field not in _RELATION_FIELDS.get(entity_type, {}):
             continue
         # variant_of is empty ON a base location or world — that is what a base
@@ -506,7 +481,6 @@ def standard_sections(entity_type: str) -> list[str]:
         "scene": ["Content", "Objective", "Value Turn", "Dramatic Function", "Production", "Notes"],
         "sequence": ["Summary", "Purpose", "Value Arc", "Progression", "Sequence Climax", "Plots", "Notes"],
         "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],
-        "arc_beat": ["Action", "The Gap", "Choice", "Value Shift", "Notes"],
         "relationship": ["Nature", "Perspectives", "Tension", "History", "Scenes to Write", "Notes"],
         "value": ["Definition", "Notes"],
         "scene_beats": ["Conflict", "Findings", "Notes"],
@@ -560,9 +534,7 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
     for key, value in fm.items():
         if key in FIELDS_TO_SKIP:
             continue
-        # Arc keeps 'scene' as an extra attribute (which scene the beat occurs in)
-        # in addition to the arc_beat relation created separately
-        if key in rel_fields and not (entity_type == "arc_beat" and key == "scene"):
+        if key in rel_fields:
             continue  # handled separately as relations
         if schema.get(key, {}).get("type") == "number":
             value = coerce_number(value)
@@ -570,11 +542,6 @@ def columns_for_insert(entity_type: str, slug: str, fm: dict) -> dict:
             columns[column_map[key]] = value
         else:
             extra[key] = value
-
-    # Arc: the character link is the parent_id column, set from the frontmatter
-    # field. It never came from the id, so a beat's id is simply its own slug.
-    if entity_type == "arc_beat":
-        columns["parent_id"] = fm.get("character") or None
 
     columns["extra"] = json.dumps(extra) if extra else "{}"
     return columns
@@ -792,7 +759,7 @@ def check_references(project_path, entity_type: str, frontmatter: dict) -> None:
     """Raise ValueError on the first `ref` that names no existing record.
 
     Reads the database, so this is write-time only — the same constraint
-    `validate_scene_location` and `validate_arc_parents` carry. A `ref` is a
+    `validate_scene_location` carries. A `ref` is a
     slug of another entity, and an unresolvable one is invisible to every
     reader: they filter on `to_id`, so the scene looks like it serves no plot
     and the plot looks unpopulated, with nothing to say so.
@@ -1185,24 +1152,4 @@ def _defined_values(values) -> str:
                      for name, words in values.items())
 
 
-def validate_arc_parents(project_path, character: str, scene: str) -> None:
-    """Raise ValueError if character or scene doesn't exist in DB."""
-    from core.db import get_db
-    conn = get_db(project_path)
-    try:
-        if character:
-            row = conn.execute(
-                "SELECT id FROM entities WHERE id=? AND type='character'",
-                (character,),
-            ).fetchone()
-            if not row:
-                raise ValueError(f"Character not found: {character}")
-        if scene:
-            row = conn.execute(
-                "SELECT id FROM entities WHERE id=? AND type='scene'",
-                (scene,),
-            ).fetchone()
-            if not row:
-                raise ValueError(f"Scene not found: {scene}")
-    finally:
-        conn.close()
+

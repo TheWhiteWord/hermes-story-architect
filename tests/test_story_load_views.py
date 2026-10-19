@@ -170,14 +170,14 @@ class TestBaseViewIsUnchanged:
         base = load(project)
         assert "relationships" not in base
         assert "unfilled" not in base
-        # No arc beats, and no per-character perspective data — the two heaviest
+        # No per-character perspective data — the heaviest
         # domains, which is exactly what the views are for. A single
         # dramatic_role per scene *is* kept: at one short string it earns its
         # place in the map.
         dumped = json.dumps(base)
         assert "is_crisis" not in dumped
         assert "perspectives" not in dumped
-        assert "arc_beat" not in dumped
+
 
     def test_base_view_stays_small_as_the_project_grows(self, project):
         """The cost that justifies the views: a scene must be near-free."""
@@ -190,28 +190,6 @@ class TestBaseViewIsUnchanged:
         grown = len(json.dumps(load(project)))
         # 40 scenes must not cost more than a trivial slice of the budget.
         assert (grown - small) / 40 < 40, f"{grown - small} chars for 40 scenes"
-
-
-class TestArcView:
-    def test_one_character_returns_beats_in_order(self, project):
-        r = load(project, view="arc", character="kael")
-        assert r["character"] == "kael"
-        assert [b["id"] for b in r["beats"]] == ["kael-1", "kael-2", "kael-3"]
-
-    def test_beats_carry_the_value_shift(self, project):
-        beat = load(project, view="arc", character="kael")["beats"][0]
-        assert beat["shift"] == "positive → mixed"
-        assert beat["y"] == 0.8
-
-    def test_no_character_returns_every_arc(self, project):
-        r = load(project, view="arc")
-        got = {a["character"] for a in r["arcs"]}
-        assert "kael" in got and "marcus-chen" in got
-
-    def test_unknown_character_is_empty_not_an_error(self, project):
-        r = load(project, view="arc", character="nobody")
-        assert r["beats"] == []
-        assert "note" in r
 
 
 class TestDramaticElementsView:
@@ -286,7 +264,7 @@ class TestDramaticElementsView:
     def test_no_dead_markers_are_emitted(self, project):
         """The loop this replaced read is_setup / is_turning_point /
         is_crisis / is_climax / is_resolution — none a scene field, and two of
-        them arc_beat's. If any reappear, the view is reading a key that
+        If any reappear, the view is reading a key that
         belongs to another entity type."""
         scenes = (load(project, view="dramatic_elements")["acts"][0]
                   ["sequences"][0]["scenes"])
@@ -351,10 +329,10 @@ class TestUnfilledView:
     def test_answers_what_next(self, project):
         """The top gap must be the field most entities share.
 
-        Not a fixed field name: 16 of the fixture's 17 characters have no arc
-        designed, so `character_value_at_close` legitimately outranks everything
-        else. Pinning a name here would make the test fail every time the
-        fixture's data changes, and pass for the wrong reason if it did not.
+        Not a fixed field name: the fixture's characters have no goals, so
+        `goals_short` legitimately outranks everything else. Pinning a name
+        here would make the test fail every time the fixture's data changes,
+        and pass for the wrong reason if it did not.
         """
         r = load(project, view="unfilled")
         assert r["total_gaps"] > 0
@@ -394,10 +372,10 @@ class TestDispatch:
     def test_unknown_view_lists_the_valid_ones(self, project):
         r = load(project, view="nonsense")
         assert "unfilled" in r["error"]
-        for v in ("arc", "dramatic_elements", "relationship", "values"):
+        for v in ("dramatic_elements", "relationship", "unfilled", "values"):
             assert v in r["error"]
 
     def test_every_view_is_documented_in_the_schema(self, project):
         from tools.story_load import SCHEMA
         assert set(SCHEMA["properties"]["view"]["enum"]) == {
-            "arc", "dramatic_elements", "relationship", "unfilled", "values"}
+            "dramatic_elements", "relationship", "unfilled", "values"}

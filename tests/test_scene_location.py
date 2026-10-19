@@ -1,7 +1,6 @@
 """A scene's location must resolve to a location record.
 
-Mirrors the arc_beat parent check in test_arcs.py, and the convention it
-follows: the write refuses, the error names the thing that is missing, and an
+Follows the convention: the write refuses, the error names the thing that is missing, and an
 empty value is a deliberate absence rather than a gap.
 
 The ordering note in validate_scene_location is load-bearing — the check reads

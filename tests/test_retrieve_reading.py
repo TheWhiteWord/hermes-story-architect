@@ -211,14 +211,3 @@ class TestBatchAndIds:
         proj, vault = db
         r = _get(proj, vault, entity_type="character", id="kael", sections=["Identity"])
         assert r["entities"][0]["id"] == "kael"
-
-    def test_arc_beat_suffix_resolves(self, db):
-        """Beats are keyed `{character}-{beat}`; the beat part alone is enough."""
-        proj, vault = db
-        r = _get(proj, vault, entity_type="arc_beat", id=["1"], sections=["Action"])
-        assert r["entities"][0]["id"].endswith("-1")
-
-    def test_arc_beat_full_key_resolves(self, db):
-        proj, vault = db
-        r = _get(proj, vault, entity_type="arc_beat", id=["kael-1"], sections=["Action"])
-        assert r["entities"][0]["id"] == "kael-1"

@@ -105,14 +105,9 @@ class Test3EditScenario:
         """Delete a character → story_load excludes it. Arcs cascade-delete."""
         proj, vault = db_project
 
-        # Create a character with arc beats
+        # Create a character
         create_entity(proj, "character", "temp-char",
             {"name": "Temp", "story_role": "Minor", "one_sentence": "Temp"})
-        create_entity(proj, "arc_beat", "1", {
-            "id": "1", "character": "temp-char",
-            "label": "Beat", "action": "a", "gap": "g",
-            "choice": "c", "shift": "s", "y": 0.0, "order": 1,
-        })
 
         # Delete character
         result = delete_entity(proj, "character", "temp-char",
@@ -123,7 +118,7 @@ class Test3EditScenario:
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         ids = _all_entity_ids(result)
         assert "temp-char" not in ids
-        assert "temp-char-1" not in ids, f"Arc beat not cascade-deleted: {ids}"
+
 
     def test_delete_sequence_with_scenes_blocked(self, db_project):
         """Deleting a sequence that has scenes is blocked."""
@@ -139,31 +134,6 @@ class Test3EditScenario:
                                "Delete seq", True)
         assert "Cannot delete" in result["error"]
         assert [c["id"] for c in result["blocking_children"]] == ["scene-in-seq"]
-
-    def test_delete_character_cascades_arcs(self, db_project):
-        """Deleting a character cascade-deletes all their arc beats."""
-        proj, vault = db_project
-
-        create_entity(proj, "character", "cascade-char",
-            {"name": "Cascade", "story_role": "Minor", "one_sentence": "Test"})
-        for i in range(1, 4):
-            create_entity(proj, "arc_beat", str(i), {
-                "id": str(i), "character": "cascade-char",
-                "label": f"Beat {i}", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.0, "order": i,
-            })
-
-        # Delete character
-        result = delete_entity(proj, "character", "cascade-char",
-                               "Delete cascade-char", True)
-        assert result["success"] is True
-
-        # All arcs gone
-        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
-        ids = _all_entity_ids(result)
-        assert "cascade-char" not in ids
-        for i in range(1, 4):
-            assert f"cascade-char-{i}" not in ids, f"Arc {i} not cascade-deleted: {ids}"
 
     def test_reorder_visible_in_load(self, db_project):
         """Reorder scenes → story_load shows new order_key sequence."""
@@ -223,23 +193,3 @@ class TestAppValidation:
         with pytest.raises(ValueError, match="Character not found|nonexistent-char"):
             create_entity(tmp_path, "plot", "test-plot",
                 {"name": "Test Plot", "characters": ["nonexistent-char"]})
-
-    def test_arc_unknown_character_rejected(self, tmp_path):
-        """Create arc with non-existent character → error."""
-        with pytest.raises(ValueError, match="Character not found"):
-            create_entity(tmp_path, "arc_beat", "1", {
-                "id": "1", "character": "nonexistent",
-                "label": "Test", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.0, "order": 1,
-            })
-
-    def test_arc_unknown_scene_rejected(self, tmp_path):
-        """Create arc with non-existent scene → error."""
-        create_entity(tmp_path, "character", "kael",
-            {"name": "Kael", "story_role": "Protagonist", "one_sentence": "Test"})
-        with pytest.raises(ValueError, match="Scene not found"):
-            create_entity(tmp_path, "arc_beat", "1", {
-                "id": "1", "character": "kael", "scene": "nonexistent-scene",
-                "label": "Test", "action": "a", "gap": "g",
-                "choice": "c", "shift": "s", "y": 0.0, "order": 1,
-            })

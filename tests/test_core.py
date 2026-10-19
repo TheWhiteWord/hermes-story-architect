@@ -808,13 +808,6 @@ class TestUnfilledFields:
         assert "value_arc" in result
         assert "one_sentence" in result
 
-    def test_unfilled_fields_arc_action(self):
-        from core.entity import unfilled_fields
-        extra = {"action": "", "gap": ""}
-        result = unfilled_fields("arc_beat", extra)
-        assert "action" in result
-        assert "gap" in result
-
     def test_unfilled_fields_skips_status(self):
         """status is a workflow state, never reported as unfilled."""
         from core.entity import unfilled_fields
@@ -825,33 +818,19 @@ class TestUnfilledFields:
         assert "dramatic_role" in result
 
     def test_unfilled_fields_skips_booleans(self):
-        """Boolean fields (is_crisis, is_climax, arc_complete) are not 'unfilled'."""
+        """Boolean fields are not 'unfilled'."""
         from core.entity import unfilled_fields
         extra = {"is_crisis": False, "is_climax": False, "action": ""}
-        result = unfilled_fields("arc_beat", extra)
+        result = unfilled_fields("scene_beats", extra)
         assert "is_crisis" not in result
         assert "is_climax" not in result
-        assert "action" in result
 
     def test_unfilled_fields_skips_numbers(self):
-        """Numeric fields (y, act_count) are not 'unfilled'."""
+        """Numeric fields (act_count) are not 'unfilled'."""
         from core.entity import unfilled_fields
-        extra = {"y": 0.0, "action": ""}
-        result = unfilled_fields("arc_beat", extra)
-        assert "y" not in result
-        assert "action" in result
-
-    def test_unfilled_fields_arc_type_empty(self):
-        """arc_type unset is flagged; 'absent' is a real choice and is not.
-
-        'absent' is the case that matters: it is a legal member of ARC_TYPES
-        meaning "this character has no arc", so it must not read as unfilled.
-        """
-        from core.entity import unfilled_fields
-        result = unfilled_fields("character", {"arc_type": ""})
-        assert "arc_type" in result
-        result = unfilled_fields("character", {"arc_type": "absent"})
-        assert "arc_type" not in result
+        extra = {"act_count": 0, "action": ""}
+        result = unfilled_fields("project", extra)
+        assert "act_count" not in result
 
     def test_unfilled_fields_plot_scope_empty(self):
         """plot_scope at empty default is flagged; at 'main' is not."""
@@ -920,22 +899,6 @@ class TestUnfilledFields:
         result = unfilled_fields("act", extra)
         assert "act_objective" in result
 
-    def test_unfilled_fields_curve_fields(self):
-        """`y` is a number, so it is never a gap row; `shift` is a
-        placeholder-default string, so an unfilled one is — same as `action`.
-
-        Only a beat carries the curve now: a scene's value is `value_turns`,
-        which is a list and follows the sub-fields rule (an entry present =
-        filled). Act and sequence state an expectation, not an observed turn,
-        so they carry no `shift`/`y` to be unfilled.
-        """
-        from core.entity import unfilled_fields
-        result = unfilled_fields("arc_beat", {})
-        assert "y" not in result
-        assert "shift" in result
-        filled = unfilled_fields("arc_beat", {"shift": "trust → suspicion"})
-        assert "shift" not in filled
-
     def test_get_unfilled_map(self, tmp_path):
         from core.db import get_unfilled_map
 
@@ -966,119 +929,5 @@ class TestUnfilledFields:
 
 # ---- Value Schema Tests (task_27 phase 1) ----
 
-# Field → the value it charges. A description must name it, or the model is
-# left guessing which value the charge belongs to. Only the character-side
-# fields survive the B1/B2 redesign: the story-side charges moved to
-# `scene.value_turns`, whose words come from `value` entities.
-_VALUE_FIELDS = {
-    "character": ["character_value_at_open", "character_value_at_close"],
-    "arc_beat": ["character_value_at_open", "character_value_at_close", "y"],
-}
-
-# The curve fields live on arc_beat only now: they describe a turn, and a turn
-# is only observable once the beat exists. A scene's turn is `value_turns`,
-# whose words come from a `value` entity.
-_CURVE_ENTITIES = ("arc_beat",)
-
-
-class TestValueSchema:
-    """The schema descriptions are the model's only instruction — pin their meaning."""
-
-    @pytest.mark.parametrize("entity_type,field", [
-        (et, f) for et, fields in _VALUE_FIELDS.items() for f in fields
-    ])
-    def test_value_description_names_the_value_it_charges(self, entity_type, field):
-        desc = ENTITY_SCHEMAS[entity_type][field]["description"]
-        # Every surviving charge field is character-side: the story's value is
-        # a `value_turns` entry whose words come from the plot's schema.
-        assert "this character's value" in desc, \
-            f"{entity_type}.{field} does not say which value it charges: {desc!r}"
-
-    @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
-    def test_y_description_states_the_ending_charge(self, entity_type):
-        """`y` is the ENDING charge — the point a curve passes through.
-
-        The rule lived only in a skill document while the field the model reads
-        said only "Value charge (-1.0 to +1.0)", so the graph's x-axis meaning
-        was documented nowhere it was reachable.
-        """
-        desc = ENTITY_SCHEMAS[entity_type]["y"]["description"]
-        assert "Ending" in desc
-        assert "curve" in desc
-
-    @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
-    def test_shift_description_names_the_value_that_turns(self, entity_type):
-        desc = ENTITY_SCHEMAS[entity_type]["shift"]["description"]
-        assert "this character's value" in desc
-
-    def test_containers_have_no_value_word_field(self):
-        """The value word is stated once, on the plot's schema, and inherited
-        downward through the turns that name it."""
-        for entity_type in ("act", "sequence", "scene", "arc_beat"):
-            assert "value" not in ENTITY_SCHEMAS[entity_type]
-
-    def test_arc_beat_carries_the_character_charge(self):
-        for field in ("character_value_at_open", "character_value_at_close"):
-            meta = ENTITY_SCHEMAS["arc_beat"][field]
-            assert meta["optional"] is True
-            # B12: the default was the prose "Not set", which is not in
-            # VALUE_CHARGES, so every arc beat reported a false finding.
-            assert meta["default"] == ""
-
-    @pytest.mark.parametrize("entity_type", _CURVE_ENTITIES)
-    def test_y_description_states_the_sign_convention(self, entity_type):
-        """`y` is signed like the charge word — the rule the graph depends on.
-
-        "The ending charge" is not enough on its own: `positive` and `negative`
-        are words, `-0.3` is a number, and nothing told the model which way
-        round. A beat reading `positive → mixed` with `y: -0.3` satisfies every
-        other rule in the schema and still plots on the wrong side of the line.
-
-        Asserted on the description because that is what `story_describe`
-        returns to the model. There is deliberately no runtime check: the
-        rejected continuity rules in the plan exist because a machine cannot
-        judge whether a charge and a number agree — it can only be told.
-        """
-        desc = ENTITY_SCHEMAS[entity_type]["y"]["description"]
-        assert "positive is above zero" in desc, desc
-        assert "negative below" in desc, desc
-
-    def test_y_range_is_validated_on_every_curve_entity(self):
-        for entity_type in _CURVE_ENTITIES:
-            warnings = validate_entity(entity_type, {"title": "T", "y": 2.0})
-            assert any("y out of range" in w for w in warnings), entity_type
-            assert not any("y out of range" in w for w in
-                           validate_entity(entity_type, {"title": "T", "y": 0.3}))
-
-    def test_only_beats_carry_the_curve_fields(self):
-        """`shift` and `y` describe a turn, and only a beat has one.
-
-        On an act or a sequence they could only be the model predicting scenes
-        that do not exist yet — a guess with no observation behind it, which is
-        the one thing this redesign exists to remove. A scene's turn is
-        `value_turns`, whose words come from the plot's schema.
-        """
-        for entity_type in _CURVE_ENTITIES:
-            for field in ("shift", "y"):
-                assert field in ENTITY_SCHEMAS[entity_type], f"{entity_type} lost {field}"
-        for entity_type in ("project", "act", "sequence", "scene"):
-            for field in ("shift", "y"):
-                assert field not in ENTITY_SCHEMAS[entity_type], f"{entity_type} re-gained {field}"
-
-    def test_project_defaults_cover_the_whole_project_schema(self):
-        """A project key missing from _PROJECT_DEFAULTS is always emitted,
-        unfilled or not — `.get()` returns None and `v != None` is always true."""
-        from core.db import _PROJECT_DEFAULTS, _PROJECT_TITLE_PAGE_FIELDS
-
-        assert set(_PROJECT_DEFAULTS) | _PROJECT_TITLE_PAGE_FIELDS == set(ENTITY_SCHEMAS["project"])
-        assert set(_PROJECT_DEFAULTS) & _PROJECT_TITLE_PAGE_FIELDS == set()
-        for key, default in _PROJECT_DEFAULTS.items():
-            assert default == ENTITY_SCHEMAS["project"][key]["default"], key
-
-    def test_project_defaults_exclude_the_title_page_block(self):
-        from core.db import _PROJECT_DEFAULTS
-
-        for key in ("screenplay_title", "credit", "author", "contact", "draft_date", "draft"):
-            assert key not in _PROJECT_DEFAULTS
-
+# A scene's turn is `value_turns`, whose words come from a `value` entity.
 

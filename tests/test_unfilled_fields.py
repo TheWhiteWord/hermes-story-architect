@@ -95,9 +95,8 @@ class TestNeverUnfilled:
         the derived value in — so an absent row reads as an empty role, which
         is the gap.
 
-        Every other computed field stays out: a scene's `arc_beats_list` or a
-        character's `relationships` summarises entities that live elsewhere and
-        are reported there.
+        Every other computed field stays out: a character's `relationships`
+        summarises entities that live elsewhere and are reported there.
         """
         from core.entity import _RELATION_FIELDS
         for entity_type, fields in ENTITY_SCHEMAS.items():

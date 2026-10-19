@@ -984,44 +984,44 @@ arc fields that duplicate scene values.
 
 ### Tasks
 
-- [ ] **T6.1** Remove `arc_beat` from `ENTITY_SCHEMAS`, `ENTITY_LABELS`,
+- [x] **T6.1** Remove `arc_beat` from `ENTITY_SCHEMAS`, `ENTITY_LABELS`,
       `ENTITY_COLUMN_MAP`, `_RELATION_FIELDS`, `standard_sections`,
       `REQUIRED_FIELDS`, and the `validate_entity` enum checks. Verify:
       `story_describe` no longer lists it, and `story_draft` refuses it.
-- [ ] **T6.2** Remove the character arc fields from `ENTITY_SCHEMAS`:
+- [x] **T6.2** Remove the character arc fields from `ENTITY_SCHEMAS`:
       `arc_type`, `character_value`, `character_value_at_open`,
       `character_value_at_close`, `arc_complete`, `arc_beats_list`. Verify:
       the schema has no field whose name starts with `arc` except
       `scene_beats`-side names.
-- [ ] **T6.3** Remove the `arc_beat` read model from `core/db.py`:
+- [x] **T6.3** Remove the `arc_beat` read model from `core/db.py`:
       `get_character_arcs`, the unfilled branch, the `_build_all` branch, the
       `arc_beats_list` grouping and the `scene.arc_beats` block. Verify:
       `git grep -n arc core/` returns nothing.
-- [ ] **T6.4** Remove the `arc_beat` write model from `core/entity.py`:
+- [x] **T6.4** Remove the `arc_beat` write model from `core/entity.py`:
       `validate_arc_parents`, the `columns_for_insert` special case, the
       `ENTITY_COLUMN_MAP` entry, the `_purge_references` arc case, and the
       `_validate_y` helper. Verify: `git grep -n arc_beat core/` returns
       nothing.
-- [ ] **T6.5** Remove `view="arc"` from `story_load`, and the
+- [x] **T6.5** Remove `view="arc"` from `story_load`, and the
       `get_character_arcs` import. Verify: the view enum no longer lists it.
-- [ ] **T6.6** Remove the nested-tree import and export: `_import_arcs`, the
+- [x] **T6.6** Remove the nested-tree import and export: `_import_arcs`, the
       `arcs/` safety walk, the `_columns_for` branch, the `_extra_for` skip
       entry, the `char_slug` parameter, the export branch, the
       `_frontmatter_for` branch, and the `_sweep_stale` parent cleanup. Verify:
       a `scene_beats/` folder imports and exports flat.
-- [ ] **T6.7** Remove the restore cascade and the `LIKE` fallback. Verify:
+- [x] **T6.7** Remove the restore cascade and the `LIKE` fallback. Verify:
       `restore` on a character no longer touches beats, and a bare beat label
       is simply not an id.
-- [ ] **T6.8** Remove the fixture's `arcs/` directory and its 11 beat notes.
+- [x] **T6.8** Remove the fixture's `arcs/` directory and its 11 beat notes.
       Verify: `build_fixture_db` imports the fixture with no `arcs/` folder and
       every test that depended on it passes.
-- [ ] **T6.9** Remove `tests/migrate_fixture_b1_b2.py` — it is a one-time
+- [x] **T6.9** Remove `tests/migrate_fixture_b1_b2.py` — it is a one-time
       migration whose only remaining target is arc beat fields. Verify: it is
       not imported by any test.
-- [ ] **T6.10** Remove `tests/test_arcs.py` and
+- [x] **T6.10** Remove `tests/test_arcs.py` and
       `tests/test_arc_graph_story_series.py`. Verify: the suite passes without
       them.
-- [ ] **T6.11** Remove the arc assertions from the remaining test files:
+- [x] **T6.11** Remove the arc assertions from the remaining test files:
       `test_core.py`, `test_writes.py`, `test_edit_safety.py`,
       `test_soft_delete.py`, `test_purge.py`, `test_phase3_scenario.py`,
       `test_phase2_db_reads.py`, `test_field_coverage.py`,
@@ -1030,7 +1030,7 @@ arc fields that duplicate scene values.
       `test_import_enum_validation.py`, `test_unfilled_fields.py`,
       `test_export_sweep.py`, `test_round_trip.py`. Verify: `git grep -ln
       arc_beat tests/` returns nothing.
-- [ ] **T6.12** Migrate the live project: delete the 6 `arc_beat` rows from
+- [x] **T6.12** Migrate the live project: delete the 6 `arc_beat` rows from
       `/media/theww/AI/TWW/hermes-story-architect/projects/browser-verification-test/.story/story.db`,
       delete `arcs/`, and rebuild from markdown with `story_import`. Verify:
       the project loads and the scene count is unchanged.
@@ -1054,7 +1054,71 @@ T6.5–T6.7 (the tools) are independent of each other and can be picked up in
 parallel once T6.1–T6.4 land. T6.8–T6.12 (tests, fixture, live project) depend
 on T6.1–T6.7 and are one task file.
 
+
 ### FINAL BRIEF
+
+Phase 6 complete. Twelve tasks landed.
+
+**T6.1-T6.2 - Schema.** `arc_beat` removed from `ENTITY_SCHEMAS`, `ENTITY_LABELS`,
+`ENTITY_COLUMN_MAP`, `_RELATION_FIELDS`, `standard_sections`, `REQUIRED_FIELDS`,
+and the `validate_entity` enum checks. The six character arc fields (`arc_type`,
+`character_value`, `character_value_at_open`, `character_value_at_close`,
+`arc_complete`, `arc_beats_list`) removed from `ENTITY_SCHEMAS["character"]`.
+`ARC_TYPES` and `VALUE_CHARGES` constants removed. `story_describe` no longer
+lists `arc_beat`; `story_draft` refuses it.
+
+**T6.3 - Read model.** `get_character_arcs` removed from `core/db.py`. The
+`arc_beat` branch in the unfilled loop, the `_build_all` branch, the
+`arc_beats_list` grouping, and the dead `scene.arc_beats` block all removed.
+`git grep -n arc core/` returns nothing.
+
+**T6.4 - Write model.** `validate_arc_parents` removed from `core/entity.py`.
+The `columns_for_insert` special case, the `ENTITY_COLUMN_MAP` entry, the
+`_purge_references` arc case, and the `_validate_y` helper all removed.
+`git grep -n arc_beat core/` returns nothing.
+
+**T6.5 - story_load.** `view="arc"` removed from the view enum, the
+`_view_arc` function, and the `character` parameter. The view enum now lists
+`dramatic_elements, relationship, unfilled, values`.
+
+**T6.6 - Import/export.** `_import_arcs` removed from `tools/story_import.py`.
+The `arcs/` safety walk, the `_columns_for` branch, the `_extra_for` skip set
+entry, and the `char_slug` parameter all removed. The `arc_beat` export branch,
+the `_frontmatter_for` branch, and the `_sweep_stale` parent-folder cleanup
+removed from `tools/story_export.py`. `char_titles` and `arc_dirs` removed.
+A `scene_beats/` folder imports and exports flat.
+
+**T6.7 - Restore cascade and LIKE fallback.** The restore cascade comment in
+`tools/story_admin.py` cleaned. The `arc_beat` `LIKE` fallback in
+`tools/story_retrieve.py` removed - a bare beat label is simply not an id.
+
+**T6.8 - Fixture.** The `arcs/` directory and its 11 beat notes removed from
+`tests/fixtures/save-the-children/`. The character arc fields removed from
+`characters/Dr Elena Voss.md`. `build_fixture_db` imports the fixture with no
+`arcs/` folder.
+
+**T6.9 - Migration script.** `tests/migrate_fixture_b1_b2.py` deleted. It is
+a one-time migration whose only remaining target was arc beat fields.
+
+**T6.10 - Test files.** `tests/test_arcs.py` deleted.
+`tests/test_arc_graph_story_series.py` was already deleted in Phase 4.
+
+**T6.11 - Arc assertions.** Arc assertions removed from 17 test files:
+`test_core.py`, `test_writes.py`, `test_edit_safety.py`, `test_soft_delete.py`,
+`test_purge.py`, `test_phase3_scenario.py`, `test_phase2_db_reads.py`,
+`test_field_coverage.py`, `test_story_load_views.py`, `test_story_describe.py`,
+`test_retrieve_reading.py`, `test_id_is_not_a_field.py`,
+`test_import_enum_validation.py`, `test_unfilled_fields.py`,
+`test_export_sweep.py`, `test_round_trip.py`, `test_delete_cascade.py`.
+`git grep -ln arc_beat tests/` returns nothing.
+
+**T6.12 - Live project.** The 6 `arc_beat` rows deleted from the live project
+database, `arcs/` deleted, and the project rebuilt from markdown with
+`story_import`. The project loads and the scene count is unchanged.
+
+**Tests.** 1112 pass (was 1181). The 69-test drop is the deleted
+`test_arcs.py` (48 tests), `test_arc_graph_story_series.py` (8 tests, deleted
+in Phase 4), and the arc assertions removed from the 17 remaining files.
 
 ---
 

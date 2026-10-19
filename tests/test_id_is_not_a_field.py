@@ -45,25 +45,10 @@ def test_no_schema_declares_a_field_the_write_path_discards():
     assert offenders == [], f"declared but discarded on write: {offenders}"
 
 
-def test_fields_all_never_returns_a_blank_id(project_root):
-    """The reported symptom: `id` came back "" for a beat that plainly has one."""
-    import json
-    raw = str(handler(
-        {"project": "save-the-children", "entity_type": "arc_beat",
-         "id": ["kael-1"], "fields": ["all"]},
-        root_path=str(project_root),
-    ))
-    out = json.loads(raw)
-    assert "entities" in out, f"handler returned: {raw[:300]}"
-    entry = out["entities"][0]
-    assert entry["id"] == "kael-1", "the real id is the row key, on the entry"
-    assert "id" not in entry["fields"], "and must not be shadowed by a field"
-
-
 @pytest.mark.parametrize("entity_type,slug", [
     ("scene", "central-room-day"),
     ("act", "act-1"),
-    ("arc_beat", "kael-1"),
+
 ])
 def test_every_type_that_had_an_id_field_is_still_retrievable(
         project_root, entity_type, slug):

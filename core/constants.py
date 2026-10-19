@@ -12,7 +12,6 @@ SCENE_TIMES_OF_DAY = ["DAY", "NIGHT", "DUSK", "DAWN", "CONTINUOUS", "LATER"]
 # the only reasons a scene can serve NO plot — a bridge between beats, or a
 # beat that moves nothing. They are mutually exclusive with `plot_roles`.
 SCENE_DRAMATIC_ROLES = ["plot_role", "transition", "non-event"]
-VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
 PLOT_SCOPES = ["main", "sub"]
@@ -43,7 +42,6 @@ CONFLICT_LEVELS = ["inner", "personal", "extra-personal"]
 VALUE_MAJOR_COUNT = 3
 
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
-ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
 
 MEMORY_CATEGORIES = ("decisions", "directions", "open_questions", "continuity_warnings")
@@ -59,7 +57,6 @@ ENTITY_LABELS = {
     "scene": "Scene",
     "sequence": "Sequence",
     "act": "Act",
-    "arc_beat": "Arc Beat",
     "relationship": "Relationship",
     "value": "Value",
     "scene_beats": "Scene Beats",
@@ -92,12 +89,6 @@ ENTITY_SCHEMAS = {
                 "strength": {"type": "number", "description": "Signed tension: negative is antagonism (observed -0.6..0.9). Dashboard view only."},
             },
         },
-        "arc_type": {"type": "string", "default": "", "optional": True, "description": "One of: positive, negative, flat, ironic, absent"},
-        "character_value": {"type": "string", "default": "", "optional": True, "description": "The value this character's arc explores (e.g. 'Freedom'). May differ from the story's."},
-        "character_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value where their arc begins. One of: positive, negative, mixed, ironic."},
-        "character_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value where their arc ends. One of: positive, negative, mixed, ironic."},
-        "arc_complete": {"type": "boolean", "default": False, "optional": True, "description": "Whether this character's arc is complete"},
-        "arc_beats_list": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed list of arc beats for this character (read-only, derived from arc_beat entities)"},
     },
     "location": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
@@ -279,21 +270,7 @@ ENTITY_SCHEMAS = {
                                       "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
                         }},
     },
-    "arc_beat": {
-        "character": {"type": "string", "default": "", "optional": False, "description": "Character slug this beat belongs to"},
-        "scene": {"type": "string", "default": "", "optional": False, "description": "Scene slug where this beat occurs"},
-        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within character's arc"},
-        "label": {"type": "string", "default": "", "optional": False, "description": "Human-readable label (e.g. 'First Doubt')"},
-        "action": {"type": "string", "default": "", "optional": True, "description": "What the character does"},
-        "gap": {"type": "string", "default": "", "optional": True, "description": "Expectation vs reality gap"},
-        "choice": {"type": "string", "default": "", "optional": True, "description": "The choice the character makes"},
-        "character_value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value entering this beat. One of: positive, negative, mixed, ironic."},
-        "character_value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on this character's value leaving this beat. One of: positive, negative, mixed, ironic."},
-        "shift": {"type": "string", "default": "", "optional": True, "description": "How this character's value turns at this beat, in dramatic language (e.g. 'suspicious doubt → active defiance')."},
-        "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on this character's value after this beat's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the arc curve passes through."},
-        "is_crisis": {"type": "boolean", "default": False, "optional": True, "description": "Marks a crisis beat"},
-        "is_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks a climax beat"},
-    },
+
     "scene_beats": {
         "scene": {"type": "string", "default": "", "optional": False, "description": "Slug of an existing scene", "ref": "scene"},
         "driver": {"type": "string", "default": "", "optional": True, "description": "Slug of the character who drives the scene", "ref": "character"},
@@ -388,18 +365,15 @@ ENTITY_SCHEMAS = {
 # It was 34 strings before this, one per field: 'Goals not set', 'Action not
 # described', 'Shift not recorded', 'Credit N.A.'. They were defaults written
 # into the data on create, and the enum check then rejected them as invalid
-# values — 10 false findings on a minimal character, plot, project or arc beat.
+# values — 10 false findings on a minimal character, plot or project.
 # Nothing was ever stored in them: both real databases hold zero. The prose was
 # never carrying information either, because `story_retrieve` reports unfilled
 # fields *by name* through `unfilled_fields`.
 UNFILLED = "N.A."
 
 # ─── Required fields ───
-# Derived from ENTITY_SCHEMAS rather than maintained beside it. A hand-written
-# copy drifted: it demanded an arc_beat `id` the write path never reads (the id
-# is built from the slug), listed five fields the schema marks optional, and
-# listed two more — plot.status, project.logline — that survived only because
-# their defaults happen to be truthy. Three notes on the rule:
+# Derived from ENTITY_SCHEMAS rather than maintained beside it. Three notes on
+# the rule:
 #
 #   * `id` and `type` are in FIELDS_TO_SKIP, so the write path discards them.
 #   * `order` is auto-numbered by create_entity.

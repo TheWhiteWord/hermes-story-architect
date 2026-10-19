@@ -186,12 +186,6 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
         if entity_type == "value":
             validate_value(project_path, slug, merged)
 
-        # Parent validation for arc type
-        if entity_type == "arc_beat":
-            from .entity import validate_arc_parents
-            validate_arc_parents(
-                project_path, merged.get("character", ""), merged.get("scene", ""))
-
         # Parent validation for scene (act_id consistency, location exists)
         if entity_type == "scene":
             from .entity import (check_references, validate_scene_act_id,
@@ -1100,15 +1094,7 @@ def _purge_references(conn, deleted_ids: set) -> tuple:
                 extra[field] = [v for v in value if str(v) not in deleted_ids]
                 changed = True
 
-        # Single-valued reference: an arc beat's scene. Reset to the schema
-        # default rather than a bare "", so a field whose default is a real
-        # value resets to that value and not to nothing.
-        if str(extra.get("scene", "")) in deleted_ids:
-            was = extra["scene"]
-            extra["scene"] = _default_for(entity_type, "scene")
-            changed = True
-            detached.append({"entity_id": entity_id, "entity_type": entity_type,
-                             "field": "scene", "was_pointing_at": was})
+
 
         # Per-character sub-objects: a relationship's perspectives. This one
         # really is a removal — the surviving half of the relationship is what

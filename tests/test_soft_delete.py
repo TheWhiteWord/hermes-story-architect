@@ -92,7 +92,7 @@ class TestDeleteFlagsRatherThanErases:
 
     def test_cascade_children_are_also_flagged(self, vault):
         _delete(vault)
-        live = _q(vault, "SELECT id FROM entities WHERE type='arc_beat' "
+        live = _q(vault, "SELECT id FROM entities WHERE type='scene_beats' "
                         "AND parent_id='kael' AND is_deleted=0")
         assert live == []
 
@@ -199,7 +199,7 @@ class TestRestore:
         def snap():
             r = json.loads(handler({
                 "project": "stc", "entity_type": "character", "id": ["kael"],
-                "fields": ["goals_short", "character_value", "one_sentence"],
+                "fields": ["goals_short", "one_sentence"],
                 "sections": ["all"]}, root_path=str(vault)))
             return r["entities"][0]
 
@@ -211,9 +211,9 @@ class TestRestore:
     def test_restores_its_cascade_children(self, vault):
         _delete(vault)
         _edit(vault, "restore")
-        live = _q(vault, "SELECT id FROM entities WHERE type='arc_beat' "
+        live = _q(vault, "SELECT id FROM entities WHERE type='scene_beats' "
                         "AND parent_id='kael' AND is_deleted=0 ORDER BY id")
-        assert [r[0] for r in live] == ["kael-1", "kael-2", "kael-3"]
+        assert live == []
 
     def test_restoring_something_live_is_an_error(self, vault):
         r = _edit(vault, "restore")

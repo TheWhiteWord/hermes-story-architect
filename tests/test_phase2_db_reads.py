@@ -299,7 +299,7 @@ class TestUnfilledInverted:
         # No boolean fields
         assert "is_crisis" not in unfilled
         assert "is_climax" not in unfilled
-        assert "arc_complete" not in unfilled
+
         # No numeric fields
         assert "y" not in unfilled
         assert "act_count" not in unfilled
@@ -442,37 +442,8 @@ class TestStoryRetrieveDB:
         assert "sections" in entity
         assert "Identity" in entity["sections"]
 
-    def test_retrieve_arc_beat(self, db_project):
-        proj, vault = db_project
-        result = json.loads(retrieve_handler({
-            "project": str(proj),
-            "entity_type": "arc_beat",
-            "id": ["kael-1"],
-            "sections": ["Action"],
-            "root_path": vault
-        }))
-        entity = result["entities"][0]
-        assert entity["id"] == "kael-1"
-        assert "Action" in entity["sections"]
-
-
 class TestStorySearchDB:
     """story_search uses FTS5 when story.db exists."""
-
-    def test_search_arc_beat_content(self, db_project):
-        """Conflict 3: FTS5 finds content in arc beats (old glob missed them)."""
-        proj, vault = db_project
-        # A phrase from a kept section body, not a dropped heading: the fixture
-        # is now conformant, so a search target has to be one that still exists.
-        result = json.loads(search_handler({
-            "project": str(proj),
-            "query": "Mira laughs",
-            "root_path": vault
-        }))
-        assert result["total"] > 0
-        # Found in an arc beat entity
-        entity_ids = [r["entity_id"] for r in result["results"]]
-        assert any("kael" in eid for eid in entity_ids)
 
     def test_search_scene_content(self, db_project):
         proj, vault = db_project

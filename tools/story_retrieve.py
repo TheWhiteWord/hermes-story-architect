@@ -70,17 +70,6 @@ def _resolve(conn, entity_type: str, entity_id: str):
     """Find the entity. Returns (row, error) — exactly one is set."""
     if entity_type == "project":
         sql, params = "SELECT * FROM entities WHERE type='project' LIMIT 1", ()
-    elif entity_type == "arc_beat":
-        sql, params = "SELECT * FROM entities WHERE type='arc_beat' AND id=? AND is_deleted=0", (entity_id,)
-        row = conn.execute(sql, params).fetchone()
-        if row:
-            return row, None
-        # A beat is keyed `{character}-{beat}`; the caller may only know the beat part.
-        row = conn.execute(
-            "SELECT * FROM entities WHERE type='arc_beat' AND id LIKE ? AND is_deleted=0", (f"%-{entity_id}",)
-        ).fetchone()
-        if row:
-            return row, None
     else:
         sql, params = ("SELECT * FROM entities WHERE type=? AND id=? AND is_deleted=0",
                       (entity_type, entity_id))

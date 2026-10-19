@@ -81,21 +81,10 @@ def _diff(project_path: Path) -> dict:
             if fm.get("id"):
                 markdown_ids.add(str(fm["id"]))
 
-    # Arc beats live in arcs/{character}/{beat}.md. They do not appear in the
-    # flat folders above, and a database may hold them typed as 'character', so
-    # match them by the note tree as well.
-    arc_beat_ids = set()
-    arcs = project_path / "arcs"
-    if arcs.exists():
-        for char_dir in arcs.iterdir():
-            if char_dir.is_dir() and not char_dir.name.startswith(("_", ".")):
-                arc_beat_ids |= _ids_in(char_dir)
-
     at_risk = sorted(
         entity_id for entity_id, entity_type in rows
-        if entity_type not in ("project", "arc_beat")
+        if entity_type != "project"
         and entity_id not in markdown_ids
-        and entity_id not in arc_beat_ids
     )
     return {"entities_in_db": len(rows), "would_be_destroyed": at_risk}
 
@@ -250,7 +239,6 @@ def _import_all(conn, project_path: Path) -> None:
     _import_folder(conn, project_path, "scene_beats", "scene_beats")
     _import_folder(conn, project_path, "sequences", "sequence")
     _import_folder(conn, project_path, "acts", "act")
-    _import_arcs(conn, project_path)
     _import_folder(conn, project_path, "relationships", "relationship")
 
 
@@ -370,37 +358,12 @@ def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str)
         _insert_relations(conn, entity_type, entity_id, fm)
 
 
-def _import_arcs(conn, project_path: Path) -> None:
-    """Import arc beats from nested arcs/{character}/{beat}.md structure."""
-    import frontmatter
-
-    arcs_folder = project_path / "arcs"
-    if not arcs_folder.exists():
-        return
-
-    for char_folder in sorted(arcs_folder.iterdir()):
-        if not char_folder.is_dir() or char_folder.name.startswith("_") or char_folder.name.startswith("."):
-            continue
-        for note in sorted(char_folder.glob("*.md")):
-            if note.name.startswith("_"):
-                continue
-            post = frontmatter.load(note)
-            fm = dict(post.metadata)
-            body = post.content
-            # The folder is the character's *title* for grouping, so the link
-            # comes from the frontmatter. The folder name is only the fallback,
-            # for a tree written before the folder was renamed.
-            char_slug = str(fm.get("character") or char_folder.name)
-            beat_id = str(fm.get("id") or note.stem)
-            _insert_entity(conn, "arc_beat", beat_id, fm, body, char_slug=char_slug)
 
 
 
-
-def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
-                   char_slug: str = None) -> None:
+def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str) -> None:
     """Insert entity row + sections + relations."""
-    columns = _columns_for(entity_type, slug, fm, char_slug)
+    columns = _columns_for(entity_type, slug, fm)
     conn.execute(
         "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (columns["id"], columns["type"], columns["name"], columns["one_sentence"],
@@ -448,7 +411,7 @@ def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
             )
 
 
-def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -> dict:
+def _columns_for(entity_type: str, slug: str, fm: dict) -> dict:
     """Map frontmatter fields to entity columns."""
     if entity_type == "character":
         return {
@@ -510,14 +473,6 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": fm.get("scene"), "location_id": None,
             "extra": _extra_for("scene_beats", fm),
         }
-    elif entity_type == "arc_beat":
-        return {
-            "id": slug, "type": "arc_beat",
-            "name": fm.get("label", ""), "one_sentence": "",
-            "order_key": fm.get("order", 0), "status": "",
-            "parent_id": char_slug, "location_id": None,
-            "extra": _extra_for("arc_beat", fm),
-        }
     elif entity_type == "relationship":
         return {
             "id": slug, "type": "relationship",
@@ -576,7 +531,6 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         "scene_beats": {"scene", "id"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
-        "arc_beat": {"id", "label", "order", "character"},
         "relationship": {"name", "status", "id"},
         "value": {"name", "id"},
     }

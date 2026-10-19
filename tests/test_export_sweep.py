@@ -74,7 +74,7 @@ class TestIdempotent:
             _export(p, vault)
         assert note_for(p, "characters", "kael").exists()
         assert (p / "project.md").exists()
-        assert note_for(p, "arcs", "kael-1").exists()
+        assert note_for(p, "scene_beats", "central-room-day-beats").exists()
         assert (p / ".story" / "memory.md").exists()
 
     def test_first_export_never_removes(self, proj):
@@ -111,21 +111,6 @@ class TestDeleteSurvivesRoundTrip:
         _reimport(p, vault)
         ids = _ids(p)
         assert "mira" in ids and "dr-elena-voss" in ids
-
-    def test_emptied_arc_folder_is_pruned(self, proj):
-        p, vault = proj
-        _export(p, vault)
-        # The folder is the character's title, not their id. marcus-chen has two
-        # beats; mira has none, so the folder cannot be found through her.
-        marcus_dir = note_for(p, "arcs", "marcus-chen-1").parent
-        conn = sqlite3.connect(str(p / ".story" / "story.db"))
-        beats = [r[0] for r in conn.execute(
-            "SELECT id FROM entities WHERE type='arc_beat' AND parent_id='marcus-chen'")]
-        conn.close()
-        _delete(p, *beats)
-        _export(p, vault)
-        assert not marcus_dir.exists()
-
 
 class TestSceneBeatsSweep:
     """T2.3 — the export sweep removes an orphaned scene_beats note."""

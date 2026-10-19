@@ -129,10 +129,10 @@ class TestPreviews:
     def test_preview_covers_sections_and_extra(self, proj):
         p, _ = proj
         r = current_values(p, "character", "kael",
-                           {"Background": "New voice.", "arc_type": "ironic"})
+                           {"Background": "New voice."})
         stored = {c["field"]: c["stored_in"] for c in r["changes"]}
         assert stored["Background"] == "section"
-        assert stored["arc_type"] == "extra"
+
 
     def test_delete_preview_deletes_nothing(self, proj):
         """The refusal is the preview, so this is the same call as the
@@ -161,26 +161,13 @@ class TestDeleteGuard:
     def test_refusal_lists_the_cascade(self, proj):
         p, _ = proj
         r = _delete(p, "character", "kael")
-        assert set(r["would_delete"]) == {"kael", "kael-1", "kael-2", "kael-3"}
+        assert set(r["would_delete"]) == {"kael"}
         assert r["sections_deleted"] > 0
 
     def test_confirm_proceeds(self, proj):
         p, _ = proj
         assert _delete(p, "character", "mira", confirm=True)["success"] is True
         assert _gone(p, "mira")
-
-    def test_confirm_cascades_arcs(self, proj):
-        p, _ = proj
-        _delete(p, "character", "kael", confirm=True)
-        conn = sqlite3.connect(str(p / ".story" / "story.db"))
-        try:
-            # Beats are flagged, not erased, so restore brings them back too.
-            left = [r[0] for r in conn.execute(
-                "SELECT id FROM entities WHERE type='arc_beat' "
-                "AND parent_id='kael' AND is_deleted=0")]
-        finally:
-            conn.close()
-        assert left == []
 
     def test_structural_children_block_even_with_confirm(self, proj):
         """The guard is a hard stop, not a speed bump."""

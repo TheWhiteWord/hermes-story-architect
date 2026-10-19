@@ -18,19 +18,15 @@ SCHEMA = {
         },
         "view": {
             "type": "string",
-            "enum": ["arc", "dramatic_elements", "relationship", "unfilled", "values"],
+            "enum": ["dramatic_elements", "relationship", "unfilled", "values"],
             "description": "Optional focused view. Omit for the base structural map. "
-                           "'arc' = one character's arc beats, pass character. "
                            "'dramatic_elements' = per-scene dramatic roles and milestones. "
                            "'relationship' = the full relationship graph with perspectives. "
                            "'unfilled' = what is still incomplete, to answer 'what next?'. "
                            "'values' = the value schemas and their turns, for a scene, "
                            "unit, or the whole project."
         },
-        "character": {
-            "type": "string",
-            "description": "For view='arc': the character id. Defaults to every character."
-        },
+
         "act": {
             "type": "string",
             "description": "For view='dramatic_elements' or 'values': limit to one act id. "
@@ -126,8 +122,6 @@ def handler(args: dict, **kwargs) -> str:
 
 def _extended_view(conn, project_path, view: str, args: dict):
     """One focused domain. Returns None for an unknown view name."""
-    if view == "arc":
-        return _view_arc(conn, args)
     if view == "dramatic_elements":
         return _view_dramatic_elements(conn, args)
     if view == "relationship":
@@ -136,33 +130,8 @@ def _extended_view(conn, project_path, view: str, args: dict):
         return _view_unfilled(project_path, args)
     if view == "values":
         return _view_values(conn, project_path, args)
-    return {"error": f"Unknown view: {view}. Valid: arc, "
+    return {"error": f"Unknown view: {view}. Valid: "
                      f"dramatic_elements, relationship, unfilled, values."}
-
-
-def _view_arc(conn, args: dict) -> dict:
-    """A character's beats, in order, with the value shift at each step."""
-    from core.db import get_character_arcs
-
-    character = args.get("character")
-    if character:
-        beats = get_character_arcs(project_path_of(conn), character)
-        if not beats:
-            return {"view": "arc", "character": character, "beats": [],
-                    "note": f"No arc beats for '{character}'."}
-        return {"view": "arc", "character": character, "beats": beats}
-
-    rows = conn.execute(
-        "SELECT id FROM entities WHERE type='character' AND is_deleted=0 ORDER BY id").fetchall()
-    project_path = project_path_of(conn)
-    arcs = []
-    for (char_id,) in rows:
-        beats = get_character_arcs(project_path, char_id)
-        if beats:
-            arcs.append({"character": char_id, "beat_count": len(beats),
-                         "beats": beats})
-    return {"view": "arc", "arcs": arcs,
-            "hint": "Pass character=<id> for one arc in full."}
 
 
 def _view_dramatic_elements(conn, args: dict) -> dict:

@@ -120,13 +120,6 @@ def _sweep_stale(project_path: Path, written: set) -> list:
         if stale.is_file():
             stale.unlink()
             removed.append(rel)
-            # An arc beat was the last note in its character folder.
-            for parent in stale.parents:
-                if parent == project_path or not parent.is_dir():
-                    break
-                if parent.parent == project_path / "arcs" and not any(parent.iterdir()):
-                    parent.rmdir()
-                break
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(sorted(now), indent=2))
@@ -140,16 +133,11 @@ def _export_all(conn, project_path: Path) -> set:
     # second export is idempotent. The counter only fires when two entities in
     # one folder want the same title.
     used_names = {}
-    # A beat's folder is its character's title, so the id -> title map is needed
-    # before the beats are written.
-    char_titles = dict(conn.execute(
-        "SELECT id, name FROM entities WHERE type='character' AND is_deleted=0"))
+
     # A scene_beats note has no title of its own — the design names it by the
     # SCENE's title — so the map has to exist before the records are written.
     scene_titles = dict(conn.execute(
         "SELECT id, name FROM entities WHERE type='scene' AND is_deleted=0"))
-    # character id -> the folder name their beats are filed under
-    arc_dirs = {}
     written = set()
     value_blocks = []
     entity_rows = conn.execute(
@@ -239,21 +227,7 @@ def _export_all(conn, project_path: Path) -> set:
             written.add(project_path / ".story" / "memory.md")
             continue
 
-        if entity_type == "arc_beat":
-            # The character is the folder, named by their title like every other
-            # note. The character link itself rides in the frontmatter, so this
-            # is grouping, not identity. Cached per character: the counter in
-            # _filename is for siblings, and every beat of one character has to
-            # land in the *same* folder.
-            arcs = project_path / "arcs"
-            if parent_id not in arc_dirs:
-                arc_dirs[parent_id] = _filename(
-                    char_titles.get(parent_id, parent_id or "unknown"),
-                    arcs, used_names.setdefault(arcs, set()))
-            folder = arcs / arc_dirs[parent_id]
-            folder.mkdir(parents=True, exist_ok=True)
-        else:
-            folder = project_path / _folder_for(entity_type)
+        folder = project_path / _folder_for(entity_type)
 
         # A scene_beats note is named by the scene's title: the record has no
         # title of its own, and two records for scenes of the same name would
@@ -386,16 +360,6 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
         fm["order"] = int(order_key) if order_key == int(order_key) else order_key
         fm["status"] = status
         fm.update(extra)
-        return fm
-
-    if entity_type == "arc_beat":
-        fm["id"] = entity_id
-        fm["character"] = parent_id
-        fm["label"] = name
-        fm["order"] = int(order_key) if order_key == int(order_key) else order_key
-        # Remove 'id' from extra since we already set it
-        arc_extra = {k: v for k, v in extra.items() if k != "id"}
-        fm.update(arc_extra)
         return fm
 
     if entity_type == "scene_beats":

@@ -176,34 +176,6 @@ class TestFieldsSurviveAsBlanks:
     never part of the schema.
     """
 
-    def test_arc_beat_keeps_an_empty_scene_key(self, fixture_path, tmp_path):
-        p, vault = _setup(fixture_path, tmp_path, "blank-beat")
-        _delete(p, "scene", "central-room-day")
-        extra = _extra(p, "dr-elena-voss-1")
-        assert "scene" in extra
-        assert extra["scene"] == ""
-
-    def test_beat_prose_is_untouched(self, fixture_path, tmp_path):
-        p, vault = _setup(fixture_path, tmp_path, "blank-prose")
-        before = _extra(p, "dr-elena-voss-1")
-        _delete(p, "scene", "central-room-day")
-        after = _extra(p, "dr-elena-voss-1")
-        assert after["action"] == before["action"]
-        assert after["gap"] == before["gap"]
-        assert after["choice"] == before["choice"]
-        assert after["y"] == before["y"]
-
-    def test_retrieve_shows_the_field_as_empty(self, fixture_path, tmp_path):
-        from tools.story_retrieve import handler as retrieve_handler
-        p, vault = _setup(fixture_path, tmp_path, "blank-read")
-        _delete(p, "scene", "central-room-day")
-        r = json.loads(retrieve_handler(
-            {"project": "save-the-children", "entity_type": "arc_beat", "id": ["dr-elena-voss-1"],
-             "fields": ["scene", "action"]}, root_path=str(vault)))
-        fields = r["entities"][0]["fields"]
-        assert "scene" in fields and fields["scene"] == ""
-        assert fields["action"]
-
     def test_relationship_keeps_an_empty_scenes_list(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "blank-scenes")
         _delete(p, "scene", "central-room-day")
@@ -226,17 +198,10 @@ class TestFieldsSurviveAsBlanks:
 class TestDetachedReporting:
     """Required fields are skipped by unfilled_fields, so the delete must say so.
 
-    `arc_beat.scene` is optional: False, and unfilled_fields deliberately skips
+    `scene_beats.scene` is optional: False, and unfilled_fields deliberately skips
     required fields — an empty required field is a schema violation, not a
     "needs filling" hint. Without this report the gap is invisible.
     """
-
-    def test_delete_reports_detached_beats(self, fixture_path, tmp_path):
-        p, vault = _setup(fixture_path, tmp_path, "det-1")
-        result = _delete(p, "scene", "central-room-day")
-        beats = {d["entity_id"] for d in result["detached"] if d["field"] == "scene"}
-        assert beats == {"dr-elena-voss-1", "kael-1", "marcus-chen-1",
-                         "the-administrator-1"}
 
     def test_detached_names_what_it_pointed_at(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "det-2")
@@ -266,12 +231,6 @@ class TestDetachedReporting:
 class TestDefaultsOnReset:
     """A reset field takes the schema default, so a placeholder survives."""
 
-    def test_arc_beat_scene_resets_to_its_default(self, fixture_path, tmp_path):
-        from core.constants import ENTITY_SCHEMAS
-        p, vault = _setup(fixture_path, tmp_path, "def-1")
-        _delete(p, "scene", "central-room-day")
-        assert _extra(p, "dr-elena-voss-1")["scene"] == ENTITY_SCHEMAS["arc_beat"]["scene"]["default"]
-
     def test_optional_location_still_lands_in_unfilled_fields(self, fixture_path, tmp_path):
         """location_id is a column so it reads "", but location is optional —
         so unfilled_fields reports it and the UI has its signal."""
@@ -294,7 +253,7 @@ class TestReporting:
     def test_reports_the_cascade(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "cascade")
         result = _delete(p, "character", "kael")
-        assert set(result["cascade_deleted"]) == {"kael-1", "kael-2", "kael-3"}
+        assert result["cascade_deleted"] == []
 
     def test_nothing_purged_when_nothing_referenced(self, fixture_path, tmp_path):
         p, vault = _setup(fixture_path, tmp_path, "nopurge")
