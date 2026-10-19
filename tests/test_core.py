@@ -380,8 +380,8 @@ class TestNoteCreation:
             headings = [r[0] for r in sec_rows]
             assert "Content" in headings
             assert "Objective" in headings
-            assert "Conflict" in headings
-            assert "Beats" in headings
+            # Conflict and Beats moved to `scene_beats` with the design (T1.2):
+            # the scene holds what happens, the record holds how and why.
             assert "Value Turn" in headings
             assert "Dramatic Function" in headings
             assert "Production" in headings

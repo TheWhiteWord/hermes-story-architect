@@ -55,14 +55,6 @@ The ADMINISTRATOR speaks from everywhere and nowhere. Kael listens. Then shakes 
 
 [placeholder — scene/Objective]
 
-## Conflict
-
-[placeholder — scene/Conflict]
-
-## Beats
-
-[placeholder — scene/Beats]
-
 ## Value Turn
 
 [placeholder — scene/Value Turn]

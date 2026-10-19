@@ -60,14 +60,6 @@ KAEL stands before the door, hand on the handle. It turns. The lock was never en
 
 [placeholder — scene/Objective]
 
-## Conflict
-
-[placeholder — scene/Conflict]
-
-## Beats
-
-[placeholder — scene/Beats]
-
 ## Value Turn
 
 [placeholder — scene/Value Turn]

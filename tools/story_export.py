@@ -56,6 +56,7 @@ _FOLDERS = {
     "world": "worlds",
     "plot": "plots",
     "scene": "scenes",
+    "scene_beats": "scene_beats",
     "sequence": "sequences",
     "act": "acts",
     "relationship": "relationships",
@@ -143,6 +144,10 @@ def _export_all(conn, project_path: Path) -> set:
     # before the beats are written.
     char_titles = dict(conn.execute(
         "SELECT id, name FROM entities WHERE type='character' AND is_deleted=0"))
+    # A scene_beats note has no title of its own — the design names it by the
+    # SCENE's title — so the map has to exist before the records are written.
+    scene_titles = dict(conn.execute(
+        "SELECT id, name FROM entities WHERE type='scene' AND is_deleted=0"))
     # character id -> the folder name their beats are filed under
     arc_dirs = {}
     written = set()
@@ -250,11 +255,18 @@ def _export_all(conn, project_path: Path) -> set:
         else:
             folder = project_path / _folder_for(entity_type)
 
+        # A scene_beats note is named by the scene's title: the record has no
+        # title of its own, and two records for scenes of the same name would
+        # otherwise both fall to the "untitled" fallback and collide.
+        note_title = name
+        if entity_type == "scene_beats" and parent_id:
+            note_title = scene_titles.get(parent_id, name)
+
         # The filename is the title, so the id has to live in the frontmatter —
         # it is the only thing that survives the name change. `used` is per
         # folder, so two characters may each own a "The Choice" note.
         used = used_names.setdefault(folder, set())
-        note = folder / f"{_filename(name, folder, used)}.md"
+        note = folder / f"{_filename(note_title, folder, used)}.md"
         _write_note(note, fm, body)
         written.add(note)
 
@@ -384,6 +396,12 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
         # Remove 'id' from extra since we already set it
         arc_extra = {k: v for k, v in extra.items() if k != "id"}
         fm.update(arc_extra)
+        return fm
+
+    if entity_type == "scene_beats":
+        fm["id"] = entity_id
+        fm["scene"] = parent_id
+        fm.update({k: v for k, v in extra.items() if k != "id"})
         return fm
 
     if entity_type == "relationship":

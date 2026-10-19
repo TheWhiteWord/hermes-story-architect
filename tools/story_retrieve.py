@@ -96,6 +96,22 @@ def _row_data(conn, row) -> dict:
     return dict(zip(_columns(conn), row))
 
 
+def _scene_beats(conn, scene_id: str) -> dict | None:
+    """A scene's `scene_beats` record, or None when it has none.
+
+    One record per scene (the write path refuses a second), so this is a lookup
+    rather than a list. The record is read whole: it is the same data the scene's
+    `turning_point` and `scene_beats` computed fields are derived from.
+    """
+    row = conn.execute(
+        "SELECT id, extra FROM entities "
+        "WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+        (scene_id,)).fetchone()
+    if not row:
+        return None
+    return {"id": row[0], **json.loads(row[1] or "{}")}
+
+
 def _project_path(conn) -> Path:
     """Recover the project folder from the database file the connection is on."""
     # ponytail: sqlite exposes the file path; the plugin always uses .story/story.db.
@@ -132,6 +148,17 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
         values["value_focus"] = (
             for_project(_project_path(conn)) if entity_type == "project"
             else VALUE_FOCUS_SCOPES[entity_type](_project_path(conn), data["id"]))
+    # The same for a scene's `scene_beats` and `turning_point`: the record is
+    # another entity, so there is nothing in this row's `extra` to read. A
+    # scene with no record returns None for the record and "" for the turning
+    # point — the distinction the design keeps ("or empty").
+    if entity_type == "scene" and ("scene_beats" in wanted
+                                   or "turning_point" in wanted):
+        sb = _scene_beats(conn, data["id"])
+        if "scene_beats" in wanted:
+            values["scene_beats"] = sb
+        if "turning_point" in wanted:
+            values["turning_point"] = sb.get("turning_point", "") if sb else ""
 
     # Relation-backed fields: plot beats are rows linking to scenes, not
     # columns. Their position in the output is wherever the schema puts them,

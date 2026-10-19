@@ -54,7 +54,11 @@ class TestEntityFields:
         assert list(_handler({"entity_type": "character"})["entity_schemas"]) == ["character"]
 
     def test_all_entity_types_by_default(self):
-        assert len(_handler({})["entity_schemas"]) == 11
+        # Derived from ENTITY_SCHEMAS, not a remembered number: scene_beats was
+        # added after this test first ran, and a literal count is exactly how a
+        # new type silently stops being described.
+        from core.constants import ENTITY_SCHEMAS
+        assert len(_handler({})["entity_schemas"]) == len(ENTITY_SCHEMAS)
 
     def test_relation_backed_fields_are_flagged(self):
         fields = _handler({"entity_type": "plot"})["entity_schemas"]["plot"]

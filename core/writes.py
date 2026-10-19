@@ -215,6 +215,13 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             from .entity import check_references
             check_references(project_path, entity_type, merged)
 
+        # The scene_beats rules the schema cannot express: the scene exists and
+        # has no other record, every reference resolves, a beat has content.
+        # Merged state, so this is what will be stored.
+        if entity_type == "scene_beats":
+            from .entity import validate_scene_beats
+            validate_scene_beats(project_path, merged)
+
         # Auto-order if not provided
         if entity_type in ("scene", "sequence") and merged.get("order", 0) == 0 and columns["parent_id"]:
             next_order = _get_next_order_db(conn, entity_type, columns["parent_id"])
@@ -468,6 +475,51 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                     ).fetchall()
                 ]
             validate_scene_dramatic_role(merged_role, merged_roles)
+
+        # ── A scene_beats, checked on its MERGED state ──
+        # The same rule the dramatic_role contradiction check follows: an edit
+        # that moves the record to another scene, or adds a beat, must be
+        # checked against what will be stored — the record as it will stand,
+        # not the keys this call happened to send.
+        #
+        # The "one record per scene" rule is checked against the stored parent
+        # rather than the merged one: an edit that leaves `scene` alone is
+        # re-validating the record against itself, and the store is what says
+        # whether a second record already exists for the scene it is moving to.
+        if entity_type == "scene_beats":
+            from .entity import (check_references, validate_beat_references,
+                                 _validate_beat_content)
+            row = conn.execute(
+                "SELECT parent_id, extra FROM entities WHERE id=?",
+                (entity_id,)).fetchone()
+            stored_parent, stored_extra_json = row[0], row[1]
+            stored_extra = json.loads(stored_extra_json) if stored_extra_json else {}
+            # The scene link is a COLUMN (`parent_id`), not extra — so the
+            # merged state has to be seeded from the column or every edit
+            # validates a record with no scene at all.
+            merged_sb = {"scene": stored_parent, **stored_extra,
+                         **{k: v for k, v in data.items()
+                            if k in ENTITY_SCHEMAS["scene_beats"]}}
+            check_references(project_path, "scene_beats", merged_sb)
+            validate_beat_references(project_path, merged_sb.get("beats", []),
+                                     merged_sb.get("true_character", []))
+            _validate_beat_content(merged_sb.get("beats", []))
+            # The one-record rule, only when the scene link moves: re-validating
+            # a record that still points at its own scene is checking it against
+            # itself, which would always fail.
+            if str(merged_sb.get("scene") or "") != str(stored_parent or ""):
+                if not conn.execute(
+                        "SELECT id FROM entities WHERE id=? AND type='scene' "
+                        "AND is_deleted=0",
+                        (str(merged_sb.get("scene") or ""),)).fetchone():
+                    raise ValueError(f"Scene not found: {merged_sb.get('scene')}")
+                if conn.execute(
+                        "SELECT id FROM entities WHERE type='scene_beats' "
+                        "AND parent_id=? AND is_deleted=0",
+                        (str(merged_sb.get("scene") or ""),)).fetchone():
+                    raise ValueError(
+                        f"Scene '{merged_sb.get('scene')}' already has "
+                        f"scene_beats. Edit it instead of creating another.")
 
         applied_fields = []
         applied_sections = []

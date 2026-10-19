@@ -306,6 +306,10 @@ ENTITY_COLUMN_MAP = {
     "sequence": {"title": "name", "order": "order_key", "status": "status", "act_id": "parent_id"},
     "act": {"title": "name", "order": "order_key", "status": "status"},
     "arc_beat": {"label": "name", "order": "order_key", "character": "parent_id"},
+    # `scene` is the structural link the delete cascade reads (`parent_id`), so
+    # deleting a scene takes its scene_beats with it and restore brings it back.
+    # The frontmatter field is `scene`; columns_for_insert maps between them.
+    "scene_beats": {"scene": "parent_id"},
     "relationship": {"name": "name", "type": "type", "status": "status"},
     "value": {"name": "name"},
 }
@@ -360,6 +364,7 @@ _RELATION_FIELDS = {
     "location": {"variant_of": ("location_variant", False)},
     "world": {"variant_of": ("world_variant", False)},
     "arc_beat": {},
+    "scene_beats": {},
     "relationship": {},
     "value": {},
 }
@@ -495,12 +500,16 @@ def standard_sections(entity_type: str) -> list[str]:
         "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function", "Notes"],
         "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict", "Notes"],
         "plot": ["Summary", "Role", "Threads", "Value", "Characters", "Notes"],
-        "scene": ["Content", "Objective", "Conflict", "Beats", "Value Turn", "Dramatic Function", "Production", "Notes"],
+        # Conflict and Beats moved to `scene_beats` with the design: the scene
+        # holds what happens, `scene_beats` holds how and why. Objective stays —
+        # it is the reasoning behind the field, as on the act.
+        "scene": ["Content", "Objective", "Value Turn", "Dramatic Function", "Production", "Notes"],
         "sequence": ["Summary", "Purpose", "Value Arc", "Progression", "Sequence Climax", "Plots", "Notes"],
         "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],
         "arc_beat": ["Action", "The Gap", "Choice", "Value Shift", "Notes"],
         "relationship": ["Nature", "Perspectives", "Tension", "History", "Scenes to Write", "Notes"],
         "value": ["Definition", "Notes"],
+        "scene_beats": ["Conflict", "Findings", "Notes"],
     }
     return sections.get(entity_type, [])
 
@@ -820,6 +829,128 @@ def check_references(project_path, entity_type: str, frontmatter: dict) -> None:
                                  f"(at {path})")
     finally:
         conn.close()
+
+
+def validate_scene_beats(project_path, merged: dict) -> None:
+    """Raise ValueError on the rules a `scene_beats` record has to obey.
+
+    The schema cannot say any of these, which is why they live here rather than
+    in `ENTITY_SCHEMAS`:
+
+      * the scene exists, and the scene has no other record (one per scene);
+      * every reference resolves — the ones a `ref` declares, and the two
+        multi-type sites `validate_beat_references` owns;
+      * a beat has content, so an entry cannot be an empty shell.
+
+    Called on the MERGED state, on create and on edit, so an edit that moves a
+    record to another scene is checked against the state that will be stored
+    rather than against the keys the caller happened to send.
+    """
+    from core.db import get_db
+
+    scene_id = str(merged.get("scene") or "")
+    if not scene_id:
+        raise ValueError("scene_beats requires a scene")
+    conn = get_db(project_path)
+    try:
+        if not conn.execute(
+                "SELECT id FROM entities WHERE id=? AND type='scene' AND is_deleted=0",
+                (scene_id,)).fetchone():
+            raise ValueError(f"Scene not found: {scene_id}")
+        # A record may already exist for this scene; on create that is a
+        # refusal, on edit it is this very record being edited, which is why
+        # the caller skips this check for the row it is writing.
+        if conn.execute(
+                "SELECT id FROM entities WHERE type='scene_beats' "
+                "AND parent_id=? AND is_deleted=0", (scene_id,)).fetchone():
+            raise ValueError(f"Scene '{scene_id}' already has scene_beats. "
+                             f"Edit it instead of creating another.")
+        check_references(project_path, "scene_beats", merged)
+        validate_beat_references(project_path, merged.get("beats", []),
+                                 merged.get("true_character", []))
+        _validate_beat_content(merged.get("beats", []))
+    finally:
+        conn.close()
+
+
+# Who may act, and what a change may land on. The asymmetry is the point: a
+# relationship is the bond between two people, so it can be the OBJECT of a
+# change but cannot act. A `by` names who acts.
+_BY_TYPES = ("character", "location", "world")
+_CHANGE_TYPES = ("character", "relationship", "location", "world")
+
+
+def _resolve_any(conn, slug: str, types) -> bool:
+    """True when `slug` is an existing, non-deleted entity of one of `types`."""
+    return bool(conn.execute(
+        f"SELECT 1 FROM entities WHERE id=? AND is_deleted=0 AND type IN "
+        f"({','.join('?' * len(types))})", (slug, *types)).fetchone())
+
+
+def validate_beat_references(project_path, beats, true_character) -> None:
+    """Raise ValueError on a `by` or `changes[].entity` that resolves to nothing.
+
+    `check_references` resolves a `ref` against exactly one type, and these two
+    sites name three and four — so they are checked here, beside it, and never
+    by the same code path twice. `true_character[].character` IS a declared
+    `ref: character`, so it is not repeated here.
+    """
+    from core.db import get_db
+
+    if not isinstance(beats, list):
+        return
+    conn = get_db(project_path)
+    try:
+        for i, beat in enumerate(beats):
+            if not isinstance(beat, dict):
+                continue
+            at = f"beats[{i}]"
+            for side in ("action", "reaction"):
+                entry = beat.get(side)
+                if not isinstance(entry, dict):
+                    continue
+                slug = str(entry.get("by") or "")
+                if slug and not _resolve_any(conn, slug, _BY_TYPES):
+                    raise ValueError(
+                        f"{at}.{side}.by '{slug}' is not a character, "
+                        f"location or world")
+            changes = beat.get("changes")
+            if not isinstance(changes, list):
+                continue
+            for j, change in enumerate(changes):
+                if not isinstance(change, dict):
+                    continue
+                slug = str(change.get("entity") or "")
+                if slug and not _resolve_any(conn, slug, _CHANGE_TYPES):
+                    raise ValueError(
+                        f"{at}.changes[{j}].entity '{slug}' is not a "
+                        f"character, relationship, location or world")
+    finally:
+        conn.close()
+
+
+def _validate_beat_content(beats) -> None:
+    """Raise ValueError on a beat that holds nothing on either side.
+
+    A beat is two-sided by definition, so "no content" means no content on
+    either side: no surface or subtext on `action` or `reaction`, and no gap,
+    risk or changes. Such an entry is an empty shell, and the design calls a
+    beat with no gap and no changes mere activity rather than action.
+    """
+    if not isinstance(beats, list):
+        return
+    for i, beat in enumerate(beats):
+        if not isinstance(beat, dict):
+            continue
+        action, reaction = beat.get("action"), beat.get("reaction")
+        action = action if isinstance(action, dict) else {}
+        reaction = reaction if isinstance(reaction, dict) else {}
+        if not (action.get("surface") or reaction.get("surface")
+                or action.get("subtext") or reaction.get("subtext")
+                or beat.get("gap") or beat.get("risk") or beat.get("changes")):
+            raise ValueError(
+                f"Beat {i} has no content: no surface, subtext, gap, risk, "
+                f"or changes.")
 
 
 def validate_scene_plot_roles(project_path, entries) -> None:

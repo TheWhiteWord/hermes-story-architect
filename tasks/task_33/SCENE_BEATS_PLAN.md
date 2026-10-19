@@ -199,7 +199,7 @@ happens when its scene goes.
 
 ### Tasks
 
-- [ ] **T1.1** Add `scene_beats` to `ENTITY_SCHEMAS` (`core/constants.py`).
+- [x] **T1.1** Add `scene_beats` to `ENTITY_SCHEMAS` (`core/constants.py`).
       Fields, in the order a reader scans them: `scene` (ref: scene, required),
       `driver` (ref: character), `scene_objective` (string),
       `turning_point` (string), `true_character` (list, `sub_fields`:
@@ -211,39 +211,39 @@ happens when its scene goes.
       The `ref` target for `by` and `changes[].entity` is **not expressible**
       as a single `ref` value, because the design allows three types on `by`
       and four on `changes[].entity` — see F1.1.
-- [ ] **T1.2** Give `scene_beats` its standard sections:
+- [x] **T1.2** Give `scene_beats` its standard sections:
       `Conflict`, `Findings`, `Notes` (`core/entity.py:490`). Verify:
       `story_describe(entity_type="scene_beats")["sections"]["standard_sections"]`.
-- [ ] **T1.3** Declare `scene_beats.scene` in `ENTITY_COLUMN_MAP` as a column
+- [x] **T1.3** Declare `scene_beats.scene` in `ENTITY_COLUMN_MAP` as a column
       (so the delete cascade reaches it), and verify the export/import round
       trip carries the column. The column is `scene_id` or `parent_id`; the
       design's frontmatter field is `scene`, so the map is
       `{"scene": "parent_id"}` and `parent_id` is what the cascade reads.
       Verify: `delete_entity` on the scene soft-deletes the `scene_beats` row,
       and `restore` brings it back.
-- [ ] **T1.4** Add the hard write rule "the scene exists and has no other
+- [x] **T1.4** Add the hard write rule "the scene exists and has no other
       `scene_beats`" (`core/writes.py`, in the `scene_beats` branch of
       `create_entity`). Verify: a second `scene_beats` for the same scene is
       refused, and the refusal names the existing one.
-- [ ] **T1.5** Add the hard rule "every referenced entity exists". Verify:
+- [x] **T1.5** Add the hard rule "every referenced entity exists". Verify:
       `check_references` is called on the `scene_beats` create path with the
       declared refs, and a ref to a deleted entity is refused.
-- [ ] **T1.6** Add the rule "a beat has content" — a `beats` entry whose
+- [x] **T1.6** Add the rule "a beat has content" — a `beats` entry whose
       `action` and `reaction` both hold no `surface` and no `subtext`, and
       which has no `gap`, no `risk` and no `changes`, is refused. Verify: the
       refusal is a `ValueError` naming the entry. Per F1.5 the beat is
       two-sided, so "no content" means no content on **either** side.
-- [ ] **T1.7** Wire the export: `_FOLDERS["scene_beats"] = "scene_beats"`, one
+- [x] **T1.7** Wire the export: `_FOLDERS["scene_beats"] = "scene_beats"`, one
       `_import_folder(conn, project_path, "scene_beats", "scene_beats")` call
       after `scenes`, and `scene_beats` in the `markdown_ids` walk
       (`tools/story_import.py:71`). Verify: an import → export → import round
       trip is byte-identical for a `scene_beats` note.
-- [ ] **T1.8** Wire the scene's computed fields. `turning_point` is
+- [x] **T1.8** Wire the scene's computed fields. `turning_point` is
       `scene_beats.turning_point` (read-only); `scene_beats` is the record
       itself (read-only). Verify: both appear in `story_retrieve` for a scene
       that has one, and neither is writable through `story_draft` (the
       computed check in `core/drafts.py:167` refuses them).
-- [ ] **T1.9** Wire the scene's `scene_objective` field (stored, optional),
+- [x] **T1.9** Wire the scene's `scene_objective` field (stored, optional),
       and rewrite the `value_turns[].effects` description to what §6.1 defines
       ("the outcome of the value shift for a plot protagonist, by conflict
       level"). One field, one line, same edit site
@@ -306,8 +306,8 @@ not declare.** §8 lists three reference sites; §5.3's table declares `characte
 two reference sites on `scene_beats` plus the beat's, written loosely.
 
 Resolved by reading it as the design means it: the check is "every character a
-`scene_beats` record names — in `driver`, in a beat's `by` (either side), in a
-`true_character[].character` — is in the scene's cast". That is one rule over
+`scene_beats` record names — in `driver`, in a beat's `by` (either side), in
+a `true_character[].character` — is in the scene's cast". That is one rule over
 the record's sites, and it is a soft finding, so it is prose. No code.
 
 Under the nested shape (F1.5) the beat contributes **two** `by` sites, so the
@@ -370,6 +370,71 @@ visible rather than discovered later, and so no one adds `check_references` to
 the importer "while they are in there" — that is a change to a path the design
 did not name.
 
+**F1.7 — the design's identity rule ("the id is derived from the scene id plus
+`-beats`, set by the write path and refused on a collision") cannot be
+implemented as written.** `create_entity` refuses *any* id already in use across
+all types (`core/writes.py:171`), so a derived id is refused the moment its
+slug collides with any other entity — including another scene's derived record
+or a scene literally named `x-beats`. The write path cannot derive an id and
+refuse its own derivation.
+
+**Resolved as (a): the caller supplies the id; `-beats` is a documented
+convention.** The existing collision check already refuses a clash by type, and
+it names the other entity, so the rule the design wants is enforced with no new
+mechanism. Recorded because §12.1 lists the suffix as an open point and this is
+the answer: the suffix is a convention the skill teaches, not a write-path
+derivation.
+
+**F1.8 — T1.2 makes three fixture scenes unloadable. Resolved: convert them.**
+`standard_sections("scene")` drops `Conflict` and `Beats`, but
+`tests/fixtures/save-the-children/scenes/` has three notes carrying exactly
+those headings. The section set is closed on create, edit **and import**, so
+those three scenes — and the session-scoped `fixture_path` every dependent test
+uses — failed to import.
+
+Converted, not deleted: each scene's `Conflict` prose moved into a
+`scene_beats/<scene title>.md` note with `id: <scene id>-beats` and
+`scene: <scene id>`, and the scene kept its remaining sections. The `Beats`
+placeholder was dropped rather than invented: it was the design's own dead
+token (`[placeholder — scene/Beats]`), and `scene_beats`'s section set is
+`Conflict, Findings, Notes`, so it had no destination. The fixture now matches
+the new section set and still imports.
+
+**F1.9 — the design names a `scene_beats` note by the scene's title, but the
+record has no title of its own.** `scene_beats.name` is empty (it is not a
+`title` field), so `_filename` fell back to `"untitled"`, and the counter
+inside `_filename` is a local reset on every export — so three records exported
+as `untitled.md`, `2.md`, `3.md`, and the next import read two of them as the
+same id (`UNIQUE constraint failed: entities.id`).
+
+Resolved by naming the record from its scene's title, which is what §5.4 asks
+for and what the `arc_beat` folder already does for the character. This is also
+the one place the round trip would have broken silently, so it is recorded as
+the reason the export needed a `scene_beats` branch at all.
+
+**F1.10 — the edit path read a `scene_beats` record's scene link from `extra`,
+where it does not live.** The `scene` field is a column (`parent_id`), so the
+merged state for validation was `{**extra, **data}` — which never contained
+`scene` unless the caller sent it. Every edit therefore validated a record with
+no scene at all and was refused with "Scene not found: None", even for a
+section edit that touched nothing but prose.
+
+Resolved by seeding the merged state from the column:
+`{"scene": stored_parent, **stored_extra, **data}`. This is the same class of
+bug as F1.2 (the edit path missing what the create path has), so it is recorded
+with it.
+
+**F1.11 — `_restore_entity` cascaded only `arc_beat`.** Its docstring says the
+restore is "the exact inverse of the delete", and the delete cascades on
+`parent_id` — but the restore keyed on `type='arc_beat'`, so a scene came back
+with no `scene_beats` and the record stayed deleted. That is the failure T1.3's
+verify names.
+
+Resolved by keying the cascade on `parent_id` alone, for every type. It is one
+fact (this row owned that row) rather than a per-type branch, and it is the
+same list the delete already soft-deleted. `arc_beat` is still covered, so
+nothing is lost before phase 6 removes the type.
+
 ### Parallel work
 
 T1.7 (export/import) is independent of T1.4–T1.6 (validation) and can be
@@ -377,6 +442,55 @@ picked up in the same pass. It is one task file because it is one logical
 change.
 
 ### FINAL BRIEF
+
+Phase 1 complete. Nine tasks landed, plus four defects found while verifying
+them.
+
+**The entity.** `scene_beats` is a normal entity type: schema in
+`core/constants.py`, `ENTITY_LABELS` entry from phase 0, sections
+`Conflict, Findings, Notes`, and `scene` mapped to `parent_id` in
+`ENTITY_COLUMN_MAP` so the delete cascade reaches it. Fields, in reading order:
+`scene` (ref: scene, required), `driver` (ref: character), `scene_objective`,
+`turning_point`, `true_character` (list: `character` / `dilemma` /
+`choice_reveals`), `beats` (list, nested per the diagram — `action` and
+`reaction`, each `by` / `surface` / `subtext`, then `gap`, `risk`, `changes`
+with `entity` / `change`).
+
+**The write contract.** One place owns the rules a schema cannot say:
+`validate_scene_beats(project_path, merged)`, called from the `scene_beats`
+branch of `create_entity` and of `edit_entity`, always on the merged state. It
+holds the one-record-per-scene rule, calls `check_references` for the declared
+refs, calls `validate_beat_references` for the two multi-type sites (`by` against
+three types, `changes[].entity` against four), and calls `_validate_beat_content`
+for the beat rule. The one-record rule on edit is checked against the stored
+parent, so re-validating a record against itself cannot fail.
+
+**The scene's computed fields.** `scene_objective` is stored and optional.
+`turning_point` and `scene_beats` are computed and read-only, derived from the
+record — read in `core/db.py`'s `_build_scene` and in `story_retrieve`'s
+`_entity_fields`. Both are refused by the draft validator. A scene with no
+record returns `""` for `turning_point` and `None` for `scene_beats`.
+
+**Export and import.** One flat `scene_beats/` folder, named by the scene's
+title, with `id` and `scene` in frontmatter. Import runs immediately after
+`scenes`, so the record's scene exists. Verified byte-identical over an
+import → export → wipe → import cycle, and the export sweep removes an orphaned
+record's note while leaving a hand-authored note alone.
+
+**Tests.** 1176 pass (was 1171). Two test files were updated because they
+asserted the old state: `test_core.py` (the scene section list) and
+`test_field_coverage.py` (the schema-driven sweep now creates a `scene_beats`,
+which needs a parent scene and a real character for its `driver`). The
+`story_describe` type count is now derived from `ENTITY_SCHEMAS` rather than a
+remembered number. The sweep's probe in `test_edit_silent_success.py` was
+extended to fill optional sub-fields and to skip the multi-type reference sites
+by name, so a nested `beats` probe exercises its shape instead of emitting an
+empty entry.
+
+**Not in this phase.** The scene's computed `scene_beats` is *not* reported as
+unfilled yet — `unfilled_fields` skips it, and it is not in `_RELATION_FIELDS`.
+That is T2.1. No soft rule is code (they are prose in the `Findings` section),
+and the importer still does not validate references, for any type (F1.6).
 
 ---
 

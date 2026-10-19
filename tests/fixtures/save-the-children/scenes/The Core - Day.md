@@ -56,14 +56,6 @@ The children step through the door. Blinking. Silent. The sky is impossibly larg
 
 [placeholder — scene/Objective]
 
-## Conflict
-
-[placeholder — scene/Conflict]
-
-## Beats
-
-[placeholder — scene/Beats]
-
 ## Value Turn
 
 [placeholder — scene/Value Turn]

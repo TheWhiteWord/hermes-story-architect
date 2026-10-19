@@ -33,6 +33,15 @@ def _sample_value(field, meta):
         if field in ("p", "c", "cd", "nn"):
             # Four distinct ladder words — the value's shape rule.
             return f"{field}-word"
+        if field in ("by", "entity"):
+            # `by` and `changes[].entity` resolve against real records
+            # (validate_beat_references), so the sample must name one: a
+            # character is the one type both sites accept.
+            return "parent-char"
+        if field == "driver":
+            # A declared ref: character. `parent-char` exists in the parents
+            # this test creates for a scene_beats.
+            return "parent-char"
         if "slug" in field or field.endswith("_id"):
             return f"ref-{field}"
         if field == "order":
@@ -118,6 +127,14 @@ def _create_parents(project, entity_type):
         create_entity(project, "act", "act-1", {"title": "Act I"})
         create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
         create_entity(project, "scene", "beat-scene", {"title": "Beat Scene", "sequence_id": "seq-1", "act_id": "act-1"})
+    if entity_type == "scene_beats":
+        # A record's scene must exist, and its `driver` is a ref: character.
+        create_entity(project, "character", "parent-char",
+                      {"name": "Parent", "story_role": "Protagonist",
+                       "one_sentence": "Parent char"})
+        create_entity(project, "act", "act-1", {"title": "Act I"})
+        create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project, "scene", "beats-scene", {"title": "Beats Scene", "sequence_id": "seq-1", "act_id": "act-1"})
     if entity_type in ("scene", "sequence", "plot"):
         create_entity(project, "act", "act-1", {"title": "Act I"})
     if entity_type in ("scene", "plot"):
@@ -145,6 +162,9 @@ def _prepare_frontmatter(entity_type, slug, fm):
     if entity_type == "arc_beat":
         fm["character"] = "parent-char"
         fm["scene"] = "beat-scene"
+        fm["id"] = slug
+    if entity_type == "scene_beats":
+        fm["scene"] = "beats-scene"
         fm["id"] = slug
     if entity_type == "scene":
         fm["sequence_id"] = "seq-1"
@@ -214,6 +234,17 @@ def test_create_load_retrieve(entity_type, project):
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "arc_beat",
+            "id": [slug],
+            "sections": ["all"],
+        }))
+        found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
+    elif entity_type == "scene_beats":
+        # A record is reached through its scene's computed `scene_beats` field
+        # (see _build_scene), so it is verified via retrieve like arc_beat,
+        # relationship and value.
+        retrieve_result = json.loads(retrieve_handler({
+            "project": str(project),
+            "entity_type": "scene_beats",
             "id": [slug],
             "sections": ["all"],
         }))

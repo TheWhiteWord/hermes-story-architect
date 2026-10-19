@@ -321,15 +321,21 @@ def _restore_entity(args: dict, project_path: Path) -> dict:
             }
         conn.execute(
             "UPDATE entities SET is_deleted=0, deleted_at=NULL WHERE id=?", (entity_id,))
-        # Beats cascaded with the character come back too — a restore that left
-        # them deleted would silently halve the arc.
+        # Children come back with their parent. The restore is meant to be the
+        # exact inverse of the delete, and the delete cascades on `parent_id` —
+        # so leaving a child deleted would restore a scene with no scene_beats,
+        # or a character with no arc beats, silently.
+        #
+        # Keyed on `parent_id` for every type rather than a per-type branch: the
+        # cascade is one fact (this row owned that row), and the list is what the
+        # delete already soft-deleted.
         restored_children = [r[0] for r in conn.execute(
-            "SELECT id FROM entities WHERE type='arc_beat' AND parent_id=? "
-            "AND is_deleted=1 ORDER BY id", (entity_id,)).fetchall()]
+            "SELECT id FROM entities WHERE parent_id=? AND is_deleted=1 "
+            "ORDER BY id", (entity_id,)).fetchall()]
         if restored_children:
             conn.execute(
                 "UPDATE entities SET is_deleted=0, deleted_at=NULL "
-                "WHERE type='arc_beat' AND parent_id=? AND is_deleted=1", (entity_id,))
+                "WHERE parent_id=? AND is_deleted=1", (entity_id,))
     finally:
         conn.close()
 

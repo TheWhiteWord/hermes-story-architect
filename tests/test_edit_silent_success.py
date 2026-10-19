@@ -55,7 +55,12 @@ def _probe_value(meta: dict):
     The sweep asserts a valid KEY is accepted; a wrong-typed value is correctly
     refused, so the probe must satisfy the field's shape. Scalar fields take a
     plain string (empty for enums, which the write path accepts); a structured
-    field takes one entry whose required sub-fields carry type-correct values.
+    field takes one entry whose sub-fields carry type-correct values.
+
+    Optional sub-fields are filled too, not only the required ones: a list of
+    objects whose optional members are all absent is an empty entry, and a
+    field with a content rule (scene_beats.beats) refuses that. Filling them is
+    also what makes the probe exercise the nested shape.
     """
     if not meta:
         return "PROBE"
@@ -65,14 +70,12 @@ def _probe_value(meta: dict):
     if kind == "boolean":
         return False
     if kind == "list":
-        entry = {k: _probe_value(m) for k, m in (meta.get("sub_fields") or {}).items()
-                 if m.get("required")}
-        return [entry]
+        entry = {k: _probe_value(m) for k, m in (meta.get("sub_fields") or {}).items()}
+        return [entry] if entry else []
     if kind == "object":
         if meta.get("keyed"):
             return {}
-        return {k: _probe_value(m) for k, m in (meta.get("sub_fields") or {}).items()
-                if m.get("required")}
+        return {k: _probe_value(m) for k, m in (meta.get("sub_fields") or {}).items()}
     if meta.get("enum"):
         return ""
     return "PROBE"
@@ -83,6 +86,25 @@ def _has_ref(meta: dict) -> bool:
     if meta.get("ref"):
         return True
     return any(_has_ref(m) for m in (meta.get("sub_fields") or {}).values())
+
+
+def _has_reference_site(meta: dict) -> bool:
+    """True if any sub-field is a reference site, declared or by name.
+
+    `_has_ref` covers a declared `ref`. A `scene_beats` beat's `by` and
+    `changes[].entity` are reference sites the schema cannot declare (three and
+    four target types), so they are resolved by name instead — see
+    `core.entity.validate_beat_references`. A probe of "PROBE" cannot resolve
+    either way, so the sweep skips a field carrying one.
+    """
+    if meta.get("ref"):
+        return True
+    for name, sub in (meta.get("sub_fields") or {}).items():
+        if name in ("by", "entity") or _has_ref(sub):
+            return True
+        if _has_reference_site(sub):
+            return True
+    return False
 
 
 def _field(vault, name, entity_type="character", entity_id="kael"):
@@ -238,7 +260,7 @@ class TestValidKeysStillWork:
                 # type; the sweep cannot synthesise one, so those fields are out
                 # of scope for the acceptance check (their ref is validated
                 # elsewhere, at write time, against real records).
-                if _has_ref(schema.get(key, {})):
+                if _has_reference_site(schema.get(key, {})):
                     continue
                 try:
                     # Rebuild per probe: one field's probe can invalidate

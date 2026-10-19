@@ -552,6 +552,19 @@ def get_project_summary(project_path: Path) -> dict:
                 }
 
 
+        # ── A scene's scene_beats, keyed by the scene it belongs to ──
+        # One record per scene (the write path refuses a second), so the key is
+        # the scene and the record is read whole — the scene's `turning_point`
+        # and `scene_beats` fields are the same data the reader holds.
+        scene_beats = {
+            row[1]: {"id": row[0], **extra}
+            for row, extra in (
+                (row, json.loads(row[2]) if row[2] else {})
+                for row in conn.execute(
+                    "SELECT id, parent_id, extra FROM entities "
+                    "WHERE type='scene_beats' AND is_deleted=0"))
+        }
+
         # ── Helpers ──
         # A stub is a scene that does not exist yet, and `status` is the only
         # thing that says so. It USED to be `status == planned OR no
@@ -593,8 +606,15 @@ def get_project_summary(project_path: Path) -> dict:
                 "location": scene_loc.get(sid),
                 "milestone": milestone_label(scene_plot_roles.get(sid, []), plot_scopes),
                 "value_turns": s["_extra"].get("value_turns", []),
+                # The scene's computed fields, read from its scene_beats. A
+                # scene with no record carries an empty turning_point and no
+                # scene_beats key at all — the record is absent, not empty, and
+                # reporting `{}` would claim one exists.
+                "turning_point": scene_beats.get(sid, {}).get("turning_point", ""),
+                **({"scene_beats": scene_beats[sid]}
+                   if sid in scene_beats else {}),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": [], "value_turns": []},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": [], "value_turns": [], "turning_point": ""},
                          always_keep={"status"})
 
         # ── Build sequence output ──

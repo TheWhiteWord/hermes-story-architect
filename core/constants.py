@@ -196,6 +196,17 @@ ENTITY_SCHEMAS = {
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs present in this scene"},
         "no_cast": {"type": "boolean", "default": False, "optional": True, "description": "Set true when this scene deliberately has no characters (e.g. an empty room). Clears the 'characters unfilled' gap so a decision is not flagged forever"},
         "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the scene"},
+        # The driver's immediate desire, written on the scene as the reasoning
+        # behind it and on `scene_beats` as the mechanism's first step. The two
+        # keep identical names and are allowed to drift: reconciling them is the
+        # author's job after reworking `scene_beats`, not the reader's.
+        "scene_objective": {"type": "string", "default": "", "optional": True, "description": "The driver's immediate desire. One sentence."},
+        # Read from this scene's scene_beats. Neither is written: the record is
+        # written on `scene_beats` and read back here, so a computed field can
+        # never disagree with the record it derives from. `turning_point` is
+        # the moment of the major gap; `scene_beats` is the whole record.
+        "turning_point": {"type": "string", "default": "", "optional": True, "computed": True, "description": "The moment of the major gap, read from this scene's scene_beats (read-only)"},
+        "scene_beats": {"type": "object", "default": None, "optional": True, "computed": True, "description": "This scene's scene_beats record (read-only)"},
         "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "How this scene functions dramatically. One of: plot_role, transition, non-event. 'plot_role' (or empty) means the role is defined per plot in plot_roles — do NOT repeat it here. 'transition' and 'non-event' are the only values that serve no plot, and they are mutually exclusive with plot_roles: setting one requires plot_roles to be empty."},
         # The write side of a plot role. Every entry names its own plot, so one
         # scene can hold different roles in different plots — which is why the
@@ -225,7 +236,7 @@ ENTITY_SCHEMAS = {
                             "value": {"type": "string", "required": True, "description": "The name of an existing value entity — the value, named by its positive pole (e.g. 'trust')"},
                             "from": {"type": "string", "required": True, "description": "The state when the scene opens, as a word of that value's four rungs"},
                             "to": {"type": "string", "required": True, "description": "The state when the scene closes, as a word of that value's four rungs"},
-                            "effects": {"type": "list", "required": True, "description": "One entry per protagonist the shift affects",
+                            "effects": {"type": "list", "required": True, "description": "The outcome of the value shift for a plot protagonist, by conflict level",
                                         "sub_fields": {
                                             "character": {"type": "string", "required": True, "ref": "character", "description": "A protagonist of the plot, whether or not present in the scene"},
                                             "levels": {"type": "list", "required": True, "description": "One entry per conflict level through which the shift reaches that character",
@@ -282,6 +293,57 @@ ENTITY_SCHEMAS = {
         "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on this character's value after this beat's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the arc curve passes through."},
         "is_crisis": {"type": "boolean", "default": False, "optional": True, "description": "Marks a crisis beat"},
         "is_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks a climax beat"},
+    },
+    "scene_beats": {
+        "scene": {"type": "string", "default": "", "optional": False, "description": "Slug of an existing scene", "ref": "scene"},
+        "driver": {"type": "string", "default": "", "optional": True, "description": "Slug of the character who drives the scene", "ref": "character"},
+        "scene_objective": {"type": "string", "default": "", "optional": True, "description": "The driver's immediate desire. One sentence."},
+        "turning_point": {"type": "string", "default": "", "optional": True, "description": "The moment of the major gap, read from how the beats relate. One sentence. Surfaces on the scene as a computed field."},
+        # A true choice is a dilemma; it is where true character shows. The
+        # source gives no count per scene, so the list holds none, one or
+        # several, and most scenes hold none. `character` may differ from
+        # `driver`: in an ultimatum one character drives and another chooses.
+        "true_character": {
+            "type": "list", "default": [], "optional": True,
+            "description": "True-character moments: the choices that reveal who the character is. None, one or several.",
+            "sub_fields": {
+                "character": {"type": "string", "required": True, "ref": "character", "description": "Slug of the character who faces the choice — may differ from the driver"},
+                "dilemma": {"type": "string", "description": "The alternatives and what choosing costs: irreconcilable goods, or the lesser of two evils"},
+                "choice_reveals": {"type": "string", "description": "What the choice shows about who the character is"},
+            },
+        },
+        # The beats of action and reaction. Each side carries its own `by`,
+        # because "the same character on both sides means inner conflict" is a
+        # real, checkable fact and needs two `by` fields to express it — the
+        # flattened reading of the design's diagram could not.
+        # `by` and `changes[].entity` name three and four types respectively,
+        # which no single `ref` value can express; validate_beat_references
+        # resolves both.
+        "beats": {
+            "type": "list", "default": [], "optional": True,
+            "description": "Ordered beats of action and reaction. A beat with no gap, risk, changes, surface or subtext is mere activity, not action.",
+            "sub_fields": {
+                "action": {"type": "object", "description": "The acting side of the beat",
+                           "sub_fields": {
+                               "by": {"type": "string", "description": "Slug of a character, location or world that acts"},
+                               "surface": {"type": "string", "description": "What is shown or said"},
+                               "subtext": {"type": "string", "description": "The underlying action, as an active gerund phrase"},
+                           }},
+                "reaction": {"type": "object", "description": "The reacting side of the beat",
+                             "sub_fields": {
+                                 "by": {"type": "string", "description": "Slug of a character, location or world that reacts"},
+                                 "surface": {"type": "string", "description": "What is shown or said"},
+                                 "subtext": {"type": "string", "description": "The underlying action, as an active gerund phrase"},
+                             }},
+                "gap": {"type": "string", "description": "What the character expected and what came back. One sentence. Empty when the beat is mere activity."},
+                "risk": {"type": "string", "description": "What the character now stands to lose, carried into the next action. One sentence."},
+                "changes": {"type": "list", "description": "What this exchange changed, for anyone or anything",
+                            "sub_fields": {
+                                "entity": {"type": "string", "description": "Slug of a character, relationship, location or world"},
+                                "change": {"type": "string", "description": "One sentence: what this exchange changed for that entity"},
+                            }},
+            },
+        },
     },
     "relationship": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Display name (e.g. 'Kael & Mira')"},

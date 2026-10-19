@@ -69,7 +69,7 @@ def _diff(project_path: Path) -> dict:
 
     markdown_ids = set()
     for folder in ("characters", "locations", "worlds", "plots", "scenes",
-                   "sequences", "acts", "relationships"):
+                   "scene_beats", "sequences", "acts", "relationships"):
         markdown_ids |= _ids_in(project_path / folder)
 
     # Values live in one root file, not a folder, so they would otherwise be
@@ -245,6 +245,9 @@ def _import_all(conn, project_path: Path) -> None:
     _import_folder(conn, project_path, "worlds", "world")
     _import_folder(conn, project_path, "plots", "plot")
     _import_folder(conn, project_path, "scenes", "scene")
+    # Immediately after the scenes: a record names its scene, so the scene must
+    # exist before the record is inserted.
+    _import_folder(conn, project_path, "scene_beats", "scene_beats")
     _import_folder(conn, project_path, "sequences", "sequence")
     _import_folder(conn, project_path, "acts", "act")
     _import_arcs(conn, project_path)
@@ -499,6 +502,14 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": None, "location_id": None,
             "extra": _extra_for("act", fm),
         }
+    elif entity_type == "scene_beats":
+        return {
+            "id": slug, "type": "scene_beats",
+            "name": "", "one_sentence": "",
+            "order_key": 0, "status": "",
+            "parent_id": fm.get("scene"), "location_id": None,
+            "extra": _extra_for("scene_beats", fm),
+        }
     elif entity_type == "arc_beat":
         return {
             "id": slug, "type": "arc_beat",
@@ -562,6 +573,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
         # `plot_roles` is relation-stored, so it must not land in extra.
         "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters",
                   "plot_roles"},
+        "scene_beats": {"scene", "id"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
         "arc_beat": {"id", "label", "order", "character"},
