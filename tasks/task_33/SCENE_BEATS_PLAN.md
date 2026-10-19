@@ -532,15 +532,15 @@ what export removes.
 
 ### Tasks
 
-- [ ] **T2.1** Report the scene's computed `scene_beats` field as unfilled
+- [x] **T2.1** Report the scene's computed `scene_beats` field as unfilled
       when empty, for scenes that are not `planned` and whose `dramatic_role`
       is `plot_role` or empty. Verify: a `planned` scene is skipped; a
       `transition` scene is not reported; a `drafted` plot-role scene with no
       `scene_beats` is reported.
-- [ ] **T2.2** Verify the Findings section is the surface for the soft rules
+- [x] **T2.2** Verify the Findings section is the surface for the soft rules
       and that no code path claims to enforce them. Verify: `git grep` for
       `turning_point` and `changes` returns only the schema and the reader.
-- [ ] **T2.3** Verify the export sweep removes an orphaned `scene_beats` note
+- [x] **T2.3** Verify the export sweep removes an orphaned `scene_beats` note
       (its scene deleted) and leaves a hand-authored note alone. Verify: a test
       that deletes the scene in the database, exports, and asserts the note is
       gone.
@@ -550,6 +550,30 @@ what export removes.
 None new. F1.1 and F1.2 are carried and resolved in phase 1.
 
 ### FINAL BRIEF
+
+Phase 2 complete. Three tasks landed.
+
+**T2.1 — Unfilled reporting for the scene's computed `scene_beats` field.**
+Implemented in `core/db.py:849-859`, in `get_unfilled_map` (not `_build_scene`
+as the task suggested — the unfilled view reads the DB directly, never calls
+`_build_scene`). A scene that is not `planned` and whose `dramatic_role` is
+`plot_role` or empty is reported as unfilled for `scene_beats` when no record
+exists. `transition` and `non-event` scenes are never reported. Six tests in
+`tests/test_scene_beats.py` cover: drafted plot-role reported, drafted
+empty-role reported, planned skipped, transition skipped, non-event skipped,
+has-beats not reported.
+
+**T2.2 — Soft rules are prose, not code.** Verified: `git grep` confirms
+`turning_point` and `changes` appear only in the schema and the reader. No code
+path enforces the soft rules. The `Findings` section is the surface.
+
+**T2.3 — Export sweep removes orphaned `scene_beats` notes.** The sweep is
+manifest-driven (`tools/story_export.py:96`). A `scene_beats` note whose scene
+is deleted is removed by the manifest, with no new code. Two tests in
+`tests/test_export_sweep.py::TestSceneBeatsSweep` cover: deleted scene sweeps
+its note, hand-authored note survives.
+
+**Tests.** 1184 pass (was 1176). No regressions.
 
 ---
 

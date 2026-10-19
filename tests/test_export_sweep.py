@@ -127,6 +127,37 @@ class TestDeleteSurvivesRoundTrip:
         assert not marcus_dir.exists()
 
 
+class TestSceneBeatsSweep:
+    """T2.3 — the export sweep removes an orphaned scene_beats note."""
+
+    def test_deleted_scene_sweeps_its_scene_beats_note(self, proj):
+        """A scene_beats note whose scene is deleted is removed by the manifest."""
+        p, vault = proj
+        _export(p, vault)  # establishes the manifest
+
+        # Find the scene_beats note for a scene
+        sb_note = note_for(p, "scene_beats", "central-room-day-beats")
+        assert sb_note.exists()
+
+        # Delete the scene in the database
+        _delete(p, "central-room-day")
+
+        # Export again — the sweep should remove the orphaned note
+        result = _export(p, vault)
+        assert str(sb_note.relative_to(p)) in result["files_removed"]
+        assert not sb_note.exists()
+
+    def test_hand_authored_note_in_scene_beats_survives(self, proj):
+        """A hand-authored note the database has never seen is never touched."""
+        p, vault = proj
+        (p / "scene_beats" / "handwritten.md").write_text(
+            "---\nname: Hand\n---\n\n## Conflict\n\nBy a human.\n"
+        )
+        for _ in range(3):
+            _export(p, vault)
+        assert (p / "scene_beats" / "handwritten.md").exists()
+
+
 class TestHandAuthoredNotesAreSafe:
     def test_unknown_note_survives_every_export(self, proj):
         """The property that keeps export from eating a user's own writing."""

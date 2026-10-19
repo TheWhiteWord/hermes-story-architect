@@ -846,6 +846,17 @@ def get_unfilled_map(project_path: Path) -> dict:
                 # not have to reason about that.
                 if scene_loc.get(eid):
                     extra = {**extra, "location": scene_loc[eid]}
+                # The scene's computed `scene_beats` field is reported unfilled
+                # when the record is absent, for scenes that are not `planned`
+                # and whose `dramatic_role` is `plot_role` or empty. A
+                # `transition` or `non-event` scene is never reported.
+                dramatic_role = extra.get("dramatic_role", "")
+                if dramatic_role in ("", "plot_role"):
+                    has_sb = conn.execute(
+                        "SELECT 1 FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+                        (eid,)).fetchone()
+                    if not has_sb:
+                        unfilled_inv.setdefault("scene_beats", []).append(eid)
             elif etype == "arc_beat":
                 if not name:
                     continue  # stub — label stored in name column
