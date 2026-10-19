@@ -53,7 +53,6 @@ DASH.switchGraphTab = function(tab) {
   }
   const netLegend = document.getElementById('graph-legend');
   if (netLegend) netLegend.style.display = (tab === 'network') ? '' : 'none';
-  if (tab === 'arcgraph') { DASH.buildCharsGrid(); DASH.buildArcGraph(); DASH.updateLegend(); }
 }
 
 DASH._origSwitchView = DASH.switchView;

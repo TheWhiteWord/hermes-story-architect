@@ -43,6 +43,7 @@ tests/test_relationship_subfields.py
 tests/test_retrieve_reading.py
 tests/test_root_path_config.py
 tests/test_round_trip.py
+tests/test_scene_beats.py
 tests/test_scene_content_lint.py
 tests/test_scene_dramatic_role.py
 tests/test_scene_heading_lint_integration.py
@@ -58,10 +59,15 @@ tests/test_story_describe.py
 tests/test_story_draft_tool.py
 tests/test_story_load_views.py
 tests/test_story_memory.py
-tests/test_story_view_subplot_milestones.py
+tests/test_story_view_structure.py
 tests/test_unfilled_column_fields.py
 tests/test_unfilled_fields.py
 tests/test_unfilled_truncation.py
-tests/test_value_ownership.py
+tests/test_value_entity.py
+tests/test_value_focus.py
+tests/test_value_graph.py
+tests/test_value_turns.py
+tests/test_values_export_import.py
+tests/test_values_view.py
 tests/test_write_shape.py
 tests/test_writes.py

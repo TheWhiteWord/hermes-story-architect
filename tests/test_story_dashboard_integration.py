@@ -139,7 +139,7 @@ class TestDashboardIntegration:
                         "views/scenes.js", "views/locations.js", "views/plots.js",
                         "views/relationships.js", "views/worlds.js", "views/story.js",
                         "panels/panel-manager.js", "panels/entity-panels.js",
-                        "graph/network.js", "graph/arc-graph.js",
+                        "graph/network.js",
                         "statistics/statistics.js", "statistics/charts.js",
                         "script-view.js"]:
             js_content += Path(f"src/dashboard/js/{js_file}").read_text() + "\n"
@@ -148,10 +148,9 @@ class TestDashboardIntegration:
             "switchView", "showScenePanel", "showCharacterPanel", "showLocationPanel",
             "showPlotPanel", "showRelationshipPanel", "showSequencePanel", "showActPanel",
             "showWorldPanel", "openStatsPanel", "closeStatsPanel", "switchStatsGroup",
-            "sortTable", "switchGraphTab", "resetGraphLayout", "toggleArcSpline",
-            "toggleArcLabels", "toggleArcCharMute", "refreshIndex", "toggleSidebar",
+            "sortTable", "switchGraphTab", "resetGraphLayout", "refreshIndex", "toggleSidebar",
             "loadFromFile", "loadSampleData", "closePanel", "handleFileLoad",
-            "renderBarcodeChart", "filterScenes", "showArcTooltip", "hideArcTooltip",
+            "renderBarcodeChart", "filterScenes",
         ]
         for fn in handler_fns:
             # Must NOT appear as bare function in handler attribute in HTML
@@ -184,8 +183,7 @@ class TestAssemblyIntegrity:
             "locations-view", "plots-view", "relationships-view",
             "worlds-view", "script-view", "stats-panel", "detail-panel",
             "loading-screen", "error-screen", "file-input",
-            "network-canvas", "graph-legend", "chars-grid",
-            "arc-graph-wrap", "arc-legend", "arc-warnings",
+            "network-canvas", "graph-legend",
             "scene-search", "scene-list", "location-list", "plot-list",
             "relationship-list", "world-list", "screenplay-container",
             "panel-body", "panel-footer", "panel-name", "panel-type",

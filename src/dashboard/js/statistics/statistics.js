@@ -220,27 +220,6 @@ DASH.populateStructuralStats = function() {
       </div>`
     ).join('') || '<div class="panel-muted" style="font-size:var(--font-size-xs);">No acts.</div>';
   }
-
-  // Arc design summary
-  const arcContainer = document.getElementById('structStats-arc-summary');
-  if (arcContainer) {
-    const chars = DASH.story.characters || [];
-    const charsWithArcs = chars.filter(c => c.arc_type && c.arc_type !== 'absent' && c.arc_beats_list && c.arc_beats_list.length > 0);
-    const totalArcBeats = chars.reduce((sum, c) => sum + (c.arc_beats_list ? c.arc_beats_list.length : 0), 0);
-    if (charsWithArcs.length > 0) {
-      arcContainer.innerHTML = `<div style="margin-bottom:6px;font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${charsWithArcs.length} characters · ${totalArcBeats} beats designed</div>` +
-        charsWithArcs.map(c => {
-          const col = DASH.roleColor(c.role || c.story_role || '');
-          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <span class="legend-dot" style="background:${col}"></span>
-            <span style="font-size:var(--font-size-sm)">${DASH.escapeHtml(c.name)}</span>
-            <span class="panel-muted" style="margin-left:auto;font-size:var(--font-size-xs)">${c.arc_type} · ${c.arc_beats_list.length} beats</span>
-          </div>`;
-        }).join('');
-    } else {
-      arcContainer.innerHTML = '<div class="panel-muted" style="font-size:var(--font-size-xs);">No character arcs designed.</div>';
-    }
-  }
 }
 
 DASH.switchStatsGroup = function(group, btn) {

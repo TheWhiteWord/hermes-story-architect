@@ -104,12 +104,12 @@ def _scene_beats(conn, scene_id: str) -> dict | None:
     `turning_point` and `scene_beats` computed fields are derived from.
     """
     row = conn.execute(
-        "SELECT id, extra FROM entities "
+        "SELECT id, parent_id, extra FROM entities "
         "WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
         (scene_id,)).fetchone()
     if not row:
         return None
-    return {"id": row[0], **json.loads(row[1] or "{}")}
+    return {"id": row[0], "scene": row[1], **json.loads(row[2] or "{}")}
 
 
 def _project_path(conn) -> Path:

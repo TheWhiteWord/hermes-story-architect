@@ -114,10 +114,6 @@ DASH.showCharacterPanel = function(char) {
       <div class="panel-section-title">Relationships</div>
       ${rels}
     </div>` : ''}
-    <div>
-      <div class="panel-section-title">Arc</div>
-      ${DASH.arcSectionHtml(char)}
-    </div>
     ${DASH.renderSectionsHtml('character', char.id)}
   `;
 

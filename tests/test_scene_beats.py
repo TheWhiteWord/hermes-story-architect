@@ -9,11 +9,16 @@ in Phase 1 (adding `scene_beats` refs to the write path) is not regressed
 by a later refactor. Uses `plot.characters` (ref: character) as the
 concrete case since `scene_beats` schema does not exist yet.
 """
+import json
+
 import pytest
 
+from tools.story_retrieve import handler as retrieve_handler
+from tools.story_search import handler as search_handler
 from core import writes
 from core.db import get_db, get_unfilled_map
 from core.entity import check_references
+from core.drafts import stage as draft_stage
 
 
 def test_check_references_id_only_lookup(fixture_path):
@@ -112,3 +117,198 @@ def test_unfilled_not_reported_when_scene_beats_exists(tmp_path):
     })
     unfilled = get_unfilled_map(p)
     assert "has-beats" not in unfilled.get("scene_beats", [])
+
+
+# ── T3.1: story_retrieve returns scene_beats fields and sections ─────────────
+
+
+class TestRetrieveSceneBeats:
+    """T3.1 — story_retrieve returns a scene_beats entity's fields and sections."""
+
+    def _make_scene_beats(self, p):
+        """Create a scene + scene_beats with nested beats and true_character."""
+        writes.create_entity(p, "character", "t3-alice", {"name": "Alice"})
+        writes.create_entity(p, "act", "t3-act", {"title": "Act I"})
+        writes.create_entity(p, "sequence", "t3-seq",
+                            {"title": "Seq 1", "act_id": "t3-act"})
+        writes.create_entity(p, "scene", "t3-scene", {
+            "title": "Scene 1", "sequence_id": "t3-seq", "act_id": "t3-act",
+        })
+        writes.create_entity(p, "scene_beats", "t3-scene-beats", {
+            "scene": "t3-scene",
+            "driver": "t3-alice",
+            "scene_objective": "Alice wants the truth",
+            "turning_point": "Alice learns the secret",
+            "true_character": [
+                {"character": "t3-alice", "dilemma": "Trust vs. safety",
+                 "choice_reveals": "She chooses trust"}
+            ],
+            "beats": [
+                {
+                    "action": {"by": "t3-alice", "surface": "Asks about the door",
+                               "subtext": "She already knows"},
+                    "reaction": {"by": "t3-alice", "surface": "Silence",
+                                 "subtext": "He is hiding something"},
+                    "gap": "She knows he is lying",
+                    "risk": "He will leave",
+                    "changes": [{"entity": "t3-alice", "change": "Now suspicious"}],
+                }
+            ],
+        }, sections={
+            "Conflict": "Alice wants answers; Kael wants silence.",
+            "Findings": "The scene needs more subtext in the middle.",
+            "Notes": "Tighten the dialogue.",
+        })
+
+    def test_retrieve_returns_nested_beats_and_true_character(self, fixture_path):
+        """The nested shape survives a round trip through story_retrieve."""
+        p = fixture_path
+        self._make_scene_beats(p)
+
+        result = json.loads(retrieve_handler({
+            "project": str(p),
+            "entity_type": "scene_beats",
+            "id": ["t3-scene-beats"],
+            "fields": ["all"],
+            "sections": ["all"],
+        }))
+
+        assert result["entities"], f"Entity not found: {result}"
+        entity = result["entities"][0]
+        assert entity["id"] == "t3-scene-beats"
+
+        fields = entity["fields"]
+        assert fields["scene"] == "t3-scene"
+        assert fields["driver"] == "t3-alice"
+        assert fields["scene_objective"] == "Alice wants the truth"
+        assert fields["turning_point"] == "Alice learns the secret"
+
+        tc = fields["true_character"]
+        assert isinstance(tc, list) and len(tc) == 1
+        assert tc[0]["character"] == "t3-alice"
+        assert tc[0]["dilemma"] == "Trust vs. safety"
+        assert tc[0]["choice_reveals"] == "She chooses trust"
+
+        beats = fields["beats"]
+        assert isinstance(beats, list) and len(beats) == 1
+        beat = beats[0]
+        assert beat["action"]["by"] == "t3-alice"
+        assert beat["action"]["surface"] == "Asks about the door"
+        assert beat["action"]["subtext"] == "She already knows"
+        assert beat["reaction"]["by"] == "t3-alice"
+        assert beat["reaction"]["surface"] == "Silence"
+        assert beat["reaction"]["subtext"] == "He is hiding something"
+        assert beat["gap"] == "She knows he is lying"
+        assert beat["risk"] == "He will leave"
+        assert beat["changes"][0]["entity"] == "t3-alice"
+        assert beat["changes"][0]["change"] == "Now suspicious"
+
+        sections = entity["sections"]
+        assert "Conflict" in sections
+        assert "Findings" in sections
+        assert "Notes" in sections
+
+
+# ── T3.2: scene computed fields are in the load payload and read-only ─────────
+
+
+class TestSceneComputedFields:
+    """T3.2 — turning_point and scene_beats are in the payload and read-only."""
+
+    def _make_scene_with_beats(self, p):
+        writes.create_entity(p, "character", "t3-alice", {"name": "Alice"})
+        writes.create_entity(p, "act", "t3-act", {"title": "Act I"})
+        writes.create_entity(p, "sequence", "t3-seq",
+                            {"title": "Seq 1", "act_id": "t3-act"})
+        writes.create_entity(p, "scene", "t3-scene", {
+            "title": "Scene 1", "sequence_id": "t3-seq", "act_id": "t3-act",
+        })
+        writes.create_entity(p, "scene_beats", "t3-scene-beats", {
+            "scene": "t3-scene",
+            "turning_point": "The moment of change",
+            "beats": [{"action": {"surface": "test"}, "reaction": {"surface": "test"}}],
+        })
+
+    def test_retrieve_scene_returns_computed_fields(self, fixture_path):
+        """story_retrieve on a scene returns turning_point and scene_beats."""
+        p = fixture_path
+        self._make_scene_with_beats(p)
+
+        result = json.loads(retrieve_handler({
+            "project": str(p),
+            "entity_type": "scene",
+            "id": ["t3-scene"],
+            "fields": ["turning_point", "scene_beats"],
+        }))
+
+        entity = result["entities"][0]
+        assert entity["fields"]["turning_point"] == "The moment of change"
+        sb = entity["fields"]["scene_beats"]
+        assert sb is not None
+        assert sb["id"] == "t3-scene-beats"
+        assert sb["scene"] == "t3-scene"
+
+    def test_draft_refuses_computed_fields_on_edit(self, fixture_path):
+        """story_draft with turning_point or scene_beats in data refuses."""
+        p = fixture_path
+        self._make_scene_with_beats(p)
+
+        result = draft_stage(p, [
+            {"op": "edit", "entity_type": "scene", "entity_id": "t3-scene",
+             "data": {"turning_point": "Fake turning point"},
+             "summary": "Try to set turning_point"},
+        ], summary="test")
+
+        assert result["success"] is True
+        assert result["validation"]
+        assert any("turning_point" in v and "read-only" in v
+                    for v in result["validation"])
+
+    def test_draft_refuses_scene_beats_computed_field(self, fixture_path):
+        """story_draft with scene_beats in data refuses."""
+        p = fixture_path
+        self._make_scene_with_beats(p)
+
+        result = draft_stage(p, [
+            {"op": "edit", "entity_type": "scene", "entity_id": "t3-scene",
+             "data": {"scene_beats": {"id": "fake"}},
+             "summary": "Try to set scene_beats"},
+        ], summary="test")
+
+        assert result["success"] is True
+        assert result["validation"]
+        assert any("scene_beats" in v and "read-only" in v
+                    for v in result["validation"])
+
+
+# ── T3.3: story_search reaches scene_beats prose ─────────────────────────────
+
+
+class TestSearchSceneBeats:
+    """T3.3 — story_search reaches a scene_beats note's prose."""
+
+    def test_search_finds_scene_beats_findings(self, fixture_path):
+        """A search for a term in a scene_beats Findings section finds it."""
+        p = fixture_path
+        writes.create_entity(p, "character", "t3-alice", {"name": "Alice"})
+        writes.create_entity(p, "act", "t3-act", {"title": "Act I"})
+        writes.create_entity(p, "sequence", "t3-seq",
+                            {"title": "Seq 1", "act_id": "t3-act"})
+        writes.create_entity(p, "scene", "t3-scene", {
+            "title": "Scene 1", "sequence_id": "t3-seq", "act_id": "t3-act",
+        })
+        writes.create_entity(p, "scene_beats", "t3-scene-beats", {
+            "scene": "t3-scene",
+            "beats": [{"action": {"surface": "test"}, "reaction": {"surface": "test"}}],
+        }, sections={
+            "Findings": "The zorblatt dialogue needs tightening.",
+        })
+
+        result = json.loads(search_handler({
+            "project": str(p),
+            "query": "zorblatt",
+        }))
+
+        assert result["total"] > 0
+        entity_ids = [r["entity_id"] for r in result["results"]]
+        assert "t3-scene-beats" in entity_ids

@@ -557,7 +557,7 @@ def get_project_summary(project_path: Path) -> dict:
         # the scene and the record is read whole — the scene's `turning_point`
         # and `scene_beats` fields are the same data the reader holds.
         scene_beats = {
-            row[1]: {"id": row[0], **extra}
+            row[1]: {"id": row[0], "scene": row[1], **extra}
             for row, extra in (
                 (row, json.loads(row[2]) if row[2] else {})
                 for row in conn.execute(

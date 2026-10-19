@@ -53,20 +53,13 @@ DASH.renderSceneItem = function(s) {
   (s.milestone || []).forEach(m => structTags.push(m));
   const structHtml = roleTags
     + structTags.map(t => `<span class="tag tag-struct">${DASH.escapeHtml(t)}</span>`).join('');
-  // Arc beat indicator dots
-  const arcBeatDots = (s.arc_beats || []).map(ab => {
-    const c = (DASH.story.characters || []).find(x => x.id === ab.character || String(x.id) === String(ab.character));
-    const color = c ? DASH.roleColor(c.role || c.story_role || '') : '#8a8a8a';
-    const label = c ? `${c.name}: ${ab.label || ''}` : '';
-    return `<span class="arc-beat-dot-scene" style="background:${color}" title="${DASH.escapeHtml(label)}"></span>`;
-  }).join('');
   return `
     <div class="scene-item" data-id="${s.id}">
       <div class="scene-number">${String(s.order || 0).padStart(2, '0')}</div>
       <div class="scene-body">
         <div class="scene-heading">${s.title || s.id}</div>
         ${s.heading ? `<div class="panel-muted" style="font-size:var(--font-size-xs);margin-top:2px;">${DASH.escapeHtml(s.heading)}</div>` : ''}
-        <div class="scene-meta">${charTags}${locTags}${structHtml}${arcBeatDots}</div>
+        <div class="scene-meta">${charTags}${locTags}${structHtml}</div>
       </div>
     </div>
   `;

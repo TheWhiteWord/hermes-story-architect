@@ -126,31 +126,6 @@ DASH.buildGraphView = function() {
     DASH.network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
   });
 
-  DASH.network.on('hoverNode', params => {
-    const nodeId = params.node;
-    const char = chars.find(c => c.id === nodeId);
-    if (!char) return;
-    const role = char.role || char.story_role || '';
-    const arcType = char.arc_type || 'absent';
-    const arcValue = char.character_value || '';
-    const arcBeatCount = char.arc_beats_list ? char.arc_beats_list.length : 0;
-    const tt = document.getElementById('arc-beat-tooltip');
-    if (!tt) return;
-    document.getElementById('tt-label').textContent = char.name;
-    document.getElementById('tt-char').textContent = role;
-    let shiftText = '';
-    if (arcBeatCount > 0) {
-      shiftText = arcType + (arcValue ? ' · ' + arcValue : '') + ' · ' + arcBeatCount + ' beats';
-    } else {
-      shiftText = arcType;
-    }
-    document.getElementById('tt-shift').textContent = shiftText;
-    document.getElementById('tt-value').innerHTML = '';
-    tt.classList.add('visible');
-    DASH.positionArcTooltip({ clientX: params.event.clientX, clientY: params.event.clientY });
-  });
-  DASH.network.on('blurNode', () => DASH.hideArcTooltip());
-
   const edgeTooltip = document.createElement('div');
   edgeTooltip.className = 'edge-tooltip';
   document.body.appendChild(edgeTooltip);
@@ -184,13 +159,10 @@ DASH.buildGraphView = function() {
   const seenRoles = new Set();
   chars.forEach(c => seenRoles.add(DASH.getRoleKey(c.role)));
   const roleLegend = [...seenRoles].map(role => {
-    const charsInRole = chars.filter(c => DASH.getRoleKey(c.role) === role);
-    const arcChars = charsInRole.filter(c => c.arc_type && c.arc_type !== 'absent');
-    const arcBadge = arcChars.length > 0 ? ` <span style="color:var(--muted-foreground);font-size:9px">(${arcChars.length} arc)</span>` : '';
     return `
       <div class="legend-item">
         <div class="legend-dot" style="background:${DASH.ROLE_COLORS[role] || '#8a8a8a'}"></div>
-        <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>${arcBadge}
+        <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>
       </div>`;
   }).join('');
 

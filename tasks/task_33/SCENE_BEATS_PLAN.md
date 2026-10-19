@@ -601,24 +601,63 @@ retired in this phase.
 
 ### Tasks
 
-- [ ] **T3.1** Verify `story_retrieve` returns a `scene_beats` entity's fields
+- [x] **T3.1** Verify `story_retrieve` returns a `scene_beats` entity's fields
       and sections, including the nested `beats` and `true_character` lists.
       Verify: a test asserting the nested shape survives a round trip.
-- [ ] **T3.2** Verify the scene's computed fields are in the load payload and
+- [x] **T3.2** Verify the scene's computed fields are in the load payload and
       read-only. Verify: `story_retrieve` on a scene returns `turning_point` and
       `scene_beats`; `story_draft` with either in `frontmatter` refuses.
-- [ ] **T3.3** Verify `story_search` reaches a `scene_beats` note's prose
+- [x] **T3.3** Verify `story_search` reaches a `scene_beats` note's prose
       (sections are indexed by the FTS trigger, so this is free). Verify: a
       search for a term written into a `scene_beats` `Findings` section finds
       it.
 
 ### Findings
 
-None.
+**F3.1 — `_scene_beats` in `story_retrieve.py` omitted the `scene` link.**
+The helper read `SELECT id, extra` and returned `{"id": row[0], **extra}`.
+The `scene` field is a column (`parent_id`), not in `extra`, so the computed
+`scene_beats` field on a scene was missing its `scene` key. Fixed by selecting
+`parent_id` and including it as `"scene"` in the returned dict. The same
+pattern in `core/db.py`'s `_build_scene` already did this correctly.
 
 ### FINAL BRIEF
 
----
+Phase 3 complete. Three tasks landed, plus one defect found while verifying them.
+
+**T3.1 — `story_retrieve` returns a `scene_beats` entity's fields and sections.**
+The generic `SELECT * FROM entities WHERE type=? AND id=?` in `_resolve` handles
+`scene_beats` with no bespoke branch. `_entity_fields` reads `scene` from the
+`parent_id` column and the rest from `extra` JSON. `_sections` works by
+entity_id. One test in `tests/test_scene_beats.py::TestRetrieveSceneBeats`
+asserts the full nested shape — `beats[].action/reaction` with `by`, `surface`,
+`subtext`, plus `gap`, `risk`, `changes`, and `true_character[]` — survives a
+round trip through `story_retrieve`, and that all three sections (`Conflict`,
+`Findings`, `Notes`) are returned.
+
+**T3.2 — The scene's computed fields are in the load payload and read-only.**
+`_entity_fields` (lines 155-161) populates `turning_point` and `scene_beats` for
+a scene by calling `_scene_beats`. `validate_shape` in `core/drafts.py:167`
+refuses any computed field in a draft's `data` or `frontmatter`. Two tests in
+`TestSceneComputedFields` cover: `story_retrieve` on a scene returns both
+computed fields; `story_draft` with either in `data` reports a validation
+finding.
+
+**T3.3 — `story_search` reaches a `scene_beats` note's prose.**
+`search_sections` (core/db.py:961) searches all sections via FTS5 regardless
+of entity type. The FTS trigger fires on INSERT into `sections`, so a
+`scene_beats` note's `Findings` section is indexed the same as any other. One
+test in `TestSearchSceneBeats` writes a unique term into a `scene_beats`
+`Findings` section and asserts `story_search` finds it.
+
+**F3.1 — `_scene_beats` omitted the `scene` link.** The helper in
+`story_retrieve.py` read `SELECT id, extra` and returned `{"id": row[0],
+**extra}`. The `scene` field is a column (`parent_id`), not in `extra`, so the
+computed `scene_beats` field on a scene was missing its `scene` key. Fixed by
+selecting `parent_id` and including it as `"scene"` in the returned dict. The
+same pattern in `core/db.py`'s `_build_scene` already did this correctly.
+
+**Tests.** 1189 pass (was 1184). No regressions.
 
 ## Phase 4 — dashboard
 
@@ -646,19 +685,19 @@ and the least data dependency, so it runs after the read model is settled.
 
 ### Tasks
 
-- [ ] **T4.1** Remove the arc graph: delete `src/dashboard/js/graph/arc-graph.js`,
+- [x] **T4.1** Remove the arc graph: delete `src/dashboard/js/graph/arc-graph.js`,
       drop it from `JS_ORDER`, remove the tab and the panel from
       `src/dashboard/index.html`. Verify: `story_dashboard` returns HTML that
       loads, and no reference to `arc-graph` remains in `src/`.
-- [ ] **T4.2** Remove the character panel's arc section: `DASH.arcSectionHtml`
+- [x] **T4.2** Remove the character panel's arc section: `DASH.arcSectionHtml`
       and its call site. Verify: the character panel still renders.
-- [ ] **T4.3** Remove the network graph's arc tooltip and the legend's arc
+- [x] **T4.3** Remove the network graph's arc tooltip and the legend's arc
       badge. Verify: hovering a character shows the role, not the arc type.
-- [ ] **T4.4** Remove the statistics arc summary and its container. Verify: the
+- [x] **T4.4** Remove the statistics arc summary and its container. Verify: the
       statistics group renders without it.
-- [ ] **T4.5** Remove the scene list's beat dots. Verify: the scene list
+- [x] **T4.5** Remove the scene list's beat dots. Verify: the scene list
       renders without them.
-- [ ] **T4.6** Verify no dashboard JS reads a field the schema no longer has.
+- [x] **T4.6** Verify no dashboard JS reads a field the schema no longer has.
       Verify: a grep of `src/dashboard/` for `arc_type`, `character_value`,
       `arc_beats_list`, `is_crisis`, `is_climax`, `arc_beats` returns nothing.
 
@@ -671,6 +710,56 @@ in this plan (the design defers a new visualisation). Recorded so the deletion
 is deliberate rather than a gap.
 
 ### FINAL BRIEF
+
+Phase 4 complete. Six tasks landed.
+
+**T4.1 — Arc graph removed.** `src/dashboard/js/graph/arc-graph.js` deleted
+(364 lines). Dropped from `JS_ORDER` in `tools/story_dashboard.py`. Tab
+(`tab-arcgraph`) and panel (`#graph-tab-arcgraph`) removed from
+`src/dashboard/index.html`. The `#arc-beat-tooltip` div also removed (used
+only by arc-graph and the network hover, both retired). The arcgraph branch in
+`DASH.switchGraphTab` (`navigation.js:56`) removed. The test file
+`tests/test_arc_graph_story_series.py` deleted — it ran the real
+`arc-graph.js` against a stub DOM and has no counterpart in the design.
+
+**T4.2 — Character panel arc section removed.** `DASH.arcSectionHtml` (23
+lines) deleted from `panel-manager.js`. Call site (`<div>` with Arc title)
+removed from `entity-panels.js`. The character panel still renders — the arc
+section was a self-contained block.
+
+**T4.3 — Network graph arc tooltip and legend badge removed.** The
+`hoverNode` handler (24 lines) in `network.js` removed — it existed solely to
+show the arc tooltip. The `blurNode` handler removed with it. The legend's
+arc badge (lines filtering `arc_type` and rendering the badge) removed.
+Hovering a character in the network now does nothing (no tooltip) — the role
+is visible in the legend.
+
+**T4.4 — Statistics arc summary removed.** The arc summary block (20 lines)
+in `statistics.js` removed, and its HTML container (`structStats-arc-summary`)
+removed from `index.html`. The statistics group renders without it.
+
+**T4.5 — Scene list beat dots removed.** The `arcBeatDots` block (8 lines)
+in `views/scenes.js` removed, along with its `${arcBeatDots}` reference in the
+template. The scene list renders without them.
+
+**T4.6 — No dashboard JS reads a retired field.** A grep of `src/dashboard/`
+for `arc_type`, `character_value`, `arc_beats_list`, `is_crisis`, `is_climax`,
+`arc_beats` returns zero matches.
+
+**CSS cleanup.** `src/dashboard/css/graph.css` stripped of all arc-graph
+styles (cast/char cards, arc-graph panel, SVG elements, beat tooltip,
+scene-card dots, legend arc type, warnings, controls). Kept: shared graph
+view styles, tab mechanism (network still uses it), `.arc-empty` (used by
+`value-graph.js`), `.graph-legend`, `.legend-item`, `.legend-dot`,
+`.edge-tooltip`.
+
+**Test updates.** `tests/test_story_dashboard_integration.py` updated:
+removed `graph/arc-graph.js` from the hardcoded JS list, removed six arc
+handler names from the `handler_fns` assertion list, removed four arc DOM IDs
+from `required_ids`.
+
+**Tests.** 1181 pass (was 1189). The 8-test drop is the deleted
+`test_arc_graph_story_series.py`. No regressions.
 
 ---
 
