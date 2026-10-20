@@ -636,10 +636,11 @@ class TestDispatch:
     def test_unknown_view_lists_the_valid_ones(self, project):
         r = load(project, view="nonsense")
         assert "unfilled" in r["error"]
-        for v in ("dramatic_elements", "relationship", "unfilled", "values"):
+        for v in ("dramatic_elements", "relationship", "unfilled", "values",
+                  "track"):
             assert v in r["error"]
 
     def test_every_view_is_documented_in_the_schema(self, project):
         from tools.story_load import SCHEMA
         assert set(SCHEMA["properties"]["view"]["enum"]) == {
-            "dramatic_elements", "relationship", "unfilled", "values"}
+            "dramatic_elements", "relationship", "unfilled", "values", "track"}

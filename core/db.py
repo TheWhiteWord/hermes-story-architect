@@ -283,6 +283,20 @@ def get_memory_block(project_path: Path) -> dict:
     }
 
 
+def scene_order(act_id, seq_id, scene_id, act_key, seq_key, scene_key) -> tuple:
+    """The story order of one scene: (act, sequence, scene).
+
+    Sequence order keys restart in every act, so a scene's position is only
+    meaningful once its act and sequence are part of the key. Scenes with no
+    act or sequence order (a scene with no sequence) sort first, and the id
+    breaks ties, so the order is total and stable across calls.
+    """
+    return (act_key if act_key is not None else 0,
+            seq_key if seq_key is not None else 0,
+            scene_key if scene_key is not None else 0,
+            scene_id)
+
+
 def get_scene_value_turns(project_path: Path) -> list[dict]:
     """Every scene's value turns, each tagged with plot/act/sequence and story order.
 
@@ -311,13 +325,10 @@ def get_scene_value_turns(project_path: Path) -> list[dict]:
             "LEFT JOIN entities pp ON p.parent_id = pp.id "
             "WHERE e.type='scene' AND e.is_deleted=0").fetchall()
         out: list[dict] = []
-        for scene_id, extra_json, seq_id, act_id, scene_order, \
-                seq_order, act_order in rows:
+        for scene_id, extra_json, seq_id, act_id, scene_key, \
+                seq_key, act_key in rows:
             extra = json.loads(extra_json) if extra_json else {}
-            order = (act_order if act_order is not None else 0,
-                     seq_order if seq_order is not None else 0,
-                     scene_order if scene_order is not None else 0,
-                     scene_id)
+            order = scene_order(act_id, seq_id, scene_id, act_key, seq_key, scene_key)
             for turn in extra.get("value_turns") or []:
                 if not isinstance(turn, dict):
                     continue

@@ -18,7 +18,7 @@ SCHEMA = {
         },
         "view": {
             "type": "string",
-            "enum": ["dramatic_elements", "relationship", "unfilled", "values"],
+            "enum": ["dramatic_elements", "relationship", "unfilled", "values", "track"],
             "description": "Optional focused view. Omit for the base structural map. "
                            "'dramatic_elements' = per-scene dramatic roles, milestones, and "
                            "the scene's objective, turning point and scene_beats pointer — "
@@ -26,12 +26,13 @@ SCHEMA = {
                            "'relationship' = the full relationship graph with perspectives. "
                            "'unfilled' = what is still incomplete, to answer 'what next?'. "
                            "'values' = the value schemas and their turns, for a scene, "
-                           "unit, or the whole project."
+                           "unit, or the whole project. "
+                           "'track' = one entity across the story, in story order."
         },
 
         "act": {
             "type": "string",
-            "description": "For view='dramatic_elements' or 'values': limit to one act id. "
+            "description": "For view='dramatic_elements', 'values' or 'track': limit to one act id. "
                            "Defaults to all."
         },
         "plot": {
@@ -51,7 +52,7 @@ SCHEMA = {
         },
         "sequence": {
             "type": "string",
-            "description": "For view='values': limit to one sequence id. Defaults to all."
+            "description": "For view='values' or 'track': limit to one sequence id. Defaults to all."
         },
         "scene": {
             "type": "string",
@@ -62,7 +63,9 @@ SCHEMA = {
         "value": {
             "type": "string",
             "description": "For view='values' with plot/sequence/act: narrow to one "
-                           "value name. Defaults to all the unit's values."
+                           "value name. Defaults to all the unit's values. "
+                           "For view='track': narrow the header `values` and every "
+                           "row's `effects` to one value name."
         },
         "field": {
             "type": "string",
@@ -73,7 +76,10 @@ SCHEMA = {
         "entity": {
             "type": "string",
             "description": "For view='unfilled': one entity id. Answers 'what did I skip on this?'. "
-                           "Pair with `field` to ask both ways at once."
+                           "Pair with `field` to ask both ways at once. "
+                           "For view='track' (required): one entity id — a character, "
+                           "relationship, location or world. Returns its journey across "
+                           "the scenes that record it, in story order."
         }
     },
     "required": ["project"]
@@ -143,8 +149,31 @@ def _extended_view(conn, project_path, view: str, args: dict):
         return _view_unfilled(project_path, args)
     if view == "values":
         return _view_values(conn, project_path, args)
+    if view == "track":
+        return _view_track(project_path, args)
     return {"error": f"Unknown view: {view}. Valid: "
-                     f"dramatic_elements, relationship, unfilled, values."}
+                     f"dramatic_elements, relationship, unfilled, values, track."}
+
+
+def _view_track(project_path, args: dict) -> dict:
+    """One entity's journey across the scenes that record it.
+
+    A character reads its driving, its true-character moments, its value path
+    and the effects recorded for it; a location, world or relationship reduces
+    to the scenes where its state changed. The reader is `core.track`, which
+    owns the shape; this is only the call.
+    """
+    from core.track import for_entity
+
+    entity = args.get("entity")
+    if not entity:
+        return {"view": "track",
+                "error": "view='track' needs `entity` — an entity id. "
+                         "Pass one, or use view='unfilled' with `entity` "
+                         "to ask what is still missing on it."}
+    return for_entity(project_path, entity,
+                      act=args.get("act"), sequence=args.get("sequence"),
+                      value=args.get("value"))
 
 
 def _view_dramatic_elements(conn, args: dict) -> dict:
