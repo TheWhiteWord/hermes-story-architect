@@ -496,7 +496,8 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                             if k in ENTITY_SCHEMAS["scene_beats"]}}
             check_references(project_path, "scene_beats", merged_sb)
             validate_beat_references(project_path, merged_sb.get("beats", []),
-                                     merged_sb.get("true_character", []))
+                                     merged_sb.get("true_character", []),
+                                     merged_sb.get("changes", []))
             _validate_beat_content(merged_sb.get("beats", []))
             # The one-record rule, only when the scene link moves: re-validating
             # a record that still points at its own scene is checking it against

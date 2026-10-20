@@ -150,10 +150,9 @@ class TestRetrieveSceneBeats:
                     "reaction": {"by": "t3-alice", "surface": "Silence",
                                  "subtext": "He is hiding something"},
                     "gap": "She knows he is lying",
-                    "risk": "He will leave",
-                    "changes": [{"entity": "t3-alice", "change": "Now suspicious"}],
                 }
             ],
+            "changes": [{"entity": "t3-alice", "change": "Now suspicious"}],
         }, sections={
             "Conflict": "Alice wants answers; Kael wants silence.",
             "Findings": "The scene needs more subtext in the middle.",
@@ -199,9 +198,13 @@ class TestRetrieveSceneBeats:
         assert beat["reaction"]["surface"] == "Silence"
         assert beat["reaction"]["subtext"] == "He is hiding something"
         assert beat["gap"] == "She knows he is lying"
-        assert beat["risk"] == "He will leave"
-        assert beat["changes"][0]["entity"] == "t3-alice"
-        assert beat["changes"][0]["change"] == "Now suspicious"
+        # The beat is action, reaction, gap — nothing else.
+        assert set(beat) == {"action", "reaction", "gap"}
+
+        # `changes` moved up: the scene's closing state, not one exchange's.
+        changes = fields["changes"]
+        assert changes[0]["entity"] == "t3-alice"
+        assert changes[0]["change"] == "Now suspicious"
 
         sections = entity["sections"]
         assert "Conflict" in sections
@@ -318,6 +321,80 @@ class TestSceneComputedFields:
 
 
 # ── T3.3: story_search reaches scene_beats prose ─────────────────────────────
+
+class TestBeatShape:
+    """Issue 3 + 5 — the beat is action, reaction, gap; `risk` is gone and
+    `changes` moved up to the record."""
+
+    def _parents(self, p, slug="shape"):
+        writes.create_entity(p, "character", "shape-alice", {"name": "Alice"})
+        writes.create_entity(p, "act", "shape-act", {"title": "Act I"})
+        writes.create_entity(p, "sequence", "shape-seq",
+                             {"title": "Seq", "act_id": "shape-act"})
+        writes.create_entity(p, "scene", slug, {
+            "title": "Scene", "sequence_id": "shape-seq", "act_id": "shape-act"})
+        return slug
+
+    def test_the_beat_has_exactly_action_reaction_and_gap(self, fixture_path):
+        p = fixture_path
+        slug = self._parents(p)
+        writes.create_entity(p, "scene_beats", f"{slug}-beats", {
+            "scene": slug,
+            "beats": [{"action": {"surface": "Asks"},
+                       "reaction": {"surface": "Silence"},
+                       "gap": "She knows he is lying"}],
+        })
+        fields = json.loads(retrieve_handler({
+            "project": str(p), "entity_type": "scene_beats",
+            "id": [f"{slug}-beats"], "fields": ["all"],
+        }))["entities"][0]["fields"]
+        assert set(fields["beats"][0]) == {"action", "reaction", "gap"}
+
+    def test_risk_is_not_a_field_any_more(self, fixture_path):
+        """The retired field must not be described, and must not be writable."""
+        from tools.story_describe import handler as describe_handler
+        schema = json.loads(describe_handler({"entity_type": "scene_beats"}))
+        beat = schema["entity_schemas"]["scene_beats"]["beats"]["sub_fields"]
+        assert "risk" not in beat
+        assert set(beat) == {"action", "reaction", "gap"}
+
+    def test_changes_lives_at_the_top_level(self, fixture_path):
+        p = fixture_path
+        slug = self._parents(p)
+        writes.create_entity(p, "scene_beats", f"{slug}-beats", {
+            "scene": slug,
+            "beats": [{"action": {"surface": "Asks"},
+                       "reaction": {"surface": "Silence"},
+                       "gap": "x"}],
+            "changes": [{"entity": "shape-alice", "change": "Now suspicious"}],
+        })
+        fields = json.loads(retrieve_handler({
+            "project": str(p), "entity_type": "scene_beats",
+            "id": [f"{slug}-beats"], "fields": ["all"],
+        }))["entities"][0]["fields"]
+        assert fields["changes"] == [
+            {"entity": "shape-alice", "change": "Now suspicious"}]
+
+    def test_a_changes_entity_must_resolve(self, fixture_path):
+        """`changes[].entity` is checked where the field now lives."""
+        p = fixture_path
+        slug = self._parents(p)
+        with pytest.raises(ValueError, match="changes\\[0\\].entity"):
+            writes.create_entity(p, "scene_beats", f"{slug}-beats", {
+                "scene": slug,
+                "beats": [{"action": {"surface": "Asks"},
+                           "reaction": {"surface": "Silence"},
+                           "gap": "x"}],
+                "changes": [{"entity": "ghost-entity", "change": "x"}],
+            })
+
+    def test_effects_stay_on_the_scene(self, fixture_path):
+        """`changes` is the state of any entity; `effects` still ties a value
+        shift to a plot protagonist. Neither replaces the other."""
+        from tools.story_describe import handler as describe_handler
+        scene = json.loads(describe_handler({"entity_type": "scene"}))
+        effects = scene["entity_schemas"]["scene"]["value_turns"]["sub_fields"]["effects"]
+        assert "conflict_level" in effects["sub_fields"]["levels"]["sub_fields"]
 
 
 class TestSearchSceneBeats:

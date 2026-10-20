@@ -73,6 +73,31 @@ building blocks that shape the turning of a scene.
 - **Surveying the beats reveals the shape of the scene.** Even behavior that
   looks random has a design, and the moment the largest gap opened between
   expectation and result is the turning point.
+- **A beat is three things: `action`, `reaction`, `gap`.** Nothing else belongs
+  in it. What a character stands to lose is not a field — it is read from the
+  chain of expectation, gap and the next action.
+
+**The gap opens; it does not close.** It is the break between what was expected
+and what came back, written at the moment it opens. What the character does
+about it is the *next* beat's action, and writing it into the gap closes the
+beat and swallows that action.
+
+| Term | What it is |
+| --- | --- |
+| Gap | The break between expectation and result at a beat. It opens there and is not closed there. The next action responds to it and opens a larger one. |
+| Turning point | The moment the scene's largest gap opens and the value turns. It starts the closing state and does not resolve the gap. |
+| Escalation | The pattern of successive gaps, each larger. It is read across steps and never stored. |
+
+**Mere activity is an exchange where the expectation is met.** Nothing opens,
+so `gap` stays empty — an empty gap is a valid beat, not an incomplete one.
+
+**A good gap and a bad one.**
+
+- Good: "Expects the key to be handed over; is refused."
+- Bad: "Expects the key to be handed over; is refused, so she backs down."
+
+The bad one reports the response, so the gap is closed inside the beat and the
+next action has nothing left to do. Stop at the break.
 
 ## Text and subtext
 

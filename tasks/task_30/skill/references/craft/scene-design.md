@@ -130,20 +130,40 @@ written first, not in what ends up true:
 
 Either way the two records describe one scene, so **after writing or reworking
 `scene_beats`, check whether the scene's own fields still hold.** The ones that
-can move are `scene_objective`, `effects` (on the value turns), and `changes`
-(on the beats); fill `gap` and `risk` where something moved, and **leave the
-rest empty** — a field that did not change is not a field to fill.
+can move are `scene_objective`, `effects` (on the value turns) and `changes`
+(on the record); fill `gap` where something moved, and **leave the rest empty**
+— a field that did not change is not a field to fill.
 
 **What the record holds.** `scene` (its link to the scene, required), the
-driver, the objective, the turning point, the true-character choices, and the
-ordered beats. Named: `driver`,
-`scene_objective`, `turning_point` (read back onto the scene as a computed
-field), `true_character` (a `character` with a `dilemma` and what the
-`choice_reveals`), and `beats` — each beat with an `action` side and a
-`reaction` side, each of those with a `by`, a `surface` and a `subtext`, plus
-the beat's `gap`, `risk`, and `changes` (each a `change` for an `entity`).
-Field shapes are in `story_describe`; what a beat is for is
-`references/theory/scene-and-beat.md`.
+driver, the objective, the turning point, the true-character choices, what
+changed, and the ordered beats. Named: `driver`, `scene_objective`,
+`turning_point` (read back onto the scene as a computed field), `true_character`
+(a `character` with a `dilemma` and what the `choice_reveals`), `changes` (one
+`change` for an `entity` whose state is different when the scene closes), and
+`beats` — each beat with an `action` side and a `reaction` side, each of those
+with a `by`, a `surface` and a `subtext`, plus the beat's `gap`. A beat is three
+things and nothing more. Field shapes are in `story_describe`; what a beat is
+for is `references/theory/scene-and-beat.md`.
+
+**`risk` is gone.** It recorded a trend as if it were a datum, and it repeated
+the gap and the next action's subtext. What a character stands to lose is read
+from the chain — expectation, gap, the next action — not written down.
+
+**`changes` is scene-level, not beat-level.** A beat changes *behaviour*; what
+is different for an entity is a fact about the scene. So `changes` sits beside
+`beats`, one entry per entity whose state differs at the close. The scene's own
+`effects` stay as they are: they tie a value shift to a plot protagonist and a
+conflict level, while `changes` records the state of any entity — a secondary
+character, an antagonist, a relationship, a place.
+
+**Write the beats first, then derive `changes`.** Include secondary characters
+and antagonists whenever their state shifts. **Write the state, not the event:**
+"now willing to confront the board" is a change; "confronts the board" is an
+action. **Do not pad** — no entry means unchanged.
+
+**Reading it.** A character's row is built from `driver`, `changes`,
+`true_character` and, for protagonists, the scene `effects` — never the beats.
+Attribution to a specific exchange stays in the beat prose.
 
 **Reading the record: the scene gives you its id, not its contents.** A
 scene's `scene_beats` field is the *slug* of the record, because the id is
@@ -164,10 +184,10 @@ which circle; `Findings` is the evaluation of the scene; `Notes` is free-form.
 → `../model/entity-sections.md`
 
 **The soft rules, and where they go.** A value turn with no turning point, a
-turning point in a flat scene, scene `effects` that disagree with beat
-`changes`, a character the record names who is not in the cast — none of these
-is refused by a write. They are judgements, and `Findings` is where they are
-written. → `../model/entity-sections.md`
+turning point in a flat scene, scene `effects` that disagree with `changes`, a
+character the record names who is not in the cast — none of these is refused by
+a write. They are judgements, and `Findings` is where they are written.
+→ `../model/entity-sections.md`
 
 ## The couplings
 

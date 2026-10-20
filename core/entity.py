@@ -833,7 +833,8 @@ def validate_scene_beats(project_path, merged: dict) -> None:
                              f"Edit it instead of creating another.")
         check_references(project_path, "scene_beats", merged)
         validate_beat_references(project_path, merged.get("beats", []),
-                                 merged.get("true_character", []))
+                                 merged.get("true_character", []),
+                                 merged.get("changes", []))
         _validate_beat_content(merged.get("beats", []))
     finally:
         conn.close()
@@ -853,13 +854,17 @@ def _resolve_any(conn, slug: str, types) -> bool:
         f"({','.join('?' * len(types))})", (slug, *types)).fetchone())
 
 
-def validate_beat_references(project_path, beats, true_character) -> None:
+def validate_beat_references(project_path, beats, true_character, changes=None) -> None:
     """Raise ValueError on a `by` or `changes[].entity` that resolves to nothing.
 
     `check_references` resolves a `ref` against exactly one type, and these two
     sites name three and four — so they are checked here, beside it, and never
     by the same code path twice. `true_character[].character` IS a declared
     `ref: character`, so it is not repeated here.
+
+    `changes` moved from the beat to the top level of the record (it is the
+    scene's closing state, not one exchange's), so it is passed separately
+    rather than read out of each beat.
     """
     from core.db import get_db
 
@@ -880,17 +885,16 @@ def validate_beat_references(project_path, beats, true_character) -> None:
                     raise ValueError(
                         f"{at}.{side}.by '{slug}' is not a character, "
                         f"location or world")
-            changes = beat.get("changes")
-            if not isinstance(changes, list):
+        if not isinstance(changes, list):
+            return
+        for j, change in enumerate(changes):
+            if not isinstance(change, dict):
                 continue
-            for j, change in enumerate(changes):
-                if not isinstance(change, dict):
-                    continue
-                slug = str(change.get("entity") or "")
-                if slug and not _resolve_any(conn, slug, _CHANGE_TYPES):
-                    raise ValueError(
-                        f"{at}.changes[{j}].entity '{slug}' is not a "
-                        f"character, relationship, location or world")
+            slug = str(change.get("entity") or "")
+            if slug and not _resolve_any(conn, slug, _CHANGE_TYPES):
+                raise ValueError(
+                    f"changes[{j}].entity '{slug}' is not a "
+                    f"character, relationship, location or world")
     finally:
         conn.close()
 
@@ -899,9 +903,9 @@ def _validate_beat_content(beats) -> None:
     """Raise ValueError on a beat that holds nothing on either side.
 
     A beat is two-sided by definition, so "no content" means no content on
-    either side: no surface or subtext on `action` or `reaction`, and no gap,
-    risk or changes. Such an entry is an empty shell, and the design calls a
-    beat with no gap and no changes mere activity rather than action.
+    either side: no surface or subtext on `action` or `reaction`, and no gap.
+    Such an entry is an empty shell, and the design calls a beat with no gap
+    mere activity rather than action.
     """
     if not isinstance(beats, list):
         return
@@ -913,10 +917,9 @@ def _validate_beat_content(beats) -> None:
         reaction = reaction if isinstance(reaction, dict) else {}
         if not (action.get("surface") or reaction.get("surface")
                 or action.get("subtext") or reaction.get("subtext")
-                or beat.get("gap") or beat.get("risk") or beat.get("changes")):
+                or beat.get("gap")):
             raise ValueError(
-                f"Beat {i} has no content: no surface, subtext, gap, risk, "
-                f"or changes.")
+                f"Beat {i} has no content: no surface, subtext, or gap.")
 
 
 def validate_scene_plot_roles(project_path, entries) -> None:

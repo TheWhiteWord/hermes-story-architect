@@ -201,7 +201,7 @@ ENTITY_SCHEMAS = {
         # base `story_load` map from growing with every beat. `ref` is
         # declaration only: the field is computed, so no write path ever carries
         # it into `check_references`.
-        "turning_point": {"type": "string", "default": "", "optional": True, "computed": True, "description": "The moment of the major gap, read from this scene's scene_beats (read-only)"},
+        "turning_point": {"type": "string", "default": "", "optional": True, "computed": True, "description": "The moment the scene's largest gap opens and the value turns. One sentence. It starts the scene's closing state and does not resolve the gap. Read from this scene's scene_beats (read-only)."},
         "scene_beats": {"type": "string", "default": "", "optional": True, "computed": True, "ref": "scene_beats", "description": "Slug of this scene's scene_beats record (read-only). Read the record itself with story_retrieve on scene_beats and this id. Empty when the scene has none."},
         "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "How this scene functions dramatically. One of: plot_role, transition, non-event. 'plot_role' (or empty) means the role is defined per plot in plot_roles — do NOT repeat it here. 'transition' and 'non-event' are the only values that serve no plot, and they are mutually exclusive with plot_roles: setting one requires plot_roles to be empty."},
         # The write side of a plot role. Every entry names its own plot, so one
@@ -280,7 +280,7 @@ ENTITY_SCHEMAS = {
         "scene": {"type": "string", "default": "", "optional": False, "description": "Slug of an existing scene", "ref": "scene"},
         "driver": {"type": "string", "default": "", "optional": True, "description": "Slug of the character who drives the scene", "ref": "character"},
         "scene_objective": {"type": "string", "default": "", "optional": True, "description": "The driver's immediate desire. One sentence."},
-        "turning_point": {"type": "string", "default": "", "optional": True, "description": "The moment of the major gap, read from how the beats relate. One sentence. Surfaces on the scene as a computed field."},
+        "turning_point": {"type": "string", "default": "", "optional": True, "description": "The moment the scene's largest gap opens and the value turns. One sentence. It starts the scene's closing state and does not resolve the gap. Surfaces on the scene as a computed field."},
         # A true choice is a dilemma; it is where true character shows. The
         # source gives no count per scene, so the list holds none, one or
         # several, and most scenes hold none. `character` may differ from
@@ -294,16 +294,30 @@ ENTITY_SCHEMAS = {
                 "choice_reveals": {"type": "string", "description": "What the choice shows about who the character is"},
             },
         },
+        # What changed, at the end of the scene. The beats change behaviour;
+        # this is the state those changes leave behind, assessed over the whole
+        # scene rather than one exchange. One entry per entity that is different
+        # when the scene closes — a character, a relationship, a location or a
+        # world. No entry means unchanged. Scene `effects` stay as they are: they
+        # tie a value shift to a plot protagonist and a level, while this records
+        # the state of any entity.
+        "changes": {
+            "type": "list", "default": [], "optional": True,
+            "description": "One entry per entity whose state is different at the end of the scene. Only where something changed. No entry means unchanged.",
+            "sub_fields": {
+                "entity": {"type": "string", "description": "The character, relationship, location or world whose state changed. Must exist."},
+                "change": {"type": "string", "description": "One sentence, readable without the beats: the new state, not the event. For a character: what they now believe or know, want or are willing to do, or how their situation, standing or bond with another has shifted. For a relationship, location or world: its changed condition."},
+            },
+        },
         # The beats of action and reaction. Each side carries its own `by`,
         # because "the same character on both sides means inner conflict" is a
         # real, checkable fact and needs two `by` fields to express it — the
-        # flattened reading of the design's diagram could not.
-        # `by` and `changes[].entity` name three and four types respectively,
-        # which no single `ref` value can express; validate_beat_references
-        # resolves both.
+        # flattened reading of the design's diagram could not. `by` names three
+        # types, which no single `ref` value can express; validate_beat_references
+        # resolves it.
         "beats": {
             "type": "list", "default": [], "optional": True,
-            "description": "Ordered beats of action and reaction. A beat with no gap, risk, changes, surface or subtext is mere activity, not action.",
+            "description": "Ordered beats of action and reaction. A beat with no gap, surface or subtext is mere activity, not action.",
             "sub_fields": {
                 "action": {"type": "object", "description": "The acting side of the beat",
                            "sub_fields": {
@@ -317,13 +331,11 @@ ENTITY_SCHEMAS = {
                                  "surface": {"type": "string", "description": "What is shown or said"},
                                  "subtext": {"type": "string", "description": "The underlying action, as an active gerund phrase"},
                              }},
-                "gap": {"type": "string", "description": "What the character expected and what came back. One sentence. Empty when the beat is mere activity."},
-                "risk": {"type": "string", "description": "What the character now stands to lose, carried into the next action. One sentence."},
-                "changes": {"type": "list", "description": "What this exchange changed, for anyone or anything",
-                            "sub_fields": {
-                                "entity": {"type": "string", "description": "Slug of a character, relationship, location or world"},
-                                "change": {"type": "string", "description": "One sentence: what this exchange changed for that entity"},
-                            }},
+                # The break between expectation and result, at the moment it
+                # opens — and not closed there. What follows from it belongs to
+                # the next beat's action, so a gap that reports the response
+                # closes it inside the beat and swallows the next action.
+                "gap": {"type": "string", "description": "The break between what was expected and what came back, at the moment it opens. One sentence. Stop at the break: what follows from it is the next beat's action. Empty when the beat is mere activity."},
             },
         },
     },
