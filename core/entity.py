@@ -153,9 +153,8 @@ def _validate_field(entity_type: str, field: str, value, meta: dict,
     the path, so a nested one is findable by index rather than by reading the
     whole field back.
 
-    `object` is a map keyed by entity (relationship.perspectives): the keys
-    are the entities and the values carry the declarations' subjects, so the
-    sub-fields apply to each VALUE.
+    An `object` holds its sub-fields under its own keys — `keyed: True` instead
+    means a map whose keys are entities, so the sub-fields apply to each value.
     """
     sub_fields = meta.get("sub_fields") or {}
     keys = ", ".join(sub_fields)
@@ -181,6 +180,11 @@ def _validate_field(entity_type: str, field: str, value, meta: dict,
             warnings.append(
                 f"{at} must be an object with keys [{keys}] "
                 f"— got {type(value).__name__}")
+            return
+        if not meta.get("keyed"):
+            # A fixed-key object: the declaration names its own keys.
+            for key, key_meta in sub_fields.items():
+                _validate_sub_field(at, value, key, key_meta, warnings)
             return
         # A map keyed by entity (perspectives): the keys are the entities
         # and the values carry the declarations' subjects, so the sub-fields

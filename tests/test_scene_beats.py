@@ -421,3 +421,68 @@ class TestSearchSceneBeats:
         assert result["total"] > 0
         entity_ids = [r["entity_id"] for r in result["results"]]
         assert "t3-scene-beats" in entity_ids
+
+
+class TestBeatObjectShape:
+    """A beat's `action`/`reaction` are FIXED-KEY objects, not maps.
+
+    `_validate_field` read every `object` as a map keyed by entity (the
+    `relationship.perspectives` shape), so it validated a beat side's *values*
+    and reported `by`, `surface` and `subtext` each as "holds a str". Every
+    well-formed beat was therefore refused at staging — while `create_entity`
+    accepted the same record, so the two write paths disagreed about the shape
+    the schema declares. `perspectives` is the only declared map and carries
+    `keyed: True`; these are the only fixed-key objects.
+    """
+
+    def _parents(self, p, slug="objshape"):
+        writes.create_entity(p, "character", "obj-alice", {"name": "Alice"})
+        writes.create_entity(p, "act", "obj-act", {"title": "Act I"})
+        writes.create_entity(p, "sequence", "obj-seq",
+                             {"title": "Seq", "act_id": "obj-act"})
+        writes.create_entity(p, "scene", slug, {
+            "title": "Scene", "sequence_id": "obj-seq", "act_id": "obj-act"})
+        return slug
+
+    def _op(self, slug):
+        return [{"op": "create", "type": "scene_beats", "id": f"{slug}-beats",
+                 "summary": "beats",
+                 "frontmatter": {
+                     "scene": slug,
+                     "beats": [{
+                         "action": {"by": "obj-alice", "surface": "Asks",
+                                    "subtext": "pressing for the answer"},
+                         "reaction": {"by": "obj-alice", "surface": "Silence",
+                                      "subtext": "withholding it"},
+                         "gap": "Expects the answer; gets none."}]}}]
+
+    def test_a_well_formed_beat_stages_clean(self, fixture_path):
+        """The shape the schema declares must produce no findings."""
+        slug = self._parents(fixture_path)
+        result = draft_stage(fixture_path, self._op(slug))
+        assert result["validation"] == []
+
+    def test_the_write_path_accepts_the_same_record(self, fixture_path):
+        """The two write paths must agree about the shape the schema declares."""
+        slug = self._parents(fixture_path)
+        writes.create_entity(fixture_path, "scene_beats", f"{slug}-beats",
+                             self._op(slug)[0]["frontmatter"])
+
+    def test_a_wrong_type_inside_a_fixed_key_object_is_still_reported(self, fixture_path):
+        """The fix narrows the reading; it must not stop validating the values."""
+        slug = self._parents(fixture_path)
+        op = self._op(slug)
+        op[0]["frontmatter"]["beats"][0]["action"]["surface"] = 7
+        result = draft_stage(fixture_path, op)
+        assert any("action.surface" in v and "int" in v
+                   for v in result["validation"])
+
+    def test_a_declared_map_is_still_validated_per_value(self, fixture_path):
+        """`keyed: True` keeps its own reading: the keys are entities."""
+        from core.entity import validate_entity
+        warnings = validate_entity("relationship", {
+            "characters": ["obj-alice", "obj-alice"],
+            "perspectives": {"obj-alice": {"strength": "high"}},
+        })
+        assert any("perspectives.obj-alice.strength must be a number" in w
+                   for w in warnings)
