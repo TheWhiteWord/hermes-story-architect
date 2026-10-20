@@ -154,9 +154,7 @@ class TestRetrieveSceneBeats:
             ],
             "changes": [{"entity": "t3-alice", "change": "Now suspicious"}],
         }, sections={
-            "Conflict": "Alice wants answers; Kael wants silence.",
-            "Findings": "The scene needs more subtext in the middle.",
-            "Notes": "Tighten the dialogue.",
+            "Notes": "The scene needs more subtext in the middle.",
         })
 
     def test_retrieve_returns_nested_beats_and_true_character(self, fixture_path):
@@ -207,9 +205,7 @@ class TestRetrieveSceneBeats:
         assert changes[0]["change"] == "Now suspicious"
 
         sections = entity["sections"]
-        assert "Conflict" in sections
-        assert "Findings" in sections
-        assert "Notes" in sections
+        assert set(sections) == {"Notes"}
 
 
 # ── T3.2: scene computed fields are in the load payload and read-only ─────────
@@ -400,8 +396,8 @@ class TestBeatShape:
 class TestSearchSceneBeats:
     """T3.3 — story_search reaches a scene_beats note's prose."""
 
-    def test_search_finds_scene_beats_findings(self, fixture_path):
-        """A search for a term in a scene_beats Findings section finds it."""
+    def test_search_finds_scene_beats_notes(self, fixture_path):
+        """A search for a term in a scene_beats note's prose finds it."""
         p = fixture_path
         writes.create_entity(p, "character", "t3-alice", {"name": "Alice"})
         writes.create_entity(p, "act", "t3-act", {"title": "Act I"})
@@ -414,7 +410,7 @@ class TestSearchSceneBeats:
             "scene": "t3-scene",
             "beats": [{"action": {"surface": "test"}, "reaction": {"surface": "test"}}],
         }, sections={
-            "Findings": "The zorblatt dialogue needs tightening.",
+            "Notes": "The zorblatt dialogue needs tightening.",
         })
 
         result = json.loads(search_handler({

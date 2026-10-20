@@ -486,7 +486,11 @@ def standard_sections(entity_type: str) -> list[str]:
         "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],
         "relationship": ["Nature", "Perspectives", "Tension", "History", "Scenes to Write", "Notes"],
         "value": ["Definition", "Notes"],
-        "scene_beats": ["Conflict", "Findings", "Notes"],
+        # One section. `scene_beats` is the execution record — the beats, the
+        # turning point, the closing changes are fields. Everything that is
+        # not a field goes in `Notes`: what was planned against what was
+        # written, and the evaluation of the scene.
+        "scene_beats": ["Notes"],
     }
     return sections.get(entity_type, [])
 

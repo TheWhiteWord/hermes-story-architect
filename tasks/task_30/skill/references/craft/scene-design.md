@@ -179,14 +179,15 @@ never in it. `view="dramatic_elements"` carries the pointer beside the scene's
 `scene_objective` and `turning_point` (each only when filled), so a scene's
 dramatic spine is one view and its beats are one retrieve.
 
-**What the sections hold.** `Conflict` is what resists the objective and from
-which circle; `Findings` is the evaluation of the scene; `Notes` is free-form.
-→ `../model/entity-sections.md`
+**What the sections hold.** `Notes` is the one section: what was planned
+against what was written, and the evaluation of the scene. Everything else on
+the record — the beats, the turning point, the driver, the true-character
+moments, the closing changes — is a field. → `../model/entity-sections.md`
 
 **The soft rules, and where they go.** A value turn with no turning point, a
 turning point in a flat scene, scene `effects` that disagree with `changes`, a
 character the record names who is not in the cast — none of these is refused by
-a write. They are judgements, and `Findings` is where they are written.
+a write. They are judgements, and `Notes` is where they are written.
 → `../model/entity-sections.md`
 
 ## The couplings

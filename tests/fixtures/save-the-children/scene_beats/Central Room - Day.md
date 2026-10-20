@@ -4,6 +4,6 @@ scene: central-room-day
 type: scene_beats
 ---
 
-## Conflict
+## Notes
 
-[placeholder — scene/Conflict]
+[placeholder — scene/Notes]

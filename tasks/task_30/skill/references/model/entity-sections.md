@@ -196,15 +196,17 @@ The scene keeps its own `Objective`.*
 
 ## Scene beats
 
-*Three sections. The scene's beats, and the evaluation of the scene.*
+*One section. The beats, and anything that is not a field.*
 
-- **Conflict** — what resists the objective, and from which circle: inner,
-  personal, extra-personal. More than one at once is normal.
-- **Findings** — the evaluation of the scene: missing conflict, repetition, a
-  turning point in the wrong place, on-the-nose dialogue. These are the
-  author's judgements, written here rather than computed, so the list is not a
-  closed one.
-- **Notes** — see below.
+- **Notes** — everything the record holds as prose rather than as a field: what
+  was planned against what was actually written, and the evaluation of the
+  scene (missing conflict, repetition, a turning point in the wrong place,
+  on-the-nose dialogue). These are the author's judgements, written here
+  rather than computed, so the list is not a closed one.
+
+The beats themselves, the turning point, the driver, the true-character
+moments and the closing changes are all fields — read them from `story_retrieve`,
+not from a section.
 
 ## Relationship
 
