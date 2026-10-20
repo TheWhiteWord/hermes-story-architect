@@ -85,12 +85,27 @@ def _row_data(conn, row) -> dict:
     return dict(zip(_columns(conn), row))
 
 
+def _scene_beats_id(conn, scene_id: str) -> str:
+    """The id of a scene's `scene_beats` record, or "" when it has none.
+
+    One record per scene (the write path refuses a second), so this is a lookup
+    rather than a list. It returns the ID, not the record: the id cannot be
+    derived from the scene id (it is caller-supplied — the skill teaches
+    `{scene_id}-beats`), so the pointer is what tells the reader where to look.
+    The record itself is read with `story_retrieve` on `scene_beats` and this id.
+    """
+    row = conn.execute(
+        "SELECT id FROM entities "
+        "WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+        (scene_id,)).fetchone()
+    return row[0] if row else ""
+
+
 def _scene_beats(conn, scene_id: str) -> dict | None:
     """A scene's `scene_beats` record, or None when it has none.
 
-    One record per scene (the write path refuses a second), so this is a lookup
-    rather than a list. The record is read whole: it is the same data the scene's
-    `turning_point` and `scene_beats` computed fields are derived from.
+    Read whole: it is the same data the scene's `turning_point` computed field
+    is derived from.
     """
     row = conn.execute(
         "SELECT id, parent_id, extra FROM entities "
@@ -137,17 +152,16 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
         values["value_focus"] = (
             for_project(_project_path(conn)) if entity_type == "project"
             else VALUE_FOCUS_SCOPES[entity_type](_project_path(conn), data["id"]))
-    # The same for a scene's `scene_beats` and `turning_point`: the record is
-    # another entity, so there is nothing in this row's `extra` to read. A
-    # scene with no record returns None for the record and "" for the turning
-    # point — the distinction the design keeps ("or empty").
-    if entity_type == "scene" and ("scene_beats" in wanted
-                                   or "turning_point" in wanted):
+    # The same for a scene's `turning_point`: the record is another entity, so
+    # there is nothing in this row's `extra` to read, and a scene with no record
+    # returns "" — the distinction the design keeps ("or empty"). `scene_beats`
+    # is NOT here: it is the record's id, so `_scene_beats_id` answers it and
+    # the record itself is a second `story_retrieve` call.
+    if entity_type == "scene" and "turning_point" in wanted:
         sb = _scene_beats(conn, data["id"])
-        if "scene_beats" in wanted:
-            values["scene_beats"] = sb
-        if "turning_point" in wanted:
-            values["turning_point"] = sb.get("turning_point", "") if sb else ""
+        values["turning_point"] = sb.get("turning_point", "") if sb else ""
+    if entity_type == "scene" and "scene_beats" in wanted:
+        values["scene_beats"] = _scene_beats_id(conn, data["id"])
 
     # Relation-backed fields: plot beats are rows linking to scenes, not
     # columns. Their position in the output is wherever the schema puts them,

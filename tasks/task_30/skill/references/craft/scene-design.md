@@ -145,6 +145,20 @@ the beat's `gap`, `risk`, and `changes` (each a `change` for an `entity`).
 Field shapes are in `story_describe`; what a beat is for is
 `references/theory/scene-and-beat.md`.
 
+**Reading the record: the scene gives you its id, not its contents.** A
+scene's `scene_beats` field is the *slug* of the record, because the id is
+chosen when the record is created and cannot be derived from the scene id
+(`{scene_id}-beats` is the convention, not a rule). So the read is two calls:
+
+1. `story_retrieve` on the **scene**, `fields: ["scene_beats"]` — the pointer.
+   Empty when the scene has no record.
+2. `story_retrieve` on **`scene_beats`**, `id: [<that slug>]` — the record.
+
+The base `story_load` map carries the pointer and nothing more; the beats are
+never in it. `view="dramatic_elements"` carries the pointer beside the scene's
+`scene_objective` and `turning_point` (each only when filled), so a scene's
+dramatic spine is one view and its beats are one retrieve.
+
 **What the sections hold.** `Conflict` is what resists the objective and from
 which circle; `Findings` is the evaluation of the scene; `Notes` is free-form.
 → `../model/entity-sections.md`

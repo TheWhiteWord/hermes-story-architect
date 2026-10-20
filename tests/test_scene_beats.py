@@ -230,7 +230,7 @@ class TestSceneComputedFields:
         })
 
     def test_retrieve_scene_returns_computed_fields(self, fixture_path):
-        """story_retrieve on a scene returns turning_point and scene_beats."""
+        """story_retrieve on a scene returns turning_point and the scene_beats POINTER."""
         p = fixture_path
         self._make_scene_with_beats(p)
 
@@ -243,10 +243,46 @@ class TestSceneComputedFields:
 
         entity = result["entities"][0]
         assert entity["fields"]["turning_point"] == "The moment of change"
-        sb = entity["fields"]["scene_beats"]
-        assert sb is not None
-        assert sb["id"] == "t3-scene-beats"
-        assert sb["scene"] == "t3-scene"
+        # A slug, not the record: the id cannot be derived from the scene id, so
+        # the pointer is what tells the reader where to look. The record itself
+        # is a second call on `scene_beats` with this id.
+        assert entity["fields"]["scene_beats"] == "t3-scene-beats"
+
+    def test_the_pointer_is_empty_without_a_record(self, fixture_path):
+        """A scene with no record returns an empty pointer, not a record."""
+        p = fixture_path
+        writes.create_entity(p, "act", "t3-act", {"title": "Act I"})
+        writes.create_entity(p, "sequence", "t3-seq",
+                            {"title": "Seq 1", "act_id": "t3-act"})
+        writes.create_entity(p, "scene", "t3-scene", {
+            "title": "Scene 1", "sequence_id": "t3-seq", "act_id": "t3-act",
+        })
+
+        result = json.loads(retrieve_handler({
+            "project": str(p),
+            "entity_type": "scene",
+            "id": ["t3-scene"],
+            "fields": ["scene_beats"],
+        }))
+
+        assert result["entities"][0]["fields"]["scene_beats"] == ""
+
+    def test_the_record_is_read_with_the_pointer(self, fixture_path):
+        """The pointer and the record are two calls, and they agree."""
+        p = fixture_path
+        self._make_scene_with_beats(p)
+
+        scene = json.loads(retrieve_handler({
+            "project": str(p), "entity_type": "scene",
+            "id": ["t3-scene"], "fields": ["scene_beats"],
+        }))["entities"][0]["fields"]["scene_beats"]
+
+        record = json.loads(retrieve_handler({
+            "project": str(p), "entity_type": "scene_beats",
+            "id": [scene], "fields": ["all"],
+        }))["entities"][0]
+        assert record["id"] == scene
+        assert record["fields"]["turning_point"] == "The moment of change"
 
     def test_draft_refuses_computed_fields_on_edit(self, fixture_path):
         """story_draft with turning_point or scene_beats in data refuses."""

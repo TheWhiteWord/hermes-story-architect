@@ -243,8 +243,10 @@ Answers to the four open questions, kept so the reasoning is not re-derived.
 - **Completeness is elastic, and one type is exempt.** `scene_beats` carries no
   completeness bar: the beats can be absent, minimal, or full, and an empty
   list is a valid state rather than a gap to close. The scene's computed
-  `scene_beats` field is what is reported as missing when the record does not
-  exist at all — the record, not its contents.
+  `scene_beats` field is a pointer — the record's slug — and is what is
+  reported as missing when the record does not exist at all: the record, not
+  its contents. Read the record itself with `story_retrieve` on `scene_beats`
+  and that id.
 - **Reporting blank sections.** Not a separate report. `story_retrieve` with
   `sections: ["all"]` returns each section's body, and a blank one is `""` —
   read it there. It also returns the headings the note uses under names of its

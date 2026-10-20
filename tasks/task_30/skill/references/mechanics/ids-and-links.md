@@ -73,6 +73,10 @@ The field-by-field list is in `story_describe`.
 - **`character.relationships` is computed** and read-only. Writing it is
   refused, because it is derived from the `relationship` entities rather than
   stored. → `references/craft/character-relationships.md`
+- **`scene.scene_beats` and `scene.turning_point` are computed** and read-only.
+  They are read back from the scene's `scene_beats` record, so a write naming
+  them is refused. `scene_beats` holds the record's slug; read the record with
+  `story_retrieve` on `scene_beats` and that id. → `references/craft/scene-design.md`
 - **`id` and `type` are discarded** rather than rejected — passing them is
   accepted and ignored, which is quieter than a refusal and worth knowing.
 - So there are three different answers to "can I write this field": refused

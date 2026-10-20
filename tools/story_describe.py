@@ -59,6 +59,13 @@ def _is_reference(entity_type: str, field: str) -> bool:
     says "slug" in its description. Making that machine-readable rather than
     prose is the same D1 fix as `sub_fields`.
     """
+    # A declared `ref` is the strongest statement there is, and it holds for a
+    # computed field too: `scene.scene_beats` is a pointer, and the agent has
+    # to know the value is a slug before it goes looking for the record. The
+    # declaration is read here rather than guessed, so a field that says it is
+    # a reference is never unlabelled by the heuristic below.
+    if ENTITY_SCHEMAS.get(entity_type, {}).get(field, {}).get("ref"):
+        return True
     # A relation field describes its target in prose ("Scenes where plot is
     # established") without saying "slug", so the word is not the test for
     # these. Anything the maps declare is a reference by definition.

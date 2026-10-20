@@ -550,10 +550,11 @@ def get_project_summary(project_path: Path) -> dict:
 
         # ── A scene's scene_beats, keyed by the scene it belongs to ──
         # One record per scene (the write path refuses a second), so the key is
-        # the scene and the record is read whole — the scene's `turning_point`
-        # and `scene_beats` fields are the same data the reader holds.
+        # the scene. The whole record is read — the readers need the two facts
+        # on it — but the base map emits only its id: the beats themselves are
+        # what keep the once-per-session map small.
         scene_beats = {
-            row[1]: {"id": row[0], "scene": row[1], **extra}
+            row[1]: {"id": row[0], **extra}
             for row, extra in (
                 (row, json.loads(row[2]) if row[2] else {})
                 for row in conn.execute(
@@ -602,15 +603,16 @@ def get_project_summary(project_path: Path) -> dict:
                 "location": scene_loc.get(sid),
                 "milestone": milestone_label(scene_plot_roles.get(sid, []), plot_scopes),
                 "value_turns": s["_extra"].get("value_turns", []),
-                # The scene's computed fields, read from its scene_beats. A
-                # scene with no record carries an empty turning_point and no
-                # scene_beats key at all — the record is absent, not empty, and
-                # reporting `{}` would claim one exists.
-                "turning_point": scene_beats.get(sid, {}).get("turning_point", ""),
-                **({"scene_beats": scene_beats[sid]}
-                   if sid in scene_beats else {}),
+                # The scene's computed field, read from its scene_beats. It is
+                # the record's ID, not the record: the id cannot be derived from
+                # the scene id, so this is the pointer a reader follows with a
+                # second call. The key is absent entirely when the scene has no
+                # record, so an empty string is never reported as one. The rest
+                # of the record — the beats above all — stays out of the base
+                # map, which is the once-per-session call.
+                **({"scene_beats": scene_beats[sid]["id"]} if sid in scene_beats else {}),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": [], "value_turns": [], "turning_point": ""},
+            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": [], "value_turns": [], "scene_beats": ""},
                          always_keep={"status"})
 
         # ── Build sequence output ──

@@ -189,6 +189,18 @@ class TestStorageLabelsAreTrue:
                           ("plot", "characters")]:
             assert out[et][field]["is_reference"] is True, f"{et}.{field}"
 
+    def test_a_declared_ref_is_a_reference_even_when_computed(self):
+        """`scene.scene_beats` is computed AND a pointer.
+
+        The `not computed` guard below would suppress the label, so an agent
+        reading `story_describe` sees a field it cannot set and no indication
+        that its value is a slug. The declaration wins: it is the strongest
+        statement of what the field is.
+        """
+        out = _handler({})["entity_schemas"]["scene"]
+        assert out["scene_beats"]["computed"] is True
+        assert out["scene_beats"]["is_reference"] is True
+
     def test_an_id_is_not_a_reference(self):
         """`id` says "slug" because it IS one. Calling it a reference to
         another entity would be wrong in the other direction.

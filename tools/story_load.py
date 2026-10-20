@@ -20,7 +20,8 @@ SCHEMA = {
             "type": "string",
             "enum": ["dramatic_elements", "relationship", "unfilled", "values"],
             "description": "Optional focused view. Omit for the base structural map. "
-                           "'dramatic_elements' = per-scene dramatic roles and milestones. "
+                           "'dramatic_elements' = per-scene dramatic roles, milestones, and "
+                           "the scene's objective, turning point and scene_beats pointer. "
                            "'relationship' = the full relationship graph with perspectives. "
                            "'unfilled' = what is still incomplete, to answer 'what next?'. "
                            "'values' = the value schemas and their turns, for a scene, "
@@ -143,8 +144,24 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     reaching at it from each plot — the role comes from the relation kind
     ("plot_setup" -> "setup") — and the main plot's inciting_incident, crisis
     and climax roles are the story-level milestones.
+
+    A scene's `scene_objective` and `turning_point` are here too, and
+    `scene_beats` is the pointer to the record they come from. They are not in
+    the base map, which is the once-per-session call and stays slim; this view
+    is the opt-in read of a scene's dramatic spine, and it already nests
+    act → sequence → scene so the two fields have a home. Each is emitted only
+    when filled, so an empty one costs nothing.
     """
     act_filter = args.get("act")
+
+    # Each scene's `scene_beats` record, keyed by the scene. Only the id and the
+    # two facts this view surfaces are read — not the beats, which would defeat
+    # the point of keeping them out of the base map.
+    scene_beats = {}
+    for sb_id, parent_id, extra_json in conn.execute(
+            "SELECT id, parent_id, extra FROM entities "
+            "WHERE type='scene_beats' AND is_deleted=0"):
+        scene_beats[parent_id] = {"id": sb_id, **json.loads(extra_json or "{}")}
 
     # Which plots point at which scene, in which role. Built unconditionally:
     # the view exists to cross-check the plot roles against the structural
@@ -215,6 +232,24 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                     scene["milestone"] = milestones
                 if scene_id in plot_refs:
                     scene["plots"] = plot_refs[scene_id]
+                # The scene's dramatic spine: the objective and the moment the
+                # gap opens, read from its `scene_beats` record, and the pointer
+                # to that record. `scene_objective` is the SCENE's own field
+                # first (it is written on the scene as the reasoning behind it)
+                # and the record's only as a fallback, since the two keep
+                # identical names and are allowed to drift. Each is emitted only
+                # when filled — this view is opt-in, but an absent fact is not
+                # one more key.
+                record = scene_beats.get(scene_id)
+                objective = extra.get("scene_objective", "") or (
+                    (record or {}).get("scene_objective", ""))
+                if objective:
+                    scene["scene_objective"] = objective
+                turning = (record or {}).get("turning_point", "")
+                if turning:
+                    scene["turning_point"] = turning
+                if record:
+                    scene["scene_beats"] = record["id"]
                 scenes_out.append(scene)
             seq["scenes"] = scenes_out
             seqs_out.append(seq)

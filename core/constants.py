@@ -192,12 +192,17 @@ ENTITY_SCHEMAS = {
         # keep identical names and are allowed to drift: reconciling them is the
         # author's job after reworking `scene_beats`, not the reader's.
         "scene_objective": {"type": "string", "default": "", "optional": True, "description": "The driver's immediate desire. One sentence."},
-        # Read from this scene's scene_beats. Neither is written: the record is
-        # written on `scene_beats` and read back here, so a computed field can
-        # never disagree with the record it derives from. `turning_point` is
-        # the moment of the major gap; `scene_beats` is the whole record.
+        # Read from this scene's scene_beats, which is another entity and so has
+        # nothing in this row's `extra` to read. `scene_beats` is the POINTER to
+        # that record — a slug, not the record — because the id cannot be derived
+        # from the scene id: it is caller-supplied, and the skill teaches
+        # `{scene_id}-beats` as the convention. The full record is read with
+        # `story_retrieve` on `scene_beats` and this id, which is what keeps the
+        # base `story_load` map from growing with every beat. `ref` is
+        # declaration only: the field is computed, so no write path ever carries
+        # it into `check_references`.
         "turning_point": {"type": "string", "default": "", "optional": True, "computed": True, "description": "The moment of the major gap, read from this scene's scene_beats (read-only)"},
-        "scene_beats": {"type": "object", "default": None, "optional": True, "computed": True, "description": "This scene's scene_beats record (read-only)"},
+        "scene_beats": {"type": "string", "default": "", "optional": True, "computed": True, "ref": "scene_beats", "description": "Slug of this scene's scene_beats record (read-only). Read the record itself with story_retrieve on scene_beats and this id. Empty when the scene has none."},
         "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "How this scene functions dramatically. One of: plot_role, transition, non-event. 'plot_role' (or empty) means the role is defined per plot in plot_roles — do NOT repeat it here. 'transition' and 'non-event' are the only values that serve no plot, and they are mutually exclusive with plot_roles: setting one requires plot_roles to be empty."},
         # The write side of a plot role. Every entry names its own plot, so one
         # scene can hold different roles in different plots — which is why the

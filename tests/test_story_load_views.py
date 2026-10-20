@@ -17,6 +17,10 @@ from pathlib import Path
 
 import pytest
 
+from core.db import get_project_summary
+from core.writes import create_entity as writes_create_entity
+from tools.story_load import handler as load_handler
+
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 
@@ -366,6 +370,152 @@ class TestUnfilledView:
     def test_every_entry_names_its_entities_and_count(self, project):
         for item in load(project, view="unfilled")["unfilled"]:
             assert item["count"] == len(item["entities"])
+
+
+class TestBaseMapStaysSmall:
+    """The base map is the once-per-session call, so a scene's beat list must
+    not live in it. Issue 2: `scene_objective` and `turning_point` are the
+    `dramatic_elements` view's, and `scene_beats` is a pointer — the record is
+    a second call."""
+
+    def _scene_with_beats(self, project, slug="slim", parent="act-slim"):
+        """A scene with a beat list, in its own act/sequence.
+
+        Fresh ids throughout: the fixture already has acts, sequences and a
+        `scene_beats` record, and the base map is read whole, so reusing one
+        would make the assertion about a row this helper did not write.
+        """
+        writes_create_entity(project, "act", parent, {"title": "Act"})
+        writes_create_entity(project, "sequence", f"seq-{slug}",
+                             {"title": "Seq", "act_id": parent})
+        writes_create_entity(project, "scene", slug, {
+            "title": "Scene", "status": "drafted", "sequence_id": f"seq-{slug}",
+            "act_id": parent, "scene_objective": "to get the door open",
+        })
+        # A record with a beat list, so the assertion has something to exclude.
+        writes_create_entity(project, "scene_beats", f"{slug}-beats", {
+            "scene": slug,
+            "turning_point": "the lock was never engaged",
+            "beats": [{"action": {"surface": "A" * 200},
+                       "reaction": {"surface": "B" * 200},
+                       "gap": "C" * 200}],
+        })
+
+    def test_the_base_map_carries_only_the_pointer(self, project):
+        self._scene_with_beats(project)
+        row = self._row(project, "slim")
+        assert row["scene_beats"] == "slim-beats"
+        # The record's own fields must not surface under a made-up name either.
+        assert "turning_point" not in row
+        assert "beats" not in row
+
+    def test_the_base_map_stays_small_with_a_beat_list(self, project):
+        """The point of the pointer, measured against the scene that has none.
+
+        Both rows differ only by the pointer: a scene with a three-beat record
+        costs ~23 bytes more than one with no record at all, where the record
+        itself is ~1200 bytes. A tautology here would be comparing two scenes
+        that both have a record, which measures the id and nothing else.
+        """
+        self._scene_with_beats(project)
+        writes_create_entity(project, "act", "act-bare", {"title": "Act"})
+        writes_create_entity(project, "sequence", "seq-bare",
+                             {"title": "Seq", "act_id": "act-bare"})
+        writes_create_entity(project, "scene", "bare", {
+            "title": "Scene", "status": "drafted",
+            "sequence_id": "seq-bare", "act_id": "act-bare",
+        })
+        scenes = self._all_scenes(project)
+        assert "scene_beats" not in scenes["bare"]
+        assert scenes["slim"]["scene_beats"] == "slim-beats"
+        assert len(json.dumps(scenes["slim"])) - len(json.dumps(scenes["bare"])) < 50
+
+    def _all_scenes(self, project):
+        return {s["id"]: s for a in get_project_summary(project)["acts"]
+                for q in a["sequences"] for s in q["scenes"]}
+
+    def test_a_scene_without_a_record_carries_no_pointer(self, project):
+        writes_create_entity(project, "act", "act-bare", {"title": "Act"})
+        writes_create_entity(project, "sequence", "seq-bare",
+                             {"title": "Seq", "act_id": "act-bare"})
+        writes_create_entity(project, "scene", "bare", {
+            "title": "Scene", "status": "drafted",
+            "sequence_id": "seq-bare", "act_id": "act-bare",
+        })
+        assert "scene_beats" not in self._row(project, "bare")
+
+    def _row(self, project, slug):
+        scenes = [s for a in get_project_summary(project)["acts"]
+                  for q in a["sequences"] for s in q["scenes"]]
+        return next(s for s in scenes if s["id"] == slug)
+
+
+class TestDramaticElementsCarriesTheSpine:
+    """Issue 2: `scene_objective` and `turning_point` live here, with the
+    pointer, each emitted only when filled."""
+
+    def _load(self, project):
+        return json.loads(load_handler(
+            {"project": "save-the-children", "view": "dramatic_elements"},
+            root_path=str(project.parent.parent)))
+
+    def _scene_row(self, project, slug="spine-scene"):
+        acts = self._load(project)["acts"]
+        return next(s for a in acts for q in a["sequences"]
+                    for s in q["scenes"] if s["id"] == slug)
+
+    def _scene(self, project, slug="spine-scene", parent="act-spine", **fields):
+        writes_create_entity(project, "act", parent, {"title": "Act"})
+        writes_create_entity(project, "sequence", f"seq-{parent}",
+                             {"title": "Seq", "act_id": parent})
+        writes_create_entity(project, "scene", slug, {
+            "title": "Scene", "status": "drafted",
+            "sequence_id": f"seq-{parent}", "act_id": parent, **fields})
+        return slug
+
+    def test_a_record_carries_objective_turning_point_and_pointer(self, project):
+        self._scene(project, scene_objective="to get the door open without being seen")
+        writes_create_entity(project, "scene_beats", "spine-scene-beats", {
+            "scene": "spine-scene",
+            "turning_point": "the handle turns and the lock was never engaged",
+        })
+        row = self._scene_row(project)
+        assert row["scene_objective"] == "to get the door open without being seen"
+        assert row["turning_point"] == "the handle turns and the lock was never engaged"
+        assert row["scene_beats"] == "spine-scene-beats"
+
+    def test_the_objective_falls_back_to_the_record(self, project):
+        """The scene's own field is the reasoning behind it; the record's is the
+        mechanism's first step. They may drift, so the scene wins when set."""
+        self._scene(project)
+        writes_create_entity(project, "scene_beats", "spine-scene-beats", {
+            "scene": "spine-scene",
+            "scene_objective": "the record's version",
+        })
+        assert self._scene_row(project)["scene_objective"] == "the record's version"
+
+    def test_the_scene_field_wins_when_both_are_set(self, project):
+        """The two keep identical names and are allowed to drift; the scene's is
+        the reasoning behind it, so it is the one the view reports."""
+        self._scene(project, scene_objective="the scene's version")
+        writes_create_entity(project, "scene_beats", "spine-scene-beats", {
+            "scene": "spine-scene",
+            "scene_objective": "the record's version",
+        })
+        assert self._scene_row(project)["scene_objective"] == "the scene's version"
+
+    def test_each_field_is_omitted_when_unfilled(self, project):
+        self._scene(project)
+        row = self._scene_row(project)
+        assert "scene_objective" not in row
+        assert "turning_point" not in row
+        assert "scene_beats" not in row
+
+    def test_the_view_keeps_the_fixture_scene_beats_record(self, project):
+        """The fixture already has a `scene_beats` record; it must stay readable
+        through the pointer, not just through freshly-written ones."""
+        row = self._scene_row(project, slug="central-room-day")
+        assert row["scene_beats"] == "central-room-day-beats"
 
 
 class TestDispatch:
