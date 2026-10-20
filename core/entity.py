@@ -474,10 +474,14 @@ def standard_sections(entity_type: str) -> list[str]:
         "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function", "Notes"],
         "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict", "Notes"],
         "plot": ["Summary", "Role", "Threads", "Value", "Characters", "Notes"],
-        # The scene holds what happens; how it resists and how it evaluates
-        # itself is the `scene_beats` record's. Objective stays — it is the
-        # reasoning behind the field, as on the act.
-        "scene": ["Content", "Objective", "Value Turn", "Dramatic Function", "Production", "Notes"],
+        # Conflict and Beats stay on the scene: the scene is created first, so
+        # it is where the scene is PLANNED — what resists the objective, and
+        # the beats as they are designed. `scene_beats` is where the record of
+        # execution lives, and keeps its own Conflict/Findings for how the
+        # finished scene works. Objective stays too — the reasoning behind the
+        # field, as on the act.
+        "scene": ["Content", "Objective", "Conflict", "Beats", "Value Turn",
+                  "Dramatic Function", "Production", "Notes"],
         "sequence": ["Summary", "Purpose", "Value Arc", "Progression", "Sequence Climax", "Plots", "Notes"],
         "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],
         "relationship": ["Nature", "Perspectives", "Tension", "History", "Scenes to Write", "Notes"],
