@@ -32,15 +32,20 @@ call, so the routing is worth holding.*
 
 | View | Answers | Needs |
 |---|---|---|
-| `dramatic_elements` | each scene's role and its milestones | — |
+| `dramatic_elements` | each scene's role, its milestones, and its objective and turning point | — or `act`, or `plot` |
 | `relationship` | every bond and both sides of each | — |
 | `unfilled` | what is still missing | — or `field`, or `entity` |
 | `values` | where each value stands, and where it turns next | — or `scene`, `unit`, `plot` |
 
 - **`dramatic_elements`** is the structural read: what each scene is *for*. This
   is where the milestone flags surface, and it nests act → sequence → scene.
-  Add `act` to narrow it, and `add_plot` only when the plot cross-references are
-  the point — they roughly double the response.
+  Add `act` to narrow it to one act.
+- **Add `plot` to read one plot's escalation spine.** The header narrows to that
+  plot, and the view returns only the scenes carrying a role in it. Add
+  `milestones_only` to trim those rows to the spine itself: `id`, `milestone`,
+  `role`, `scene_objective`, `turning_point`. `role` is that plot's own role at
+  the scene; `milestone` is the main plot's, so a subplot's rows carry their
+  role under `role`. → `references/craft/plot-and-structure.md`
 - **`relationship`** is small and whole: every bond with both perspectives. It
   is the fastest way to see the cast's web. → `references/craft/character-relationships.md`
 - **`unfilled`** is the "what next?" view, and the only one that reports

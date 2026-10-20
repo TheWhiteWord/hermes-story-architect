@@ -21,7 +21,8 @@ SCHEMA = {
             "enum": ["dramatic_elements", "relationship", "unfilled", "values"],
             "description": "Optional focused view. Omit for the base structural map. "
                            "'dramatic_elements' = per-scene dramatic roles, milestones, and "
-                           "the scene's objective, turning point and scene_beats pointer. "
+                           "the scene's objective, turning point and scene_beats pointer — "
+                           "filterable to one plot's escalation spine with plot + milestones_only. "
                            "'relationship' = the full relationship graph with perspectives. "
                            "'unfilled' = what is still incomplete, to answer 'what next?'. "
                            "'values' = the value schemas and their turns, for a scene, "
@@ -35,7 +36,18 @@ SCHEMA = {
         },
         "plot": {
             "type": "string",
-            "description": "For view='values': limit to one plot id. Defaults to all."
+            "description": "For view='dramatic_elements': limit the view to one plot id. "
+                           "The project header narrows to that plot. For view='values': "
+                           "limit to one plot id. Defaults to all."
+        },
+        "milestones_only": {
+            "type": "boolean",
+            "description": "For view='dramatic_elements': keep only the scenes carrying a "
+                           "role of the filtered plot (any plot when `plot` is omitted), "
+                           "as trimmed rows — id, milestone, role, scene_objective, "
+                           "turning_point — each key only when filled. `role` is the "
+                           "filtered plot's own role; `milestone` stays the main plot's, "
+                           "so a subplot's rows carry their role under `role`. Defaults false."
         },
         "sequence": {
             "type": "string",
@@ -151,8 +163,18 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     is the opt-in read of a scene's dramatic spine, and it already nests
     act → sequence → scene so the two fields have a home. Each is emitted only
     when filled, so an empty one costs nothing.
+
+    `plot` narrows the view to one plot: the `project` header's plot index keeps
+    only that plot. `milestones_only` then trims the tree to the escalation
+    spine — the scenes carrying a role of that plot, as rows of `id`, `milestone`,
+    `role`, `scene_objective`, `turning_point`, each key only when filled. The
+    row carries TWO role keys because `milestone` is the main plot's only: a
+    subplot's own role goes under `role`, so filtering to a subplot reports the
+    scenes it promotes without calling them milestones.
     """
     act_filter = args.get("act")
+    plot_filter = args.get("plot")
+    milestones_only = bool(args.get("milestones_only"))
 
     # Each scene's `scene_beats` record, keyed by the scene. Only the id and the
     # two facts this view surfaces are read — not the beats, which would defeat
@@ -243,17 +265,48 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                 record = scene_beats.get(scene_id)
                 objective = extra.get("scene_objective", "") or (
                     (record or {}).get("scene_objective", ""))
+                turning = (record or {}).get("turning_point", "")
+                if milestones_only:
+                    # The escalation spine: only the scenes this plot promotes.
+                    # Filtered on the plot ROLE, not on `milestone` — `milestone`
+                    # is the main plot's, so filtering a subplot on it would
+                    # keep nothing at all.
+                    roles = [e["role"] for e in plot_refs.get(scene_id, [])
+                             if not plot_filter or e["plot"] == plot_filter]
+                    if not roles:
+                        continue
+                    # Trimmed: the spine is what the scene is FOR, not its
+                    # production state. `title`/`status`/`plots`/`scene_beats`
+                    # are the full view's and are dropped by rebuilding the row.
+                    scene = {"id": scene_id}
+                    if milestones:
+                        scene["milestone"] = milestones
+                    # Every role the filtered plot holds here, story order. One
+                    # plot can promote the same scene twice (setup and crisis).
+                    scene["role"] = roles
+                    if objective:
+                        scene["scene_objective"] = objective
+                    if turning:
+                        scene["turning_point"] = turning
+                    scenes_out.append(scene)
+                    continue
                 if objective:
                     scene["scene_objective"] = objective
-                turning = (record or {}).get("turning_point", "")
                 if turning:
                     scene["turning_point"] = turning
                 if record:
                     scene["scene_beats"] = record["id"]
                 scenes_out.append(scene)
             seq["scenes"] = scenes_out
+            # An empty sequence or act is not structure, it is the filter's
+            # result — with `milestones_only` most of the tree is exactly that,
+            # and a reader counting acts to find the spine would be misled.
+            if not seq["scenes"]:
+                continue
             seqs_out.append(seq)
         act["sequences"] = seqs_out
+        if not act["sequences"]:
+            continue
         acts_out.append(act)
 
     # The project is the top container even when `act` narrows to one act: the
@@ -309,9 +362,16 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                 if entry["plot"] in main_plot_ids and entry["role"] in main_milestones:
                     main_milestones[entry["role"]].append(scene_id)
 
+    if plot_filter:
+        plot_index = [p for p in plot_index if p["id"] == plot_filter]
+        if not plot_index:
+            return {"view": "dramatic_elements", "plot": plot_filter,
+                    "error": f"No plot with id '{plot_filter}'."}
+
     out = {
         "view": "dramatic_elements",
         "act": act_filter or "all",
+        "plot": plot_filter or "all",
         "project": {
             "structure_type": pro.get("structure_type", ""),
             "story_climax_scene_id": main_milestones["climax"] or "unfilled",

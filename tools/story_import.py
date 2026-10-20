@@ -377,10 +377,8 @@ def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
     """Insert every standard section for the type, empty where the note is silent.
 
     A heading in the note that is not standard is refused, exactly as on the
-    create and edit paths. It used to be inserted as written, which meant the
-    same section name was valid or an error depending on which path carried
-    it — and it is how a note written against an older vocabulary ended up
-    holding prose under a name nothing would ever read back.
+    create and edit paths. The section set is closed, so a heading outside it
+    is prose nothing will ever read back as a section of this type.
     """
     from core.section_parser import list_sections, get_section
     from core.entity import standard_sections
@@ -496,18 +494,16 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     """The entity's extra JSON, from the fields that are not columns or relations.
 
     A key that belongs to no field of this type is refused, as it is on the
-    create and edit paths. It used to be kept verbatim, which is how a nested
-    `goals: {short, long}` survived an import while every reader looked for
-    the flat `goals_short` — the character showed its goals in the dashboard
-    and as unfilled in story_retrieve at the same time.
+    create and edit paths. A field is flat: a nested shape such as
+    `goals: {short, long}` survives nowhere, because every reader looks for the
+    flat `goals_short`.
     """
     from core.constants import ENTITY_SCHEMAS
 
     # The VALUE checks, which `_extra_for` was missing and the write paths both
-    # have. A hand-edited note carrying a retired value used to import clean:
-    # `dramatic_role: climax` was accepted after the enum narrowed to
-    # plot_role/transition/non-event, stored, and read back as a value no
-    # reader expects — the silent version of the unknown-key refusal below.
+    # have. A hand-edited note carrying a retired value reads back as a value no
+    # reader expects: `dramatic_role: climax` is outside the enum of
+    # plot_role/transition/non-event.
     #
     # Only the value checks, NOT the structural ones. `value_problems` is the
     # split, and it lives beside the checks so the two kinds cannot drift.

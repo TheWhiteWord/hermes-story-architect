@@ -187,8 +187,8 @@ def validate_shape(ops: list) -> list[str]:
             continue
         merged = {f: op["frontmatter"].get(f, m["default"])
                   for f, m in schema.items() if not m.get("computed")}
-        # Unrecognised keys would land in `extra` verbatim, exactly as an
-        # unrecognised edit key used to — reported rather than written.
+        # Unrecognised keys would land in `extra` verbatim. They are reported
+        # rather than written.
         for key in [k for k in op["frontmatter"] if k not in schema]:
             findings.append(f"{where}: unknown {entity_type} field '{key}'")
         # Same for a section name: the set is closed, so a heading off the list
@@ -459,11 +459,7 @@ def _dispatch(project_path: Path, op: dict) -> dict:
 
     The op fields are already what the write functions take, so there is
     nothing to translate: `project_path` is resolved, and each op names its
-    entity directly. The tool-boundary shapes this used to build — a top-level
-    `project` for one handler and a nested `target.project` for the other,
-    relations folded into `frontmatter`, the reorder list as
-    `order_context.ordered_ids` — were artifacts of the JSON handlers and do
-    not exist here.
+    entity directly. Each op is handed to its own write function as-is.
     """
     from . import writes
 
@@ -799,12 +795,10 @@ def _fmt_scalar(value) -> str:
 def _fmt(value) -> str:
     """A field value for the preview.
 
-    A structured field used to fall through to `str()`, which is a Python repr:
-    single quotes, no line breaks, and it wraps mid-sentence. For
-    `relationship.perspectives` that hid the one thing the field is for — two
-    characters side by side — so a dict is one bolded line per entry and a list
-    of objects is one line per item. `<br>` because these live in a table cell,
-    where a newline would end the row.
+    A structured field is one bolded line per entry for a dict, and one line
+    per item for a list of objects — `str()` would render a Python repr: single
+    quotes, no line breaks, wrapping mid-sentence. `<br>` because these live in a
+    table cell, where a newline would end the row.
     """
     if isinstance(value, dict):
         if not value:

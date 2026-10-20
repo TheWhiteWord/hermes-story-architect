@@ -145,9 +145,9 @@ with a `by`, a `surface` and a `subtext`, plus the beat's `gap`. A beat is three
 things and nothing more. Field shapes are in `story_describe`; what a beat is
 for is `references/theory/scene-and-beat.md`.
 
-**`risk` is gone.** It recorded a trend as if it were a datum, and it repeated
-the gap and the next action's subtext. What a character stands to lose is read
-from the chain — expectation, gap, the next action — not written down.
+**A beat is action, reaction, gap, and nothing more.** What a character stands
+to lose is read from that chain — the expectation, the gap, the next action —
+not written down.
 
 **`changes` is scene-level, not beat-level.** A beat changes *behaviour*; what
 is different for an entity is a fact about the scene. So `changes` sits beside

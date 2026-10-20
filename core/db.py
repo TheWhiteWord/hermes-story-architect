@@ -286,16 +286,13 @@ def get_memory_block(project_path: Path) -> dict:
 def get_scene_value_turns(project_path: Path) -> list[dict]:
     """Every scene's value turns, each tagged with plot/act/sequence and story order.
 
-    One pass over every scene; callers filter in Python (one scan for the
-    whole project beats one scan per plot). Each turn carries the act,
-    sequence and scene it sits in, resolved from the parent chain, and an
+    One pass over every scene; callers filter in Python. Each turn carries the
+    act, sequence and scene it sits in, resolved from the parent chain, and an
     `order` key of (act, sequence, scene) — the true story order, because
     sequence order keys restart in every act.
 
-    Fixes two defects of the per-plot scan this replaces: turns are tagged
-    with the plot they name, so a plot never sees another plot's turns of a
-    value it shares, and the order key includes the act, so a scene in act 2
-    cannot sort before an act 1 scene.
+    Each turn is tagged with the plot it names, so a plot never sees another
+    plot's turns of a value it shares.
 
     One row per turn: `{scene_id, plot, act_id, sequence_id, order, value,
     from, to, effects}`. A scene with no sequence has none, and none of its
@@ -564,11 +561,9 @@ def get_project_summary(project_path: Path) -> dict:
 
         # ── Helpers ──
         # A stub is a scene that does not exist yet, and `status` is the only
-        # thing that says so. It USED to be `status == planned OR no
-        # dramatic_role`, back when an empty dramatic_role meant "not shaped
-        # yet". Now the role lives in `plot_roles` and this field only says
-        # transition/non-event, so keying a stub on it would collapse every
-        # ordinary scene — which has no dramatic_role — to a bare id.
+        # thing that says so. An ordinary scene has no `dramatic_role` at all —
+        # that field only says transition/non-event — so keying a stub on it
+        # would collapse every ordinary scene to a bare id.
         def _is_scene_stub(s):
             return s["status"] == "planned"
 
@@ -687,10 +682,11 @@ def get_project_summary(project_path: Path) -> dict:
                 "value_arc": plot["value_arc"],
                 "characters": plot["characters"],
             }
-            # No setups/complications/crisis/climax/resolutions: view='dramatic_elements' with
-            # add_plot carries all four per scene, with the beat's own prose,
-            # and story_retrieve returns the plot whole. Repeating the bare
-            # scene ids here bought nothing in the view that must stay small.
+            # No setups/complications/crisis/climax/resolutions: the plot roles
+            # are read per scene in view='dramatic_elements', with the role's
+            # own prose, and story_retrieve returns the plot whole. Repeating
+            # the bare scene ids here bought nothing in the view that must stay
+            # small.
             return _omit(result, {"plot_type": "", "plot_scope": "", "value_arc": "",
                                   "characters": []},
                          always_keep={"status"})
@@ -806,17 +802,14 @@ def get_unfilled_map(project_path: Path) -> dict:
         for eid, etype, name, one_sentence, status, extra_json, loc_id, parent_id in ent_rows:
             extra = json.loads(extra_json) if extra_json else {}
             # The row, so `unfilled_fields` can see the fields that live in
-            # columns. It used to be handed `extra` alone and each column was
-            # merged in by hand, one type at a time — which is how four of them
-            # went missing and were reported as gaps on filled data.
+            # columns. Handing it `extra` alone leaves every column reported as
+            # a gap on filled data.
             row = {"id": eid, "type": etype, "name": name,
                    "one_sentence": one_sentence, "status": status,
                    "location_id": loc_id, "parent_id": parent_id}
 
             if etype == "scene":
                 # `status == planned` only, matching `_is_scene_stub` above.
-                # The dramatic_role clause that used to sit here had the same
-                # defect and the same fix; see the comment on that helper.
                 if status == "planned":
                     continue  # stub
                 # A scene that records no cast is a decision (no_cast), not a gap.
@@ -1346,13 +1339,11 @@ def get_dashboard_data(project_path: Path) -> dict:
         ).fetchall()
         scene_status = dict(status_rows)
 
-        # Dramatic roles are counted from the `plot_<role>` RELATIONS, not from
-        # the scene's `dramatic_role`. That field no longer holds a role — it
-        # only says plot_role / transition / non-event — so grouping on it
-        # produced a chart of "plot_role: 6", which reports the storage
-        # decision rather than the shape of the story. The relations are where
-        # the roles actually live, and this is the same fact the plot's five
-        # computed fields report per plot.
+        # Dramatic roles are counted from the `plot_<role>` RELATIONS. The
+        # scene's `dramatic_role` only says plot_role / transition / non-event,
+        # so grouping on it reports the storage decision rather than the shape
+        # of the story. The relations are where the roles live, and this is the
+        # same fact the plot's computed fields report per plot.
         role_rows = conn.execute(
             "SELECT kind, COUNT(*) FROM relations "
             "WHERE kind LIKE 'plot\\_%' ESCAPE '\\' "

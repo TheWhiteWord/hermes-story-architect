@@ -160,8 +160,8 @@ def _export_all(conn, project_path: Path) -> set:
             # `plot_roles` is a RELATION field, so it never lands in `extra` and
             # `fm.update(extra)` below would silently drop every plot role from
             # the scene note — and re-import would then lose them with nothing
-            # to complain about. Rebuilt from the rows, which is the same fact
-            # the plot note used to carry.
+            # to complain about. Rebuilt from the rows, which is where the plot
+            # note's role list came from.
             role_rows = conn.execute(
                 "SELECT from_id, kind, note FROM relations "
                 "WHERE to_id=? AND kind LIKE 'plot_%' ORDER BY \"order\"",

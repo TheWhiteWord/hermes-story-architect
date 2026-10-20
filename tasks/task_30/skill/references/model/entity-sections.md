@@ -191,17 +191,15 @@ home for.
 - **Production** — location, time, heading. Screenplay-facing.
 - **Notes**
 
-*The scene's `Conflict` and `Beats` sections are gone.* Both moved to the
-`scene_beats` record, which holds the beats and the evaluation of the scene.
-The scene keeps its own `Objective`.
+*The scene's `Conflict` and `Beats` content lives in the `scene_beats` record.
+The scene keeps its own `Objective`.*
 
 ## Scene beats
 
 *Three sections. The scene's beats, and the evaluation of the scene.*
 
 - **Conflict** — what resists the objective, and from which circle: inner,
-  personal, extra-personal. More than one at once is normal. The scene's own
-  `Conflict` section is gone; this is where it went.
+  personal, extra-personal. More than one at once is normal.
 - **Findings** — the evaluation of the scene: missing conflict, repetition, a
   turning point in the wrong place, on-the-nose dialogue. These are the
   author's judgements, written here rather than computed, so the list is not a

@@ -474,9 +474,9 @@ def standard_sections(entity_type: str) -> list[str]:
         "location": ["Description", "Atmosphere", "Image System", "History", "Dramatic Function", "Notes"],
         "world": ["Description", "History", "Livelihood", "Power", "Rituals", "Values", "Conflict", "Notes"],
         "plot": ["Summary", "Role", "Threads", "Value", "Characters", "Notes"],
-        # Conflict and Beats moved to `scene_beats` with the design: the scene
-        # holds what happens, `scene_beats` holds how and why. Objective stays —
-        # it is the reasoning behind the field, as on the act.
+        # The scene holds what happens; how it resists and how it evaluates
+        # itself is the `scene_beats` record's. Objective stays — it is the
+        # reasoning behind the field, as on the act.
         "scene": ["Content", "Objective", "Value Turn", "Dramatic Function", "Production", "Notes"],
         "sequence": ["Summary", "Purpose", "Value Arc", "Progression", "Sequence Climax", "Plots", "Notes"],
         "act": ["Summary", "Objective", "Value Arc", "Reversal", "Notes"],

@@ -8,9 +8,7 @@ the dict directly.
 **Errors raise; previews return.** A preview or a refusal whose payload is the
 point — the delete consent gate, the structural-children refusal — returns a
 dict, because the caller needs the thing it is being refused *with*. A fault
-raises `ValueError`, with the actionable detail in the message: nothing that
-used to travel in an `error` key is lost, because the key only ever named what
-the sentence now says.
+raises `ValueError`, with the actionable detail in the message.
 """
 import json
 import re
@@ -132,11 +130,10 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             f"of: {', '.join(standard)}. story_describe lists them per type."
         )
 
-    # Same for field names, and for the same reason: edit_entity refused an
-    # unrecognised key and create silently dropped it. The visible symptom was
-    # `{"goals": {"short": ..., "long": ...}}` — a shape the schema's own
-    # description used to advertise — reporting a character created with no
-    # goals at all. A field is flat, always; there is no nested form. The
+    # Same for field names, and for the same reason: edit_entity refuses an
+    # unrecognised key. A nested shape such as
+    # `{"goals": {"short": ..., "long": ...}}` reports a character created with
+    # no goals at all. A field is flat, always; there is no nested form. The
     # import path refuses the same key, so a note carrying one fails to import
     # rather than importing as something no reader will ever show.
     from .entity import ENTITY_COLUMN_MAP, relation_fields
@@ -652,7 +649,7 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
         "message": f"Applied: {summary}",
         "entity_id": entity_id,
         # Name what actually landed, so "success" cannot mean "silently did
-        # nothing" the way an unrecognised key used to.
+        # nothing".
         "applied": {
             "fields": sorted(set(applied_fields)),
             "sections": sorted(set(applied_sections)),
@@ -851,9 +848,8 @@ def delete_entity(project_path: Path, entity_type: str, slug: str,
 # ─── reorder ───
 
 # Entity types reorder can renumber. Declared here, next to the function that
-# enforces it, and imported by the draft validator so a type that stages is a
-# type that commits — the two checks used to disagree, and the disagreement
-# only surfaced as a raw ValueError after the user had approved the preview.
+# enforces it, and imported by the draft validator, so a type that stages is a
+# type that commits.
 REORDERABLE_TYPES = ("scene", "sequence")
 
 

@@ -47,6 +47,16 @@ pointer at it is a relation, and nothing reconciles the two. → `references/cra
   reverses hardest *at that level*. An act's climax and the story's climax are
   usually different scenes, and the story's is the one that cannot be undone.
 
+**Escalation is read across the promoted scenes, and stored nowhere.** A plot's
+chain of promoted scenes is the escalation: each milestone scene's
+`scene_objective` states what is wanted, and its `turning_point` states where
+the gap opens. Read it with `view="dramatic_elements"`, `plot` set to the plot,
+and `milestones_only` — the rows come back as `id`, `milestone`, `role`,
+`scene_objective`, `turning_point`. Successive turning points are the pattern;
+each is larger than the last, and the reader judges that. A subplot's chain is
+its own, read the same way, with the role under `role` since `milestone` is the
+main plot's. → `../mechanics/reading-the-project.md`
+
 **Plots.** The other thing running through the structure.
 
 - A plot declares what kind it is: `plot_scope` is main or sub, and `plot_type`

@@ -2,12 +2,10 @@
 
 The counterpart to story_load ("what exists and where" vs "what does this say").
 
-Three defects this replaces:
-  * a typo'd or mistyped id reported "Database not found. Run story_import first."
-    — pointing the agent at the one tool that destroys work;
-  * relation-backed fields (plot beats, scene characters) were unreachable, so an
-    agent could not see that a plot's crisis scene was empty;
-  * one entity per call, forcing a round trip per id.
+* A typo'd or mistyped id reports the project, not the import tool.
+* Relation-backed fields (plot beats, scene characters) are reachable, so a
+  plot's crisis scene can be read as empty.
+* Any number of entities per call.
 """
 import json
 from pathlib import Path
@@ -270,12 +268,10 @@ def handler(args: dict, **kwargs) -> str:
             return json.dumps({"error": "Database schema incomplete. Run story_import first."})
 
         schema = ENTITY_SCHEMAS.get(entity_type, {})
-        # `["all"]` means EVERY field, computed ones included. It used to filter
-        # them out, on the reasoning that a computed field is derived and so is
-        # not "the entity's own" — which reads right until you retrieve a plot
-        # in full and find no scenes anywhere in it. The five role fields are
-        # the whole content of a plot entity: without them a full retrieve
-        # returns the plot's name, type and scope and nothing about its story.
+        # `["all"]` means EVERY field, computed ones included. The five role
+        # fields are the whole content of a plot entity: without them a full
+        # retrieve returns the plot's name, type and scope and nothing about its
+        # story.
         #
         # They are still refused on the WRITE paths (drafts, create, edit) and
         # by the importer, which is where "computed" earns its keep: nobody

@@ -518,6 +518,120 @@ class TestDramaticElementsCarriesTheSpine:
         assert row["scene_beats"] == "central-room-day-beats"
 
 
+class TestDramaticElementsEscalationSpine:
+    """Issue 6: `plot` narrows the view and its header; `milestones_only`
+    trims the tree to the scenes the filtered plot promotes, each row carrying
+    the role that plot holds there."""
+
+    def _load(self, project, **args):
+        return json.loads(load_handler(
+            {"project": "save-the-children", "view": "dramatic_elements", **args},
+            root_path=str(project.parent.parent)))
+
+    @staticmethod
+    def _scenes(out):
+        return [s for a in out["acts"] for q in a["sequences"]
+                for s in q["scenes"]]
+
+    def test_the_full_view_keeps_its_header_and_rows(self, project):
+        """The new arguments are opt-in: with neither, nothing changes."""
+        out = self._load(project)
+        assert out["plot"] == "all"
+        assert {p["id"] for p in out["project"]["plots"]} == {
+            "the-resistance", "the-scientists-last-stand"}
+        assert set(self._scenes(out)[0]) >= {"title", "status", "plots"}
+
+    def test_plot_narrows_the_header_to_that_plot(self, project):
+        out = self._load(project, plot="the-resistance")
+        assert out["plot"] == "the-resistance"
+        assert [p["id"] for p in out["project"]["plots"]] == ["the-resistance"]
+        # The story-level facts are the main plot's and stay, so the filtered
+        # view can still be judged against the whole.
+        assert out["project"]["story_climax_scene_id"] == ["central-room-night"]
+        assert out["project"]["structure_type"] == "Classical"
+
+    def test_an_unknown_plot_is_an_error_not_an_empty_view(self, project):
+        out = self._load(project, plot="no-such-plot")
+        assert "error" in out
+        assert "no-such-plot" in out["error"]
+
+    def test_milestones_only_trims_the_rows(self, project):
+        rows = self._scenes(self._load(project, plot="the-resistance",
+                                       milestones_only=True))
+        assert [r["id"] for r in rows] == [
+            "central-room-day", "central-room-night", "the-core-day"]
+        for row in rows:
+            assert set(row) == {"id", "milestone", "role"}
+
+    def test_a_subplot_row_carries_that_plots_own_role(self, project):
+        """`milestone` is the main plot's, so the subplot's role has to have a
+        key of its own — filtering on `milestone` would keep nothing at all."""
+        rows = self._scenes(self._load(
+            project, plot="the-scientists-last-stand", milestones_only=True))
+        assert [r["id"] for r in rows] == ["central-room-day"]
+        assert rows[0]["role"] == ["setup"]
+        # The scene also serves the main plot, so both role keys are present
+        # and neither is a lie: milestone is the main plot's, role is this one's.
+        assert rows[0]["milestone"] == ["inciting_incident"]
+
+    def test_milestones_only_without_plot_keeps_every_promoted_scene(self, project):
+        """No `plot`: the spine is every scene any plot promotes."""
+        rows = self._scenes(self._load(project, milestones_only=True))
+        assert [r["id"] for r in rows] == [
+            "central-room-day", "central-room-night", "the-core-day"]
+        # One plot can promote a scene once and another plot twice: the roles
+        # are listed together, in story order, not deduplicated across plots.
+        assert rows[0]["role"] == ["inciting_incident", "setup"]
+
+    def test_the_spine_rows_carry_the_scenes_two_facts_when_written(self, project):
+        """Case (a) of the issue: a milestone scene with beats and a turning
+        point. The fixture records exist but carry no prose, so the facts are
+        written here — the point is that the trimmed row keeps them."""
+        from core.writes import create_entity, edit_entity
+        edit_entity(project, "scene", "central-room-day",
+                    {"scene_objective": "to get the door open without being seen"}, "r")
+        # One record per scene, so the existing one is edited rather than
+        # a second created.
+        edit_entity(project, "scene_beats", "the-core-day-beats",
+                    {"turning_point": "the handle turns and the lock was never engaged"}, "r")
+        rows = {r["id"]: r for r in self._scenes(
+            self._load(project, plot="the-resistance", milestones_only=True))}
+        assert rows["central-room-day"]["scene_objective"] == (
+            "to get the door open without being seen")
+        assert rows["the-core-day"]["turning_point"] == (
+            "the handle turns and the lock was never engaged")
+        # And the trimmed row drops what the spine does not need.
+        assert "scene_beats" not in rows["the-core-day"]
+        assert "title" not in rows["central-room-day"]
+
+    def test_a_scene_promoted_by_no_plot_is_not_on_the_spine(self, project):
+        """Case (d): a transition serves no plot, so it is never a milestone
+        and never appears here."""
+        from core.writes import create_entity
+        create_entity(project, "act", "act-corridor", {"title": "Act"})
+        create_entity(project, "sequence", "seq-corridor",
+                      {"title": "Seq", "act_id": "act-corridor"})
+        create_entity(project, "scene", "corridor-walk", {
+            "title": "Corridor", "status": "drafted",
+            "sequence_id": "seq-corridor", "act_id": "act-corridor",
+            "dramatic_role": "transition",
+        })
+        ids = [r["id"] for r in self._scenes(
+            self._load(project, milestones_only=True))]
+        assert "corridor-walk" not in ids
+        # It is still in the full view, where a transition is a real row.
+        assert "corridor-walk" in [r["id"] for r in self._scenes(
+            self._load(project))]
+
+    def test_an_empty_act_is_dropped_by_the_spine(self, project):
+        """A sequence with no promoted scene is the filter's result, not
+        structure — leaving it in would make a reader count empty acts."""
+        out = self._load(project, plot="the-scientists-last-stand",
+                         milestones_only=True)
+        assert [a["id"] for a in out["acts"]] == ["act-1"]
+        assert all(q["scenes"] for a in out["acts"] for q in a["sequences"])
+
+
 class TestDispatch:
     def test_unknown_view_lists_the_valid_ones(self, project):
         r = load(project, view="nonsense")
