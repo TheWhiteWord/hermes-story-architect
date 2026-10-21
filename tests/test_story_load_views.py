@@ -19,6 +19,7 @@ import pytest
 
 from core.db import get_project_summary
 from core.writes import create_entity as writes_create_entity
+from core.writes import edit_entity
 from tools.story_load import handler as load_handler
 
 
@@ -372,13 +373,13 @@ class TestUnfilledView:
             assert item["count"] == len(item["entities"])
 
 
-class TestBaseMapStaysSmall:
-    """The base map is the once-per-session call, so a scene's beat list must
-    not live in it. Issue 2: `scene_objective` and `turning_point` are the
-    `dramatic_elements` view's, and `scene_beats` is a pointer — the record is
-    a second call."""
+class TestBaseMapSceneRow:
+    """The base map is the once-per-session call. A scene's row carries what it
+    is FOR — its plots, its objective — and a pointer to its beats. The beats,
+    their `turning_point` and the `value_turns` are the views' and the record's."""
 
-    def _scene_with_beats(self, project, slug="slim", parent="act-slim"):
+    def _scene_with_beats(self, project, slug="slim", parent="act-slim",
+                          objective="to get the door open"):
         """A scene with a beat list, in its own act/sequence.
 
         Fresh ids throughout: the fixture already has acts, sequences and a
@@ -390,7 +391,7 @@ class TestBaseMapStaysSmall:
                              {"title": "Seq", "act_id": parent})
         writes_create_entity(project, "scene", slug, {
             "title": "Scene", "status": "drafted", "sequence_id": f"seq-{slug}",
-            "act_id": parent, "scene_objective": "to get the door open",
+            "act_id": parent, "scene_objective": objective,
         })
         # A record with a beat list, so the assertion has something to exclude.
         writes_create_entity(project, "scene_beats", f"{slug}-beats", {
@@ -409,15 +410,56 @@ class TestBaseMapStaysSmall:
         assert "turning_point" not in row
         assert "beats" not in row
 
+    def test_the_base_map_carries_the_scenes_plots_as_bare_slugs(self, project):
+        """The plots a scene serves, as slugs. The role it plays in each is the
+        `dramatic_elements` view's, which carries the plot index."""
+        from core.writes import edit_entity
+        edit_entity(project, "scene", "central-room-day",
+                    {"plot_roles": [
+                        {"plot": "the-resistance", "role": "inciting_incident"},
+                        {"plot": "the-scientists-last-stand", "role": "setup"},
+                    ]}, "r")
+        row = self._row(project, "central-room-day")
+        assert row["plots"] == ["the-resistance", "the-scientists-last-stand"]
+        # `dramatic_role` is a single word about the scene; the plots are the
+        # thing the map reports, and a scene can serve several.
+        assert "dramatic_role" not in row
+
+    def test_the_base_map_carries_the_scenes_objective(self, project):
+        """The scene's own field first, and the record's as the fallback."""
+        self._scene_with_beats(project)
+        assert self._row(project, "slim")["scene_objective"] == "to get the door open"
+
+    def test_the_objective_falls_back_to_the_record(self, project):
+        """The record's objective is read when the scene's own field is empty.
+        One record per scene, so the existing one is edited."""
+        self._scene_with_beats(project, slug="fallback", parent="act-fallback")
+        edit_entity(project, "scene", "fallback", {"scene_objective": ""}, "r")
+        edit_entity(project, "scene_beats", "fallback-beats",
+                    {"scene_objective": "the record's version"}, "r")
+        assert self._row(project, "fallback")["scene_objective"] == "the record's version"
+
+    def test_the_base_map_carries_no_value_turns(self, project):
+        """A value turn is a shift of a value with its effects — the `values`
+        view and the dashboard's graph read it, not the base map."""
+        edit_entity(project, "scene", "central-room-day",
+                    {"value_turns": [{"plot": "the-resistance", "value": "freedom",
+                                      "from": "imprisoned", "to": "free",
+                                      "effects": [{"character": "kael", "levels": [
+                                          {"conflict_level": "inner",
+                                           "effect": "Kael realises it."}]}]}]}, "r")
+        assert "value_turns" not in self._row(project, "central-room-day")
+
     def test_the_base_map_stays_small_with_a_beat_list(self, project):
         """The point of the pointer, measured against the scene that has none.
 
         Both rows differ only by the pointer: a scene with a three-beat record
         costs ~23 bytes more than one with no record at all, where the record
-        itself is ~1200 bytes. A tautology here would be comparing two scenes
-        that both have a record, which measures the id and nothing else.
+        itself is ~1200 bytes. Both scenes are given the same objective, so the
+        measurement is the pointer and nothing else — a tautology here would be
+        comparing two scenes that both have a record, which measures the id.
         """
-        self._scene_with_beats(project)
+        self._scene_with_beats(project, objective="")
         writes_create_entity(project, "act", "act-bare", {"title": "Act"})
         writes_create_entity(project, "sequence", "seq-bare",
                              {"title": "Seq", "act_id": "act-bare"})
@@ -430,10 +472,6 @@ class TestBaseMapStaysSmall:
         assert scenes["slim"]["scene_beats"] == "slim-beats"
         assert len(json.dumps(scenes["slim"])) - len(json.dumps(scenes["bare"])) < 50
 
-    def _all_scenes(self, project):
-        return {s["id"]: s for a in get_project_summary(project)["acts"]
-                for q in a["sequences"] for s in q["scenes"]}
-
     def test_a_scene_without_a_record_carries_no_pointer(self, project):
         writes_create_entity(project, "act", "act-bare", {"title": "Act"})
         writes_create_entity(project, "sequence", "seq-bare",
@@ -443,6 +481,10 @@ class TestBaseMapStaysSmall:
             "sequence_id": "seq-bare", "act_id": "act-bare",
         })
         assert "scene_beats" not in self._row(project, "bare")
+
+    def _all_scenes(self, project):
+        return {s["id"]: s for a in get_project_summary(project)["acts"]
+                for q in a["sequences"] for s in q["scenes"]}
 
     def _row(self, project, slug):
         scenes = [s for a in get_project_summary(project)["acts"]

@@ -355,8 +355,18 @@ def test_edit_all_field_types(entity_type, project):
             assert entity_data["title"] == edit_data["title"]
         if "status" in edit_data:
             assert entity_data["status"] == edit_data["status"]
-        if "dramatic_role" in edit_data:
-            assert entity_data.get("dramatic_role") == edit_data["dramatic_role"]
+        if "heading" in edit_data:
+            # A heading is prose, read with story_retrieve rather than in the
+            # base map's scene row. `fields` returns the requested names, so a
+            # key is only absent when the field is not this entity's.
+            retrieved = retrieve_handler({
+                "project": str(project),
+                "entity_type": "scene",
+                "id": [entity_id],
+                "fields": ["heading"],
+            })
+            heading = json.loads(retrieved)["entities"][0]["fields"].get("heading")
+            assert heading == edit_data["heading"]
 
     # Section check
     if section_name:

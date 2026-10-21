@@ -600,7 +600,6 @@ def get_project_summary(project_path: Path) -> dict:
                 "title": s["title"],
                 "status": s["status"],
                 "one_sentence": s["one_sentence"],
-                "dramatic_role": s["dramatic_role"],
                 # `characters`/`location`, not `chars`/`loc`: the write tools
                 # use these names, and the abbreviations saved 12 tokens
                 # (0.7% of the payload) at the cost of a second vocabulary
@@ -608,7 +607,18 @@ def get_project_summary(project_path: Path) -> dict:
                 "characters": chars,
                 "location": scene_loc.get(sid),
                 "milestone": milestone_label(scene_plot_roles.get(sid, []), plot_scopes),
-                "value_turns": s["_extra"].get("value_turns", []),
+                # The plots this scene serves, as bare slugs. The role it plays
+                # in each is the `dramatic_elements` view's, which carries the
+                # plot index; the base map stays the once-per-session call.
+                "plots": [e["plot"] for e in scene_plot_roles.get(sid, [])],
+                # The scene's immediate desire, for the same reason it is in
+                # `dramatic_elements`: the map says what each scene is FOR, and
+                # this is that in one line. The scene's own field first — it is
+                # the reasoning behind the record — and the record's as the
+                # fallback, since the two keep identical names and drift.
+                "scene_objective": (
+                    s["_extra"].get("scene_objective", "")
+                    or scene_beats.get(sid, {}).get("scene_objective", "")),
                 # The scene's computed field, read from its scene_beats. It is
                 # the record's ID, not the record: the id cannot be derived from
                 # the scene id, so this is the pointer a reader follows with a
@@ -618,7 +628,7 @@ def get_project_summary(project_path: Path) -> dict:
                 # map, which is the once-per-session call.
                 **({"scene_beats": scene_beats[sid]["id"]} if sid in scene_beats else {}),
             }
-            return _omit(result, {"one_sentence": "", "dramatic_role": "", "characters": [], "location": None, "milestone": [], "value_turns": [], "scene_beats": ""},
+            return _omit(result, {"one_sentence": "", "characters": [], "location": None, "milestone": [], "plots": [], "scene_objective": "", "scene_beats": ""},
                          always_keep={"status"})
 
         # ── Build sequence output ──

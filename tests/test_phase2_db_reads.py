@@ -132,28 +132,27 @@ class TestStubClassification:
     """Scene and arc beat stubs are correctly classified."""
 
     def test_scene_stub_has_only_id(self, db_project):
-        """A planned scene with no dramatic_role is a stub: {id} only."""
+        """A planned scene is a stub: {id} only."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         # Verify stub mechanism: if a stub exists, it should be a compact object
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and "dramatic_role" not in scene:
-                        assert "id" in scene
-                        assert "status" not in scene or scene.get("status") == "planned"
-        # Note: fixture has no stub scenes (all have dramatic_role + status),
-        # so this test is vacuous here.
+                    if isinstance(scene, dict) and scene.get("status") == "planned":
+                        assert set(scene) <= {"id", "characters"}
+                        assert "title" not in scene
 
-    def test_scene_full_has_dramatic_role(self, db_project):
-        """A non-stub scene has dramatic_role."""
+    def test_scene_full_has_no_stub_markers(self, db_project):
+        """A non-stub scene carries its full row, not the stub's."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         found_full = False
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and scene.get("dramatic_role"):
+                    if isinstance(scene, dict) and scene.get("status") != "planned":
+                        assert scene.get("title"), "a full scene carries its title"
                         found_full = True
         assert found_full, "No full scenes found in fixture"
 
@@ -175,7 +174,7 @@ class TestEmbeddedCrossReferences:
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and scene.get("dramatic_role"):
+                    if isinstance(scene, dict) and scene.get("status") != "planned":
                         # characters may be omitted when empty, but must be
                         # present for scenes that have characters assigned
                         if scene.get("characters"):
@@ -188,7 +187,7 @@ class TestEmbeddedCrossReferences:
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and scene.get("dramatic_role"):
+                    if isinstance(scene, dict) and scene.get("status") != "planned":
                         # location may be omitted when unassigned
                         if scene.get("location"):
                             assert isinstance(scene["location"], str)
@@ -276,7 +275,7 @@ class TestUnfilledInverted:
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and "dramatic_role" not in scene:
+                    if isinstance(scene, dict) and scene.get("status") == "planned":
                         assert scene["id"] not in all_unfilled, f"Stub scene {scene['id']} in unfilled"
 
     def test_character_goals_unfilled(self, db_project):
