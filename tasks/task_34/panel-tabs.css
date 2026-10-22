@@ -1,0 +1,46 @@
+/* Tabs for the detail panel.
+   panel-tabs.js lifts what a panel function already rendered into an "Overview"
+   pane and appends the tabs a module registered for that kind of entity. This
+   is the strip and the panes those tabs live in — the panel functions are not
+   touched. */
+
+.ptab-strip {
+  display: flex; align-items: center; gap: 2px;
+  padding-bottom: 0; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+}
+.ptab-strip::-webkit-scrollbar { display: none; }
+
+.ptab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 8px; margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent;
+  background: none; cursor: pointer; font: inherit; font-size: var(--font-size-sm);
+  color: var(--muted-foreground); white-space: nowrap;
+}
+.ptab:hover { color: var(--foreground); }
+.ptab.active {
+  color: var(--foreground); font-weight: 500;
+  border-bottom-color: var(--accent);
+}
+
+/* The dot marks a tab whose record is not there yet, so the strip says so
+   before the pane does. */
+.ptab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-gap); flex: none; }
+
+.ptab-widen {
+  margin-left: auto; padding: 4px; flex: none;
+  border: 0; border-radius: var(--radius);
+  background: none; cursor: pointer; color: var(--muted-foreground);
+  display: inline-flex; align-items: center;
+}
+.ptab-widen:hover { color: var(--foreground); background: var(--card); }
+.ptab-widen[aria-pressed="true"] {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Only the active pane takes part in the panel body's flex column, so the
+   inactive ones cost no gap and no height. */
+.ptab-pane { display: none; min-width: 0; }
+.ptab-pane.active { display: block; }

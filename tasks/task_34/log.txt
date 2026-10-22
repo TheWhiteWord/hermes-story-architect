@@ -1,0 +1,150 @@
+
+MESSAGE:
+
+'ll start by pulling the latest branch and studying the dashboard conventions: file structure, how the entity detail panels and their tabs are built, the colour tokens, and what data reaches the UI.
+Still working: research is done, and I'm now building the files. First I'll dump a real dashboard payload from the fixture, so my sample data and my code use the exact shapes the UI receives.
+I have what I need. The next step is the data layer, which is pure functions with no DOM, in line with the repo's existing split and testable in node.
+
+---
+ACTIONS TAKEN:
+- Exploring the codebase's structure and core files.
+- Reviewing the app's script structure and global conventions.
+- Building a detail panel from assigned HTML structures.
+- Mapping out the entity detail panel's tab structure.
+- Examining the dashboard's bundled libraries and dependencies.
+- Exploring the entity panel layout and dashboard data structure.
+- Scoping where tab navigation could fit in the detail panel
+- Mapping out the detail panel's structure and sections.
+- Figuring out how the panel width affects the expanded view. 
+- Designing a responsive layout toggle for wider lane views.
+- Reviewing file concatenation order for the dashboard tool.
+- Diagnosing why the dashboard lacks a scene beats pointer.
+- Checking payload builder for scene beats support before implementing
+- Exploring how the data structure organizes different entity sections.
+- Checking the beat record’s exact field layout in the schema.
+- Building a demo dataset for development and testing.
+- Checking tool compatibility for the rendering environment.
+- Organizing new files and module structure for the dashboard panels:
+    - Building the dashboard and verifying visuals with sample data.
+    - Designing panel tabs for scene detail views.
+    - Weighing a monkeypatch versus direct edits for integration.
+    - Handling panel width resets and cross-panel state conflicts.
+    - Deciding default widths and toggles for wide detail tabs.
+    - Designing beat rhythm strips and character lane visuals.
+    - Sketching arrow, gap, and bubble layouts for exchange flow.
+    - Defining color tokens and cards for changes and milestones.
+    - Picking palette colors and planning the character journey computation.
+    - Sketching journey ribbon visuals with lanes, dots, and markers.
+    - Mapping value depth strips to align with the ribbon.
+    - Planning hover interactions, scroll handling, and marker color details.
+- Assembling dashboard preview and reviewing style conventions
+- Reviewing the panel layout styling in the stylesheet.
+- Setting up color conventions for entities like characters and locations.
+- Resolving a color conflict for the gap and turning-point 
+- Mapping out the story's structural conventions.
+- Examining the story's scene and sequence data model.
+- Mapping out the value graph architecture for reuse.
+- Setting up project files for building and testing.
+- Crafting sample story data to test dashboard changes.
+- Designing hover tooltips and detail timeline for scene rows:
+    - Mapping out the story data structure and schema.
+    - Drafting a richer sample story for backend testing.
+    - Designing panel tabs and the detail layout for scenes.
+    - Wiring panel state updates to layout resize events.
+    - Building the scene beats tab and entity link resolution.
+    - Laying out the exchange grid and arrow connectors.
+    - Styling bubbles and responsive layout for narrow screens.
+    - Summarizing beat rhythm, header chips, and section rendering details.
+    - Building the character journey tab and value tracking.
+    - Sizing the ribbon layout and reusing the value-graph axis.
+    - Designing marker rows and value-depth lanes for the journey ribbon.
+- `Pure data layer: entity lookup and the character track derived from scenes, value turns and scene_beats
+`track-data.js`
+
+---
+
+MESSAGE:
+The data layer is done. Next is the shared tab component, which is the piece that makes both tabs drop-in.
+Tab strip, panes and wide mode for the detail panel `panel-tabs.css`
+The tokens exist, so the CSS is sound. Now the tab component itself.
+
+---
+ACTIONS TAKEN:
+- Tab component for the detail panel: decorates existing panel functions, no edits to entity-panels.js
+panel-tabs.js
+- Debugging panel activation and mount order issues.
+- Designing CSS grid layout for scene beat bubbles and connectors.
+- Shaping curved connectors and markers for conflict links.
+- Styling bubbles and rhythm strip cells for beat display.
+- Tracing how plot data maps to entity sections.
+- Laying out the scene beats as participant lanes
+- Scene beats tab: header, rhythm strip, lane exchange, changes, true character, notes `scene-beats-tab.js`
+- Matching the footer button styling to existing panel markup.
+- Footer buttons use btn btn-hermes, so I’m fixing that and tidying a leftover line in the rhythm summary.
+- Matching the footer button styling to existing panel markup.
+- Styling flash animations, change lists, and choice components:
+    - Footer buttons use btn btn-hermes, so I’m fixing that and tidying a leftover line in the rhythm summary.
+    - Styling the scene-beats layout with CSS.
+    - Styling header, chips, and rhythm cell components.
+    - Laying out exchange lanes and connecting beat elements.
+    - Styling gap markers, narrow mode, and bubble appearance.
+- Styles for the scene beats tab, with a container query that folds the lanes at narrow widths `scene-beats.css`
+- Before writing the journey tab, I'm registering what exists in the build and building a rich sample story, so I can render the scene tab and iterate on how it looks.
+- Mapping the script loading order and dependencies.
+- Tracking a mismatch between expected dict and tuple data.
+- Verifying scene-beat records link correctly to parent scenes.
+- Building a sample story to test the rendered tabs
+- Layering crisis and climax beats with shifting character dynamics.
+    - Building a sample story structure with replaced narrative fields.
+    - Mapping characters, locations, and plot arcs across scenes.
+    - Designing scene sequences with value turns and plot milestones.
+    - Drafting detailed scene beats with character actions and reactions.
+    - Writing scene beats with actions, reactions, and gaps.
+- Building a dashboard harness mirroring the handler's data injection.
+- Checking dashboard dependencies on external CDN resources.
+- Locating the vis-network library file in the project.
+- The tab mounts with no page errors, and the panel widened to 680px. Here is how it looks.
+- View the first render of the scene Beats tab `scene_central-room-day_1440.png`
+- Refining lane order, rhythm numbering, and icon before final review
+- View the crisis scene with a true-character choice and analysis notes `scene_the-offer_w.png`
+
+---
+
+MESSAGE:
+The two-lane scene reads very well. Now the most crowded case: five participants, a circumstance beat, and an inner-conflict beat.
+
+Narrow mode works. Next, the empty states: missing, not expected, and not started, plus a lighter beat list with no turning point. I’ll stitch them into one image.
+
+The scene tab handles every state. Now the character journey tab. I want to reuse the value graph’s geometry and axis so the two stay visually aligned, so I’m reading those functions precisely first.
+
+---
+
+ACTIONS :
+
+- Designing custom layout dimensions for value label widths.
+- Stacking axis and ribbon rows within one shared SVG.
+- Sizing ribbon geometry and handling tooltip and click interaction:
+    - Building a custom tooltip element with shared styling.
+    - Designing the ribbon chart’s rows and visual markers.
+    - Mapping value-path lanes and the detailed timeline rows.
+    - Laying out timeline rows and silent-scene grouping logic.
+- Designing the unified SVG layout for the journey tab
+- Character Journey tab: stats, act focus, ribbon (markers, circles, value depth) and the detail timeline `character-journey-tab.js`
+- Building styles for the character journey layout.
+- Styles for the character Journey tab `character-journey.css`
+- View Kael's Journey tab, the protagonist case with circles and value depth char_kael_w.png
+- Reviewing a data visualization’s layout and design choices.
+- Checking value-path lines and scene-column details for accuracy.
+- Expanding the visualization to the remaining character types
+- View five character types side by side chars.png
+- Verifying how each character’s visual markers display correctly.
+- Adding beat-participation markers for secondary characters’ immersion.
+- Adding participation markers and value strip summaries for secondary characters
+- View the antagonist's Journey with beat participation now visible char_the-administrator_w.png
+```
+
+
+
+
+
+
