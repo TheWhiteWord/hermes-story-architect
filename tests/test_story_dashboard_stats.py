@@ -5,8 +5,7 @@ from pathlib import Path
 import pytest
 
 # Add repo root to path
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "save-the-children"
 
@@ -145,7 +144,12 @@ class TestStructuralStats:
     """Regression tests for dashboard structural stats from DB."""
 
     def test_structural_stats_scene_roles(self, fixture_path):
-        """get_dashboard_data returns correct role counts (not all 'unset')."""
+        """Roles are counted from the `plot_<role>` relations.
+
+        They used to be counted from the scene's `dramatic_role`, which is now
+        only plot_role/transition/non-event — so this asserts the real role
+        names, and that `plot_role` is not itself reported as a role.
+        """
         from tools.story_import import handler as import_handler
         from core.db import get_dashboard_data
 
@@ -155,10 +159,11 @@ class TestStructuralStats:
         stats = data["structural_stats"]
         roles = stats["sceneRoles"]
 
-        # DB: all scenes have dramatic roles
-        assert roles.get("unset", 0) == 0, f"Expected no 'unset' roles, got: {roles}"
+        # The storage marker is not a dramatic role and must not appear as one.
+        assert "plot_role" not in roles, f"plot_role leaked into the chart: {roles}"
+        assert "unset" not in roles, f"unset is gone from the model: {roles}"
 
-        # Fixture has one scene per role
-        assert roles.get("setup", 0) == 1
-        assert roles.get("climax", 0) == 1
-        assert roles.get("resolution", 0) == 1
+        # The fixture's scenes, counted by the role they actually play.
+        assert roles.get("inciting_incident", 0) >= 1
+        assert roles.get("climax", 0) >= 1
+        assert roles.get("resolution", 0) >= 1

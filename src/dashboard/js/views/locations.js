@@ -21,7 +21,7 @@ DASH.buildLocationsView = function() {
     }
     return `
       <div class="entity-card" data-id="${l.id}" onclick="DASH.showLocationPanel('${l.id}')">
-        <div class="entity-card-pip" style="background:#6bbfb0"></div>
+        <div class="entity-card-pip" style="background:${DASH.ENTITY_KIND_COLORS.location}"></div>
         <div class="entity-card-body">
           <div class="entity-card-name">${l.name}</div>
           <div class="entity-card-sub">${l.one_sentence || ''}</div>

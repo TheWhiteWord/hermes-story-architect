@@ -16,12 +16,10 @@ can see through it, and the reference sites are scattered across `entities`,
 import json
 import shutil
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 
@@ -45,10 +43,18 @@ def _db(vault):
 
 
 def _edit(vault, action, entity_type="character", slug="kael", **extra):
-    from tools.story_edit import handler
+    """route the two admin actions (purge/restore) and the two write ones."""
+    from core.writes import delete_entity, edit_entity
+    from tools.story_admin import handler
+    project = vault / "projects" / "stc"
+    if action == "delete_entity":
+        return delete_entity(project, entity_type, slug, "test",
+                             extra.get("confirm"))
+    if action == "edit_note":
+        return edit_entity(project, entity_type, slug, extra.get("data", {}), "test")
     return json.loads(handler({
-        "action": action,
-        "target": {"entity_type": entity_type, "slug": slug, "project": "stc"},
+        "action": action, "project": "stc",
+        "target": {"entity_type": entity_type, "id": slug},
         "summary": "test", **extra}, root_path=str(vault)))
 
 
@@ -86,7 +92,7 @@ class TestDeleteFlagsRatherThanErases:
 
     def test_cascade_children_are_also_flagged(self, vault):
         _delete(vault)
-        live = _q(vault, "SELECT id FROM entities WHERE type='arc_beat' "
+        live = _q(vault, "SELECT id FROM entities WHERE type='scene_beats' "
                         "AND parent_id='kael' AND is_deleted=0")
         assert live == []
 
@@ -112,8 +118,21 @@ class TestDeletedEntitiesAreInvisible:
     def test_story_load_omits_it(self, vault):
         from tools.story_load import handler
         _delete(vault)
-        assert "kael" not in json.dumps(
-            json.loads(handler({"project": "stc"}, root_path=str(vault))))
+        payload = json.loads(handler({"project": "stc"}, root_path=str(vault)))
+        # Scoped to the character's own nodes, not the whole JSON: a value turn
+        # legitimately names a character in its `effects` prose, so a deleted
+        # character can still appear as a *mention* while being absent as an
+        # entity. The invariant is "no entity node for it", not "no text".
+        def walk(node):
+            if isinstance(node, dict):
+                if node.get("id") == "kael":
+                    pytest.fail("deleted character still present as an entity node")
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for x in node:
+                    walk(x)
+        walk(payload)
 
     def test_search_cannot_reach_its_prose(self, vault):
         from tools.story_search import handler
@@ -153,8 +172,8 @@ class TestDeletedEntitiesAreInvisible:
 
     def test_it_is_not_an_edit_target(self, vault):
         _delete(vault)
-        r = _edit(vault, "edit_note", data={"goals_short": "x"})
-        assert "error" in r
+        with pytest.raises(ValueError, match="not found"):
+            _edit(vault, "edit_note", data={"goals_short": "x"})
 
     def test_story_load_arc_view_omits_its_beats(self, vault):
         from tools.story_load import handler
@@ -180,7 +199,7 @@ class TestRestore:
         def snap():
             r = json.loads(handler({
                 "project": "stc", "entity_type": "character", "id": ["kael"],
-                "fields": ["goals_short", "character_value", "one_sentence"],
+                "fields": ["goals_short", "one_sentence"],
                 "sections": ["all"]}, root_path=str(vault)))
             return r["entities"][0]
 
@@ -192,9 +211,9 @@ class TestRestore:
     def test_restores_its_cascade_children(self, vault):
         _delete(vault)
         _edit(vault, "restore")
-        live = _q(vault, "SELECT id FROM entities WHERE type='arc_beat' "
+        live = _q(vault, "SELECT id FROM entities WHERE type='scene_beats' "
                         "AND parent_id='kael' AND is_deleted=0 ORDER BY id")
-        assert [r[0] for r in live] == ["kael-1", "kael-2", "kael-3"]
+        assert live == []
 
     def test_restoring_something_live_is_an_error(self, vault):
         r = _edit(vault, "restore")
@@ -231,19 +250,28 @@ class TestSchema:
         conn.commit()
         conn.close()
 
-        from core.db import SCHEMA_SQL, ensure_soft_delete_columns
-        conn = sq.connect(str(old))
-        conn.executescript(SCHEMA_SQL)
-        ensure_soft_delete_columns(conn)
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
-        conn.close()
+        # get_db is where the repair lives, and the path every caller takes.
+        proj = tmp_path / "legacy"
+        (proj / ".story").mkdir(parents=True)
+        (proj / ".story" / "story.db").write_bytes(old.read_bytes())
+
+        from core.db import get_db
+        conn = get_db(proj)
+        try:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(entities)")}
+        finally:
+            conn.close()
         assert {"is_deleted", "deleted_at"} <= cols
 
     def test_migration_is_idempotent(self, vault):
-        from core.db import get_db, ensure_soft_delete_columns
-        conn = get_db(vault / "projects" / "stc")
+        """Opening twice adds nothing twice — get_db runs on every connection."""
+        from core.db import get_db
+        proj = vault / "projects" / "stc"
+        get_db(proj).close()
+        conn = get_db(proj)
         try:
-            ensure_soft_delete_columns(conn)
-            ensure_soft_delete_columns(conn)
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(entities)")]
         finally:
             conn.close()
+        assert cols.count("is_deleted") == 1
+        assert cols.count("deleted_at") == 1

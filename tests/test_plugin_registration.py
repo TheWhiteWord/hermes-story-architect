@@ -26,10 +26,17 @@ sys.modules["hermes_story_architect"] = plugin
 _spec.loader.exec_module(plugin)
 
 TOOLS = [
-    "story_backup", "story_create", "story_dashboard", "story_describe", "story_edit",
-    "story_export", "story_import", "story_load", "story_memory", "story_retrieve",
-    "story_search",
+    "story_admin", "story_backup", "story_dashboard", "story_describe",
+    "story_draft", "story_export", "story_import", "story_load",
+    "story_memory", "story_retrieve", "story_search",
 ]
+
+
+def _manifest_tools():
+    import yaml
+    return set(yaml.safe_load(
+        (Path(__file__).parent.parent / "plugin.yaml").read_text(encoding="utf-8")
+    )["provides_tools"])
 
 
 class TestRegisteredSchemaShape:
@@ -63,27 +70,32 @@ class TestRegisteredSchemaShape:
         assert not missing, f"properties missing a description or type: {missing}"
 
 
+@pytest.fixture
+def registered():
+    """Every tool register() actually hands to Hermes, read back for real."""
+    registered = {}
+
+    class FakeCtx:
+        def register_tool(self, name, toolset, schema, handler, **kw):
+            registered[name] = schema
+
+        def register_skill(self, *a, **kw):
+            pass
+
+        def register_hook(self, *a, **kw):
+            pass
+
+        def get_config(self, key, default=None):
+            return default
+
+    plugin.register(FakeCtx())
+    return registered
+
+
 class TestRegistryIntegration:
-    def test_registry_actually_receives_the_parameters(self):
+    def test_registry_actually_receives_the_parameters(self, registered):
         """End-to-end: run register() for real and read back every schema."""
-        registered = {}
-
-        class FakeCtx:
-            def register_tool(self, name, toolset, schema, handler, **kw):
-                registered[name] = schema
-
-            def register_skill(self, *a, **kw):
-                pass
-
-            def register_hook(self, *a, **kw):
-                pass
-
-            def get_config(self, key, default=None):
-                return default
-
-        plugin.register(FakeCtx())
-
-        assert len(registered) == 11
+        assert set(registered) == set(TOOLS)
         for name, schema in registered.items():
             assert schema["parameters"]["properties"], f"{name} registered with no parameters"
             assert schema["description"], f"{name} registered with no description"
@@ -92,3 +104,43 @@ class TestRegistryIntegration:
         wrapped = plugin._tool_schema(importlib.import_module("tools.story_search").SCHEMA)
         assert "limit" in wrapped["parameters"]["properties"]
         assert wrapped["parameters"]["required"] == ["project", "query"]
+
+
+class TestManifestMatchesRegistration:
+    """plugin.yaml's provides_tools must equal what register() registered.
+
+    Two failure modes, one check. A name declared but never registered is
+    reported by plugins_activation.py as a tool this plugin has, and a tool
+    registered but never declared never reaches the model. Nothing else in the
+    suite compares the two, because they are two different files read at two
+    different times.
+    """
+
+    def test_manifest_and_registration_agree(self, registered):
+        assert _manifest_tools() == set(registered)
+
+
+class TestNoDirectAuthoringPath:
+    """The authoring path is closed; this is the canary that says so.
+
+    The model must reach every write through a staged draft. If a direct
+    create or edit tool ever comes back, the consent step goes with it and
+    the user is shown a write they never agreed to.
+    """
+
+    DELETED = ("story_create", "story_edit")
+
+    def test_not_registered(self, registered):
+        for name in self.DELETED:
+            assert name not in registered, (
+                f"{name} is registered again: writes bypass the draft consent step")
+
+    def test_not_declared_in_manifest(self):
+        for name in self.DELETED:
+            assert name not in _manifest_tools(), \
+                f"{name} is declared in plugin.yaml again"
+
+    def test_module_is_gone(self):
+        """Not merely unregistered: the module itself must not exist."""
+        for name in self.DELETED:
+            assert not (Path(__file__).parent.parent / "tools" / f"{name}.py").exists()

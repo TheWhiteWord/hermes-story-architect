@@ -1,5 +1,5 @@
 name: hermes-story-architect
-version: 0.1.0
+version: 0.1.2
 description: "Story-writing environment for Hermes Desktop"
 author: Davide, Hermes Agent
 kind: backend
@@ -8,8 +8,8 @@ provides_tools:
   - story_load
   - story_retrieve
   - story_search
-  - story_edit
-  - story_create
+  - story_draft
+  - story_admin
   - story_dashboard
   - story_import
   - story_export

@@ -1,0 +1,95 @@
+# Reading the project
+
+*Schematic draft — headings and notes only.*
+
+Which call answers which question about a project, and what each one costs. The
+parameters are in the tool schema; the routing is not.
+
+*Sizes below are from the `save-the-children` fixture — indicative, not
+promises. A real project with a full cast will be larger.*
+
+---
+
+## Start with the base view
+
+*One call, no parameters beyond the project, and it opens the session.*
+
+- The base view returns the **structure** (acts, characters, plots, worlds, and
+  any orphaned locations), the **project row**, and the **whole story memory**
+  with its usage count. Verified together in one response.
+- **So the first call of a session is `story_load` with the project and nothing
+  else.** It is both "what exists" and "what has been decided", and the memory
+  comes back every time rather than needing a separate fetch.
+- It is also the cheapest way to answer "where were we" — the memory is in it.
+- → `references/model/story-memory.md` for what to do with what comes back.
+- *The views below are all opt-in on top of this.* None of them is needed to
+  begin.
+
+## The views
+
+*Each answers one question. Asking a view the wrong question costs a second
+call, so the routing is worth holding.*
+
+| View | Answers | Needs |
+|---|---|---|
+| `dramatic_elements` | each scene's role, its milestones, and its objective and turning point | — or `act`, or `plot` |
+| `relationship` | every bond and both sides of each | — |
+| `unfilled` | what is still missing | — or `field`, or `entity` |
+| `values` | where each value stands, and where it turns next | — or `scene`, `unit`, `plot` |
+
+- **`dramatic_elements`** is the structural read: what each scene is *for*. This
+  is where the milestone flags surface, and it nests act → sequence → scene.
+  Add `act` to narrow it to one act.
+- **Add `plot` to read one plot's escalation spine.** The header narrows to that
+  plot, and the view returns only the scenes carrying a role in it. Add
+  `milestones_only` to trim those rows to the spine itself: `id`, `milestone`,
+  `role`, `scene_objective`, `turning_point`. `role` is that plot's own role at
+  the scene; `milestone` is the main plot's, so a subplot's rows carry their
+  role under `role`. → `references/craft/plot-and-structure.md`
+- **`relationship`** is small and whole: every bond with both perspectives. It
+  is the fastest way to see the cast's web. → `references/craft/character-relationships.md`
+- **`unfilled`** is the "what next?" view, and the only one that reports
+  something about the project rather than about a part of it.
+- **`values`** is the value line read in story order: where each value was last
+  left, and where it turns next. It is the read for deciding what a scene turns,
+  and for reading an arc back. → `../model/value-system.md`
+
+## `unfilled` has three shapes, and they are not the same call
+
+*The most useful view in the set, and the one most likely to be called wrongly.*
+
+- **Unfiltered**, it answers *"what is incomplete in this project?"* — grouped
+  by field, with a count. On the fixture: 94 gaps across 23 fields.
+- **It is truncated, and it says so.** The response carries a `truncated` flag
+  and an `other_fields` key for what it did not show. So the unfiltered view
+  tells you it is a partial list — **read the flag before treating the absence
+  of a field as its absence from the project.**
+- **By `field`** it answers *"who else is missing this?"* — a lookup across the
+  whole project. One field, a short list. A value field worth knowing is
+  `character_value_at_close`, on the character track.
+- **By `entity`** it answers *"what did I skip on this one?"* — the same lookup
+  the other way round.
+- **These two are the cheap ones** — a few hundred characters against two and a
+  half thousand — and they are the ones to reach for by default. The unfiltered
+  view is for a genuine sweep.
+
+## Reading a response
+
+- A view returns **ids**, and ids are what every other call takes. So the loop
+  is: load to see what exists, view to narrow it, retrieve to read it.
+- → `story_retrieve` for the content itself, which takes the ids from here.
+- **Nothing in this file is about a single entity.** Reading one character's
+  sections is `story_retrieve`, and the difference is the whole point: a view
+  answers a question about the project's *shape*, a retrieve answers a question
+  about one thing's *contents*.
+
+---
+
+## Open questions
+
+- [ ] The base view returns `orphaned_locations` alongside the structure. It is
+      not in the tool's description and nothing else in the skill covers it.
+      Worth a line here, or does it belong with the structural files?
+- [ ] The unfiltered `unfilled` view is the only one that can truncate. Say to
+      prefer the filtered forms by default, or is the truncation flag enough on
+      its own?

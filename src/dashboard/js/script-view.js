@@ -22,17 +22,28 @@ DASH.buildScriptView = function() {
     const tp = stats.titlePage;
     const hasContent = Object.values(tp).some(arr => Array.isArray(arr) ? arr.length > 0 : !!arr);
     if (hasContent) {
-      const titleTokens = (tp.cc || []);
-      const titleText = titleTokens.map(t => t.text || t).join('\n');
-      const tl = (tp.tl || []).map(t => t.text || t).join('<br>');
-      const tr = (tp.tr || []).map(t => t.text || t).join('<br>');
-      const bl = (tp.bl || []).map(t => t.text || t).join('<br>');
-      const br = (tp.br || []).map(t => t.text || t).join('<br>');
+      // Find the title by its type, never by position. `screenplay_title` can be
+      // empty, and a position-based split then renders the credit line as the
+      // title — which is exactly the mistake a `type` field exists to prevent.
+      // The type is `title` or `title_unfilled`, so match the prefix.
+      const ccTokens = (tp.cc || []).map(t => (typeof t === 'string' ? { text: t } : t));
+      const titleToken = ccTokens.find(t => (t.type || '').startsWith('title'))
+                          || { text: '', unfilled: true };
+      const creditTokens = ccTokens.filter(t => !(t.type || '').startsWith('title'));
 
-      // Split title page tokens into title + credit lines
-      const titleLines = titleText.split('\n');
-      const titleName = titleLines[0] || '';
-      const creditLines = titleLines.slice(1).join('<br>');
+      const tokenHtml = (arr) => (arr || []).map(t => {
+        const text = typeof t === 'string' ? t : (t.text || '');
+        const cls = (t && t.unfilled) ? 'tp-unfilled' : `tp-${(t && t.type) || 'x'}`;
+        return `<span class="${cls}">${DASH.escapeHtml(text)}</span>`;
+      }).join('<br>');
+
+      const tl = tokenHtml(tp.tl);
+      const tr = tokenHtml(tp.tr);
+      const bl = tokenHtml(tp.bl);
+      const br = tokenHtml(tp.br);
+      const creditHtml = tokenHtml(creditTokens);
+
+      const titleCls = titleToken.unfilled ? 'tp-unfilled' : 'tp-title';
 
       const tpEl = document.createElement('div');
       tpEl.className = 'screenplay-title-page';
@@ -41,8 +52,8 @@ DASH.buildScriptView = function() {
         <div class="title-tc"></div>
         <div class="title-tr">${tr}</div>
         <div class="title-cc">
-          <span class="tp-title">${DASH.escapeHtml(titleName)}</span>
-          ${creditLines ? `<span class="tp-credit">${creditLines}</span>` : ''}
+          <span class="${titleCls}">${DASH.escapeHtml(titleToken.text || '')}</span>
+          ${creditHtml ? `<span class="tp-credit">${creditHtml}</span>` : ''}
         </div>
         <div class="title-bl">${bl}</div>
         <div class="title-br">${br}</div>

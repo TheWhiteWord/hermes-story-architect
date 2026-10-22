@@ -1,8 +1,10 @@
 """story_export tool — reads story.db → writes markdown vault."""
 import json
+import re
 from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
+from core.entity import PLOT_BEAT_FIELDS
 
 SCHEMA = {
     "description": "Write the whole database back out to Markdown files. Use to publish the "
@@ -54,10 +56,41 @@ _FOLDERS = {
     "world": "worlds",
     "plot": "plots",
     "scene": "scenes",
+    "scene_beats": "scene_beats",
     "sequence": "sequences",
     "act": "acts",
     "relationship": "relationships",
 }
+
+
+# A value is not a folder note: every value lives in one file at the project
+# root, one frontmatter block per value, so a writer reads the whole set at
+# once instead of opening one note per value. Everything else is per-note.
+VALUE_FILE = "values.md"
+
+
+def _filename(title: str, folder: Path, used: set) -> str:
+    """A readable, unique `.md` stem for one entity, for a folder being written.
+
+    Titles are what a person reads, so the filename is the title — with the
+    characters a filesystem cannot take removed. Two entities can share a title
+    ("The Choice" is one beat per character in `save-the-children`), and they
+    land in different folders, but nothing stops one folder holding two, so a
+    counter settles it: `The Choice.md`, then `The Choice 2.md`.
+
+    Nothing references a filename, so a collision is cosmetic — an id collision
+    would be silent, and `id` is the primary key for that reason. A title that
+    sanitises to nothing falls back to the entity's id, which is never empty.
+    """
+    stem = "".join(c for c in (title or "") if c.isalnum() or c in " -_").strip()
+    stem = re.sub(r"\s+", " ", stem).strip(" .")
+    candidate = stem or "untitled"
+    n = 2
+    while f"{candidate}.md" in used:
+        candidate = f"{stem} {n}"
+        n += 1
+    used.add(f"{candidate}.md")
+    return candidate
 
 
 def _sweep_stale(project_path: Path, written: set) -> list:
@@ -87,13 +120,6 @@ def _sweep_stale(project_path: Path, written: set) -> list:
         if stale.is_file():
             stale.unlink()
             removed.append(rel)
-            # An arc beat was the last note in its character folder.
-            for parent in stale.parents:
-                if parent == project_path or not parent.is_dir():
-                    break
-                if parent.parent == project_path / "arcs" and not any(parent.iterdir()):
-                    parent.rmdir()
-                break
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(sorted(now), indent=2))
@@ -102,7 +128,18 @@ def _sweep_stale(project_path: Path, written: set) -> list:
 
 def _export_all(conn, project_path: Path) -> set:
     """Export all entities to markdown files. Returns the set of paths written."""
+    # Per folder, the names claimed so far *in this pass*. Deliberately not
+    # seeded from disk: re-exporting overwrites Kael.md with Kael.md, so a
+    # second export is idempotent. The counter only fires when two entities in
+    # one folder want the same title.
+    used_names = {}
+
+    # A scene_beats note has no title of its own — the design names it by the
+    # SCENE's title — so the map has to exist before the records are written.
+    scene_titles = dict(conn.execute(
+        "SELECT id, name FROM entities WHERE type='scene' AND is_deleted=0"))
     written = set()
+    value_blocks = []
     entity_rows = conn.execute(
         "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
         "FROM entities WHERE is_deleted=0 ORDER BY type, id"
@@ -120,6 +157,21 @@ def _export_all(conn, project_path: Path) -> set:
             ).fetchall()
             if chars:
                 extra["characters"] = [r[0] for r in chars]
+            # `plot_roles` is a RELATION field, so it never lands in `extra` and
+            # `fm.update(extra)` below would silently drop every plot role from
+            # the scene note — and re-import would then lose them with nothing
+            # to complain about. Rebuilt from the rows, which is where the plot
+            # note's role list came from.
+            role_rows = conn.execute(
+                "SELECT from_id, kind, note FROM relations "
+                "WHERE to_id=? AND kind LIKE 'plot_%' ORDER BY \"order\"",
+                (entity_id,)
+            ).fetchall()
+            if role_rows:
+                extra["plot_roles"] = [
+                    {"plot": f, "role": k[len("plot_"):], "description": n or ""}
+                    for f, k, n in role_rows
+                ]
 
         if entity_type == "location" or entity_type == "world":
             kind = "location_variant" if entity_type == "location" else "world_variant"
@@ -131,16 +183,26 @@ def _export_all(conn, project_path: Path) -> set:
                 extra["variant_of"] = var[0]
 
         if entity_type == "plot":
-            for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"),
-                                ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
-                beat_rows = conn.execute(
-                    f"SELECT to_id, note FROM relations WHERE from_id=? AND kind='{kind}' "
-                    f'ORDER BY "order"', (entity_id,)
-                ).fetchall()
-                if beat_rows:
-                    extra[field] = [{"scene_id": r[0], "description": r[1]} for r in beat_rows]
+            # The five role fields are computed and are NOT emitted: they are the
+            # scene's `plot_roles` read back from this side, so writing them here
+            # would put the same fact on both notes and let the two disagree.
+            for field in list(PLOT_BEAT_FIELDS):
+                extra.pop(field, None)
+
+        # Nested value data is stored as JSON, so its key order is whatever the
+        # writer happened to produce — and the note is what a writer reads.
+        # Reorder it against the schema's declared `sub_fields`, recursively,
+        # so `value_turns` reads plot/value/from/to before its effects and the
+        # ladder reads p/c/cd/nn rather than alphabetically.
+        for field, meta in ENTITY_SCHEMAS.get(entity_type, {}).items():
+            if meta.get("sub_fields") and field in extra:
+                extra[field] = _ordered(extra[field], meta)
 
         fm = _frontmatter_for(entity_type, entity_id, name, one_sentence, order_key, status, parent_id, location_id, extra)
+        # The filename is the title, so `id` is the only thing that survives a
+        # rename — it has to be in the note for every type, not just the four
+        # that happened to declare it. Set here rather than in each branch.
+        fm["id"] = entity_id
         sections = conn.execute(
             "SELECT heading, body FROM sections WHERE entity_id = ? ORDER BY rowid",
             (entity_id,)
@@ -153,25 +215,74 @@ def _export_all(conn, project_path: Path) -> set:
                 parts.append(f"## {heading}\n\n{body_text.rstrip()}")
             body = "\n\n".join(parts)
 
+        if entity_type == "value":
+            value_blocks.append(_value_block(entity_id, name, extra, body))
+            continue
+
         if entity_type == "project":
             _write_note(project_path / "project.md", fm, body)
             written.add(project_path / "project.md")
             from core.db import get_project_memory
             _write_note(project_path / ".story" / "memory.md", get_project_memory(project_path), "")
             written.add(project_path / ".story" / "memory.md")
-        elif entity_type == "arc_beat":
-            # Derive beat_id from composite entity_id + parent_id
-            beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
-            char_dir = project_path / "arcs" / parent_id
-            char_dir.mkdir(parents=True, exist_ok=True)
-            _write_note(char_dir / f"{beat_id}.md", fm, body)
-            written.add(char_dir / f"{beat_id}.md")
-        else:
-            folder = _folder_for(entity_type)
-            _write_note(project_path / folder / f"{entity_id}.md", fm, body)
-            written.add(project_path / folder / f"{entity_id}.md")
+            continue
+
+        folder = project_path / _folder_for(entity_type)
+
+        # A scene_beats note is named by the scene's title: the record has no
+        # title of its own, and two records for scenes of the same name would
+        # otherwise both fall to the "untitled" fallback and collide.
+        note_title = name
+        if entity_type == "scene_beats" and parent_id:
+            note_title = scene_titles.get(parent_id, name)
+
+        # The filename is the title, so the id has to live in the frontmatter —
+        # it is the only thing that survives the name change. `used` is per
+        # folder, so two characters may each own a "The Choice" note.
+        used = used_names.setdefault(folder, set())
+        note = folder / f"{_filename(note_title, folder, used)}.md"
+        _write_note(note, fm, body)
+        written.add(note)
+
+    # One file for every value, always written — an empty `values.md` is a
+    # stable, present file rather than a file that appears and disappears.
+    # `entity_rows` is `ORDER BY type, id`, so the blocks come out in id order.
+    # Written directly rather than through `_write_note`: the file is a
+    # concatenation of blocks that already carry their own `---` fences, so a
+    # wrapper frontmatter block would be a leading `--- {} ---` the parser has
+    # to skip.
+    values_path = project_path / VALUE_FILE
+    values_path.write_text("\n\n".join(value_blocks) + ("\n" if value_blocks else ""))
+    written.add(values_path)
 
     return written
+
+
+def _ordered(value, meta: dict):
+    """Reorder a field's entries and their nested entries to the schema's order.
+
+    Declared `sub_fields` come first, in declaration order, at every depth;
+    any key the declaration does not name is kept after them rather than
+    dropped, so an unrecognised key still reaches the note and is still refused
+    on the next import instead of vanishing silently.
+    """
+    subs = meta.get("sub_fields") or {}
+    if meta.get("type") == "list" and isinstance(value, list):
+        return [_ordered(v, meta) for v in value]
+    if isinstance(value, dict):
+        out = {}
+        if meta.get("type") == "object" and meta.get("keyed"):
+            # A map keyed by entity: the keys are data, only the values reorder.
+            return {k: _ordered(v, meta) for k, v in value.items()}
+        for key, sub_meta in subs.items():
+            if key in value:
+                out[key] = _ordered(value[key], sub_meta) if sub_meta.get(
+                    "sub_fields") else value[key]
+        for key, v in value.items():
+            if key not in out:
+                out[key] = v
+        return out
+    return value
 
 
 def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: str,
@@ -251,16 +362,10 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
         fm.update(extra)
         return fm
 
-    if entity_type == "arc_beat":
-        # Derive beat_id from composite entity_id + parent_id (no extra storage needed)
-        beat_id = entity_id[len(parent_id)+1:] if parent_id else entity_id
-        fm["id"] = beat_id
-        fm["character"] = parent_id
-        fm["label"] = name
-        fm["order"] = int(order_key) if order_key == int(order_key) else order_key
-        # Remove 'id' from extra since we already set it
-        arc_extra = {k: v for k, v in extra.items() if k != "id"}
-        fm.update(arc_extra)
+    if entity_type == "scene_beats":
+        fm["id"] = entity_id
+        fm["scene"] = parent_id
+        fm.update({k: v for k, v in extra.items() if k != "id"})
         return fm
 
     if entity_type == "relationship":
@@ -274,14 +379,38 @@ def _frontmatter_for(entity_type: str, entity_id: str, name: str, one_sentence: 
     return fm
 
 
+def _value_block(entity_id: str, name: str, extra: dict, body: str) -> str:
+    """One value as a frontmatter block for the concatenated `values.md`.
+
+    Field order is `id, name, p, c, cd, nn, note` — the schema order, so the
+    ladder reads p/c/cd/nn rather than alphabetically. `note` is skipped when
+    empty. The block carries no wrapper frontmatter of its own: the file is a
+    concatenation of these, and the importer splits on the `---` fences.
+    """
+    import frontmatter
+    fm = {"id": entity_id, "name": name}
+    for rung in ("p", "c", "cd", "nn"):
+        fm[rung] = str(extra.get(rung) or "")
+    if extra.get("note"):
+        fm["note"] = extra["note"]
+    return frontmatter.dumps(frontmatter.Post(body, **fm), sort_keys=False).rstrip("\n")
+
+
 def _folder_for(entity_type: str) -> str:
     return _FOLDERS.get(entity_type, entity_type)
 
 
 def _write_note(path: Path, fm: dict, body: str) -> None:
-    """Write a note file with frontmatter and body."""
+    """Write a note file with frontmatter and body.
+
+    `sort_keys=False` keeps the declared order, top level and nested: PyYAML
+    sorts by default, so a `value_turns` entry came out alphabetised — effects
+    before plot, and the ladder as c/cd/nn/note/p/value — which reads as noise
+    in the one file a writer actually edits. The schema's `sub_fields` order is
+    the intended reading order.
+    """
     import frontmatter
     path.parent.mkdir(parents=True, exist_ok=True)
     post = frontmatter.Post(body, **fm)
     with open(path, "w") as f:
-        frontmatter.dump(post, f)
+        frontmatter.dump(post, f, sort_keys=False)

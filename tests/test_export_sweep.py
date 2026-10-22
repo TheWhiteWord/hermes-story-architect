@@ -19,6 +19,8 @@ import pytest
 from tools.story_export import handler as export_handler
 from tools.story_import import handler as import_handler
 
+from test_round_trip import note_for, note_rel
+
 
 def _export(project, vault):
     # Resolve by name against the vault so the tool's own path resolution runs.
@@ -70,9 +72,9 @@ class TestIdempotent:
         p, vault = proj
         for _ in range(3):
             _export(p, vault)
-        assert (p / "characters" / "kael.md").exists()
+        assert note_for(p, "characters", "kael").exists()
         assert (p / "project.md").exists()
-        assert (p / "arcs" / "kael" / "1.md").exists()
+        assert note_for(p, "scene_beats", "central-room-day-beats").exists()
         assert (p / ".story" / "memory.md").exists()
 
     def test_first_export_never_removes(self, proj):
@@ -86,9 +88,12 @@ class TestDeleteSurvivesRoundTrip:
     def test_deleted_note_is_swept(self, proj):
         p, vault = proj
         _export(p, vault)                       # establishes the manifest
+        # The filename is the title, so the path is looked up by id before the
+        # note is deleted — after that there is nothing left to find.
+        kael_note = note_rel(p, "characters", "kael")
         _delete(p, "kael")
-        assert "characters/kael.md" in _export(p, vault)["files_removed"]
-        assert not (p / "characters" / "kael.md").exists()
+        assert kael_note in _export(p, vault)["files_removed"]
+        assert not (p / kael_note).exists()
 
     def test_deleted_entity_stays_deleted(self, proj):
         p, vault = proj
@@ -107,16 +112,35 @@ class TestDeleteSurvivesRoundTrip:
         ids = _ids(p)
         assert "mira" in ids and "dr-elena-voss" in ids
 
-    def test_emptied_arc_folder_is_pruned(self, proj):
+class TestSceneBeatsSweep:
+    """T2.3 — the export sweep removes an orphaned scene_beats note."""
+
+    def test_deleted_scene_sweeps_its_scene_beats_note(self, proj):
+        """A scene_beats note whose scene is deleted is removed by the manifest."""
         p, vault = proj
-        _export(p, vault)
-        conn = sqlite3.connect(str(p / ".story" / "story.db"))
-        beats = [r[0] for r in conn.execute(
-            "SELECT id FROM entities WHERE type='arc_beat' AND parent_id='mira'")]
-        conn.close()
-        _delete(p, *beats)
-        _export(p, vault)
-        assert not (p / "arcs" / "mira").exists()
+        _export(p, vault)  # establishes the manifest
+
+        # Find the scene_beats note for a scene
+        sb_note = note_for(p, "scene_beats", "central-room-day-beats")
+        assert sb_note.exists()
+
+        # Delete the scene in the database
+        _delete(p, "central-room-day")
+
+        # Export again — the sweep should remove the orphaned note
+        result = _export(p, vault)
+        assert str(sb_note.relative_to(p)) in result["files_removed"]
+        assert not sb_note.exists()
+
+    def test_hand_authored_note_in_scene_beats_survives(self, proj):
+        """A hand-authored note the database has never seen is never touched."""
+        p, vault = proj
+        (p / "scene_beats" / "handwritten.md").write_text(
+            "---\nname: Hand\n---\n\n## Conflict\n\nBy a human.\n"
+        )
+        for _ in range(3):
+            _export(p, vault)
+        assert (p / "scene_beats" / "handwritten.md").exists()
 
 
 class TestHandAuthoredNotesAreSafe:
@@ -136,10 +160,48 @@ class TestHandAuthoredNotesAreSafe:
         result = _export(p, vault)
         assert result["success"] is True
         assert result["files_removed"] == []
-        assert (p / "characters" / "kael.md").exists()
+        assert note_for(p, "characters", "kael").exists()
 
     def test_manifest_omits_its_own_and_story_dir(self, proj):
         p, vault = proj
         _export(p, vault)
         manifest = json.loads((p / ".story" / "exported.json").read_text())
         assert all(not m.startswith(".story/") or m == ".story/memory.md" for m in manifest)
+
+
+class TestNestedFieldsKeepTheirDeclaredOrder:
+    """A note is what a writer edits, so nested keys must read in schema order.
+
+    PyYAML sorts keys by default at every depth, which turned a value turn into
+    `effects` before `plot` and the ladder into `c, cd, nn, note, p, value`.
+    Export reorders against the schema's `sub_fields`, recursively.
+    """
+
+    def test_a_value_turn_reads_plot_value_from_to_before_effects(self, proj):
+        p, vault = proj
+        _export(p, vault)
+        text = note_for(p, "scenes", "central-room-day").read_text()
+        turn = text.split("value_turns:", 1)[1]
+        order = [k for k in ("plot:", "value:", "from:", "to:", "effects:")
+                 if k in turn]
+        assert order == ["plot:", "value:", "from:", "to:", "effects:"], order
+
+    def test_nested_effects_and_levels_keep_their_order(self, proj):
+        p, vault = proj
+        _export(p, vault)
+        text = note_for(p, "scenes", "central-room-day").read_text()
+        block = text.split("effects:", 1)[1].split("from:", 1)[0]
+        assert block.index("character:") < block.index("levels:")
+        assert block.index("conflict_level:") < block.index("effect:")
+
+    def test_an_undeclared_key_is_kept_not_dropped(self):
+        """Reordering must not become a filter, or a key vanishes silently."""
+        from core.constants import ENTITY_SCHEMAS
+        from tools.story_export import _ordered
+
+        meta = ENTITY_SCHEMAS["scene"]["value_turns"]
+        turn = {"effects": [], "plot": "x", "surprise": "keep me", "to": "b",
+                "value": "v", "from": "a"}
+        out = _ordered([turn], meta)[0]
+        assert list(out) == ["plot", "value", "from", "to", "effects", "surprise"]
+        assert out["surprise"] == "keep me"

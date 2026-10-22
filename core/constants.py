@@ -7,31 +7,46 @@ SCENE_STATUSES = ["planned", "drafted", "written", "locked"]
 SEQUENCE_STATUSES = ["planned", "in-progress", "complete"]
 ACT_STATUSES = ["planned", "in-progress", "complete"]
 SCENE_TIMES_OF_DAY = ["DAY", "NIGHT", "DUSK", "DAWN", "CONTINUOUS", "LATER"]
-SCENE_DRAMATIC_ROLES = ["setup", "complication", "crisis", "climax", "resolution", "transition", "non-event"]
-VALUE_CHARGES = ["positive", "negative", "mixed", "ironic"]
+# A scene's dramatic function. `plot_role` is the ordinary case: the role is
+# defined per plot in the scene's `plot_roles`, never here. The other two are
+# the only reasons a scene can serve NO plot — a bridge between beats, or a
+# beat that moves nothing. They are mutually exclusive with `plot_roles`.
+SCENE_DRAMATIC_ROLES = ["plot_role", "transition", "non-event"]
 STRUCTURE_TYPES = ["Classical", "Miniplot", "Antiplot"]
 PLOT_TYPES = ["Contradictory", "Resonant", "Complicating", "Setup"]
 PLOT_SCOPES = ["main", "sub"]
+
+# The dramatic roles a plot can hold — the `plot_<role>` relation kinds and the
+# `has_<role>` flags the dashboard reads. Declared here because `constants`
+# cannot import `entity` (entity imports constants); the authoritative
+# field↔kind map is `_RELATION_FIELDS["plot"]`, and tests/test_plot_roles.py
+# pins the two together so they cannot drift.
+PLOT_ROLES = ["setup", "inciting_incident", "complication", "crisis", "climax", "resolution"]
+# The value ladder — four rungs of opposition (design §3.1).
+# The rung is looked up from the word and never stored. The codes are the
+# field names on a `value` entity; the meanings are what the skill teaches.
+# C and CD are defined per the source file; the notes in ISSUES.md have them
+# swapped.
+VALUE_LADDER = {
+    "p": "Positive, the ideal",
+    "c": "Contrary: opposite, not absolute negation",
+    "cd": "Contradictory: direct negation of the positive",
+    "nn": "Negation of negation: perversion or false version of the positive",
+}
+
+# Where the opposition comes from, relative to one character.
+CONFLICT_LEVELS = ["inner", "personal", "extra-personal"]
+
+# How many values are major in a unit. Ties at the cut are all major, so a
+# unit can carry more than three (design §4).
+VALUE_MAJOR_COUNT = 3
+
 VALUE_ARCS = ["Maturation", "Redemption", "Education", "Punitive", "Disillusionment", "Testing"]
-ARC_TYPES = ["positive", "negative", "flat", "ironic", "absent"]
 FUZZY_THRESHOLD = 40
 
 MEMORY_CATEGORIES = ("decisions", "directions", "open_questions", "continuity_warnings")
 MEMORY_CHAR_LIMIT = 3000
 MEMORY_ENTRY_LIMIT = 300
-
-REQUIRED_FIELDS = {
-    "character": ["name", "story_role", "one_sentence"],
-    "location": ["name", "one_sentence"],
-    "world": ["name", "one_sentence"],
-    "plot": ["name", "status"],
-    "project": ["name", "logline"],
-    "scene": ["title", "sequence_id", "act_id"],
-    "sequence": ["title", "act_id"],
-    "act": ["title"],
-    "arc_beat": ["id", "character", "scene", "label", "action", "gap", "choice", "shift", "y", "order"],
-    "relationship": ["name", "characters"],
-}
 
 ENTITY_LABELS = {
     "character": "Character",
@@ -42,11 +57,12 @@ ENTITY_LABELS = {
     "scene": "Scene",
     "sequence": "Sequence",
     "act": "Act",
-    "arc_beat": "Arc Beat",
     "relationship": "Relationship",
+    "value": "Value",
+    "scene_beats": "Scene Beats",
 }
 
-# Full field schemas — used by story_create and story_edit to ensure all fields
+# Full field schemas — used by the write path to ensure all fields
 # are present. Each field carries type, default value, and description.
 # This makes the schema self-documenting — the LLM can discover expected fields
 # and their meanings from this dictionary alone, without external reference files.
@@ -55,16 +71,24 @@ ENTITY_SCHEMAS = {
         "name": {"type": "string", "default": "", "optional": False, "description": "Character display name"},
         "story_role": {"type": "string", "default": "", "optional": False, "description": "One of: Protagonist, Antagonist, Supporting, Minor, Cameo"},
         "one_sentence": {"type": "string", "default": "", "optional": False, "description": "One-sentence summary for index label"},
-        "relationships": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed summary of relationship entities (read-only, derived from relationships/)"},
-        "goals_short": {"type": "string", "default": "Goals not set", "optional": True, "description": "Short-term goal (flat form; nested goals.short also accepted)"},
-        "goals_long": {"type": "string", "default": "Goals not set", "optional": True, "description": "Long-term goal (flat form; nested goals.long also accepted)"},
+        "goals_short": {"type": "string", "default": "", "optional": True, "description": "Short-term goal"},
+        "goals_long": {"type": "string", "default": "", "optional": True, "description": "Long-term goal"},
         "knowledge": {"type": "list", "default": [], "optional": True, "description": "Facts the character knows. Each entry is a string."},
-        "arc_type": {"type": "string", "default": "Arc type not set", "optional": True, "description": "One of: positive, negative, flat, ironic, absent"},
-        "character_value": {"type": "string", "default": "Arc value not set", "optional": True, "description": "The value this character's arc explores (e.g. 'Freedom'). May differ from the story's."},
-        "character_value_at_open": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value where their arc begins. One of: positive, negative, mixed, ironic."},
-        "character_value_at_close": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value where their arc ends. One of: positive, negative, mixed, ironic."},
-        "arc_complete": {"type": "boolean", "default": False, "optional": True, "description": "Whether this character's arc is complete"},
-        "arc_beats_list": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Computed list of arc beats for this character (read-only, derived from arc_beat entities)"},
+        "relationships": {
+            "type": "list", "default": [], "optional": True, "computed": True,
+            "description": "Computed summary of relationship entities (read-only, derived from relationships/)",
+            # Declared because the load payload emits these objects and nothing
+            # said what was in them. Read-only, so this is for interpretation,
+            # not for writing — the draft validator rejects a write with a
+            # "read-only" finding. `strength` appears only in the dashboard
+            # view, which carries more than the load payload.
+            "sub_fields": {
+                "with": {"type": "string", "description": "Slug of the OTHER character in this relationship — never this one"},
+                "label": {"type": "string", "description": "This character's label for the other (e.g. 'Colleague')"},
+                "type": {"type": "string", "description": "How this character reads the bond. Observed: ally, rival, enemy, family, romantic. Free text — not a closed set."},
+                "strength": {"type": "number", "description": "Signed tension: negative is antagonism (observed -0.6..0.9). Dashboard view only."},
+            },
+        },
     },
     "location": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
@@ -83,111 +107,243 @@ ENTITY_SCHEMAS = {
         "power": {"type": "list", "default": [], "optional": True, "description": "Who holds power and how (e.g. 'the Church sanctions all tech')"},
         "variant_of": {"type": "string", "default": "", "optional": True, "description": "Slug of the base world this is a version of. Empty on base worlds."},
     },
+    # Field ORDER is part of the contract: a reader gets these fields in
+    # reading order, not hash order. What a plot IS (name, one-sentence,
+    # status), then WHO and WHAT SHAPE (cast, value arc, scope, type), then
+    # its dramatic progression in the order the beats happen. The roles were
+    # declared setups/crisis/climax/complications/resolutions, which is neither
+    # the dramatic order (setup, complication, crisis, climax, resolution) nor
+    # the order a reader scans them in.
     "plot": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Plot display name"},
-        "one_sentence": {"type": "string", "default": "Summary not set", "optional": True, "description": "One-sentence summary for index label"},
-        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup"},
-        "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
-        "value_arc": {"type": "string", "default": "Value arc not set", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
+        "one_sentence": {"type": "string", "default": "", "label": "Summary", "optional": True, "description": "One-sentence summary for index label"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, resolved, abandoned"},
-        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs involved in this plot (frontmatter-only)"},
-        "setups": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot is established", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "crisis": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches crisis point", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "climax": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot reaches climax", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
-        "payoffs": {"type": "list", "default": [], "optional": True, "description": "Scenes where plot resolves", "sub_fields": {"scene_id": "Scene slug", "description": "What happens at this scene"}},
+        "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs of this plot's protagonists only", "ref": "character"},
+        "value_arc": {"type": "string", "default": "", "optional": True, "description": "One of: Maturation, Redemption, Education, Punitive, Disillusionment, Testing"},
+        "plot_scope": {"type": "string", "default": "", "optional": True, "description": "main or sub"},
+        "plot_type": {"type": "string", "default": "", "optional": True, "description": "One of: Contradictory, Resonant, Complicating, Setup (required for sub plots only)"},
+        # The six role fields are READ-ONLY: they are the same `plot_<role>`
+        # rows the scene writes as `plot_roles`, read back from the plot side.
+        # The agent records a role where it is writing the scene, and never has
+        # to reopen a plot to add one. `computed` is what makes every write
+        # path refuse them — draft preview, create, edit, describe.
+        #
+        # Declared in dramatic order, which is the order they occur and the
+        # order a reader scans them: setup → inciting_incident → complication →
+        # crisis → climax → resolution. Note this is NOT `PLOT_ROLES`' order —
+        # complications is plural and sits third, not last. A test pins the
+        # two so they cannot drift, because the field names are not the role
+        # names.
+        "setups": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is established (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "inciting_incident": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is incited (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "complications": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot is complicated or obstructed (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "crisis": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches crisis point (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "climax": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot reaches climax (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "resolutions": {"type": "list", "default": [], "optional": True, "computed": True, "description": "Scenes where plot resolves (read-only — set it on the scene as plot_roles)", "sub_fields": {"scene_id": {"type": "string", "description": "Scene slug"}, "description": {"type": "string", "description": "What happens at this scene"}}},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the values that shift in this plot's scenes, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the most frequent, ties at the cut all major (VALUE_MAJOR_COUNT); scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The most frequent values in this unit, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The remaining values, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
     },
     "project": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Project display name"},
-        "logline": {"type": "string", "default": "logline not set", "optional": True, "description": "One-sentence summary of the story"},
-        "genre": {"type": "string", "default": "genre not set", "optional": True, "description": "Story genre (e.g. Sci-fi thriller)"},
-        "setting": {"type": "string", "default": "not set", "optional": True, "description": "Primary setting (e.g. Near-future city-state)"},
         "status": {"type": "string", "default": "active", "optional": True, "description": "One of: active, abandoned, archived"},
-        "screenplay_title": {"type": "string", "default": "Default", "optional": True, "description": "Title page: screenplay title (center)"},
-        "credit": {"type": "string", "default": "Credit N.A.", "optional": True, "description": "Title page: credit line (e.g. 'Written by')"},
-        "author": {"type": "string", "default": "Author N.A.", "optional": True, "description": "Title page: author name"},
-        "contact": {"type": "string", "default": "Contact N.A.", "optional": True, "description": "Title page: contact info (bottom-right)"},
-        "draft_date": {"type": "string", "default": "Draft Date N.A.", "optional": True, "description": "Title page: draft date (bottom-left)"},
-        "draft": {"type": "string", "default": "N.A.", "optional": True, "description": "Title page: draft label (e.g. 'First Draft')"},
-        "spine": {"type": "string", "default": "Spine not set", "optional": True, "description": "Protagonist's desire (story-level spine)"},
-        "controlling_idea": {"type": "string", "default": "Controlling Idea not set", "optional": True, "description": "The story's controlling idea/argument"},
-        "story_value": {"type": "string", "default": "Value not set", "optional": True, "description": "The story's thematic value (e.g. 'Trust'). Stated once, here; scenes inherit it."},
-        "story_value_at_open": {"type": "string", "default": "Opening Value not set", "optional": True, "description": "Charge on the story value as the story opens. One of: positive, negative, mixed, ironic."},
-        "story_value_at_close": {"type": "string", "default": "Closing Value not set", "optional": True, "description": "Charge on the story value as the story closes. One of: positive, negative, mixed, ironic."},
-        "inciting_incident_scene_id": {"type": "string", "default": "Inciting Incident Scene not set", "optional": True, "description": "Scene slug of the inciting incident"},
-        "story_climax_scene_id": {"type": "string", "default": "Story Climax Scene not set", "optional": True, "description": "Scene slug of the story climax"},
-        "structure_type": {"type": "string", "default": "Structure Type not set", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
+        "logline": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the story"},
+        "structure_type": {"type": "string", "default": "", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
+        "genre": {"type": "string", "default": "", "optional": True, "description": "Story genre (e.g. Sci-fi thriller)"},
         "act_count": {"type": "number", "default": 3, "optional": True, "description": "Number of acts in story structure (default 3, auto-adjusts upward if more act files exist)"},
+        "screenplay_title": {"type": "string", "default": "Default", "optional": True, "description": "Title page: screenplay title (center)"},
+        "setting": {"type": "string", "default": "", "optional": True, "description": "Primary setting (e.g. Near-future city-state)"},
+        "spine": {"type": "string", "default": "", "optional": True, "description": "Protagonist's desire (story-level spine)"},
+        "controlling_idea": {"type": "string", "default": "", "optional": True, "description": "The story's controlling idea/argument"},
+        "credit": {"type": "string", "default": "", "optional": True, "description": "Title page: credit line (e.g. 'Written by')"},
+        "author": {"type": "string", "default": "", "optional": True, "description": "Title page: author name"},
+        "contact": {"type": "string", "default": "", "optional": True, "description": "Title page: contact info (bottom-right)"},
+        "draft_date": {"type": "string", "default": "", "optional": True, "description": "Title page: draft date (bottom-left)"},
+        "draft": {"type": "string", "default": "", "optional": True, "description": "Title page: draft label (e.g. 'First Draft')"},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the story's major and minor values, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the main plot's major values; minor is the subplots' major values not already major (design §4). scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The main plot's most frequent values, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The subplots' major values not already major, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
     },
     "scene": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug reflecting dramatic function (e.g., 'mara-discovers-files'), NOT the physical heading"},
         "type": {"type": "string", "default": "scene", "optional": False, "description": "Always 'scene'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name (freely editable) reflecting dramatic function"},
-        "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the scene"},
-        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, drafted, written, locked"},
-        "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},
-        "location": {"type": "string", "default": "Location not set", "optional": True, "description": "Location slug or free text"},
-        "time_of_day": {"type": "string", "default": "", "optional": True, "description": "One of: DAY, NIGHT, DUSK, DAWN, CONTINUOUS, LATER"},
-        "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug (denormalized shortcut)"},
+        "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
+        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},
+        "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},
+        "location": {"type": "string", "default": "", "optional": True, "description": "Slug of an existing location"},
+        "time_of_day": {"type": "string", "default": "", "optional": True, "description": "One of: DAY, NIGHT, DUSK, DAWN, CONTINUOUS, LATER"},
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs present in this scene"},
         "no_cast": {"type": "boolean", "default": False, "optional": True, "description": "Set true when this scene deliberately has no characters (e.g. an empty room). Clears the 'characters unfilled' gap so a decision is not flagged forever"},
-        "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this scene. One of: positive, negative, mixed, ironic."},
-        "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this scene. One of: positive, negative, mixed, ironic."},
-        "shift": {"type": "string", "default": "Shift not recorded", "optional": True, "description": "How the story value turns here, in the story's language (e.g. 'trust → suspicion')."},
-        "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on the story value after this scene's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the story-value curve passes through."},
-        "conflict_levels": {"type": "list", "default": [], "optional": True, "description": "Any of: inner, personal, extra-personal"},
-        "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "One of: setup, complication, crisis, climax, resolution, transition, non-event"},
-        "is_inciting_incident": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as the story's inciting incident"},
-        "is_sequence_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as its sequence's climax"},
-        "is_act_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as its act's climax"},
-        "is_story_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks the scene as the story's climax"},
+        "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the scene"},
+        # The driver's immediate desire, written on the scene as the reasoning
+        # behind it and on `scene_beats` as the mechanism's first step. The two
+        # keep identical names and are allowed to drift: reconciling them is the
+        # author's job after reworking `scene_beats`, not the reader's.
+        "scene_objective": {"type": "string", "default": "", "optional": True, "description": "The driver's immediate desire. One sentence."},
+        # Read from this scene's scene_beats, which is another entity and so has
+        # nothing in this row's `extra` to read. `scene_beats` is the POINTER to
+        # that record — a slug, not the record — because the id cannot be derived
+        # from the scene id: it is caller-supplied, and the skill teaches
+        # `{scene_id}-beats` as the convention. The full record is read with
+        # `story_retrieve` on `scene_beats` and this id, which is what keeps the
+        # base `story_load` map from growing with every beat. `ref` is
+        # declaration only: the field is computed, so no write path ever carries
+        # it into `check_references`.
+        "turning_point": {"type": "string", "default": "", "optional": True, "computed": True, "description": "The moment the scene's largest gap opens and the value turns. One sentence. It starts the scene's closing state and does not resolve the gap. Read from this scene's scene_beats (read-only)."},
+        "scene_beats": {"type": "string", "default": "", "optional": True, "computed": True, "ref": "scene_beats", "description": "Slug of this scene's scene_beats record (read-only). Read the record itself with story_retrieve on scene_beats and this id. Empty when the scene has none."},
+        "dramatic_role": {"type": "string", "default": "", "optional": True, "description": "How this scene functions dramatically. One of: plot_role, transition, non-event. 'plot_role' (or empty) means the role is defined per plot in plot_roles — do NOT repeat it here. 'transition' and 'non-event' are the only values that serve no plot, and they are mutually exclusive with plot_roles: setting one requires plot_roles to be empty."},
+        # The write side of a plot role. Every entry names its own plot, so one
+        # scene can hold different roles in different plots — which is why the
+        # role cannot live on the scene alone. Stored as `plot_<role>` rows
+        # pointing AT this scene; the plot's five fields read them back.
+        "plot_roles": {
+            "type": "list", "default": [], "optional": True,
+            "description": "Which plots run through this scene, and in what role. One entry per plot. This is where a plot role is written — never on the plot itself.",
+            "sub_fields": {
+                "plot": {"type": "string", "description": "Slug of an existing plot", "required": True, "ref": "plot"},
+                "role": {"type": "string", "description": "One of: setup, inciting_incident, complication, crisis, climax, resolution", "required": True, "enum": PLOT_ROLES},
+                "description": {"type": "string", "description": "What this scene does for that plot"},
+            },
+        },
+        # The value pass, recorded after the scene exists: one entry per
+        # shift of a value, with its effects on the protagonists nested
+        # inside. A scene is created without it; the value pass fills it in
+        # later by editing the scene. `value` names an existing value entity
+        # (create it first with story_draft — it can go in the same draft);
+        # `from`/`to` are words of THAT value's four rungs. A value has one
+        # schema wherever it is used, so there is nothing to define here. See
+        # VALUE_LADDER and CONFLICT_LEVELS.
+        "value_turns": {"type": "list", "default": [], "optional": True,
+                        "description": "Value turns recorded on this scene. Each entry is one shift of a value, with its effects on the protagonists.",
+                        "sub_fields": {
+                            "plot": {"type": "string", "required": True, "ref": "plot", "description": "Slug of an existing plot"},
+                            "value": {"type": "string", "required": True, "description": "The name of an existing value entity — the value, named by its positive pole (e.g. 'trust')"},
+                            "from": {"type": "string", "required": True, "description": "The state when the scene opens, as a word of that value's four rungs"},
+                            "to": {"type": "string", "required": True, "description": "The state when the scene closes, as a word of that value's four rungs"},
+                            "effects": {"type": "list", "required": True, "description": "The outcome of the value shift for a plot protagonist, by conflict level",
+                                        "sub_fields": {
+                                            "character": {"type": "string", "required": True, "ref": "character", "description": "A protagonist of the plot, whether or not present in the scene"},
+                                            "levels": {"type": "list", "required": True, "description": "One entry per conflict level through which the shift reaches that character",
+                                                       "sub_fields": {
+                                                           "conflict_level": {"type": "string", "required": True, "enum": CONFLICT_LEVELS, "description": "Where the opposition comes from, relative to that character"},
+                                                           "effect": {"type": "string", "required": True, "description": "One sentence: what the shift does to that character at that level"},
+                                                       }},
+                                        }},
+                        }},
     },
     "sequence": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug"},
         "type": {"type": "string", "default": "sequence", "optional": False, "description": "Always 'sequence'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent act (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug"},
-        "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this sequence. One of: positive, negative, mixed, ironic."},
-        "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this sequence. One of: positive, negative, mixed, ironic."},
-        "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this sequence's reversal lands"},
         "primary_plot": {"type": "string", "default": "", "optional": True, "description": "Primary plot slug this sequence serves"},
-        "purpose": {"type": "string", "default": "Purpose not set", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the values that shift in this sequence's scenes, all plots together, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the most frequent, ties at the cut all major (VALUE_MAJOR_COUNT); scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The most frequent values in this unit, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The remaining values, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
+        "purpose": {"type": "string", "default": "", "optional": True, "description": "Free text: dramatic purpose of this sequence"},
     },
     "act": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Stable slug"},
         "type": {"type": "string", "default": "act", "optional": False, "description": "Always 'act'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name. Use 'Act I', 'Act II', 'Act III', etc."},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within story (float for insertions)"},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
-        "value_at_open": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value entering this act. One of: positive, negative, mixed, ironic."},
-        "value_at_close": {"type": "string", "default": "", "optional": True, "description": "Charge on the story value leaving this act. One of: positive, negative, mixed, ironic."},
-        "climax_scene_id": {"type": "string", "default": "", "optional": True, "description": "Scene slug where this act's major reversal lands"},
-        "act_objective": {"type": "string", "default": "Objective not set", "optional": True, "description": "Protagonist's immediate goal for this act"},
+        "act_objective": {"type": "string", "default": "", "label": "Objective", "optional": True, "description": "Protagonist's immediate goal for this act"},
+        "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
+                        "description": "Computed: the values that shift in this act's scenes, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the most frequent, ties at the cut all major (VALUE_MAJOR_COUNT); scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
+                        "sub_fields": {
+                            "major": {"type": "list", "description": "The most frequent values in this unit, at most VALUE_MAJOR_COUNT, with ties at the cut included",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                            "minor": {"type": "list", "description": "The remaining values, by frequency",
+                                      "sub_fields": {"value": {"type": "string", "description": "The value's name"}, "scenes": {"type": "number", "description": "Scenes in which the value shifts"}}},
+                        }},
     },
-    "arc_beat": {
-        "id": {"type": "string", "default": "", "optional": False, "description": "Beat slug (unique within character)"},
-        "character": {"type": "string", "default": "", "optional": False, "description": "Character slug this beat belongs to"},
-        "scene": {"type": "string", "default": "", "optional": False, "description": "Scene slug where this beat occurs"},
-        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within character's arc"},
-        "label": {"type": "string", "default": "", "optional": False, "description": "Human-readable label (e.g. 'First Doubt')"},
-        "action": {"type": "string", "default": "Action not described", "optional": True, "description": "What the character does"},
-        "gap": {"type": "string", "default": "Gap not defined", "optional": True, "description": "Expectation vs reality gap"},
-        "choice": {"type": "string", "default": "Choice not recorded", "optional": True, "description": "The choice the character makes"},
-        "character_value_at_open": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value entering this beat. One of: positive, negative, mixed, ironic."},
-        "character_value_at_close": {"type": "string", "default": "Not set", "optional": True, "description": "Charge on this character's value leaving this beat. One of: positive, negative, mixed, ironic."},
-        "shift": {"type": "string", "default": "Shift not recorded", "optional": True, "description": "How this character's value turns at this beat, in dramatic language (e.g. 'suspicious doubt → active defiance')."},
-        "y": {"type": "number", "default": 0.0, "optional": True, "description": "Ending charge on this character's value after this beat's turn, -1.0 to +1.0, signed like the charge word: positive is above zero, negative below, mixed and ironic in between. The point the arc curve passes through."},
-        "is_crisis": {"type": "boolean", "default": False, "optional": True, "description": "Marks a crisis beat"},
-        "is_climax": {"type": "boolean", "default": False, "optional": True, "description": "Marks a climax beat"},
+
+    "scene_beats": {
+        "scene": {"type": "string", "default": "", "optional": False, "description": "Slug of an existing scene", "ref": "scene"},
+        "driver": {"type": "string", "default": "", "optional": True, "description": "Slug of the character who drives the scene", "ref": "character"},
+        "scene_objective": {"type": "string", "default": "", "optional": True, "description": "The driver's immediate desire. One sentence."},
+        "turning_point": {"type": "string", "default": "", "optional": True, "description": "The moment the scene's largest gap opens and the value turns. One sentence. It starts the scene's closing state and does not resolve the gap. Surfaces on the scene as a computed field."},
+        # A true choice is a dilemma; it is where true character shows. The
+        # source gives no count per scene, so the list holds none, one or
+        # several, and most scenes hold none. `character` may differ from
+        # `driver`: in an ultimatum one character drives and another chooses.
+        "true_character": {
+            "type": "list", "default": [], "optional": True,
+            "description": "True-character moments: the choices that reveal who the character is. None, one or several.",
+            "sub_fields": {
+                "character": {"type": "string", "required": True, "ref": "character", "description": "Slug of the character who faces the choice — may differ from the driver"},
+                "dilemma": {"type": "string", "description": "The alternatives and what choosing costs: irreconcilable goods, or the lesser of two evils"},
+                "choice_reveals": {"type": "string", "description": "What the choice shows about who the character is"},
+            },
+        },
+        # What changed, at the end of the scene. The beats change behaviour;
+        # this is the state those changes leave behind, assessed over the whole
+        # scene rather than one exchange. One entry per entity that is different
+        # when the scene closes — a character, a relationship, a location or a
+        # world. No entry means unchanged. Scene `effects` stay as they are: they
+        # tie a value shift to a plot protagonist and a level, while this records
+        # the state of any entity.
+        "changes": {
+            "type": "list", "default": [], "optional": True,
+            "description": "One entry per entity whose state is different at the end of the scene. Only where something changed. No entry means unchanged.",
+            "sub_fields": {
+                "entity": {"type": "string", "description": "The character, relationship, location or world whose state changed. Must exist."},
+                "change": {"type": "string", "description": "One sentence, readable without the beats: the new state, not the event. For a character: what they now believe or know, want or are willing to do, or how their situation, standing or bond with another has shifted. For a relationship, location or world: its changed condition."},
+            },
+        },
+        # The beats of action and reaction. Each side carries its own `by`,
+        # because "the same character on both sides means inner conflict" is a
+        # real, checkable fact and needs two `by` fields to express it — the
+        # flattened reading of the design's diagram could not. `by` names three
+        # types, which no single `ref` value can express; validate_beat_references
+        # resolves it.
+        "beats": {
+            "type": "list", "default": [], "optional": True,
+            "description": "Ordered beats of action and reaction. A beat with no gap, surface or subtext is mere activity, not action.",
+            "sub_fields": {
+                "action": {"type": "object", "description": "The acting side of the beat",
+                           "sub_fields": {
+                               "by": {"type": "string", "description": "Slug of a character, location or world that acts"},
+                               "surface": {"type": "string", "description": "What is shown or said"},
+                               "subtext": {"type": "string", "description": "The underlying action, as an active gerund phrase"},
+                           }},
+                "reaction": {"type": "object", "description": "The reacting side of the beat",
+                             "sub_fields": {
+                                 "by": {"type": "string", "description": "Slug of a character, location or world that reacts"},
+                                 "surface": {"type": "string", "description": "What is shown or said"},
+                                 "subtext": {"type": "string", "description": "The underlying action, as an active gerund phrase"},
+                             }},
+                # The break between expectation and result, at the moment it
+                # opens — and not closed there. What follows from it belongs to
+                # the next beat's action, so a gap that reports the response
+                # closes it inside the beat and swallows the next action.
+                "gap": {"type": "string", "description": "The break between what was expected and what came back, at the moment it opens. One sentence. Stop at the break: what follows from it is the next beat's action. Empty when the beat is mere activity."},
+            },
+        },
     },
     "relationship": {
         "name": {"type": "string", "default": "", "optional": False, "description": "Display name (e.g. 'Kael & Mira')"},
         "type": {"type": "string", "default": "relationship", "optional": False, "description": "Always 'relationship'"},
         "characters": {"type": "list", "default": [], "optional": False, "description": "Exactly two character slugs"},
-        "perspectives": {"type": "object", "default": {}, "optional": True, "description": "Per-character relationship view", "sub_fields": {
+        "perspectives": {"type": "object", "default": {}, "optional": True, "description": "Per-character relationship view", "keyed": True, "sub_fields": {
             "label": {"type": "string", "description": "Relationship label from this character's POV"},
             "feeling": {"type": "string", "description": "Emotional stance"},
             "type": {"type": "string", "description": "Category: ally/enemy/family/romantic/professional/mentor/rival/custom/neutral"},
@@ -198,4 +354,55 @@ ENTITY_SCHEMAS = {
         "status": {"type": "string", "default": "active", "optional": True, "description": "active/resolved/complex"},
         "history": {"type": "string", "default": "", "optional": True, "description": "How this relationship evolved"},
     },
+    # One value, shared by every plot that uses it. The four rungs are
+    # VALUE_LADDER, and a value names itself by its positive pole — the id is
+    # the slug of `name`, which is what makes a scene's turn able to name it.
+    "value": {
+        "name": {"type": "string", "default": "", "optional": False,
+                 "description": "The value, named by its positive pole (e.g. 'trust'). The id is the slug of this name."},
+        "p": {"type": "string", "default": "", "optional": False,
+              "description": "Positive: the story's word for the ideal (rung p)."},
+        "c": {"type": "string", "default": "", "optional": False,
+              "description": "Contrary: the story's word for the opposite, not absolute negation (rung c)."},
+        "cd": {"type": "string", "default": "", "optional": False,
+               "description": "Contradictory: the story's word for the direct negation of the positive (rung cd)."},
+        "nn": {"type": "string", "default": "", "optional": False,
+               "description": "Negation of negation: the story's word for the perversion or false version of the positive (rung nn)."},
+        "note": {"type": "string", "default": "", "optional": True,
+                 "description": "Optional: what this value means."},
+    },
+}
+
+# The one phrase that means "the user has not set this". It lives here, beside
+# the schema, because it is a *display* concern and the schema is where a field
+# declares what it is — but it is never stored. A field the user has not filled
+# holds `""` (or `0`, `False`, `[]`), and a surface that wants to say so renders
+# `f"{label}: {UNFILLED}"`.
+#
+# It was 34 strings before this, one per field: 'Goals not set', 'Action not
+# described', 'Shift not recorded', 'Credit N.A.'. They were defaults written
+# into the data on create, and the enum check then rejected them as invalid
+# values — 10 false findings on a minimal character, plot or project.
+# Nothing was ever stored in them: both real databases hold zero. The prose was
+# never carrying information either, because `story_retrieve` reports unfilled
+# fields *by name* through `unfilled_fields`.
+UNFILLED = "N.A."
+
+# ─── Required fields ───
+# Derived from ENTITY_SCHEMAS rather than maintained beside it. Three notes on
+# the rule:
+#
+#   * `id` and `type` are in FIELDS_TO_SKIP, so the write path discards them.
+#   * `order` is auto-numbered by create_entity.
+#   * `status` defaults to a valid value.
+#
+# All four are supplied here, so requiring them asks for something the caller
+# cannot meaningfully provide. Duplicating ENTITY_SCHEMAS is what created the
+# bug; this is the one place the answer is written down.
+WRITE_PATH_SUPPLIED = {"id", "type", "order", "status"}
+
+REQUIRED_FIELDS = {
+    entity_type: [field for field, meta in schema.items()
+                  if not meta.get("optional", True) and field not in WRITE_PATH_SUPPLIED]
+    for entity_type, schema in ENTITY_SCHEMAS.items()
 }

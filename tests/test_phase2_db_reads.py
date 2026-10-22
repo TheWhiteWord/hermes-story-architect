@@ -11,8 +11,7 @@ from tools.story_load import handler as load_handler
 from tools.story_retrieve import handler as retrieve_handler
 from tools.story_search import handler as search_handler
 from tools.story_dashboard import handler as dashboard_handler
-from tools.story_create import handler as create_handler
-from tools.story_edit import handler as edit_handler
+from core.writes import create_entity, edit_entity
 from tools.story_resolve import resolve_project
 
 
@@ -133,28 +132,27 @@ class TestStubClassification:
     """Scene and arc beat stubs are correctly classified."""
 
     def test_scene_stub_has_only_id(self, db_project):
-        """A planned scene with no dramatic_role is a stub: {id} only."""
+        """A planned scene is a stub: {id} only."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         # Verify stub mechanism: if a stub exists, it should be a compact object
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and "dramatic_role" not in scene:
-                        assert "id" in scene
-                        assert "status" not in scene or scene.get("status") == "planned"
-        # Note: fixture has no stub scenes (all have dramatic_role + status),
-        # so this test is vacuous here.
+                    if isinstance(scene, dict) and scene.get("status") == "planned":
+                        assert set(scene) <= {"id", "characters"}
+                        assert "title" not in scene
 
-    def test_scene_full_has_dramatic_role(self, db_project):
-        """A non-stub scene has dramatic_role."""
+    def test_scene_full_has_no_stub_markers(self, db_project):
+        """A non-stub scene carries its full row, not the stub's."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         found_full = False
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and scene.get("dramatic_role"):
+                    if isinstance(scene, dict) and scene.get("status") != "planned":
+                        assert scene.get("title"), "a full scene carries its title"
                         found_full = True
         assert found_full, "No full scenes found in fixture"
 
@@ -169,35 +167,40 @@ class TestStubClassification:
 class TestEmbeddedCrossReferences:
     """Cross-references are embedded directly, not in a relations table."""
 
-    def test_scene_has_chars(self, db_project):
-        """scene.chars populated from character_scene relations."""
+    def test_scene_has_characters(self, db_project):
+        """scene.characters populated from character_scene relations."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and scene.get("dramatic_role"):
-                        # chars may be omitted when empty, but must be present for
-                        # scenes that have characters assigned
-                        if scene.get("chars"):
-                            assert isinstance(scene["chars"], list)
+                    if isinstance(scene, dict) and scene.get("status") != "planned":
+                        # characters may be omitted when empty, but must be
+                        # present for scenes that have characters assigned
+                        if scene.get("characters"):
+                            assert isinstance(scene["characters"], list)
 
-    def test_scene_has_loc(self, db_project):
-        """scene.loc populated from location_scene relation."""
+    def test_scene_has_location(self, db_project):
+        """scene.location populated from location_scene relation."""
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and scene.get("dramatic_role"):
-                        # loc may be omitted when unassigned
-                        if scene.get("loc"):
-                            assert isinstance(scene["loc"], str)
+                    if isinstance(scene, dict) and scene.get("status") != "planned":
+                        # location may be omitted when unassigned
+                        if scene.get("location"):
+                            assert isinstance(scene["location"], str)
 
     def test_character_has_rel(self, db_project):
-        """character.relationships populated from relationship entities."""
+        """character.relationships populated from relationship entities.
+
+        `story_load` emits bare slugs there; `get_dashboard_data` emits the
+        {with, label, type, strength} shape the schema declares.
+        """
         proj, vault = db_project
-        result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
+        from core.db import get_dashboard_data
+        result = get_dashboard_data(proj)["story_data"]
         for char in result["characters"]:
             if "relationships" in char:
                 for rel in char["relationships"]:
@@ -272,7 +275,7 @@ class TestUnfilledInverted:
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and "dramatic_role" not in scene:
+                    if isinstance(scene, dict) and scene.get("status") == "planned":
                         assert scene["id"] not in all_unfilled, f"Stub scene {scene['id']} in unfilled"
 
     def test_character_goals_unfilled(self, db_project):
@@ -280,12 +283,8 @@ class TestUnfilledInverted:
         from core.db import get_unfilled_map
         proj, vault = db_project
         # Create a new character
-        create_handler({
-            "entity_type": "character", "slug": "unfilled-test",
-            "project": str(proj),
-            "frontmatter": {"name": "Unfilled", "story_role": "Minor"},
-            "root_path": vault
-        })
+        create_entity(proj, "character", "unfilled-test",
+                      {"name": "Unfilled", "story_role": "Minor"})
         unfilled = get_unfilled_map(proj)
         # goals_short should list the new character
         assert "goals_short" in unfilled
@@ -299,7 +298,7 @@ class TestUnfilledInverted:
         # No boolean fields
         assert "is_crisis" not in unfilled
         assert "is_climax" not in unfilled
-        assert "arc_complete" not in unfilled
+
         # No numeric fields
         assert "y" not in unfilled
         assert "act_count" not in unfilled
@@ -343,20 +342,26 @@ class TestNavigationalQueries:
     def test_plot_to_scenes(self, db_project):
         """Which scenes does 'the-resistance' plot touch?
 
-        Verified through story_retrieve, which returns the plot whole — the
-        base map no longer carries beats.
+        Verified through story_retrieve. The six role fields are computed, so
+        `fields: ["all"]` no longer returns them — naming them does, and that is
+        the cost of moving the write to the scene. The same rows are also on
+        each scene as `plot_roles`, which IS in `["all"]`.
         """
         proj, vault = db_project
         from tools.story_retrieve import handler as retrieve_handler
         result = json.loads(retrieve_handler({
             "project": str(proj), "entity_type": "plot",
-            "id": ["the-resistance"], "fields": ["all"]}))
+            "id": ["the-resistance"],
+            "fields": ["setups", "inciting_incident", "complications",
+                       "crisis", "climax", "resolutions"]}))
         plot = result["entities"][0]["fields"]  # field values are nested under "fields"
         scenes = (
             plot.get("setups", [])
+            + plot.get("inciting_incident", [])
+            + plot.get("complications", [])
             + plot.get("crisis", [])
             + plot.get("climax", [])
-            + plot.get("payoffs", [])
+            + plot.get("resolutions", [])
         )
         assert len(scenes) > 0
 
@@ -365,12 +370,12 @@ class TestNavigationalQueries:
         proj, vault = db_project
         result = json.loads(load_handler({"project": str(proj), "root_path": vault}))
         kael = next(e for e in result["characters"] if e["id"] == "kael")
-        # Navigate: find scenes where kael is in chars
+        # Navigate: find scenes where kael is in characters
         kael_scenes = []
         for act in result["acts"]:
             for seq in act.get("sequences", []):
                 for scene in seq.get("scenes", []):
-                    if isinstance(scene, dict) and "kael" in scene.get("chars", []):
+                    if isinstance(scene, dict) and "kael" in scene.get("characters", []):
                         kael_scenes.append(scene["id"])
         assert "central-room-day" in kael_scenes
 
@@ -436,35 +441,8 @@ class TestStoryRetrieveDB:
         assert "sections" in entity
         assert "Identity" in entity["sections"]
 
-    def test_retrieve_arc_beat(self, db_project):
-        proj, vault = db_project
-        result = json.loads(retrieve_handler({
-            "project": str(proj),
-            "entity_type": "arc_beat",
-            "id": ["kael-1"],
-            "sections": ["Action"],
-            "root_path": vault
-        }))
-        entity = result["entities"][0]
-        assert entity["id"] == "kael-1"
-        assert "Action" in entity["sections"]
-
-
 class TestStorySearchDB:
     """story_search uses FTS5 when story.db exists."""
-
-    def test_search_arc_beat_content(self, db_project):
-        """Conflict 3: FTS5 finds content in arc beats (old glob missed them)."""
-        proj, vault = db_project
-        result = json.loads(search_handler({
-            "project": str(proj),
-            "query": "First Doubt",
-            "root_path": vault
-        }))
-        assert result["total"] > 0
-        # Found in an arc beat entity
-        entity_ids = [r["entity_id"] for r in result["results"]]
-        assert any("kael" in eid for eid in entity_ids)
 
     def test_search_scene_content(self, db_project):
         proj, vault = db_project
@@ -514,18 +492,13 @@ class TestStoryDashboardDB:
 
 
 class TestAutoReimport:
-    """story_edit/story_create auto-reimport to DB in Phase 2."""
+    """A write syncs to the DB on the same call."""
 
     def test_create_entity_syncs_to_db(self, db_project):
         proj, vault = db_project
         # Create a new character
-        result = json.loads(create_handler({
-            "entity_type": "character",
-            "slug": "test-new-char",
-            "project": str(proj),
-            "frontmatter": {"name": "Test New Char", "story_role": "Supporting"},
-            "root_path": vault
-        }))
+        result = create_entity(proj, "character", "test-new-char",
+                               {"name": "Test New Char", "story_role": "Supporting"})
         assert result["success"] is True
 
         # DB should now have the new entity
@@ -541,13 +514,9 @@ class TestAutoReimport:
     def test_edit_entity_syncs_to_db(self, db_project):
         proj, vault = db_project
         # Edit kael's one_sentence
-        result = json.loads(edit_handler({
-            "action": "edit_note",
-            "target": {"entity_type": "character", "slug": "kael", "project": str(proj)},
-            "data": {"one_sentence": "Updated description."},
-            "summary": "Update one_sentence",
-            "root_path": vault
-        }))
+        result = edit_entity(proj, "character", "kael",
+                             {"one_sentence": "Updated description."},
+                             "Update one_sentence")
         assert result["success"] is True
 
         # DB should reflect the change

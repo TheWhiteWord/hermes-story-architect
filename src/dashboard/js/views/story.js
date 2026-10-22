@@ -35,28 +35,26 @@ DASH.buildStoryView = function() {
   if (p.spine) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Spine</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.spine}</div></div>`);
 
   if (p.controlling_idea) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Controlling Idea</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.controlling_idea}</div></div>`);
+  if (p.setting) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Setting</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.setting}</div></div>`);
 
-  const valueArc = [];
-  if (p.story_value) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value}</span>`);
-  if (p.story_value_at_open) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value_at_open}</span>`);
-  if (p.story_value_at_close) valueArc.push(`<span style="color:var(--muted-foreground);font-size:var(--font-size-xs)">${p.story_value_at_close}</span>`);
-  if (valueArc.length) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px;display:flex;gap:6px;align-items:center">${valueArc.join(' → ')}</div></div>`);
+  const storyFocus = (DASH.valueFocusHtml && DASH.valueFocusHtml(p.value_focus)) || '';
+  structure.push(`<div style="margin-bottom:6px"><span style="display:inline-flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc${DASH.valueGraphLink('story')}</span>${storyFocus ? `<div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${storyFocus}</div>` : ''}</div>`);
 
   if (p.structure_type) structure.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Structure</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${p.structure_type}</div></div>`);
 
-  // Key scenes: inciting incident, story climax — clickable
+  // Key scenes: the main plot's inciting_incident and climax scenes.
+  const mainPlotIds = new Set((DASH.story.plots || []).filter(p => p.plot_scope === 'main').map(p => p.id));
+  const mainMilestoneScenes = (DASH.story.scenes || []).filter(s =>
+    (s.plots || []).some(p => mainPlotIds.has(p.id) && (p.role === 'inciting_incident' || p.role === 'climax'))
+  );
   const keyScenes = [];
-  if (p.inciting_incident_scene_id) {
-    const sid = p.inciting_incident_scene_id;
-    const scene = (DASH.story.scenes || []).find(s => String(s.id) === String(sid));
-    const label = scene ? scene.title : sid;
-    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${sid}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${label}</button></div></div>`);
+  const inciting = mainMilestoneScenes.find(s => (s.plots || []).some(p => mainPlotIds.has(p.id) && p.role === 'inciting_incident'));
+  const climax = mainMilestoneScenes.find(s => (s.plots || []).some(p => mainPlotIds.has(p.id) && p.role === 'climax'));
+  if (inciting) {
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Inciting Incident</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${inciting.title}</div>${inciting.one_sentence ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-top:2px">${inciting.one_sentence}</div>` : ''}<div style="margin-top:4px"><button class="entity-link" onclick="DASH.showScenePanel('${inciting.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${inciting.title}</button></div></div>`);
   }
-  if (p.story_climax_scene_id) {
-    const sid = p.story_climax_scene_id;
-    const scene = (DASH.story.scenes || []).find(s => String(s.id) === String(sid));
-    const label = scene ? scene.title : sid;
-    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="margin-top:2px"><button class="entity-link" onclick="DASH.showScenePanel('${sid}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${label}</button></div></div>`);
+  if (climax) {
+    keyScenes.push(`<div style="margin-bottom:6px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Story Climax</span><div style="font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${climax.title}</div>${climax.one_sentence ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-top:2px">${climax.one_sentence}</div>` : ''}<div style="margin-top:4px"><button class="entity-link" onclick="DASH.showScenePanel('${climax.id}')" style="font-size:var(--font-size-sm);padding:0;background:none;border:none;cursor:pointer;color:var(--accent);text-decoration:underline">${climax.title}</button></div></div>`);
   }
 
   const structureHtml = (structure.length || keyScenes.length) ? `

@@ -92,8 +92,8 @@ def register(ctx) -> None:
     from .tools import story_load
     from .tools import story_retrieve
     from .tools import story_search
-    from .tools import story_edit
-    from .tools import story_create
+    from .tools import story_draft
+    from .tools import story_admin
     from .tools import story_memory
     from .tools import story_describe
     from .tools import story_import
@@ -102,7 +102,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_describe",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_describe.SCHEMA),
         handler=story_describe.handler,
         check_fn=_requirements_met,
@@ -111,7 +111,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_load",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_load.SCHEMA),
         handler=story_load.handler,
         check_fn=_requirements_met,
@@ -119,7 +119,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_retrieve",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_retrieve.SCHEMA),
         handler=story_retrieve.handler,
         check_fn=_requirements_met,
@@ -127,23 +127,24 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_search",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_search.SCHEMA),
         handler=story_search.handler,
         check_fn=_requirements_met,
         emoji="🔎",
     )
     ctx.register_tool(
-        name="story_edit",
-        toolset="story_architect",
-        schema=_tool_schema(story_edit.SCHEMA),
-        handler=story_edit.handler,
+        name="story_admin",
+        toolset="project",
+        schema=_tool_schema(story_admin.SCHEMA),
+        handler=story_admin.handler,
         check_fn=_requirements_met,
-        emoji="✏️",
+        emoji="🗂️",
     )
+
     ctx.register_tool(
         name="story_memory",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_memory.SCHEMA),
         handler=story_memory.handler,
         check_fn=_requirements_met,
@@ -151,12 +152,12 @@ def register(ctx) -> None:
     )
 
     ctx.register_tool(
-        name="story_create",
-        toolset="story_architect",
-        schema=_tool_schema(story_create.SCHEMA),
-        handler=story_create.handler,
+        name="story_draft",
+        toolset="project",
+        schema=_tool_schema(story_draft.SCHEMA),
+        handler=story_draft.handler,
         check_fn=_requirements_met,
-        emoji="➕",
+        emoji="📝",
     )
 
     # Register skills — new combined skill + legacy sub-skills
@@ -164,7 +165,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_import",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_import.SCHEMA),
         handler=story_import.handler,
         check_fn=_requirements_met,
@@ -172,7 +173,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_export",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_export.SCHEMA),
         handler=story_export.handler,
         check_fn=_requirements_met,
@@ -180,7 +181,7 @@ def register(ctx) -> None:
     )
     ctx.register_tool(
         name="story_backup",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_backup.SCHEMA),
         handler=story_backup.handler,
         check_fn=_requirements_met,
@@ -191,7 +192,7 @@ def register(ctx) -> None:
 
     ctx.register_tool(
         name="story_dashboard",
-        toolset="story_architect",
+        toolset="project",
         schema=_tool_schema(story_dashboard.SCHEMA),
         handler=story_dashboard.handler,
         check_fn=_requirements_met,
@@ -203,7 +204,7 @@ def register(ctx) -> None:
 
     # Auto-refresh dashboard after any data-modifying action
     def auto_refresh_dashboard(*, tool_name, result, **kwargs):
-        if tool_name not in ("story_dashboard", "story_edit", "story_create", "story_memory"):
+        if tool_name not in ("story_dashboard", "story_memory", "story_draft"):
             return
         try:
             data = json.loads(result)
@@ -212,6 +213,15 @@ def register(ctx) -> None:
                 url = data.get("dashboard_url")
                 if url:
                     ctx.dispatch_tool("desktop_preview", {"action": "open", "url": url})
+            elif tool_name == "story_draft":
+                # A staged draft wrote nothing, so there is nothing to redraw —
+                # and regenerating for a change the user has not accepted yet
+                # would be wrong as well as wasteful. Only a commit lands writes.
+                if not (data.get("success") and data.get("committed")):
+                    return
+                project = kwargs.get("args", {}).get("project", "")
+                if project:
+                    ctx.dispatch_tool("story_dashboard", {"project": project})
             # For data-modifying tools, regenerate dashboard then open
             elif data.get("success") and "error" not in data:
                 project = kwargs.get("args", {}).get("project", "")

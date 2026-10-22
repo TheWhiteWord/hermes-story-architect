@@ -12,7 +12,6 @@ import shutil
 
 import pytest
 
-from tools.story_create import handler as create_handler
 from tools.story_import import handler as import_handler
 from tools.story_retrieve import handler as retrieve_handler
 
@@ -74,14 +73,56 @@ class TestBadIdIsNotAnImportProblem:
 
 
 class TestRelationBackedFields:
+    def test_fields_come_back_in_schema_order(self, db):
+        """Reading order is part of the contract.
+
+        `_entity_fields` used to iterate `wanted`, which is a SET, so the
+        output order was whatever the hash table produced — `one_sentence`
+        landed between two role fields and the six roles came out shuffled.
+        It emits in schema order now, and the plot's schema is ordered for
+        reading: identity, then cast and shape, then the dramatic progression.
+        """
+        proj, vault = db
+        r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
+                 fields=["all"])
+        assert list(r["entities"][0]["fields"].keys()) == [
+            "name", "one_sentence", "status", "characters", "value_arc",
+            "plot_scope", "plot_type",
+            "setups", "inciting_incident", "complications",
+            "crisis", "climax", "resolutions", "value_focus"]
+
+    def test_the_order_is_the_same_whatever_subset_is_asked_for(self, db):
+        """Naming fields explicitly must not reorder them — a caller that asks
+        for `crisis, setups` gets them back setup-then-crisis, in the order the
+        schema declares. Otherwise an agent comparing two calls sees a
+        difference that is only the request order."""
+        proj, vault = db
+        r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
+                 fields=["crisis", "setups", "name"])
+        assert list(r["entities"][0]["fields"].keys()) == ["name", "setups", "crisis"]
+
+    def test_unfilled_fields_comes_last(self, db):
+        """It is the verdict on the fields and the prose above it, so it reads
+        as a summary rather than as one more section among them."""
+        proj, vault = db
+        r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
+                 fields=["all"], sections=["all"])
+        keys = list(r["entities"][0].keys())
+        assert keys.index("unfilled_fields") == len(keys) - 1
+
     def test_plot_beats_are_readable(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
-                  fields=["setups", "crisis", "climax", "payoffs"])
+                  fields=["inciting_incident", "complications", "crisis",
+                          "climax", "resolutions"])
         f = r["entities"][0]["fields"]
-        assert f["setups"], "plot setups are stored as relations and were unreachable"
-        assert f["setups"][0]["scene_id"]
-        assert "description" in f["setups"][0]
+        assert f["inciting_incident"], "plot inciting_incident is stored as a relation and was unreachable"
+        assert f["inciting_incident"][0]["scene_id"]
+        assert "description" in f["inciting_incident"][0]
+        assert f["climax"], "plot climax is stored as a relation and was unreachable"
+        assert f["climax"][0]["scene_id"]
+        assert f["resolutions"], "plot resolutions are stored as relations and were unreachable"
+        assert f["resolutions"][0]["scene_id"]
 
     def test_scene_characters_are_readable(self, db):
         proj, vault = db
@@ -90,19 +131,40 @@ class TestRelationBackedFields:
         assert r["entities"][0]["fields"]["characters"]
 
     def test_empty_beats_show_as_empty_not_missing(self, db):
-        """The point of the fix: an unset crisis must read as empty."""
+        """An unset crisis reads as `[]` in the fields AND is named in
+        `unfilled_fields`.
+
+        Both halves changed together. It used to be reported as NEITHER: the
+        fields were computed so they were excluded from `["all"]`, and computed
+        fields were skipped by the unfilled check — so a plot with no crisis
+        looked identical to a plot with every role filled, and the gap lived
+        only on the scene side as `plot_roles`. Asking a plot what it still
+        needs has to answer "your crisis", which is what this now says.
+        """
         proj, vault = db
         r = _get(proj, vault, entity_type="plot", id=["the-resistance"],
                   fields=["crisis"], sections=[])
         assert r["entities"][0]["fields"]["crisis"] == []
         assert "crisis" in r["entities"][0]["unfilled_fields"]
 
+    def test_a_scenes_plot_roles_are_readable(self, db):
+        """The write side is the read side too — `plot_roles` is in `["all"]`."""
+        proj, vault = db
+        r = _get(proj, vault, entity_type="scene", id=["central-room-day"],
+                  fields=["plot_roles"])
+        roles = r["entities"][0]["fields"]["plot_roles"]
+        assert roles, "the scene's plot roles are unreachable"
+        assert roles[0]["plot"] == "the-resistance"
+        assert roles[0]["role"] == "inciting_incident"
+        assert "description" in roles[0]
+        assert "plot_roles" not in r["entities"][0]["unfilled_fields"]
+
 
 class TestSelection:
     def test_sections_subset(self, db):
         proj, vault = db
-        r = _get(proj, vault, entity_type="character", id=["kael"], sections=["Personality"])
-        assert list(r["entities"][0]["sections"]) == ["Personality"]
+        r = _get(proj, vault, entity_type="character", id=["kael"], sections=["Identity"])
+        assert list(r["entities"][0]["sections"]) == ["Identity"]
 
     def test_missing_section_is_reported_not_silent(self, db):
         proj, vault = db
@@ -110,7 +172,7 @@ class TestSelection:
         entity = r["entities"][0]
         assert entity["sections"]["Nowhere"] is None
         assert entity["sections_not_found"] == ["Nowhere"]
-        assert "Personality" in entity["available_sections"]
+        assert "Identity" in entity["available_sections"]
 
     def test_fields_only(self, db):
         proj, vault = db
@@ -121,10 +183,10 @@ class TestSelection:
     def test_sections_and_fields_together(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="character", id=["kael"],
-                  fields=["story_role"], sections=["Personality"])
+                  fields=["story_role"], sections=["Identity"])
         entity = r["entities"][0]
         assert entity["fields"]["story_role"]
-        assert entity["sections"]["Personality"] is not None
+        assert entity["sections"]["Identity"] is not None
 
     def test_asking_for_nothing_is_an_error(self, db):
         """Otherwise a call returns an empty entity and the agent assumes it is empty."""
@@ -142,21 +204,10 @@ class TestBatchAndIds:
     def test_several_ids_in_one_call(self, db):
         proj, vault = db
         r = _get(proj, vault, entity_type="character", id=["kael", "mira"],
-                  sections=["Personality"])
+                  sections=["Identity"])
         assert [e["id"] for e in r["entities"]] == ["kael", "mira"]
 
     def test_bare_string_is_tolerated(self, db):
         proj, vault = db
-        r = _get(proj, vault, entity_type="character", id="kael", sections=["Personality"])
+        r = _get(proj, vault, entity_type="character", id="kael", sections=["Identity"])
         assert r["entities"][0]["id"] == "kael"
-
-    def test_arc_beat_suffix_resolves(self, db):
-        """Beats are keyed `{character}-{beat}`; the beat part alone is enough."""
-        proj, vault = db
-        r = _get(proj, vault, entity_type="arc_beat", id=["1"], sections=["Action"])
-        assert r["entities"][0]["id"].endswith("-1")
-
-    def test_arc_beat_full_key_resolves(self, db):
-        proj, vault = db
-        r = _get(proj, vault, entity_type="arc_beat", id=["kael-1"], sections=["Action"])
-        assert r["entities"][0]["id"] == "kael-1"

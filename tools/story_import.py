@@ -2,12 +2,14 @@
 import json
 from pathlib import Path
 
+from core.entity import plot_role_relations
+
 SCHEMA = {
     "description": "DESTRUCTIVE. Rebuilds the database from the Markdown vault: deletes every row "
                    "and re-imports, discarding all work done since the last story_export. The "
                    "database is the source of truth, not Markdown. Only for an intentional re-sync "
                    "from Markdown files. Never use this to repair a problem — take a "
-                   "story_backup first, and prefer story_edit or story_create to change things.",
+                   "story_backup first, and prefer story_draft to change things.",
     "type": "object",
     "properties": {
         "project": {"type": "string", "description": "Project slug or path"},
@@ -35,14 +37,13 @@ def _backup(project_path: Path) -> str:
 def _diff(project_path: Path) -> dict:
     """Which database entities have no Markdown note behind them.
 
-    Those are the ones an import destroys. An entity created at runtime with
-    story_create has no .md file — that is exactly the set the wipe deletes.
+    Those are the ones an import destroys. An entity created at runtime
+    has no .md file — that is exactly the set the wipe deletes.
 
     Deliberately one-directional: an entity with a note file is never reported as
     at risk, even when the importer keys it differently (the project row uses the
-    folder name, arc beats a `{char}-{beat}` composite). A missed warning only
-    means the guard stays quiet; a false "you will lose data" would block every
-    legitimate re-import.
+    folder name). A missed warning only means the guard stays quiet; a false
+    "you will lose data" would block every legitimate re-import.
     """
     from core.db import get_db
 
@@ -52,28 +53,38 @@ def _diff(project_path: Path) -> dict:
     finally:
         conn.close()
 
+    # The filename is the title, so the id is only in the frontmatter. This has
+    # to read every note — the same pass the import already makes.
+    import frontmatter
+
+    def _ids_in(folder: Path) -> set:
+        found = set()
+        if not folder.exists():
+            return found
+        for f in folder.glob("*.md"):
+            if f.name.startswith("_"):
+                continue
+            found.add(str(frontmatter.load(f).metadata.get("id") or f.stem))
+        return found
+
     markdown_ids = set()
     for folder in ("characters", "locations", "worlds", "plots", "scenes",
-                   "sequences", "acts", "relationships"):
-        d = project_path / folder
-        if d.exists():
-            markdown_ids |= {f.stem for f in d.glob("*.md") if not f.name.startswith("_")}
+                   "scene_beats", "sequences", "acts", "relationships"):
+        markdown_ids |= _ids_in(project_path / folder)
 
-    # Arc beats live in arcs/{character}/{beat}.md and are keyed `{char}-{beat}`.
-    # They do not appear in the flat folders above, and a database may hold them
-    # typed as 'character', so match them by the note tree as well.
-    arc_beat_ids = set()
-    arcs = project_path / "arcs"
-    if arcs.exists():
-        for char_dir in arcs.iterdir():
-            if char_dir.is_dir() and not char_dir.name.startswith(("_", ".")):
-                arc_beat_ids |= {f"{char_dir.name}-{f.stem}" for f in char_dir.glob("*.md")}
+    # Values live in one root file, not a folder, so they would otherwise be
+    # reported as database-only and destroyed on every import. Parse their ids
+    # from that file with the same block parser the import uses.
+    values_file = project_path / "values.md"
+    if values_file.exists():
+        for fm, _ in _iter_value_blocks(values_file.read_text()):
+            if fm.get("id"):
+                markdown_ids.add(str(fm["id"]))
 
     at_risk = sorted(
         entity_id for entity_id, entity_type in rows
-        if entity_type not in ("project", "arc_beat")
+        if entity_type != "project"
         and entity_id not in markdown_ids
-        and entity_id not in arc_beat_ids
     )
     return {"entities_in_db": len(rows), "would_be_destroyed": at_risk}
 
@@ -100,7 +111,7 @@ def handler(args, **kwargs) -> str:
     # ── Safety gate ────────────────────────────────────────────────────────────
     # An import DELETEs every row and rebuilds from Markdown. The database is the
     # source of truth, so anything that exists only in the database is lost — the
-    # character a user created five minutes ago, every story_edit since the last
+    # character a user created five minutes ago, every commit since the last
     # export. This is the one tool that can silently destroy work, so it reports
     # first and refuses without explicit consent.
     if db_file.exists() and args.get("dry_run"):
@@ -215,14 +226,19 @@ def _clear_all(conn) -> None:
 def _import_all(conn, project_path: Path) -> None:
     """Walk all entity folders and import."""
     _import_project(conn, project_path)
+    # Values first: a scene's value turn names a value, and that value must
+    # exist before the scene naming it is imported.
+    _import_values(conn, project_path)
     _import_folder(conn, project_path, "characters", "character")
     _import_folder(conn, project_path, "locations", "location")
     _import_folder(conn, project_path, "worlds", "world")
     _import_folder(conn, project_path, "plots", "plot")
     _import_folder(conn, project_path, "scenes", "scene")
+    # Immediately after the scenes: a record names its scene, so the scene must
+    # exist before the record is inserted.
+    _import_folder(conn, project_path, "scene_beats", "scene_beats")
     _import_folder(conn, project_path, "sequences", "sequence")
     _import_folder(conn, project_path, "acts", "act")
-    _import_arcs(conn, project_path)
     _import_folder(conn, project_path, "relationships", "relationship")
 
 
@@ -261,6 +277,64 @@ def _import_project(conn, project_path: Path) -> None:
         )
 
 
+def _iter_value_blocks(text: str):
+    """Yield `(frontmatter, body)` per value from the concatenated `values.md`.
+
+    The one non-reused piece: `values.md` is a concatenation of per-value
+    frontmatter blocks separated by `---`, not a single note, so `frontmatter`
+    parses only the first block. Split on the fences and parse each block's
+    YAML. An empty or absent file yields nothing — "no values", not an error.
+    A trailing fence with no closing one ends the walk rather than yielding a
+    half block.
+    """
+    import yaml
+    lines = text.split("\n")
+    i, n = 0, len(lines)
+    while i < n:
+        if lines[i].strip() != "---":
+            i += 1
+            continue
+        j = i + 1
+        fm_lines = []
+        while j < n and lines[j].strip() != "---":
+            fm_lines.append(lines[j])
+            j += 1
+        if j >= n:
+            break  # an unterminated block; ignore it
+        fm = yaml.safe_load("\n".join(fm_lines)) or {}
+        k = j + 1
+        body_lines = []
+        while k < n and lines[k].strip() != "---":
+            body_lines.append(lines[k])
+            k += 1
+        yield fm, "\n".join(body_lines).strip("\n")
+        i = k
+
+
+def _import_values(conn, project_path: Path) -> None:
+    """Import every value from the single `values.md` at the project root."""
+    values_file = project_path / "values.md"
+    if not values_file.exists():
+        return
+    text = values_file.read_text()
+    if not text.strip():
+        return
+    from core.writes import validate_value
+    for fm, body in _iter_value_blocks(text):
+        entity_id = str(fm.get("id") or "").strip()
+        name = str(fm.get("name") or "").strip()
+        if not entity_id or not name:
+            raise ValueError(
+                f"A value block in {values_file.name} is missing an id or name "
+                f"(got id={entity_id!r}, name={name!r}). Every value needs both.")
+        # Same checks the write path runs, so a hand-edited values.md is
+        # refused exactly as story_draft would refuse it. validate_value opens
+        # its own read connection, so it sees the values already inserted in
+        # this pass — the name-uniqueness rule holds across the file.
+        validate_value(project_path, entity_id, fm)
+        _insert_entity(conn, "value", entity_id, fm, body)
+
+
 def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str) -> None:
     """Import all entities from a flat folder."""
     import frontmatter
@@ -276,40 +350,20 @@ def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str)
         post = frontmatter.load(note)
         fm = dict(post.metadata)
         body = post.content
-        slug = note.stem
-        _insert_entity(conn, entity_type, slug, fm, body)
-        _insert_relations(conn, entity_type, slug, fm)
-
-
-def _import_arcs(conn, project_path: Path) -> None:
-    """Import arc beats from nested arcs/{character}/{beat}.md structure."""
-    import frontmatter
-
-    arcs_folder = project_path / "arcs"
-    if not arcs_folder.exists():
-        return
-
-    for char_folder in sorted(arcs_folder.iterdir()):
-        if not char_folder.is_dir() or char_folder.name.startswith("_") or char_folder.name.startswith("."):
-            continue
-        for note in sorted(char_folder.glob("*.md")):
-            if note.name.startswith("_"):
-                continue
-            post = frontmatter.load(note)
-            fm = dict(post.metadata)
-            body = post.content
-            char_slug = char_folder.name
-            beat_id = fm.get("id", note.stem)
-            slug = f"{char_slug}-{beat_id}"
-            _insert_entity(conn, "arc_beat", slug, fm, body, char_slug=char_slug)
+        # The filename is the title, so the id comes from the frontmatter. The
+        # stem is only the fallback, for a note written before ids were written
+        # out — or by hand.
+        entity_id = str(fm.get("id") or note.stem)
+        _insert_entity(conn, entity_type, entity_id, fm, body)
+        _insert_relations(conn, entity_type, entity_id, fm)
 
 
 
 
-def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
-                   char_slug: str = None) -> None:
+
+def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str) -> None:
     """Insert entity row + sections + relations."""
-    columns = _columns_for(entity_type, slug, fm, char_slug)
+    columns = _columns_for(entity_type, slug, fm)
     conn.execute(
         "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (columns["id"], columns["type"], columns["name"], columns["one_sentence"],
@@ -320,11 +374,24 @@ def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
 
 
 def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
-    """Insert all standard sections for entity type, empty body if missing from note."""
+    """Insert every standard section for the type, empty where the note is silent.
+
+    A heading in the note that is not standard is refused, exactly as on the
+    create and edit paths. The section set is closed, so a heading outside it
+    is prose nothing will ever read back as a section of this type.
+    """
     from core.section_parser import list_sections, get_section
     from core.entity import standard_sections
 
     headings = list_sections(body)
+    standard = standard_sections(entity_type)
+    unknown = [h for h in headings if h not in standard]
+    if unknown:
+        raise ValueError(
+            f"{entity_id}: unrecognised {entity_type} section name(s): "
+            f"{', '.join(sorted(unknown))}. The section set is closed — use one "
+            f"of: {', '.join(standard)}.")
+
     for h in headings:
         text = get_section(body, h)
         lines = text.split("\n", 1)
@@ -334,7 +401,7 @@ def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
             (entity_id, h, body_text),
         )
     # Ensure all standard sections exist (e.g. scene Content is a structural invariant)
-    for section in standard_sections(entity_type):
+    for section in standard:
         if section not in headings:
             conn.execute(
                 "INSERT INTO sections (entity_id, heading, body) VALUES (?, ?, ?)",
@@ -342,7 +409,7 @@ def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
             )
 
 
-def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -> dict:
+def _columns_for(entity_type: str, slug: str, fm: dict) -> dict:
     """Map frontmatter fields to entity columns."""
     if entity_type == "character":
         return {
@@ -396,13 +463,13 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": None, "location_id": None,
             "extra": _extra_for("act", fm),
         }
-    elif entity_type == "arc_beat":
+    elif entity_type == "scene_beats":
         return {
-            "id": slug, "type": "arc_beat",
-            "name": fm.get("label", ""), "one_sentence": "",
-            "order_key": fm.get("order", 0), "status": "",
-            "parent_id": char_slug, "location_id": None,
-            "extra": _extra_for("arc_beat", fm),
+            "id": slug, "type": "scene_beats",
+            "name": "", "one_sentence": "",
+            "order_key": 0, "status": "",
+            "parent_id": fm.get("scene"), "location_id": None,
+            "extra": _extra_for("scene_beats", fm),
         }
     elif entity_type == "relationship":
         return {
@@ -412,29 +479,87 @@ def _columns_for(entity_type: str, slug: str, fm: dict, char_slug: str = None) -
             "parent_id": None, "location_id": None,
             "extra": _extra_for("relationship", fm),
         }
+    elif entity_type == "value":
+        return {
+            "id": slug, "type": "value",
+            "name": fm.get("name", ""), "one_sentence": "",
+            "order_key": 0, "status": "", "parent_id": None, "location_id": None,
+            "extra": _extra_for("value", fm),
+        }
     return {"id": slug, "type": entity_type, "name": "", "one_sentence": "",
             "order_key": 0, "status": "", "parent_id": None, "location_id": None, "extra": {}}
 
 
 def _extra_for(entity_type: str, fm: dict) -> dict:
-    """Extract extra JSON fields for an entity type."""
+    """The entity's extra JSON, from the fields that are not columns or relations.
+
+    A key that belongs to no field of this type is refused, as it is on the
+    create and edit paths. A field is flat: a nested shape such as
+    `goals: {short, long}` survives nowhere, because every reader looks for the
+    flat `goals_short`.
+    """
+    from core.constants import ENTITY_SCHEMAS
+
+    # The VALUE checks, which `_extra_for` was missing and the write paths both
+    # have. A hand-edited note carrying a retired value reads back as a value no
+    # reader expects: `dramatic_role: climax` is outside the enum of
+    # plot_role/transition/non-event.
+    #
+    # Only the value checks, NOT the structural ones. `value_problems` is the
+    # split, and it lives beside the checks so the two kinds cannot drift.
+    from core.entity import value_problems
+    problems = value_problems(entity_type, fm)
+    if problems:
+        raise ValueError(
+            f"Invalid {entity_type} frontmatter in the note: "
+            f"{'; '.join(problems)}. story_describe lists the valid fields "
+            f"for this type.")
+
     # Fields that go to columns or relations (not extra)
     skip = {
         "character": {"name", "one_sentence", "id"},
         "location": {"name", "one_sentence", "id", "world", "variant_of"},
         "world": {"name", "one_sentence", "id", "variant_of"},
-        "plot": {"name", "one_sentence", "status", "id", "setups", "payoffs", "crisis", "climax"},
-        "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters"},
+        "plot": {"name", "one_sentence", "status", "id"},
+        # `plot_roles` is relation-stored, so it must not land in extra.
+        "scene": {"title", "order", "status", "sequence_id", "location", "id", "characters",
+                  "plot_roles"},
+        "scene_beats": {"scene", "id"},
         "sequence": {"title", "order", "status", "act_id", "id"},
         "act": {"title", "order", "status", "id"},
-        "arc_beat": {"id", "label", "order", "character"},
         "relationship": {"name", "status", "id"},
+        "value": {"name", "id"},
     }
     s = skip.get(entity_type, set())
+    valid = set(s) | set(ENTITY_SCHEMAS.get(entity_type, {})) | {"id", "type"}
+    unknown = [k for k in fm if k not in valid]
+    if unknown:
+        raise ValueError(
+            f"Unrecognised {entity_type} field(s) in frontmatter: "
+            f"{', '.join(sorted(unknown))}. story_describe lists the valid "
+            f"fields for this type.")
+
     extra = {}
     for k, v in fm.items():
+        # A computed field is derived at read time and has no row to write. It
+        # is refused rather than kept: an old note carrying `plot.setups` would
+        # otherwise import as a plot with a dead `setups` key in extra that no
+        # reader looks at, and the roles it described would be silently gone.
+        # The write paths already refuse these (drafts, create, edit).
+        if ENTITY_SCHEMAS.get(entity_type, {}).get(k, {}).get("computed"):
+            raise ValueError(
+                f"Unrecognised {entity_type} field(s) in frontmatter: {k}. "
+                f"It is read-only (computed) — set it on the scene as "
+                f"plot_roles, or on the relationship that derives it.")
         if k not in s and v not in (None, "", [], {}):
             extra[k] = v
+    # The one cross-field rule a scene has. The importer is a write path like
+    # any other, so it enforces the same invariant — otherwise a hand-edited
+    # note could import a contradiction the write tools would have refused.
+    if entity_type == "scene":
+        from core.entity import validate_scene_dramatic_role
+        validate_scene_dramatic_role(extra.get("dramatic_role", ""),
+                                     fm.get("plot_roles", []))
     return extra
 
 
@@ -452,17 +577,14 @@ def _insert_relations(conn, entity_type: str, slug: str, fm: dict) -> None:
                 "INSERT OR IGNORE INTO relations (from_id, to_id, kind) VALUES (?, ?, ?)",
                 (loc_id, slug, "location_scene"),
             )
-    elif entity_type == "plot":
-        # All 4 plot beat types — setups, crisis, climax, payoffs
-        for field, kind in (("setups", "plot_setup"), ("crisis", "plot_crisis"), ("climax", "plot_climax"), ("payoffs", "plot_payoff")):
-            for beat in fm.get(field, []):
-                sid = beat.get("scene_id", "") if isinstance(beat, dict) else beat
-                desc = beat.get("description", "") if isinstance(beat, dict) else ""
-                if sid:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note) VALUES (?, ?, ?, ?)",
-                        (slug, sid, kind, desc),
-                    )
+        # A plot role is written on the scene. The rows are the plot's to own
+        # (from_id=plot), which is the direction every reader expects.
+        for row in plot_role_relations(slug, fm.get("plot_roles")):
+            conn.execute(
+                "INSERT OR IGNORE INTO relations (from_id, to_id, kind, note, \"order\") "
+                "VALUES (?, ?, ?, ?, ?)",
+                (row["from_id"], row["to_id"], row["kind"], row["note"], row["order"]),
+            )
     elif entity_type == "location":
         target = fm.get("variant_of")
         if target:

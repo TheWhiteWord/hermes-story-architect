@@ -2,18 +2,28 @@
 
 The counterpart to story_load ("what exists and where" vs "what does this say").
 
-Three defects this replaces:
-  * a typo'd or mistyped id reported "Database not found. Run story_import first."
-    — pointing the agent at the one tool that destroys work;
-  * relation-backed fields (plot beats, scene characters) were unreachable, so an
-    agent could not see that a plot's crisis scene was empty;
-  * one entity per call, forcing a round trip per id.
+* A typo'd or mistyped id reports the project, not the import tool.
+* Relation-backed fields (plot beats, scene characters) are reachable, so a
+  plot's crisis scene can be read as empty.
+* Any number of entities per call.
 """
 import json
 from pathlib import Path
 
 from core.constants import ENTITY_SCHEMAS
-from core.entity import ENTITY_COLUMN_MAP, _RELATION_FIELDS
+from core.entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS as REVERSED_KINDS,
+                          _RELATION_FIELDS)
+from core.value_focus import for_act, for_plot, for_project, for_sequence
+
+# The computed `value_focus` read-back per unit type, with the project beside
+# it: the project row is a singleton, so `_resolve` ignores its id and its
+# scope function takes none.
+VALUE_FOCUS_SCOPES = {
+    "plot": for_plot,
+    "sequence": for_sequence,
+    "act": for_act,
+    "project": for_project,
+}
 
 SCHEMA = {
     "description": "Read one or more entities: their field values and section prose, plus which "
@@ -40,16 +50,13 @@ SCHEMA = {
         "fields": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Field names to return. ['all'] for every non-computed field. Omit for "
-                           "none. Call story_describe to see what fields a type has.",
+            "description": "Field names to return. ['all'] for every field, including the "
+                           "computed ones a plot's five role fields are. Omit for none. Call "
+                           "story_describe to see what fields a type has.",
         },
     },
     "required": ["project", "entity_type", "id"],
 }
-
-# Relations stored from the opposite side: a scene's characters are the
-# character_scene rows pointing AT it, not rows it owns.
-REVERSED_KINDS = {"character_scene"}
 
 def _columns(conn) -> list:
     # Never cached across calls: tests and the dashboard use different databases
@@ -61,17 +68,6 @@ def _resolve(conn, entity_type: str, entity_id: str):
     """Find the entity. Returns (row, error) — exactly one is set."""
     if entity_type == "project":
         sql, params = "SELECT * FROM entities WHERE type='project' LIMIT 1", ()
-    elif entity_type == "arc_beat":
-        sql, params = "SELECT * FROM entities WHERE type='arc_beat' AND id=? AND is_deleted=0", (entity_id,)
-        row = conn.execute(sql, params).fetchone()
-        if row:
-            return row, None
-        # A beat is keyed `{character}-{beat}`; the caller may only know the beat part.
-        row = conn.execute(
-            "SELECT * FROM entities WHERE type='arc_beat' AND id LIKE ? AND is_deleted=0", (f"%-{entity_id}",)
-        ).fetchone()
-        if row:
-            return row, None
     else:
         sql, params = ("SELECT * FROM entities WHERE type=? AND id=? AND is_deleted=0",
                       (entity_type, entity_id))
@@ -87,22 +83,87 @@ def _row_data(conn, row) -> dict:
     return dict(zip(_columns(conn), row))
 
 
+def _scene_beats_id(conn, scene_id: str) -> str:
+    """The id of a scene's `scene_beats` record, or "" when it has none.
+
+    One record per scene (the write path refuses a second), so this is a lookup
+    rather than a list. It returns the ID, not the record: the id cannot be
+    derived from the scene id (it is caller-supplied — the skill teaches
+    `{scene_id}-beats`), so the pointer is what tells the reader where to look.
+    The record itself is read with `story_retrieve` on `scene_beats` and this id.
+    """
+    row = conn.execute(
+        "SELECT id FROM entities "
+        "WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+        (scene_id,)).fetchone()
+    return row[0] if row else ""
+
+
+def _scene_beats(conn, scene_id: str) -> dict | None:
+    """A scene's `scene_beats` record, or None when it has none.
+
+    Read whole: it is the same data the scene's `turning_point` computed field
+    is derived from.
+    """
+    row = conn.execute(
+        "SELECT id, parent_id, extra FROM entities "
+        "WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+        (scene_id,)).fetchone()
+    if not row:
+        return None
+    return {"id": row[0], "scene": row[1], **json.loads(row[2] or "{}")}
+
+
+def _project_path(conn) -> Path:
+    """Recover the project folder from the database file the connection is on."""
+    # ponytail: sqlite exposes the file path; the plugin always uses .story/story.db.
+    return Path(conn.execute("PRAGMA database_list").fetchone()[2]).parent.parent
+
+
 def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
     """Field values: columns, extra JSON, and relation-backed fields merged in."""
     extra = json.loads(data.get("extra") or "{}")
     schema = ENTITY_SCHEMAS.get(entity_type, {})
     column_map = ENTITY_COLUMN_MAP.get(entity_type, {})
 
+    # Emit in SCHEMA order, not in `wanted` order. `wanted` is a set, so
+    # iterating it gave whatever order the hash table happened to produce —
+    # which put one_sentence between two role fields and shuffled the five
+    # roles against each other. The schema is the one ordered declaration of a
+    # type's fields, so it is what the output order follows: a reader gets the
+    # fields as the type declares them, on every call, and reordering the
+    # schema reorders every reader at once.
     values = {}
-    for field in wanted:
-        if field not in schema:
+    for field, meta in schema.items():
+        if field not in wanted:
             continue
         if field in column_map:
             values[field] = data.get(column_map[field], "")
         else:
-            values[field] = extra.get(field, schema[field]["default"])
+            values[field] = extra.get(field, meta["default"])
+    # A computed field is derived, not stored: `value_focus` is the major and
+    # minor values counted from the scenes' value_turns. Nothing to read from
+    # `extra`, so it is built here — the first loop above already reserved the
+    # key in schema position. The project row is a singleton, so `_resolve`
+    # ignores its id and its scope function takes none.
+    if "value_focus" in wanted and entity_type in VALUE_FOCUS_SCOPES:
+        values["value_focus"] = (
+            for_project(_project_path(conn)) if entity_type == "project"
+            else VALUE_FOCUS_SCOPES[entity_type](_project_path(conn), data["id"]))
+    # The same for a scene's `turning_point`: the record is another entity, so
+    # there is nothing in this row's `extra` to read, and a scene with no record
+    # returns "" — the distinction the design keeps ("or empty"). `scene_beats`
+    # is NOT here: it is the record's id, so `_scene_beats_id` answers it and
+    # the record itself is a second `story_retrieve` call.
+    if entity_type == "scene" and "turning_point" in wanted:
+        sb = _scene_beats(conn, data["id"])
+        values["turning_point"] = sb.get("turning_point", "") if sb else ""
+    if entity_type == "scene" and "scene_beats" in wanted:
+        values["scene_beats"] = _scene_beats_id(conn, data["id"])
 
-    # Relation-backed fields: plot beats are rows linking to scenes, not columns.
+    # Relation-backed fields: plot beats are rows linking to scenes, not
+    # columns. Their position in the output is wherever the schema puts them,
+    # so the first loop above reserves the key and this one fills it.
     for field, (kind, is_list) in _RELATION_FIELDS.get(entity_type, {}).items():
         if field not in wanted:
             continue
@@ -124,6 +185,18 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
             values[field] = [{"scene_id": to_id, "description": note} for to_id, note in rows]
         else:
             values[field] = [to_id for to_id, _ in rows]
+    # A scene's plot_roles are the same rows read from the other side, and the
+    # only place they are WRITTEN. Not in `_RELATION_FIELDS` because it is one
+    # field to five kinds — see entity.plot_role_relations.
+    if entity_type == "scene" and "plot_roles" in wanted:
+        values["plot_roles"] = [
+            {"plot": plot, "role": kind[len("plot_"):], "description": note or ""}
+            for plot, kind, note in conn.execute(
+                'SELECT from_id, kind, note FROM relations '
+                "WHERE to_id=? AND kind LIKE 'plot_%' ORDER BY \"order\"",
+                (data["id"],),
+            ).fetchall()
+        ]
     return values
 
 
@@ -137,7 +210,16 @@ def _unfilled(conn, data: dict, entity_type: str) -> list:
                else "SELECT 1 FROM relations WHERE from_id=? AND kind=? LIMIT 1")
         if conn.execute(sql, (data["id"], kind)).fetchone():
             extra[field] = [1]
-    return unfilled_fields(entity_type, extra)
+    # The same for a scene's plot_roles — filled means a row exists, not an
+    # extra key, and plot_roles is never in extra.
+    if entity_type == "scene" and conn.execute(
+            "SELECT 1 FROM relations WHERE to_id=? AND kind LIKE 'plot_%' LIMIT 1",
+            (data["id"],)).fetchone():
+        extra["plot_roles"] = [1]
+    # `data` IS the row (see _row_data), so the column-backed fields —
+    # scene.location, plot.one_sentence, project.logline, location.world —
+    # are visible here instead of being reported as gaps.
+    return unfilled_fields(entity_type, extra, data)
 
 
 def _sections(conn, entity_id: str, wanted) -> dict:
@@ -186,8 +268,16 @@ def handler(args: dict, **kwargs) -> str:
             return json.dumps({"error": "Database schema incomplete. Run story_import first."})
 
         schema = ENTITY_SCHEMAS.get(entity_type, {})
-        wanted = set(f for f, m in schema.items() if not m.get("computed")) \
-            if want_fields == ["all"] else set(want_fields or [])
+        # `["all"]` means EVERY field, computed ones included. The five role
+        # fields are the whole content of a plot entity: without them a full
+        # retrieve returns the plot's name, type and scope and nothing about its
+        # story.
+        #
+        # They are still refused on the WRITE paths (drafts, create, edit) and
+        # by the importer, which is where "computed" earns its keep: nobody
+        # types them, they are derived. Excluding them from a READ is a
+        # different claim, and the wrong one.
+        wanted = set(schema) if want_fields == ["all"] else set(want_fields or [])
 
         entities, not_found = [], []
         for entity_id in ids:
@@ -199,7 +289,6 @@ def handler(args: dict, **kwargs) -> str:
             entry = {"id": data["id"]}
             if wanted:
                 entry["fields"] = _entity_fields(conn, data, entity_type, wanted)
-                entry["unfilled_fields"] = _unfilled(conn, data, entity_type)
             if want_sections:
                 found = _sections(conn, data["id"], want_sections)
                 entry["sections"] = found
@@ -207,6 +296,11 @@ def handler(args: dict, **kwargs) -> str:
                 if missing:
                     entry["sections_not_found"] = missing
                     entry["available_sections"] = list(_sections(conn, data["id"], ["all"]))
+            # `unfilled_fields` LAST: it is the verdict on everything above, and
+            # it reads as a summary of the fields and the prose rather than as
+            # one more section among them.
+            if wanted:
+                entry["unfilled_fields"] = _unfilled(conn, data, entity_type)
             entities.append(entry)
     finally:
         conn.close()

@@ -36,28 +36,30 @@ DASH.renderSceneItem = function(s) {
     const l = DASH.findLocation(lref);
     return l ? `<span class="tag tag-location">${DASH.escapeHtml(l.name)}</span>` : '';
   }).join('');
-  // Structural tags: dramatic_role + climax flags (orange)
-  const structTags = [];
-  if (s.dramatic_role) structTags.push(s.dramatic_role);
-  if (s.is_inciting_incident) structTags.push('inciting');
-  if (s.is_sequence_climax) structTags.push('seq-climax');
-  if (s.is_act_climax) structTags.push('act-climax');
-  if (s.is_story_climax) structTags.push('DASH.story-climax');
-  const structHtml = structTags.map(t => `<span class="tag tag-struct">${t}</span>`).join('');
-  // Arc beat indicator dots
-  const arcBeatDots = (s.arc_beats || []).map(ab => {
-    const c = (DASH.story.characters || []).find(x => x.id === ab.character || String(x.id) === String(ab.character));
-    const color = c ? DASH.roleColor(c.role || c.story_role || '') : '#8a8a8a';
-    const label = c ? `${c.name}: ${ab.label || ''}` : '';
-    return `<span class="arc-beat-dot-scene" style="background:${color}" title="${DASH.escapeHtml(label)}"></span>`;
+  // Structural tags: per-plot roles + climax flags (orange).
+  // The role is per plot, so it is read from `plots[]` (each entry's `role`)
+  // and labelled with the plot it belongs to. A scene serving no plot carries
+  // no entry there, and says so via its `dramatic_role` transition/non-event.
+  const roleTags = (s.plots || []).map(p => {
+    const plot = (DASH.story.plots || []).find(x => x.id === p.id);
+    const label = plot ? `${plot.name}: ${p.role}` : p.role;
+    return `<span class="tag tag-struct">${DASH.escapeHtml(label)}</span>`;
   }).join('');
+  const structTags = [];
+  if ((s.plots || []).length === 0
+      && (s.dramatic_role === 'transition' || s.dramatic_role === 'non-event')) {
+    structTags.push(s.dramatic_role);
+  }
+  (s.milestone || []).forEach(m => structTags.push(m));
+  const structHtml = roleTags
+    + structTags.map(t => `<span class="tag tag-struct">${DASH.escapeHtml(t)}</span>`).join('');
   return `
     <div class="scene-item" data-id="${s.id}">
       <div class="scene-number">${String(s.order || 0).padStart(2, '0')}</div>
       <div class="scene-body">
         <div class="scene-heading">${s.title || s.id}</div>
         ${s.heading ? `<div class="panel-muted" style="font-size:var(--font-size-xs);margin-top:2px;">${DASH.escapeHtml(s.heading)}</div>` : ''}
-        <div class="scene-meta">${charTags}${locTags}${structHtml}${arcBeatDots}</div>
+        <div class="scene-meta">${charTags}${locTags}${structHtml}</div>
       </div>
     </div>
   `;

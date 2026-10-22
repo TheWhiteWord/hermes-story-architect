@@ -133,25 +133,24 @@ class TestDashboardIntegration:
     def test_no_bare_inline_handlers_in_index_html(self):
         """All inline event handlers must use DASH.* prefix (not bare globals)."""
         import re
+        from tools.story_dashboard import JS_ORDER
+
         index_html = Path("src/dashboard/index.html").read_text()
+        # The file list is JS_ORDER, not a copy of it: a hand-kept list is a
+        # second source of truth that drifts, and this one had already dropped
+        # the tab files, value-graph.js and charts.js — so the guard could not
+        # see a bare handler in any of them.
         js_content = ""
-        for js_file in ["core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
-                        "views/scenes.js", "views/locations.js", "views/plots.js",
-                        "views/relationships.js", "views/worlds.js", "views/story.js",
-                        "panels/panel-manager.js", "panels/entity-panels.js",
-                        "graph/network.js", "graph/arc-graph.js",
-                        "statistics/statistics.js", "statistics/charts.js",
-                        "script-view.js"]:
+        for js_file in JS_ORDER:
             js_content += Path(f"src/dashboard/js/{js_file}").read_text() + "\n"
         all_content = index_html + js_content
         handler_fns = [
             "switchView", "showScenePanel", "showCharacterPanel", "showLocationPanel",
             "showPlotPanel", "showRelationshipPanel", "showSequencePanel", "showActPanel",
             "showWorldPanel", "openStatsPanel", "closeStatsPanel", "switchStatsGroup",
-            "sortTable", "switchGraphTab", "resetGraphLayout", "toggleArcSpline",
-            "toggleArcLabels", "toggleArcCharMute", "refreshIndex", "toggleSidebar",
+            "sortTable", "switchGraphTab", "resetGraphLayout", "refreshIndex", "toggleSidebar",
             "loadFromFile", "loadSampleData", "closePanel", "handleFileLoad",
-            "renderBarcodeChart", "filterScenes", "showArcTooltip", "hideArcTooltip",
+            "renderBarcodeChart", "filterScenes",
         ]
         for fn in handler_fns:
             # Must NOT appear as bare function in handler attribute in HTML
@@ -184,8 +183,7 @@ class TestAssemblyIntegrity:
             "locations-view", "plots-view", "relationships-view",
             "worlds-view", "script-view", "stats-panel", "detail-panel",
             "loading-screen", "error-screen", "file-input",
-            "network-canvas", "graph-legend", "chars-grid",
-            "arc-graph-wrap", "arc-legend", "arc-warnings",
+            "network-canvas", "graph-legend",
             "scene-search", "scene-list", "location-list", "plot-list",
             "relationship-list", "world-list", "screenplay-container",
             "panel-body", "panel-footer", "panel-name", "panel-type",

@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from core.writes import create_project
 from tools.story_export import handler as export_handler
 from tools.story_import import handler as import_handler
 from tools.story_memory import handler as memory_handler
@@ -10,13 +11,7 @@ from tools.story_memory import handler as memory_handler
 
 @pytest.fixture
 def project(tmp_path):
-    from tools.story_create import handler as create_handler
-    create_handler({
-        "entity_type": "project",
-        "slug": "memory-export",
-        "project": "",
-        "frontmatter": {"name": "Memory Export"},
-    }, root_path=tmp_path)
+    create_project("memory-export", {"name": "Memory Export"}, tmp_path)
     return tmp_path / "projects" / "memory-export", tmp_path
 
 

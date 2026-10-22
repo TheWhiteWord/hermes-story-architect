@@ -20,7 +20,7 @@ DASH.buildWorldsView = function() {
     }
     return `
       <div class="entity-card" data-id="${w.id}" onclick="DASH.showWorldPanel('${w.id}')">
-        <div class="entity-card-pip" style="background:#e0a86b"></div>
+        <div class="entity-card-pip" style="background:${DASH.ENTITY_KIND_COLORS.world}"></div>
         <div class="entity-card-body">
           <div class="entity-card-name">${w.name}</div>
           <div class="entity-card-sub">${w.one_sentence || ''}</div>

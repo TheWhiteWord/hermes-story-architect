@@ -24,7 +24,7 @@ DASH.handleFileLoad = function(input) {
 DASH.loadSampleData = function() {
   // Sample data in the REAL backend schema (as per brief) — exercises the normaliser
   const sample = {
-    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", spine: "", controlling_idea: "", story_value: "", story_value_at_open: "", story_value_at_close: "", inciting_incident_scene_id: "", story_climax_scene_id: "", structure_type: "", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
+    project: { name: "The Water Audit", logline: "A forensic accountant discovers her firm is laundering water-rationing profits for a corporate police state.", genre: "Sci-fi thriller", setting: "Near-future city-state", spine: "", controlling_idea: "", structure_type: "", scene_count: 3, character_count: 2, location_count: 1, world_count: 1, plot_count: 1 },
     characters: [
       {
         id: "detective-oak", name: "Detective Oak", story_role: "Supporting",
@@ -32,7 +32,8 @@ DASH.loadSampleData = function() {
         sections: ["Personality","Background","Voice","Arc","Relationships"],
         relationships: [{ with: "mara", label: "Partner", type: "ally", strength: 0.5 }],
         scenes: [{ number: 2, heading: "INT. POLICE STATION - DAY" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
-        goals: { short: "Bring down the cartel's leadership.", long: "Redeem his failure to protect his last partner." }
+        goals_short: "Bring down the cartel's leadership.",
+        goals_long: "Redeem his failure to protect his last partner."
       },
       {
         id: "mara", name: "Mara Chen", story_role: "Protagonist", age: 34,
@@ -43,7 +44,8 @@ DASH.loadSampleData = function() {
           { with: "victor-hale", label: "Boss", type: "enemy", strength: -0.6 }
         ],
         scenes: [{ number: 1, heading: "INT. MARA'S APARTMENT - NIGHT" }, { number: 3, heading: "INT. KITCHEN - NIGHT" }],
-        goals: { short: "Find the account number her brother left behind.", long: "Burn the cartel's financial DASH.network to the ground." },
+        goals_short: "Find the account number her brother left behind.",
+        goals_long: "Burn the cartel's financial DASH.network to the ground.",
         knowledge: ["Her brother Daniel was murdered", "Victor Hale is the cartel's CFO"]
       }
     ],
@@ -57,16 +59,21 @@ DASH.loadSampleData = function() {
       {
         id: "brother-investigation", name: "Brother Investigation", status: "active",
         one_sentence: "Mara follows her brother's account number into the cartel's DASH.network.",
-        setups: [{ heading: "INT. MARA'S APARTMENT - NIGHT", description: "" }, { heading: "INT. POLICE STATION - DAY", description: "" }],
-        payoffs: [{ heading: "INT. KITCHEN - NIGHT", description: "" }],
+        // Backend shape: {scene_id, description} pointing at scene slugs. A
+        // `heading` here renders an empty panel — the one silent dashboard bug.
+        setups: [{ scene_id: "mara-apartment", description: "" }, { scene_id: "police-station", description: "" }],
+        complications: [{ scene_id: "police-station", description: "" }],
+        crisis: [{ scene_id: "kitchen-night", description: "" }],
+        climax: [{ scene_id: "kitchen-night", description: "" }],
+        resolutions: [{ scene_id: "kitchen-night", description: "" }],
         characters: ["mara", "detective-oak"],
         sections: ["Summary","Obstacles","Stakes"]
       }
     ],
     scenes: [
-      { heading: "INT. MARA'S APARTMENT - NIGHT", scene_number: null, characters: ["mara"], id: 1, locations: [] },
-      { heading: "INT. POLICE STATION - DAY", scene_number: null, characters: ["detective-oak"], id: 2, locations: [] },
-      { heading: "INT. KITCHEN - NIGHT", scene_number: null, characters: ["detective-oak","mara"], id: 3, locations: ["kitchen"] }
+      { heading: "INT. MARA'S APARTMENT - NIGHT", scene_number: null, characters: ["mara"], id: "mara-apartment", title: "Mara's Apartment", locations: [] },
+      { heading: "INT. POLICE STATION - DAY", scene_number: null, characters: ["detective-oak"], id: "police-station", title: "Police Station", locations: [] },
+      { heading: "INT. KITCHEN - NIGHT", scene_number: null, characters: ["detective-oak","mara"], id: "kitchen-night", title: "Kitchen", locations: ["kitchen"] }
     ],
     story_memory: {
       last_updated: "2026-09-06T14:30:00",

@@ -14,12 +14,10 @@ be harder to trigger than any other action:
 import json
 import shutil
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 
@@ -38,14 +36,15 @@ def vault(tmp_path, monkeypatch):
     return v
 
 
-TARGET = {"entity_type": "character", "slug": "kael", "project": "stc"}
+TARGET = {"entity_type": "character", "id": "kael"}
 
 
 def _edit(vault, action, **args):
-    from tools.story_edit import handler
+    """The two admin-only actions that act on one entity: purge and restore."""
+    from tools.story_admin import handler
     return json.loads(handler({
-        "action": action, "target": TARGET, "summary": "test", **args},
-        root_path=str(vault)))
+        "action": action, "target": TARGET, "project": "stc",
+        "summary": "test", **args}, root_path=str(vault)))
 
 
 def _exists(vault, entity_id):
@@ -59,7 +58,9 @@ def _exists(vault, entity_id):
 
 
 def _delete(vault):
-    return _edit(vault, "delete_entity", confirm=True)
+    from core.writes import delete_entity
+    return delete_entity(vault / "projects" / "stc",
+                         "character", "kael", "test", True)
 
 
 class TestGuardOneTheConfirmPhrase:
@@ -137,7 +138,7 @@ class TestWhatPurgeRemoves:
     def test_it_reports_everything_it_destroyed(self, purged):
         _, r = purged
         ids = {p["id"] for p in r["purged"]}
-        assert {"kael", "kael-1", "kael-2", "kael-3"} <= ids
+        assert "kael" in ids
 
     def test_cascade_children_go_too(self, purged):
         vault, _ = purged
@@ -183,12 +184,15 @@ class TestPurgeLeavesNoMarkdownToResurrect:
         from tools.story_export import handler as export_handler
         from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
+        from test_round_trip import note_for, note_rel
 
-        note = vault / "projects" / "stc" / "characters" / "kael.md"
         # The sweep only touches files a previous export wrote, so the entity
-        # has to be exported once while it still exists.
+        # has to be exported once while it still exists. The filename is the
+        # title, so the path is only knowable after that first export.
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
+        proj = vault / "projects" / "stc"
+        note = note_for(proj, "characters", "kael")
         assert note.exists()
 
         _delete(vault)
@@ -213,26 +217,20 @@ class TestSoftDeleteSurvivesAnExportImportRoundTrip:
         from tools.story_export import handler as export_handler
         from tools.story_import import handler as import_handler
         from tools.story_retrieve import handler as retrieve_handler
-        # Export first, so the manifest knows the file exists.
+        from test_round_trip import note_for, note_rel
+        # Export first, so the manifest knows the file exists. The filename is
+        # the title, so the path is captured while the note still exists.
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
+        proj = vault / "projects" / "stc"
+        note = note_for(proj, "characters", "kael")
         _delete(vault)
         export_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
-        assert not (vault / "projects" / "stc" / "characters" / "kael.md").exists()
+        assert not note.exists()
         import_handler({"project": "stc", "confirm": True},
                        root_path=str(vault))
         r = json.loads(retrieve_handler({
             "project": "stc", "entity_type": "character", "id": ["kael"],
             "fields": ["one_sentence"]}, root_path=str(vault)))
         assert not r.get("entities"), "story_import resurrected a deleted entity"
-
-    def test_its_arc_beats_are_swept_too(self, vault):
-        from tools.story_export import handler as export_handler
-        export_handler({"project": "stc", "confirm": True},
-                       root_path=str(vault))
-        _delete(vault)
-        r = json.loads(export_handler({"project": "stc", "confirm": True},
-                                      root_path=str(vault)))
-        assert "characters/kael.md" in r["files_removed"]
-        assert any("arcs/kael" in f for f in r["files_removed"])

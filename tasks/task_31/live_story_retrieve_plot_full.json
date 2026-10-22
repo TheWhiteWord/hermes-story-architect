@@ -1,0 +1,63 @@
+{
+  "note": "Live capture: story_retrieve(project='browser-verification-test', entity_type='plot', fields=['all'], sections=['all']). Captured 2026-10-01 against the installed plugin after task 31.",
+  "findings": [
+    "fields=['all'] means every NON-COMPUTED field. The five role fields (setups/complications/crisis/climax/resolutions) are ABSENT from this payload — not empty, absent — because story_describe marks them computed. The full entity of a plot therefore does NOT include its roles unless they are named explicitly.",
+    "This is the same discoverability gap as the base story_load map, and it is worse here: 'all' is the word an agent reaches for when it wants everything, and it silently omits the five fields that are the entire point of the plot entity post-task-31.",
+    "A SECOND false gap: unfilled_fields reports 'one_sentence' as unfilled for BOTH plots, yet one_sentence is present and non-empty in the very same payload. It is a DB column, not an extra key, so unfilled_fields (which reads extra) cannot see it. Same blind spot as location on scenes.",
+    "Genuinely unfilled, and correct to report: the-resistance.plot_type (empty string), the-scientists-last-stand.value_arc (empty string).",
+    "Note unfilled_fields omits the computed role fields entirely — so the unfilled view can never tell you that the-scientists-last-stand has no complications. The gap is invisible in the one view whose job is reporting gaps.",
+    "Prose sections Role/Characters/Notes are empty strings on both plots; Summary/Threads/Value carry real authored prose and survived the import intact."
+  ],
+  "how_to_actually_get_the_roles": {
+    "story_retrieve": "story_retrieve(entity_type='plot', id=[...], fields=['setups','complications','crisis','climax','resolutions']) — must be named explicitly",
+    "story_load": "story_load(view='dramatic_elements', add_plot=true) — roles hang off scenes",
+    "not_available": "there is no view='plots'; the enum is arc | story_value | dramatic_elements | relationship | unfilled"
+  },
+  "payload": {
+    "entity_type": "plot",
+    "entities": [
+      {
+        "id": "the-resistance",
+        "fields": {
+          "plot_type": "",
+          "name": "The Resistance",
+          "status": "active",
+          "value_arc": "Maturation",
+          "plot_scope": "main",
+          "one_sentence": "Kael and Mira organize the children to breach the Central Room.",
+          "characters": ["kael", "mira"]
+        },
+        "unfilled_fields": ["one_sentence", "plot_type"],
+        "sections": {
+          "Summary": "Kael's growing awareness of the system's wrongness becomes a quiet revolution. What begins as private questions becomes shared doubt, and shared doubt becomes organized resistance. The children must decide: accept the world as it is, or risk everything to find what's beyond the door.",
+          "Role": "",
+          "Threads": "- The Administrator controls every system — meals, light, access. Resistance means going without.\n- Not all children want to leave. Some prefer the certainty of the known to the terror of the unknown.\n- Kael's own doubt: what if the wrongness is in them, not the system?",
+          "Value": "If they fail, the children remain in a dying system — safe but stagnant, alive but not living. If they succeed, they step into a world that was never designed for them, with no guarantee of survival. The door opens both ways.",
+          "Characters": "",
+          "Notes": ""
+        }
+      },
+      {
+        "id": "the-scientists-last-stand",
+        "fields": {
+          "plot_type": "Contradictory",
+          "name": "The Scientists' Last Stand",
+          "status": "active",
+          "value_arc": "",
+          "plot_scope": "sub",
+          "one_sentence": "400 years earlier, the scientists race to complete Project Save the Children as the outsiders gather.",
+          "characters": ["dr-elena-voss", "marcus-chen", "the-outsider"]
+        },
+        "unfilled_fields": ["one_sentence", "value_arc"],
+        "sections": {
+          "Summary": "Dr. Elena Voss and her team built the Institute to save the last children of a dying world. But 400 years later, their sanctuary has become a prison — and the children they saved are now trying to escape. The scientists' sacrifice is the reason the Institute exists; their failure is the reason it's dying.",
+          "Role": "",
+          "Threads": "- The Institute's power systems are failing. There's not enough energy to keep the children alive and the doors sealed.\n- Marcus wants to wake the children. Elena believes the world outside is still uninhabitable.\n- The outsiders are at the gates. The scientists must choose: open the door to save the children, or seal it to protect them.",
+          "Value": "If the scientists succeed, the children survive — but in a cage. If they fail, the Institute collapses and everyone dies. Either way, the children will never see the sky.",
+          "Characters": "",
+          "Notes": ""
+        }
+      }
+    ]
+  }
+}

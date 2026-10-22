@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Value graphs preview</title>
+<style>
+  /* the dashboard tokens from css/base.css, so the preview looks like the app */
+  :root {
+    --foreground: #e8e8e8; --muted-foreground: #8a8a8a; --accent: #7b9cf0;
+    --border: rgba(255,255,255,0.1); --card: rgba(255,255,255,0.04); --background: #111;
+    --radius: 6px; --font-size-xs: 10px; --font-size-sm: 11px; --font-size-base: 13px;
+  }
+  body { margin: 0; background: var(--background); color: var(--foreground); font: 13px/1.4 system-ui, sans-serif; }
+  .view-header { padding: 14px 16px 4px; }
+  .view-title { font-size: 15px; font-weight: 600; }
+  .view-subtitle { font-size: 11px; color: var(--muted-foreground); }
+  .arc-empty { text-align: center; padding: 40px; color: var(--muted-foreground); }
+</style>
+<link rel="stylesheet" href="value-graph.css">
+</head>
+<body>
+<div class="view active" id="values-view">
+  <div class="view-header"><div class="view-title">Values</div><div class="view-subtitle" id="values-subtitle"></div></div>
+  <div class="view-body" id="values-body"></div>
+</div>
+<script src="sample-data.js"></script>
+<script src="value-graph.js"></script>
+<script>
+  // the tab and plot can be preset from the address: preview.html?tab=plot&plot=sub
+  const q = new URLSearchParams(location.search);
+  if (q.get('tab')) DASH.valueGraphState.tab = q.get('tab');
+  if (q.get('plot')) DASH.valueGraphState.plot = q.get('plot');
+  DASH.showScenePanel = id => console.log('open scene panel', id);
+  DASH.buildValuesView();
+</script>
+</body>
+</html>

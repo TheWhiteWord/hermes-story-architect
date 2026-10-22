@@ -171,7 +171,10 @@ DASH.populateStructuralStats = function() {
   // Dramatic role bars
   const roleContainer = document.getElementById('structStats-role-bars');
   if (roleContainer) {
-    const roleColors = { setup: '#7b9cf0', complication: '#e0c96b', crisis: '#e07070', climax: '#b07be0', resolution: '#6bbfb0', transition: '#888', unset: '#444' };
+    // Keys are the five plot roles (from the `plot_<role>` relation kinds) plus
+    // the two plot-less markers. `unset` is gone: a scene with no role row is
+    // simply absent from the count, which is what "not assigned" should mean.
+    const roleColors = { setup: '#7b9cf0', complication: '#e0c96b', crisis: '#e07070', climax: '#b07be0', resolution: '#6bbfb0', transition: '#888', 'non-event': '#5a5a5a' };
     const roles = ss.sceneRoles || {};
     const total = Object.values(roles).reduce((a, b) => a + b, 0);
     roleContainer.innerHTML = Object.entries(roles).map(([key, count]) => {
@@ -211,32 +214,11 @@ DASH.populateStructuralStats = function() {
   if (actContainer) {
     const acts = ss.acts || [];
     actContainer.innerHTML = acts.map(a =>
-      `<div class="beat-row">
-        <span class="beat-scene">${DASH.escapeHtml(a.title || a.id)}</span>
-        <span class="beat-desc">${a.sceneCount || 0} scenes · ${a.sequenceCount || 0} sequences</span>
+      `<div class="entity-row">
+        <span class="entity-row-name">${DASH.escapeHtml(a.title || a.id)}</span>
+        <span class="entity-row-sub">${a.sceneCount || 0} scenes · ${a.sequenceCount || 0} sequences</span>
       </div>`
     ).join('') || '<div class="panel-muted" style="font-size:var(--font-size-xs);">No acts.</div>';
-  }
-
-  // Arc design summary
-  const arcContainer = document.getElementById('structStats-arc-summary');
-  if (arcContainer) {
-    const chars = DASH.story.characters || [];
-    const charsWithArcs = chars.filter(c => c.arc_type && c.arc_type !== 'absent' && c.arc_beats_list && c.arc_beats_list.length > 0);
-    const totalArcBeats = chars.reduce((sum, c) => sum + (c.arc_beats_list ? c.arc_beats_list.length : 0), 0);
-    if (charsWithArcs.length > 0) {
-      arcContainer.innerHTML = `<div style="margin-bottom:6px;font-size:var(--font-size-sm);color:var(--foreground);margin-top:2px">${charsWithArcs.length} characters · ${totalArcBeats} beats designed</div>` +
-        charsWithArcs.map(c => {
-          const col = DASH.roleColor(c.role || c.story_role || '');
-          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <span class="legend-dot" style="background:${col}"></span>
-            <span style="font-size:var(--font-size-sm)">${DASH.escapeHtml(c.name)}</span>
-            <span class="panel-muted" style="margin-left:auto;font-size:var(--font-size-xs)">${c.arc_type} · ${c.arc_beats_list.length} beats</span>
-          </div>`;
-        }).join('');
-    } else {
-      arcContainer.innerHTML = '<div class="panel-muted" style="font-size:var(--font-size-xs);">No character arcs designed.</div>';
-    }
   }
 }
 

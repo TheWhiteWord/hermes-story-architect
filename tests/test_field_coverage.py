@@ -7,10 +7,9 @@ from pathlib import Path
 import pytest
 
 from core.constants import ENTITY_SCHEMAS
-from tools.story_create import handler as create_handler
+from core.writes import create_entity, create_project, edit_entity
 from tools.story_load import handler as load_handler
 from tools.story_retrieve import handler as retrieve_handler
-from tools.story_edit import handler as edit_handler
 from tools.story_search import handler as search_handler
 from tools.story_dashboard import handler as dashboard_handler
 from tools.story_import import handler as import_handler
@@ -31,6 +30,18 @@ def _sample_value(field, meta):
     if ftype == "string":
         if field in ("id", "type"):
             return "sample"
+        if field in ("p", "c", "cd", "nn"):
+            # Four distinct ladder words — the value's shape rule.
+            return f"{field}-word"
+        if field in ("by", "entity"):
+            # `by` and `changes[].entity` resolve against real records
+            # (validate_beat_references), so the sample must name one: a
+            # character is the one type both sites accept.
+            return "parent-char"
+        if field == "driver":
+            # A declared ref: character. `parent-char` exists in the parents
+            # this test creates for a scene_beats.
+            return "parent-char"
         if "slug" in field or field.endswith("_id"):
             return f"ref-{field}"
         if field == "order":
@@ -39,6 +50,11 @@ def _sample_value(field, meta):
             return 0.5
         if field == "status":
             return "active"
+        if field == "location":
+            # Slugs hold no spaces or capitals, and a scene's location must
+            # resolve to a location record. The parent location is created
+            # under this slug in _create_parents.
+            return "sample-location"
         return f"Sample {field}"
     if ftype == "number":
         if field == "y":
@@ -55,10 +71,19 @@ def _sample_value(field, meta):
             return ["knows the truth"]
         if field == "rules":
             return ["no violence"]
-        if field in ("setups", "crisis", "climax", "payoffs"):
+        if field in ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions"):
             return _make_beats()
-        if field in ("conflict_levels",):
-            return ["inner", "personal"]
+        if field == "plot_roles":
+            # The write side of a role, and the only place one is written. The
+            # plot must exist for it to validate — the fixture's parents
+            # provide that only when a scene is created after a plot.
+            return []
+        if field == "value_turns":
+            # A turn names a plot and a value entity, both of which this
+            # project holds none of, so any turn would be refused for a
+            # missing plot. Empty is the shape this field has by default,
+            # and the turns themselves are covered by test_value_turns.py.
+            return []
         return [f"item-{i}" for i in range(1, 3)]
     return f"sample-{field}"
 
@@ -71,6 +96,10 @@ def _sample_frontmatter(entity_type):
         if field in ("id", "type"):
             continue
         fm[field] = _sample_value(field, meta)
+    if entity_type == "value":
+        # A value's id IS the slug of its name, and this test creates the
+        # entity under `test-value`, so the sample name must slug to that.
+        fm["name"] = "Test value"
     return fm
 
 
@@ -81,74 +110,49 @@ def project(tmp_path):
     Each test gets a unique project slug to avoid cross-test collisions.
     """
     proj_slug = f"proj-{uuid.uuid4().hex[:8]}"
-    result = create_handler({
-        "entity_type": "project",
-        "slug": proj_slug,
-        "project": str(tmp_path),
-        "frontmatter": {"name": "Test Project", "logline": "Test logline"},
-        "root_path": tmp_path,
-    })
-    data = json.loads(result)
+    data = create_project(proj_slug,
+                          {"name": "Test Project", "logline": "Test logline"},
+                          tmp_path)
     assert data.get("success"), f"Project creation failed: {data}"
     return tmp_path / "projects" / proj_slug
 
 
 def _create_parents(project, entity_type):
     """Create required parent entities for structural types."""
-    if entity_type == "arc_beat":
-        create_handler({
-            "entity_type": "character", "slug": "parent-char",
-            "project": str(project),
-            "frontmatter": {"name": "Parent", "story_role": "Protagonist", "one_sentence": "Parent char"},
-        })
-        # Arc needs a real scene to reference (validate_arc_parents checks existence)
-        create_handler({
-            "entity_type": "act", "slug": "act-1",
-            "project": str(project),
-            "frontmatter": {"title": "Act I"},
-        })
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1",
-            "project": str(project),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"},
-        })
-        create_handler({
-            "entity_type": "scene", "slug": "beat-scene",
-            "project": str(project),
-            "frontmatter": {"title": "Beat Scene", "sequence_id": "seq-1", "act_id": "act-1"},
-        })
+    if entity_type == "scene_beats":
+        # A record's scene must exist, and its `driver` is a ref: character.
+        create_entity(project, "character", "parent-char",
+                      {"name": "Parent", "story_role": "Protagonist",
+                       "one_sentence": "Parent char"})
+        create_entity(project, "act", "act-1", {"title": "Act I"})
+        create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project, "scene", "beats-scene", {"title": "Beats Scene", "sequence_id": "seq-1", "act_id": "act-1"})
     if entity_type in ("scene", "sequence", "plot"):
-        create_handler({
-            "entity_type": "act", "slug": "act-1",
-            "project": str(project),
-            "frontmatter": {"title": "Act I"},
-        })
+        create_entity(project, "act", "act-1", {"title": "Act I"})
     if entity_type in ("scene", "plot"):
-        create_handler({
-            "entity_type": "sequence", "slug": "seq-1",
-            "project": str(project),
-            "frontmatter": {"title": "Seq 1", "act_id": "act-1"},
-        })
+        create_entity(project, "sequence", "seq-1", {"title": "Seq 1", "act_id": "act-1"})
+    if entity_type == "scene":
+        # A scene's `location` is refused unless it resolves to a location
+        # record, and a slug may hold neither spaces nor capitals. The
+        # placeholder below is therefore a slug, and the location it names has
+        # to exist.
+        create_entity(project, "location", "sample-location",
+                      {"name": "Sample location", "one_sentence": "Sample"})
     if entity_type == "plot":
         for slug in ("kael", "mira"):
-            create_handler({
-                "entity_type": "character", "slug": slug,
-                "project": str(project),
-                "frontmatter": {"name": slug.capitalize(), "story_role": "Supporting", "one_sentence": slug},
-            })
+            create_entity(project, "character", slug,
+                          {"name": slug.capitalize(), "story_role": "Supporting",
+                           "one_sentence": slug})
         for i in range(1, 4):
-            create_handler({
-                "entity_type": "scene", "slug": f"scene-{i}",
-                "project": str(project),
-                "frontmatter": {"title": f"Scene {i}", "sequence_id": "seq-1", "act_id": "act-1"},
-            })
+            create_entity(project, "scene", f"scene-{i}",
+                          {"title": f"Scene {i}", "sequence_id": "seq-1",
+                           "act_id": "act-1"})
 
 
 def _prepare_frontmatter(entity_type, slug, fm):
     """Add parent references to frontmatter based on entity type."""
-    if entity_type == "arc_beat":
-        fm["character"] = "parent-char"
-        fm["scene"] = "beat-scene"
+    if entity_type == "scene_beats":
+        fm["scene"] = "beats-scene"
         fm["id"] = slug
     if entity_type == "scene":
         fm["sequence_id"] = "seq-1"
@@ -172,13 +176,7 @@ def test_create_load_retrieve(entity_type, project):
     _create_parents(project, entity_type)
     fm = _prepare_frontmatter(entity_type, slug, fm)
 
-    result = create_handler({
-        "entity_type": entity_type,
-        "slug": slug,
-        "project": str(project),
-        "frontmatter": fm,
-    })
-    data = json.loads(result)
+    data = create_entity(project, entity_type, slug, fm)
     assert data.get("success"), f"Create failed for {entity_type}/{slug}: {data}"
 
     # Load → entity appears in nested structure
@@ -218,21 +216,33 @@ def test_create_load_retrieve(entity_type, project):
                     break
     elif entity_type == "act":
         found = any(a.get("id") == slug for a in load_result["acts"])
-    elif entity_type == "arc_beat":
-        # Arcs no longer in load output; verify via story_retrieve
+    elif entity_type == "scene_beats":
+        # A record is reached through its scene's computed `scene_beats` field
+        # (see _build_scene), so it is verified via retrieve like relationship
+        # and value.
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
-            "entity_type": "arc_beat",
-            "id": [f"parent-char-{slug}"],
+            "entity_type": "scene_beats",
+            "id": [slug],
             "sections": ["all"],
         }))
         found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
     elif entity_type == "relationship":
         # Full relationship graph removed from base view (view="relationship",
-        # task_21 spec §3.4) — verify the entity via retrieve, like arc_beat
+        # task_21 spec §3.4) — verify the entity via retrieve
         retrieve_result = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "relationship",
+            "id": [slug],
+            "sections": ["all"],
+        }))
+        found = retrieve_result["entities"] and retrieve_result["entities"][0].get("sections")
+    elif entity_type == "value":
+        # Values are not in the load tree (they are the values view's, phase 3);
+        # verify via retrieve.
+        retrieve_result = json.loads(retrieve_handler({
+            "project": str(project),
+            "entity_type": "value",
             "id": [slug],
             "sections": ["all"],
         }))
@@ -241,13 +251,10 @@ def test_create_load_retrieve(entity_type, project):
     assert found, f"Entity {slug} not in load result"
 
     # Retrieve → sections present
-    expected_id = slug
-    if entity_type == "arc_beat":
-        expected_id = f"parent-char-{slug}"
     retrieve_result = json.loads(retrieve_handler({
         "project": str(project),
         "entity_type": entity_type,
-        "id": [expected_id],
+        "id": [slug],
         "sections": ["all"],
     }))
     assert retrieve_result["entities"] and retrieve_result["entities"][0].get("sections"), \
@@ -260,7 +267,7 @@ def test_create_load_retrieve(entity_type, project):
 # ─── Phase 2: Edit every field type ──────────────────────────────────────────
 
 
-@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "arc_beat"])
+@pytest.mark.parametrize("entity_type", ["character", "plot", "scene"])
 def test_edit_all_field_types(entity_type, project):
     """Edit column, extra, section, and relation fields for an entity type."""
     slug = f"edit-{entity_type}"
@@ -269,15 +276,10 @@ def test_edit_all_field_types(entity_type, project):
     _create_parents(project, entity_type)
     fm = _prepare_frontmatter(entity_type, slug, fm)
 
-    result = create_handler({
-        "entity_type": entity_type,
-        "slug": slug,
-        "project": str(project),
-        "frontmatter": fm,
-    })
-    assert json.loads(result).get("success"), f"Create failed: {result}"
+    assert create_entity(project, entity_type, slug, fm).get("success"), \
+        f"Create failed for {entity_type}/{slug}"
 
-    entity_id = f"parent-char-{slug}" if entity_type == "arc_beat" else slug
+    entity_id = slug
 
     # Build edit payload covering all field categories
     edit_data = {}
@@ -286,15 +288,12 @@ def test_edit_all_field_types(entity_type, project):
         "character": {"one_sentence": "Updated one sentence"},
         "plot": {"one_sentence": "Updated plot summary", "status": "resolved"},
         "scene": {"title": "Updated Title", "status": "written"},
-        "arc_beat": {"label": "Updated Label"},
     }
     edit_data.update(column_fields.get(entity_type, {}))
 
     extra_fields = {
-        "character": {"arc_type": "negative", "arc_complete": True},
         "plot": {"plot_type": "Resonant", "value_arc": "Maturation"},
-        "scene": {"dramatic_role": "crisis", "shift": "trust → suspicion"},
-        "arc_beat": {"action": "Updated action", "y": -0.7, "is_crisis": True},
+        "scene": {"dramatic_role": "crisis", "heading": "INT. ROOM - DAY"},
     }
     edit_data.update(extra_fields.get(entity_type, {}))
 
@@ -302,28 +301,23 @@ def test_edit_all_field_types(entity_type, project):
         "character": "Identity",
         "plot": "Summary",
         "scene": "Content",
-        "arc_beat": "Action",
+
     }.get(entity_type)
     if section_name:
         edit_data[section_name] = f"Updated {section_name} content via edit."
 
     if entity_type == "plot":
-        # All 4 beat types — setups, crisis, climax, payoffs
+        # The six role fields are computed, so they cannot be edited. The role
+        # is written on the SCENE as `plot_roles` — covered by
+        # test_scene_plot_roles.py. What is asserted here is the refusal: an
+        # edit naming one reports it read-only instead of writing rows.
         edit_data["setups"] = [
             {"scene_id": "scene-1", "description": "New setup"},
-            {"scene_id": "scene-2", "description": "Added setup"},
         ]
-        edit_data["crisis"] = [{"scene_id": "scene-1", "description": "Crisis beat"}]
-        edit_data["climax"] = [{"scene_id": "scene-2", "description": "Climax beat"}]
-        edit_data["payoffs"] = [{"scene_id": "scene-3", "description": "New payoff"}]
 
-    edit_result = edit_handler({
-        "action": "edit_note",
-        "target": {"entity_type": entity_type, "slug": slug, "project": str(project)},
-        "data": edit_data,
-        "summary": f"Test edit for {entity_type}",
-    })
-    assert json.loads(edit_result).get("success"), f"Edit failed: {edit_result}"
+    assert edit_entity(project, entity_type, slug, edit_data,
+                       f"Test edit for {entity_type}").get("success"), \
+        f"Edit failed for {entity_type}"
 
     # Verify edit persisted
     load_after = json.loads(load_handler({"project": str(project)}))
@@ -341,27 +335,12 @@ def test_edit_all_field_types(entity_type, project):
                     if isinstance(scene, dict) and scene.get("id") == entity_id:
                         entity_data = scene
                         break
-    elif entity_type == "arc_beat":
-        # Arc beats no longer in load output; verify via story_retrieve
-        retrieve_after = json.loads(retrieve_handler({
-            "project": str(project),
-            "entity_type": "arc_beat",
-            "id": [entity_id],
-            "sections": ["all"],
-        }))
-        entity_data = ({"label": "Updated Label"}
-                       if "Updated" in retrieve_after["entities"][0]["sections"].get("Action", "")
-                       else None)
-
     assert entity_data is not None, f"Entity {entity_id} missing after edit"
 
     # Field checks
     if entity_type == "character":
         if "one_sentence" in edit_data:
             assert entity_data["one_sentence"] == edit_data["one_sentence"]
-        if "arc_type" in edit_data:
-            assert entity_data.get("arc_type") == edit_data["arc_type"]
-        # arc_complete removed from load output; verified via story_retrieve
 
     if entity_type == "plot":
         if "one_sentence" in edit_data:
@@ -376,13 +355,18 @@ def test_edit_all_field_types(entity_type, project):
             assert entity_data["title"] == edit_data["title"]
         if "status" in edit_data:
             assert entity_data["status"] == edit_data["status"]
-        if "dramatic_role" in edit_data:
-            assert entity_data.get("dramatic_role") == edit_data["dramatic_role"]
-
-    if entity_type == "arc_beat":
-        # Arc field checks (y, is_crisis, etc.) removed — arcs no longer in load output
-        if "label" in edit_data:
-            assert entity_data["label"] == edit_data["label"]
+        if "heading" in edit_data:
+            # A heading is prose, read with story_retrieve rather than in the
+            # base map's scene row. `fields` returns the requested names, so a
+            # key is only absent when the field is not this entity's.
+            retrieved = retrieve_handler({
+                "project": str(project),
+                "entity_type": "scene",
+                "id": [entity_id],
+                "fields": ["heading"],
+            })
+            heading = json.loads(retrieved)["entities"][0]["fields"].get("heading")
+            assert heading == edit_data["heading"]
 
     # Section check
     if section_name:
@@ -399,21 +383,28 @@ def test_edit_all_field_types(entity_type, project):
     # view='dramatic_elements' with add_plot, and story_retrieve returns the
     # plot whole), so verify through story_retrieve.
     if entity_type == "plot":
+        # Naming the six explicitly: they are computed, so `["all"]` omits
+        # them. An edit that tried to set `setups` above was reported read-only
+        # and wrote nothing — so the rows read here are whatever the edit left,
+        # which is the assertion: a read-only field produced no rows.
         plot_after = json.loads(retrieve_handler({
             "project": str(project),
             "entity_type": "plot",
             "id": [entity_id],
-            "fields": ["all"],
+            "fields": ["setups", "inciting_incident", "complications",
+                       "crisis", "climax", "resolutions"],
         }))["entities"][0]["fields"]  # field values are nested under "fields"
-        all_scenes = (plot_after.get("setups", []) + plot_after.get("crisis", [])
-                      + plot_after.get("climax", []) + plot_after.get("payoffs", []))
-        assert len(all_scenes) > 0, "Plot has no scene references after edit"
+        all_scenes = (plot_after.get("setups", []) + plot_after.get("inciting_incident", [])
+                      + plot_after.get("complications", [])
+                      + plot_after.get("crisis", []) + plot_after.get("climax", [])
+                      + plot_after.get("resolutions", []))
+        assert not all_scenes, "a computed role field was written by an edit"
 
 
 # ─── Phase 3: Dashboard renders without error ────────────────────────────────
 
 
-@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "arc_beat", "location", "world", "sequence", "act"])  # project excluded — it's the root entity, not a child
+@pytest.mark.parametrize("entity_type", ["character", "plot", "scene", "location", "world", "sequence", "act"])  # project excluded — it's the root entity, not a child
 def test_dashboard_renders_with_entity(entity_type, project):
     """Dashboard renders HTML without error for each entity type."""
     slug = f"dash-{entity_type}"
@@ -422,13 +413,8 @@ def test_dashboard_renders_with_entity(entity_type, project):
     _create_parents(project, entity_type)
     fm = _prepare_frontmatter(entity_type, slug, fm)
 
-    result = create_handler({
-        "entity_type": entity_type,
-        "slug": slug,
-        "project": str(project),
-        "frontmatter": fm,
-    })
-    assert json.loads(result).get("success"), f"Create failed: {result}"
+    assert create_entity(project, entity_type, slug, fm).get("success"), \
+        f"Create failed for {entity_type}/{slug}"
 
     dash_result = json.loads(dashboard_handler({"project": str(project)}))
     assert dash_result.get("success"), f"Dashboard failed: {dash_result}"
@@ -465,7 +451,7 @@ def test_import_export_round_trip(tmp_path):
 
 
 def test_import_preserves_all_plot_beats(tmp_path):
-    """plot crisis/climax beats are NOT silently dropped during import."""
+    """plot role beats are NOT silently dropped during import."""
     fixture = Path(__file__).parent / "fixtures" / "save-the-children"
     if not fixture.exists():
         pytest.skip("save-the-children fixture not available")
@@ -484,8 +470,9 @@ def test_import_preserves_all_plot_beats(tmp_path):
         ).fetchall()
         kinds = {r[0] for r in rows}
 
-        assert "plot_setup" in kinds, f"plot_setup missing: {kinds}"
-        assert "plot_payoff" in kinds, f"plot_payoff missing: {kinds}"
+        assert "plot_inciting_incident" in kinds, f"plot_inciting_incident missing: {kinds}"
+        assert "plot_climax" in kinds, f"plot_climax missing: {kinds}"
+        assert "plot_resolution" in kinds, f"plot_resolution missing: {kinds}"
 
         has_crisis_climax = False
         for plot_file in (proj / "plots").glob("*.md"):

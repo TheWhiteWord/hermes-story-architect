@@ -18,12 +18,6 @@
 </head>
 
 <body>
-<div id="arc-beat-tooltip">
-  <div class="tt-label" id="tt-label"></div>
-  <div class="tt-char" id="tt-char"></div>
-  <div class="tt-shift" id="tt-shift"></div>
-  <div class="tt-value" id="tt-value"></div>
-</div>
 <div id="app">
 
   <!-- Loading -->
@@ -101,14 +95,20 @@
 
     <button class="nav-btn" data-view="plots" onclick="DASH.switchView('plots', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-        <path d="M2 12 L5 7 L8 9 L11 4 L14 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="5" cy="7" r="1.2" fill="currentColor"/>
-        <circle cx="11" cy="4" r="1.2" fill="currentColor"/>
+        <path d="M2 5c3 0 3 6 6 6s3-6 6-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M2 11c3 0 3-6 6-6s3 6 6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
       </svg>
       <span class="nav-label">Plots</span>
     </button>
 
 
+
+    <button class="nav-btn" data-view="values" onclick="DASH.switchView('values', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M2 12l3-4 3 2 3-6 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="nav-label">Values</span>
+    </button>
 
     <button class="nav-btn" data-view="worlds" onclick="DASH.switchView('worlds', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -182,32 +182,11 @@
       </div>
       <div class="graph-tabs">
         <div class="graph-tab" id="tab-network" onclick="DASH.switchGraphTab('network')">Network</div>
-        <div class="graph-tab" id="tab-arcgraph" onclick="DASH.switchGraphTab('arcgraph')">Arc graph</div>
       </div>
       <div class="view-body">
         <div id="graph-tab-network" class="graph-tab-content active">
           <div id="network-canvas"></div>
           <div class="graph-legend" id="graph-legend"></div>
-        </div>
-        <div id="graph-tab-arcgraph" class="graph-tab-content" style="display:none;">
-          <div class="chars-section">
-            <div class="panel-section-label">Cast</div>
-            <div class="chars-grid" id="chars-grid"></div>
-            <hr class="section-divider">
-          </div>
-          <div class="arc-graph-section">
-            <div class="arc-graph-header">
-              <div class="panel-section-label arc-graph-title">Value arc trajectories</div>
-              <div class="arc-controls">
-                <button class="btn btn-sm" id="btn-spline" onclick="DASH.toggleArcSpline()">Smooth</button>
-                <button class="btn btn-sm" id="btn-labels" onclick="DASH.toggleArcLabels()">Labels</button>
-                <button class="btn btn-sm" id="btn-story" onclick="DASH.toggleArcStory()">Story arc</button>
-              </div>
-            </div>
-            <div class="arc-graph-wrap" id="arc-graph-wrap"></div>
-            <div class="arc-legend" id="arc-legend"></div>
-            <div class="arc-warnings" id="arc-warnings"></div>
-          </div>
         </div>
       </div>
     </div>
@@ -273,6 +252,15 @@
       <div class="view-body">
         <div class="entity-grid" id="world-list"></div>
       </div>
+    </div>
+
+    <!-- Values View -->
+    <div class="view" id="values-view">
+      <div class="view-header">
+        <div class="view-title">Values</div>
+        <div class="view-subtitle" id="values-subtitle">—</div>
+      </div>
+      <div class="view-body" id="values-body"></div>
     </div>
 
     <!-- Script View -->
@@ -490,9 +478,6 @@
 
         <div class="stats-section-label">Acts</div>
         <div id="structStats-act-list"></div>
-
-        <div class="stats-section-label">Character arcs</div>
-        <div id="structStats-arc-summary"></div>
 
         <button class="btn btn-hermes" data-hermes-send="Analyze the dramatic structure of this story. Comment on the distribution of scene roles, the balance of acts, and any structural patterns or gaps.">Ask Hermes about structure</button>
 

@@ -43,8 +43,25 @@ class TestRealContent:
     def test_content_is_filled(self):
         assert "one_sentence" not in _unfilled("plot", one_sentence="A courier who questions it.")
 
-    def test_placeholder_default_is_unfilled(self):
-        assert "one_sentence" in _unfilled("plot", one_sentence="Summary not set")
+    def test_stored_default_is_never_prose(self):
+        """B12's regression guard: no `default` may be a placeholder string.
+
+        A prose default is written into the data on create, and the enum check
+        then rejects it as a value the user chose — so a minimal character
+        reported four findings that meant nothing. This is the test that fails
+        if a placeholder is ever added back.
+        """
+        import re
+        from core.constants import ENTITY_SCHEMAS
+
+        prose = re.compile(r"not set|not described|not defined|not recorded", re.I)
+        offenders = [
+            f"{et}.{field}={meta['default']!r}"
+            for et, schema in ENTITY_SCHEMAS.items()
+            for field, meta in schema.items()
+            if isinstance(meta.get("default"), str) and prose.search(meta["default"])
+        ]
+        assert offenders == []
 
     def test_empty_default_still_unfilled(self):
         """Fields whose default is '' were already correct; keep them so."""
@@ -67,11 +84,29 @@ class TestNeverUnfilled:
                     assert field not in unfilled_fields(
                         entity_type, {field: False if meta["type"] == "boolean" else 0})
 
-    def test_computed_fields_are_skipped(self):
+    def test_computed_fields_are_skipped_except_the_plot_roles(self):
+        """Computed means "derived at read time", which is not the same as
+        "never a gap".
+
+        The plot's six role fields are the case that proved it: a plot with no
+        crisis scene is missing its crisis, and reporting nothing there left
+        the author no way to ask which plot was incomplete. They are relation
+        fields whose rows exist or do not, and `story_retrieve._unfilled` feeds
+        the derived value in — so an absent row reads as an empty role, which
+        is the gap.
+
+        Every other computed field stays out: a character's `relationships`
+        summarises entities that live elsewhere and are reported there.
+        """
+        from core.entity import _RELATION_FIELDS
         for entity_type, fields in ENTITY_SCHEMAS.items():
             computed = [f for f, m in fields.items() if m.get("computed")]
+            relation_fields = _RELATION_FIELDS.get(entity_type, {})
             for field in computed:
-                assert field not in unfilled_fields(entity_type, {field: ""})
+                if field in relation_fields:
+                    assert field in unfilled_fields(entity_type, {field: ""})
+                else:
+                    assert field not in unfilled_fields(entity_type, {field: ""})
 
 
 class TestSubFields:
@@ -95,7 +130,8 @@ class TestSubFields:
 
     def test_list_parent_present_counts_as_filled(self):
         """An entry existing = filled; its notes are optional prose."""
-        assert "setups" not in _unfilled("plot", setups=[{"scene_id": "s1", "description": ""}])
+        assert "plot_roles" not in _unfilled("scene", plot_roles=[
+            {"plot": "the-plot", "role": "setup", "description": ""}])
 
     def test_cleared_list_parent_is_unfilled(self):
-        assert "setups" in _unfilled("plot", setups=[])
+        assert "plot_roles" in _unfilled("scene", plot_roles=[])

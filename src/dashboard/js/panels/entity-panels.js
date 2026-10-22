@@ -9,26 +9,17 @@ DASH.showActPanel = function(actId) {
 
   const seqRows = (act.sequences_list || []).map(sid => {
     const seq = (DASH.story.sequences || []).find(s => s.id === sid);
-    return seq ? `<div class="beat-row" onclick="DASH.showSequencePanel('${sid}')">
-      <span class="beat-scene">${seq.title || sid}</span>
-      <span class="beat-desc">${seq.scene_count || 0} scenes</span>
-    </div>` : '';
+    return seq ? `<button class="entity-link" onclick="DASH.showSequencePanel('${sid}')">${seq.title || sid}<span style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-left:4px">${seq.scene_count || 0} scenes</span></button>` : '';
   }).join('');
 
-  // Plot threads in this act with scope/type
+  // Plot threads in this act — same chip style as the scene panel
   const plotRows = (act.plots || []).map(p => {
     const pl = (DASH.story.plots || []).find(x => x.id === p.id);
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
-    const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    return `<div class="beat-row" onclick="DASH.showPlotPanel('${pl.id}')">
-      <span class="beat-scene" style="color:${col}">${pl.name}</span>
-      ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
-      ${p.has_setup ? '<span class="beat-desc">setup</span>' : ''}
-      ${p.has_crisis ? '<span class="beat-desc">crisis</span>' : ''}
-      ${p.has_climax ? '<span class="beat-desc">climax</span>' : ''}
-      ${p.has_payoff ? '<span class="beat-desc">payoff</span>' : ''}
-    </div>`;
+    const col = DASH.plotColor(pl.id);
+    const badges = DASH.plotRoleBadges(p);
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scope}${badges ? ' · ' + badges : ''}</span></button>`;
   }).join('');
 
   document.getElementById('panel-body').innerHTML = `
@@ -42,8 +33,12 @@ DASH.showActPanel = function(actId) {
         ${actObj ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground)">Act objective: <span style="color:var(--foreground);font-weight:500">${actObj}</span></div>` : ''}
       </div>`;
     })()}
-    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
-    ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div>${seqRows}</div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
+    <div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink('story')}</div>
+      ${DASH.valueFocusHtml(act.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
+    ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${seqRows}</div></div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
     ${DASH.renderSectionsHtml('act', actId)}
   `;
 
@@ -119,10 +114,6 @@ DASH.showCharacterPanel = function(char) {
       <div class="panel-section-title">Relationships</div>
       ${rels}
     </div>` : ''}
-    <div>
-      <div class="panel-section-title">Arc</div>
-      ${DASH.arcSectionHtml(char)}
-    </div>
     ${DASH.renderSectionsHtml('character', char.id)}
   `;
 
@@ -250,12 +241,12 @@ DASH.showPlotPanel = function(plotId) {
       : '';
   }).filter(Boolean).join('');
 
-  // Setups/payoffs: [{scene_id, description}] (backend-normalized)
+  // Role fields: [{scene_id, description}] (backend-normalized)
   function renderBeats(arr) {
     if (!arr || !arr.length) return '';
     return arr.map(item => {
       if (typeof item === 'string') {
-        return `<div class="beat-row">${item}</div>`;
+        return `<div class="entity-row">${item}</div>`;
       }
       // Backend normalizes to {scene_id, description}
       const sceneObj = (DASH.story.scenes || []).find(s => String(s.id) === String(item.scene_id));
@@ -263,20 +254,22 @@ DASH.showPlotPanel = function(plotId) {
       const sceneName = sceneObj ? (sceneObj.title || sceneObj.id) : (item.scene_id || '');
       if (!sceneName) return '';
       const sceneLink = sceneObj
-        ? `<span class="beat-scene" onclick="DASH.showScenePanel('${sceneObj.id}')" style="cursor:pointer">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`
-        : `<span class="beat-scene">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`;
-      return `<div class="beat-row">${sceneLink}${item.description ? `<span class="beat-desc">${item.description}</span>` : ''}</div>`;
+        ? `<span class="entity-row-name" onclick="DASH.showScenePanel('${sceneObj.id}')" style="cursor:pointer">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`
+        : `<span class="entity-row-name">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`;
+      return `<div class="entity-row">${sceneLink}${item.description ? `<span class="entity-row-sub">${item.description}</span>` : ''}</div>`;
     }).join('');
   }
 
-  const setupObjs = plot.setups || [];
-  const crisisObjs = plot.crisis || [];
-  const climaxObjs = plot.climax || [];
-  const payoffObjs = plot.payoffs || [];
-  const setupsHtml = renderBeats(setupObjs);
-  const crisisHtml = renderBeats(crisisObjs);
-  const climaxHtml = renderBeats(climaxObjs);
-  const payoffsHtml = renderBeats(payoffObjs);
+  // Plot role sections, one per role — must match PLOT_ROLES in core/constants.py.
+  // The plot's field is the pluralised role (`complications` for `complication`);
+  // the singular is the fallback for payloads that key by role name directly.
+  const roleSections = DASH.PLOT_ROLES.map(r => {
+    const html = renderBeats(plot[r + 's'] || plot[r] || []);
+    return html ? `<div>
+      <div class="panel-section-title">${r[0].toUpperCase() + r.slice(1)}</div>
+      ${html}
+    </div>` : '';
+  }).join('');
 
   document.getElementById('panel-body').innerHTML = `
     <div>
@@ -288,26 +281,15 @@ DASH.showPlotPanel = function(plotId) {
       <span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span>
     </div>
     ${arcHtml}
+    <div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink(plot.id)}</div>
+      ${DASH.valueFocusHtml(plot.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
     ${chars ? `<div>
       <div class="panel-section-title">Characters involved</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
     </div>` : ''}
-    ${setupsHtml ? `<div>
-      <div class="panel-section-title">Setups</div>
-      ${setupsHtml}
-    </div>` : ''}
-    ${crisisHtml ? `<div>
-      <div class="panel-section-title">Crisis</div>
-      ${crisisHtml}
-    </div>` : ''}
-    ${climaxHtml ? `<div>
-      <div class="panel-section-title">Climax</div>
-      ${climaxHtml}
-    </div>` : ''}
-    ${payoffsHtml ? `<div>
-      <div class="panel-section-title">Payoffs</div>
-      ${payoffsHtml}
-    </div>` : ''}
+    ${roleSections}
     ${DASH.renderSectionsHtml('plot', plot.id)}
   `;
 
@@ -424,48 +406,86 @@ DASH.showScenePanel = function(sceneId) {
     return l ? `<button class="entity-link" onclick="DASH.showLocationPanel('${l.id}')">${l.name}</button>` : '';
   }).filter(Boolean).join('');
 
-  // Plots: backend populates scene.plots from plot setups/payoffs
+  // Plots: backend populates scene.plots from the plot's role rows
   const plotRefs = (scene.plots || []);
   const plots = plotRefs.map(pref => {
     const pid = (typeof pref === 'object' && pref !== null) ? pref.id : pref;
-    const beat = (typeof pref === 'object' && pref !== null) ? (pref.beat || '') : '';
+    const role = (typeof pref === 'object' && pref !== null) ? (pref.role || '') : '';
     const pl = (DASH.story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
     const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    const beatLabel = beat ? ` · ${beat.toUpperCase()}` : '';
+    const roleLabel = role ? ` · ${role.toUpperCase()}` : '';
     const scopeLabel = scope ? ` · ${scope}` : '';
-    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${beatLabel}</span></button>`;
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${roleLabel}</span></button>`;
   }).filter(Boolean).join('');
 
-  // Content from __SECTIONS__.scenes[slug]["Content"]
+  // Content from __SECTIONS__.scenes[slug]["Content"]. A placeholder marker is
+  // not content — it is the same marker the section renderer drops.
   let contentHtml = '';
   const sections = window.__SECTIONS__;
   const sceneContent = sections?.scene?.[sceneId]?.Content;
-  if (sceneContent) {
+  if (sceneContent && !DASH.isPlaceholderSection(sceneContent)) {
     contentHtml = `<div class="fountain-content">${DASH.escapeHtml(sceneContent)}</div>`;
   } else {
     contentHtml = '<div class="panel-muted">No content yet.</div>';
   }
 
-  // Dramatic metadata — only show positive values
+  // Dramatic metadata — only show positive values.
+  // The role is per plot, so each `plots[]` entry becomes its own tag naming
+  // the plot and the role it plays there. `dramatic_role` is only surfaced
+  // when the scene serves no plot at all — otherwise it says "plot_role",
+  // which restates the storage and tells a reader nothing.
   const dramaTags = [];
-  if (scene.dramatic_role) dramaTags.push({ l: 'role', v: scene.dramatic_role });
-  if (scene.is_inciting_incident) dramaTags.push({ l: 'inciting', v: 'Inciting Incident' });
-  if (scene.is_sequence_climax) dramaTags.push({ l: 'seq-climax', v: 'Sequence Climax' });
-  if (scene.is_act_climax) dramaTags.push({ l: 'act-climax', v: 'Act Climax' });
-  if (scene.is_story_climax) dramaTags.push({ l: 'DASH.story-climax', v: 'Story Climax' });
+  (scene.plots || []).forEach(p => {
+    const plot = (DASH.story.plots || []).find(x => x.id === p.id);
+    dramaTags.push({
+      l: 'role',
+      v: plot ? `${plot.name}: ${p.role}` : p.role,
+      title: p.description || '',
+    });
+  });
+  if ((scene.plots || []).length === 0
+      && (scene.dramatic_role === 'transition' || scene.dramatic_role === 'non-event')) {
+    dramaTags.push({ l: 'role', v: scene.dramatic_role });
+  }
+  (scene.milestone || []).forEach(m => dramaTags.push({ l: m, v: m }));
 
-  const valueArc = [scene.value_at_open, scene.value_at_close].filter(Boolean);
   const conflicts = (scene.conflict_levels || []).filter(Boolean);
 
-  const dramaHtml = (dramaTags.length || valueArc.length || conflicts.length) ? `
+  // Value turns: the value pass recorded on this scene, one row per shift
+  // (value, from → to), tagged with the plot it serves. Nothing here is
+  // stored on the scene itself — the words belong to the value entity, so
+  // the row names the value and leaves the rungs implicit.
+  const turnRows = (scene.value_turns || []).map(t => {
+    const pl = (DASH.story.plots || []).find(x => x.id === t.plot);
+    const plotLabel = pl ? pl.name : (t.plot || '');
+    const col = pl
+      ? (pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888'))
+      : '#888';
+    const from = DASH.escapeHtml(t.from || '');
+    const to = DASH.escapeHtml(t.to || '');
+    const shift = from && to ? `${from} <span style="opacity:0.5">→</span> ${to}`
+                 : from || to || '';
+    const sub = [shift, plotLabel ? DASH.escapeHtml(plotLabel) : ''].filter(Boolean)
+      .join('<span style="opacity:0.5;margin:0 4px">·</span>');
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${t.plot || ''}')" style="border-left:2px solid ${col}">
+      <span style="font-weight:500;margin-right:6px">${DASH.escapeHtml(t.value || '')}</span>
+      <span style="font-size:var(--font-size-xs);color:var(--muted-foreground)">${sub}</span>
+    </button>`;
+  }).join('');
+
+  const turnsHtml = turnRows ? `<div>
+    <div class="panel-section-title">Value turns ${DASH.valueGraphLink('story')}</div>
+    <div style="display:flex;flex-direction:column;gap:4px;">${turnRows}</div>
+  </div>` : '';
+
+  const dramaHtml = (dramaTags.length || conflicts.length) ? `
     <div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
         ${dramaTags.map(t => `<span class="tag tag-struct">${t.v}</span>`).join('')}
         ${conflicts.map(c => `<span class="tag tag-char" style="font-size:var(--font-size-xs)">${c}</span>`).join('')}
       </div>
-      ${valueArc.length ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:8px">Value arc: ${valueArc.join(' → ')}</div>` : ''}
     </div>` : '';
 
   document.getElementById('panel-body').innerHTML = `
@@ -482,6 +502,7 @@ DASH.showScenePanel = function(sceneId) {
       <div class="panel-section-title">Plot threads</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${plots}</div>
     </div>` : ''}
+    ${turnsHtml}
     ${scene.heading ? `<div>
       <div class="panel-section-title">Screenplay heading</div>
       <div class="panel-muted">${DASH.escapeHtml(scene.heading)}</div>
@@ -511,32 +532,27 @@ DASH.showSequencePanel = function(seqId) {
   const sceneRows = (seq.scenes_list || []).map((sid, i) => {
     const scene = (DASH.story.scenes || []).find(s => s.id === sid);
     if (!scene) return '';
-    return `<div class="beat-row" onclick="DASH.showScenePanel('${sid}')">
-      <span class="beat-scene">${i + 1}. ${scene.title || sid}</span>
-      ${scene.heading ? `<span class="beat-desc">${DASH.escapeHtml(scene.heading)}</span>` : ''}
-    </div>`;
+    return `<button class="entity-link" onclick="DASH.showScenePanel('${sid}')">${i + 1}. ${scene.title || sid}</button>`;
   }).join('');
 
-  // Plot threads in this sequence with scope/type
+  // Plot threads in this sequence — same chip style as the scene panel
   const plotRows = (seq.plots || []).map(p => {
     const pl = (DASH.story.plots || []).find(x => x.id === p.id);
     if (!pl) return '';
     const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
-    const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
-    return `<div class="beat-row" onclick="DASH.showPlotPanel('${pl.id}')">
-      <span class="beat-scene" style="color:${col}">${pl.name}</span>
-      ${scope ? `<span class="beat-desc" style="color:${col}">${scope}</span>` : ''}
-      ${p.has_setup ? '<span class="beat-desc">setup</span>' : ''}
-      ${p.has_crisis ? '<span class="beat-desc">crisis</span>' : ''}
-      ${p.has_climax ? '<span class="beat-desc">climax</span>' : ''}
-      ${p.has_payoff ? '<span class="beat-desc">payoff</span>' : ''}
-    </div>`;
+    const col = DASH.plotColor(pl.id);
+    const badges = DASH.plotRoleBadges(p);
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scope}${badges ? ' · ' + badges : ''}</span></button>`;
   }).join('');
 
   document.getElementById('panel-body').innerHTML = `
     <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
-    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div>${plotRows}</div>` : ''}
-    ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div>${sceneRows}</div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
+    <div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink('story')}</div>
+      ${DASH.valueFocusHtml(seq.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
+    ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${sceneRows}</div></div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
     ${DASH.renderSectionsHtml('sequence', seqId)}
   `;
 

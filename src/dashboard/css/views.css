@@ -225,27 +225,30 @@
 .knowledge-item::before { content: '→'; opacity: 0.5; flex-shrink: 0; }
 .knowledge-item:last-child { border-bottom: none; }
 
-/* Setup/payoff rows in plot panel */
-.beat-row {
+/* A two-line reference row: name, then the small print under it.
+   Used wherever a panel lists entities compactly — acts, sequences, plots,
+   scenes, plot role sections, the stats panel. Named for the structure, not
+   for any one caller, so a new caller doesn't have to invent a class. */
+.entity-row {
   padding: 5px 0;
   border-bottom: 1px solid var(--border);
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
   line-height: 1.5;
 }
-.beat-row .beat-scene {
+.entity-row .entity-row-name {
   display: block;
   font-size: var(--font-size-xs);
   color: var(--accent);
   margin-bottom: 2px;
 }
-.beat-row .beat-desc {
+.entity-row .entity-row-sub {
   display: block;
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
   font-style: italic;
 }
-.beat-row:last-child { border-bottom: none; }
+.entity-row:last-child { border-bottom: none; }
 
 /* Narrow layout */
 @media (max-width: 520px) {
@@ -253,11 +256,17 @@
 }
 
 
+/* ─── Values View ─── */
+#values-view .view-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
 /* ─── Script View ─── */
 #script-view .view-body {
   flex: 1;
   overflow-y: auto;
-  background: var(--card);
+  background: var(--background);
   display: flex;
   justify-content: center;
 }
@@ -290,6 +299,12 @@
 .title-cc .tp-credit { color: var(--muted-foreground); display: block; font-size: 12px; }
 .title-bl { grid-column: 1 / 4; grid-row: 3; align-self: end; color: var(--muted-foreground); }
 .title-br { grid-column: 4 / 7; grid-row: 3; text-align: right; align-self: end; color: var(--muted-foreground); }
+
+/* A title-page slot the user has not filled. It must not read as typeset
+   content — a title page is the most deliberately-typeset surface in the app,
+   and "Credit: N.A." printed in the credit line looks like a credit. Italic and
+   faint, so it reads as an annotation over the page rather than part of it. */
+.tp-unfilled { font-style: italic; opacity: 0.55; font-weight: normal; }
 
 /* Soft page break between scenes */
 .screenplay-page-break {
