@@ -89,6 +89,10 @@
   width: var(--panel-w);
   border-left: 1px solid var(--border);
 }
+/* A tab that draws to a width asks for it through the tab strip's widen
+   toggle; `panel-tabs.js` sets this class. Without the rule the toggle is a
+   button that changes nothing. */
+#detail-panel.panel-wide { width: var(--panel-w-wide); }
 /* Wide-screen: panel opens beside content */
 @media (min-width: 700px) {
   #detail-panel { min-width: 0; }
@@ -103,6 +107,9 @@
   }
   #detail-panel.open {
     width: min(var(--panel-w), calc(100vw - var(--sidebar-w)));
+  }
+  #detail-panel.panel-wide {
+    width: min(var(--panel-w-wide), calc(100vw - var(--sidebar-w)));
   }
 }
 
@@ -166,6 +173,19 @@
   color: var(--muted-foreground);
   line-height: 1.6;
 }
+
+/* The empty state a detail-panel tab shows when the record it reads is not
+   there yet. Shared by the beat and journey tabs: identical markup, and
+   naming it after either one left the other depending on a foreign
+   stylesheet. `is-missing` is the case where the absence is a gap in the
+   story rather than a scene that has no use for the record. */
+.panel-empty {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px; border: 1px dashed var(--border); border-radius: var(--radius);
+}
+.panel-empty-lead { font-weight: 600; }
+.panel-empty.is-missing { border-color: color-mix(in srgb, var(--c-gap) 55%, transparent); }
+.panel-empty.is-missing .panel-empty-lead { color: var(--c-gap); }
 
 .panel-tags { display: flex; flex-wrap: wrap; gap: var(--tag-gap); }
 

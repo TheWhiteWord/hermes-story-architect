@@ -1314,6 +1314,27 @@ def get_dashboard_data(project_path: Path) -> dict:
         except Exception:
             story_focus = {"major": [], "minor": []}
 
+        # ── A scene's scene_beats record, whole ──
+        # The base `story_load` map keeps only the pointer (`scene.scene_beats`)
+        # because the beats are what keep that once-per-session call small. The
+        # dashboard is the one reader that needs the mechanism — the beats, the
+        # closing changes, the true-character moments — so the record travels
+        # whole here, in the shape `story_load`'s dramatic_elements view gives:
+        # the id plus the record's own fields.
+        #
+        # `parent_id` is carried beside the record's `scene` because the two are
+        # allowed to disagree (the record names its scene; the row is what
+        # actually links it), and a reader must not depend on which one is set.
+        scene_beats = [
+            {"id": eid, "parent_id": parent_id, **extra}
+            for eid, parent_id, extra in (
+                (row[0], row[1], json.loads(row[2]) if row[2] else {})
+                for row in conn.execute(
+                    "SELECT id, parent_id, extra FROM entities "
+                    "WHERE type='scene_beats' AND is_deleted=0 "
+                    "ORDER BY parent_id, id"))
+        ]
+
         story_data = {
             "project": {**proj_dict, "value_focus": story_focus},
             "characters": characters,
@@ -1326,6 +1347,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             "relationships": relationships,
             "story_memory": story_memory,
             "values": values,
+            "scene_beats": scene_beats,
         }
 
         # 2. sections — {entity_type: {slug: {heading: body}}}

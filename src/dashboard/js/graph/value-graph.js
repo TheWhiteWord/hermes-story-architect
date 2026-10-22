@@ -27,6 +27,13 @@ window.DASH = window.DASH || {};
     resolution:         { label: 'Resolution',       color: '#b07be0', shape: 'dot' },
   };
 
+  // The label of a milestone, for a reader that lists a scene's milestones
+  // without drawing them (the character journey's timeline). The map stays
+  // private; the label is the part another view needs, and it is the same
+  // label the axis legend already shows, so the two cannot drift.
+  D.milestoneLabel = m => (MILESTONES[String(m).replace(/^plot_/, '')] || {}).label
+    || String(m).replace(/_/g, ' ');
+
   const state = { tab: 'story', plot: null, base: null, act: null, seq: null, animate: false };
   D.valueGraphState = state;
   let vgUid = 0;

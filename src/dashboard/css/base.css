@@ -16,6 +16,9 @@
   --sidebar-w: 44px;
   --sidebar-w-open: 180px;
   --panel-w: 320px;
+  /* A tab that draws wide (the beat exchange lanes, the journey ribbon) asks
+     for more room through the tab strip's widen toggle. */
+  --panel-w-wide: 680px;
   --radius: 6px;
   --gap: 12px;
   --font-size-xs: 10px;
@@ -30,6 +33,13 @@
   --role-rival: #e0a86b;
   --role-supporting: #6bbfb0;
   --role-entity: #e06b9b;
+
+  /* Component accents shared by the detail-panel tabs. A gap is an open
+     question (amber, the colour the value graph gives the inciting incident);
+     a true-character choice is the one pink the panels already use for a
+     secret. Both are read by name in the tab styles, never hard-coded there. */
+  --c-gap: #e0a86b;
+  --c-choice: #e06b9b;
 
   --status-active: #6bbfb0;
   --status-building: #e0a86b;

@@ -90,6 +90,61 @@ class TestAssemblesAndInjects:
         assert data["scenes"], "no scenes reached the dashboard"
 
 
+class TestSceneBeatsReachTheDashboard:
+    """The Beats tab reads `story.scene_beats[]` and nothing else.
+
+    The base `story_load` map deliberately keeps the beats out — they are what
+    make it large — and a scene carries only the record's *id*. So this is the
+    one payload that must carry the record whole: a payload that carried the
+    pointer and not the record would render a "beat list missing" empty state
+    for every scene, with no error anywhere.
+    """
+
+    @pytest.fixture
+    def data(self, vault):
+        _make(vault, "stc")
+        _import(vault, "stc")
+        from core.db import get_dashboard_data
+        return get_dashboard_data(vault / "projects" / "stc")["story_data"]
+
+    def test_the_payload_carries_the_records(self, data):
+        assert data["scene_beats"], "no scene_beats record reached the dashboard"
+
+    def test_the_record_travels_whole(self, vault, data):
+        """Every field written on the record reaches the payload, key for key.
+
+        The tab reads `driver`, `scene_objective`, `turning_point`, `beats`,
+        `changes` and `true_character`. A payload that trimmed any of them would
+        silently drop that part of the scene.
+        """
+        conn = sqlite3.connect(str(vault / "projects" / "stc" / ".story" / "story.db"))
+        rows = {r[0]: json.loads(r[1] or "{}") for r in conn.execute(
+            "SELECT id, extra FROM entities WHERE type='scene_beats' AND is_deleted=0")}
+        conn.close()
+        assert rows, "the fixture has no scene_beats record to compare against"
+        for rec in data["scene_beats"]:
+            for key, value in rows[rec["id"]].items():
+                assert rec.get(key) == value, f"{key} did not travel whole"
+
+    def test_each_record_resolves_to_its_scene(self, data):
+        """The tab finds a scene's record by `scene` OR `parent_id`.
+
+        The record names its scene and the row links it; the two are allowed to
+        disagree, so a reader must not depend on either alone. A record with
+        neither renders as a missing beat list for the scene it belongs to.
+        """
+        for rec in data["scene_beats"]:
+            assert rec.get("scene") or rec.get("parent_id"), f"unresolvable record: {rec}"
+
+    def test_the_pointer_and_the_record_agree(self, data):
+        """A scene's `scene_beats` pointer must name a record that is present."""
+        ids = {r["id"] for r in data["scene_beats"]}
+        for scene in data["scenes"]:
+            pointer = scene.get("scene_beats", "")
+            assert not pointer or pointer in ids, (
+                f"scene {scene['id']} points at '{pointer}', which is not in the payload")
+
+
 class TestProjectSlugNotTitle:
     """The file must be per-project, or two projects share one dashboard."""
 
