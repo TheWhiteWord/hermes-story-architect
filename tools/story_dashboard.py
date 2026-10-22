@@ -6,14 +6,24 @@ from pathlib import Path
 from core.constants import ENTITY_SCHEMAS, UNFILLED
 
 CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css",
-             "graph.css", "value-graph.css"]
+             "graph.css", "value-graph.css",
+             "panel-tabs.css", "scene-beats.css", "character-journey.css"]
+# Load-bearing order. `panel-tabs.js` wraps `openPanel`/`closePanel` and the
+# `show*Panel` functions, so it must come after everything it wraps; the two tab
+# modules call `D.panelTabs.register` at load time, so they come after it; and
+# `track-data.js` reads `D.valueModel`, so it comes after `value-graph.js`.
+# A reorder here fails silently — the wrap unwires and the panel renders exactly
+# as it did before, with no error. tests/test_dashboard.py pins the pairs.
 JS_ORDER = [
     "core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
     "views/scenes.js", "views/locations.js", "views/plots.js",
     "views/relationships.js", "views/worlds.js", "views/story.js",
     "panels/panel-manager.js", "panels/entity-panels.js", "panels/memory-dialog.js",
+    "panels/panel-tabs.js",
     "graph/network.js",
     "graph/value-graph.js",
+    "graph/track-data.js",
+    "panels/scene-beats-tab.js", "panels/character-journey-tab.js",
     "statistics/statistics.js", "statistics/charts.js",
     "script-view.js",
 ]

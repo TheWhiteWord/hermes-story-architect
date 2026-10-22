@@ -598,12 +598,28 @@ class TestDramaticElementsEscalationSpine:
         assert "no-such-plot" in out["error"]
 
     def test_milestones_only_trims_the_rows(self, project):
+        """The spine is five keys, each only when filled.
+
+        The code has emitted `scene_objective` and `turning_point` here since
+        they were added to the view (see `story_load`'s `milestones_only`
+        schema description), but this test still asserted the three-key row
+        they replaced — so it passed only while every scene in the fixture
+        left both facts empty. Filling the fixture's beat list is what
+        surfaced it.
+        """
         rows = self._scenes(self._load(project, plot="the-resistance",
                                        milestones_only=True))
         assert [r["id"] for r in rows] == [
             "central-room-day", "central-room-night", "the-core-day"]
         for row in rows:
-            assert set(row) == {"id", "milestone", "role"}
+            assert set(row) <= {"id", "milestone", "role",
+                                "scene_objective", "turning_point"}, row
+        # And on the fixture's filled record both are there, which is the
+        # assertion the three-key version could not make.
+        assert rows[0]["scene_objective"] == (
+            "Find out whether the door was ever locked.")
+        assert rows[0]["turning_point"] == (
+            "The handle turns. The lock was never engaged.")
 
     def test_a_subplot_row_carries_that_plots_own_role(self, project):
         """`milestone` is the main plot's, so the subplot's role has to have a

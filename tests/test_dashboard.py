@@ -144,6 +144,28 @@ class TestSceneBeatsReachTheDashboard:
             assert not pointer or pointer in ids, (
                 f"scene {scene['id']} points at '{pointer}', which is not in the payload")
 
+    def test_a_scene_carries_its_records_objective(self, data):
+        """The Beats tab reads `scene_objective` off the SCENE, not the record.
+
+        `renderSceneBeats` renders `sb.scene_objective` from the record it found
+        by scene, but the tab's header chip and the character track both read it
+        off the scene object the payload carries. A payload that emitted the
+        records and not the scene-level field would show an empty "drives"
+        header for every scene that has one — silently, since the record is
+        present and the record is correct.
+        """
+        by_scene = {r["parent_id"]: r for r in data["scene_beats"]}
+        checked = 0
+        for scene in data["scenes"]:
+            rec = by_scene.get(scene["id"])
+            if not rec:
+                continue
+            checked += 1
+            expected = scene.get("scene_objective", "")
+            assert expected == rec.get("scene_objective", ""), (
+                f"scene {scene['id']} and its record disagree on scene_objective")
+        assert checked, "the fixture has no record to compare against"
+
 
 class TestProjectSlugNotTitle:
     """The file must be per-project, or two projects share one dashboard."""
@@ -401,7 +423,9 @@ class TestActuallyRenders:
         css = " ".join(re.findall(r"<style[^>]*>(.*?)</style>", html, re.S))
         js = " ".join((FIXTURE.parents[2] / "src/dashboard/js" / p).read_text()
                       for p in ["panels/entity-panels.js", "colors.js",
-                                "statistics/statistics.js"])
+                                "statistics/statistics.js",
+                                "panels/panel-tabs.js", "panels/scene-beats-tab.js",
+                                "panels/character-journey-tab.js"])
         # Capture the whole attribute, then keep only plain class tokens —
         # skip anything holding a template hole or a space-separated group we
         # can't resolve. A regex too narrow here would skip the very class
@@ -432,3 +456,120 @@ class TestActuallyRenders:
                         "DASH.showPlotPanel('brother-investigation')")
         for role in ("Setup", "Complication", "Crisis", "Climax", "Resolution"):
             assert f">{role}<" in dom, f"the {role} section is missing"
+
+    def test_the_scene_panel_opens_with_its_beats_tab(self, vault, tmp_path):
+        """End to end: the assembled page renders the Beats tab, not a stub.
+
+        The node and Chrome harnesses of the tab work read the delivered files
+        directly. This drives `story_dashboard.handler` → `assemble_dashboard` →
+        the dashboard's own JS, which is the shipping path: it is the only check
+        that proves the tab files are in `JS_ORDER`, that the panel-tabs wrap
+        landed, and that the records actually reach the panel.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        dom = self._dom(html, tmp_path, "site_beats",
+                        "DASH.showScenePanel('central-room-day');"
+                        "DASH.panelTabs.activate('beats');")
+        assert "ptab-strip" in dom, "the panel opened with no tab strip — the wrap did not land"
+        assert "Beats" in dom, "the Beats tab never registered"
+        # The tab's own pane, not the Overview it lifted in.
+        assert 'data-pane="beats"' in dom, "the Beats pane was never built"
+        assert "ptab-pane" in dom
+        # The pane's CONTENT. A strip that opens and an empty pane is the
+        # failure this phase is about: the tab files loaded but the record
+        # never reached them, which renders the shell with nothing in it.
+        assert "sb-exchange" in dom, "the beat exchange never drew — no record reached the tab"
+        assert "sb-beat" in dom, "no beat row rendered"
+        assert "sb-gap" in dom, "a gap opened but never rendered"
+        assert "Kael" in dom, "the beat participants never rendered"
+        # The fixture's record names the scene's objective; the payload must
+        # carry it on the scene, not only on the record.
+        assert "whether the door was ever locked" in dom, (
+            "the scene objective never reached the tab")
+
+    def test_the_character_panel_opens_with_its_journey_tab(self, vault, tmp_path):
+        """The Journey tab, same shipping path. Kael is the fixture's protagonist.
+
+        The ribbon needs a value model, so this also proves `track-data.js`
+        loaded after `value-graph.js` in the assembled bundle — a reorder would
+        leave `D.valueModel` undefined and the pane rendering nothing.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        dom = self._dom(html, tmp_path, "site_journey",
+                        "DASH.showCharacterPanel(DASH.story.characters.find(c=>c.id==='kael'));"
+                        "DASH.panelTabs.activate('journey');")
+        assert "ptab-strip" in dom, "the panel opened with no tab strip — the wrap did not land"
+        assert "Journey" in dom, "the Journey tab never registered"
+        assert 'data-pane="journey"' in dom, "the Journey pane was never built"
+        # The ribbon is the part that needs the value model and the geometry.
+        assert "jr-svg" in dom, "the journey ribbon never drew"
+        # The timeline is the part that needs the payload's scenes and the
+        # milestone labels; a ribbon that draws and a timeline that stays
+        # empty is a half-wired tab.
+        assert "jr-row" in dom, "the journey timeline never rendered a scene row"
+        assert "In words" in dom, "the timeline section never rendered"
+        assert "Kael" in dom, "the character never reached the pane"
+
+
+class TestAssembledOrder:
+    """`CSS_ORDER`/`JS_ORDER` are the only thing that loads the tab files.
+
+    They are edited by hand and nothing reads them until the dashboard is
+    assembled, so a typo'd entry or a wrong position is found at render time —
+    or not at all: a JS reorder leaves the panel rendering exactly as it did
+    before, with no error. Both lists are therefore checked against the source
+    tree and against each other, here.
+    """
+
+    @pytest.fixture
+    def orders(self):
+        from tools.story_dashboard import CSS_ORDER, JS_ORDER
+        return CSS_ORDER, JS_ORDER
+
+    def test_every_css_file_in_css_order_exists(self, orders):
+        """A typo'd entry only surfaces when the dashboard is assembled."""
+        css_order, _ = orders
+        dashboard_dir = FIXTURE.parents[2] / "src" / "dashboard"
+        missing = [f for f in css_order if not (dashboard_dir / "css" / f).exists()]
+        assert not missing, f"CSS_ORDER names files that do not exist: {missing}"
+
+    def test_every_js_file_in_the_order_exists(self, orders):
+        """The same guard for the scripts, which is the list more likely to drift."""
+        _, js_order = orders
+        dashboard_dir = FIXTURE.parents[2] / "src" / "dashboard"
+        missing = [f for f in js_order if not (dashboard_dir / "js" / f).exists()]
+        assert not missing, f"JS_ORDER names files that do not exist: {missing}"
+
+    def test_no_file_is_loaded_twice(self, orders):
+        css_order, js_order = orders
+        for name, order in (("CSS_ORDER", css_order), ("JS_ORDER", js_order)):
+            dupes = sorted({f for f in order if order.count(f) > 1})
+            assert not dupes, f"{name} loads these more than once: {dupes}"
+
+    def test_js_order_satisfies_the_tab_dependencies(self, orders):
+        """Every wrap must be in place before the module that needs it runs.
+
+        `panel-tabs.js` replaces `openPanel`, `closePanel` and the `show*Panel`
+        functions at load time, so it must come after all of them. The two tab
+        modules call `D.panelTabs.register` at load time and read
+        `D.valueModel`, so they come after `panel-tabs.js` and `track-data.js`.
+        """
+        _, js_order = orders
+        at = lambda f: js_order.index(f)
+        assert at("panels/panel-manager.js") < at("panels/panel-tabs.js"), (
+            "panel-tabs.js wraps openPanel, so it must load after panel-manager.js")
+        assert at("panels/entity-panels.js") < at("panels/panel-tabs.js"), (
+            "panel-tabs.js wraps show*Panel, so it must load after entity-panels.js")
+        assert at("graph/value-graph.js") < at("graph/track-data.js"), (
+            "track-data.js reads D.valueModel, defined in value-graph.js")
+        for tab in ("panels/scene-beats-tab.js", "panels/character-journey-tab.js"):
+            assert at("panels/panel-tabs.js") < at(tab), (
+                f"{tab} registers into panel-tabs.js at load time")
+            assert at("graph/track-data.js") < at(tab), (
+                f"{tab} reads the character track, derived in track-data.js")

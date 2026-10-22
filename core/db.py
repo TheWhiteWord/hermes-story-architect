@@ -967,6 +967,30 @@ def get_dashboard_data(project_path: Path) -> dict:
     """
     conn = get_db(project_path)
     try:
+        # ── A scene's scene_beats record, whole ──
+        # The base `story_load` map keeps only the pointer (`scene.scene_beats`)
+        # because the beats are what keep that once-per-session call small. The
+        # dashboard is the one reader that needs the mechanism — the beats, the
+        # closing changes, the true-character moments — so the record travels
+        # whole here, in the shape `story_load`'s dramatic_elements view gives:
+        # the id plus the record's own fields.
+        #
+        # `parent_id` is carried beside the record's `scene` because the two are
+        # allowed to disagree (the record names its scene; the row is what
+        # actually links it), and a reader must not depend on which one is set.
+        # It is keyed by the scene too, because a scene carries the record's
+        # `scene_objective` as its own field.
+        scene_beats = [
+            {"id": eid, "parent_id": parent_id, **extra}
+            for eid, parent_id, extra in (
+                (row[0], row[1], json.loads(row[2]) if row[2] else {})
+                for row in conn.execute(
+                    "SELECT id, parent_id, extra FROM entities "
+                    "WHERE type='scene_beats' AND is_deleted=0 "
+                    "ORDER BY parent_id, id"))
+        ]
+        scene_beats_by_scene = {r["parent_id"]: r for r in scene_beats}
+
         # 1. story_data — denormalized projection per entity type
         ent_rows = conn.execute(
             "SELECT id, type, name, one_sentence, order_key, status, parent_id, location_id, extra "
@@ -1092,6 +1116,15 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["plots"] = scene_plots.get(eid, [])
                 d["milestone"] = milestone_label(scene_plots.get(eid, []), plot_scopes)
                 d["value_turns"] = extra.get("value_turns", [])
+                # The record's `scene_objective`, as the scene's own field: the
+                # scene carries it (the author writes it there as the reasoning
+                # behind the beat list) and the record repeats it, so a reader
+                # that has only the scene must still be able to show it. Same
+                # rule as the base `story_load` map — the scene's own value
+                # first, the record's as the fallback.
+                d["scene_objective"] = (
+                    extra.get("scene_objective", "")
+                    or scene_beats_by_scene.get(eid, {}).get("scene_objective", ""))
                 scenes.append(d)
 
             elif etype == "location":
@@ -1313,27 +1346,6 @@ def get_dashboard_data(project_path: Path) -> dict:
             story_focus = for_project(project_path)
         except Exception:
             story_focus = {"major": [], "minor": []}
-
-        # ── A scene's scene_beats record, whole ──
-        # The base `story_load` map keeps only the pointer (`scene.scene_beats`)
-        # because the beats are what keep that once-per-session call small. The
-        # dashboard is the one reader that needs the mechanism — the beats, the
-        # closing changes, the true-character moments — so the record travels
-        # whole here, in the shape `story_load`'s dramatic_elements view gives:
-        # the id plus the record's own fields.
-        #
-        # `parent_id` is carried beside the record's `scene` because the two are
-        # allowed to disagree (the record names its scene; the row is what
-        # actually links it), and a reader must not depend on which one is set.
-        scene_beats = [
-            {"id": eid, "parent_id": parent_id, **extra}
-            for eid, parent_id, extra in (
-                (row[0], row[1], json.loads(row[2]) if row[2] else {})
-                for row in conn.execute(
-                    "SELECT id, parent_id, extra FROM entities "
-                    "WHERE type='scene_beats' AND is_deleted=0 "
-                    "ORDER BY parent_id, id"))
-        ]
 
         story_data = {
             "project": {**proj_dict, "value_focus": story_focus},

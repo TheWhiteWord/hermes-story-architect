@@ -29,9 +29,11 @@ tab components beside the panels, one stylesheet per tab.
 `cp`, do not retype. The delivered files are the verified artefacts; a retyped
 copy is a second thing to drift.
 
-- [ ] `track-data.js` → `src/dashboard/js/graph/`
-- [ ] `panel-tabs.js`, `scene-beats-tab.js`, `character-journey-tab.js` → `src/dashboard/js/panels/`
-- [ ] `panel-tabs.css`, `scene-beats.css`, `character-journey.css` → `src/dashboard/css/`
+- [x] `track-data.js` → `src/dashboard/js/graph/`
+- [x] `panel-tabs.js`, `scene-beats-tab.js`, `character-journey-tab.js` → `src/dashboard/js/panels/`
+- [x] `panel-tabs.css`, `scene-beats.css`, `character-journey.css` → `src/dashboard/css/`
+
+Copied byte-for-byte and confirmed with `md5sum` against the delivered copies.
 
 ### 1.2 — Wire `CSS_ORDER` (`tools/story_dashboard.py:8`)
 
@@ -44,7 +46,7 @@ CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css",
              "panel-tabs.css", "scene-beats.css", "character-journey.css"]
 ```
 
-- [ ] Edit `CSS_ORDER` as above.
+- [x] Edit `CSS_ORDER` as above.
 
 ### 1.3 — Wire `JS_ORDER` (`tools/story_dashboard.py:10`)
 
@@ -76,7 +78,11 @@ JS_ORDER = [
 ]
 ```
 
-- [ ] Edit `JS_ORDER` as above.
+- [x] Edit `JS_ORDER` as above.
+
+The four pairs are stated in a comment above the list, beside the list that must
+satisfy them, because the failure is silent: an unwired wrap renders the panel
+exactly as it did before.
 
 ### 1.4 — Pin the order so it cannot silently regress
 
@@ -86,13 +92,18 @@ that asserts the relative order is the cheapest guard that catches it.
 
 Add to `tests/test_dashboard.py`:
 
-- [ ] `test_js_order_satisfies_the_tab_dependencies` — assert the four
+- [x] `test_js_order_satisfies_the_tab_dependencies` — assert the four
       required pairs hold in `JS_ORDER`: `panel-manager.js` before
       `panel-tabs.js`, `entity-panels.js` before `panel-tabs.js`,
       `value-graph.js` before `track-data.js`, `panel-tabs.js` before each tab.
-- [ ] `test_every_css_file_in_css_order_exists` — a typo'd entry in either order
+- [x] `test_every_css_file_in_css_order_exists` — a typo'd entry in either order
       raises only when the dashboard is assembled, which is the wrong time to
       find it. Read both lists and check each file is on disk.
+
+Both were added, plus two more from the same finding: `test_every_js_file_in_the_order_exists`
+(the script list is the one that actually drifts) and `test_no_file_is_loaded_twice`
+(a duplicated entry runs a module twice, which for the wrapping modules is not
+idempotent). New class `TestAssembledOrder`.
 
 ### 1.5 — Extend the class guard to the new files
 
@@ -101,12 +112,16 @@ reads only `panels/entity-panels.js`, `colors.js`, `statistics/statistics.js`.
 It is the guard that catches a renamed class silently un-styling a panel, and it
 currently does not see any of the new files.
 
-- [ ] Add `panels/panel-tabs.js`, `panels/scene-beats-tab.js`,
+- [x] Add `panels/panel-tabs.js`, `panels/scene-beats-tab.js`,
       `panels/character-journey-tab.js` to the file list it reads.
-- [ ] It must pass **without** an allowlist. If a class is genuinely shared
+- [x] It must pass **without** an allowlist. If a class is genuinely shared
       (`vg-*` from `value-graph.css`, `tag-struct`/`panel-*` from
       `components.css`), the guard already finds them in the assembled CSS. Do
       not add an escape hatch — if it fails, the class is missing.
+
+Passes with no allowlist: 108 class names extracted from the six files, none
+missing. `track-data.js` is pure functions and emits no markup, so it is
+correctly not in the list.
 
 ### 1.6 — Verify end to end on the real assembled page
 
@@ -114,10 +129,50 @@ The node harness and the Chrome harness both read the delivered files directly.
 This task proves the *shipping* path — `story_dashboard.handler` →
 `assemble_dashboard` → a page that renders both tabs.
 
-- [ ] Headless Chrome on the assembled dashboard for a fixture project: assert
+- [x] Headless Chrome on the assembled dashboard for a fixture project: assert
       the `.ptab-strip` is present on the scene panel and the character panel,
       and that the Beats and Journey panes render their content.
-- [ ] Re-run the full suite.
+- [x] Re-run the full suite.
+
+Two checks added to `TestActuallyRenders`, both driving the dashboard's own JS
+through the existing `_dom` helper. They assert the pane's **content**, not just
+its shell — a strip that opens over an empty pane is exactly the silent failure
+this phase exists to catch. Full suite: 1179 passed.
+
+## Defects found while verifying, and fixed where they live
+
+**1. `get_dashboard_data` never emitted `scene_objective` on the scene.** The
+Beats tab's header reads `sb.scene_objective`, and the character track reads it
+off the scene object; the payload carried the records but not the scene-level
+field, so the "drives" header was empty for every scene that had one — silently,
+because the record itself was correct. `core/db.py` now emits it on the scene,
+from the record, with the same scene-first/record-fallback rule the base
+`story_load` map already uses. Pinned by
+`test_a_scene_carries_its_records_objective`.
+
+**2. The fixture's beat list was an unfilled placeholder.** All three
+`scene_beats/*.md` notes carried only `[placeholder — scene/Notes]`, so the
+assembled page could not exercise the exchange at all — the tab rendered its
+empty state on the real shipping path. `Central Room - Day.md` now holds a real
+record (driver, objective, turning point, a true-character moment, two changes,
+two beats with a gap), which is the shape the tab was verified against. The
+other two scenes keep their placeholders deliberately: they are the empty state
+the tab must still render.
+
+**3. `test_milestones_only_trims_the_rows` asserted a contract the code had
+already outgrown.** It required `milestones_only` rows to carry exactly
+`{id, milestone, role}`, while `story_load` has emitted `scene_objective` and
+`turning_point` there since those fields were added to the view — and its own
+schema description says so. It passed only because every fixture scene left both
+facts empty. Fixed to the documented five-key contract, and it now asserts both
+facts are present, which the three-key version could not do.
+
+## Not done here
+
+**The ribbon fills 32% of the pane** (204px in a 647px pane at the wide panel;
+`jr-scroll` clientW == scrollW == 647, so nothing overflows). Measured, not
+guessed. That is Phase 3's finding and Phase 3's decision — it needs a 30+ scene
+story to choose the rule from, and it edits the same file. Left untouched.
 
 ## Parallel work
 
@@ -125,10 +180,10 @@ None. This phase is the trunk every later phase branches from.
 
 ## Checklist
 
-- [ ] All seven files copied to `src/dashboard/`
-- [ ] `CSS_ORDER` carries the three stylesheets, last
-- [ ] `JS_ORDER` carries the four scripts in dependency order
-- [ ] Order-pinning test added and green
-- [ ] Class guard extended to the new files and green with no allowlist
-- [ ] Headless Chrome renders both tabs from the assembled page
-- [ ] Full suite green
+- [x] All seven files copied to `src/dashboard/`
+- [x] `CSS_ORDER` carries the three stylesheets, last
+- [x] `JS_ORDER` carries the four scripts in dependency order
+- [x] Order-pinning test added and green
+- [x] Class guard extended to the new files and green with no allowlist
+- [x] Headless Chrome renders both tabs from the assembled page
+- [x] Full suite green — 1179 passed
