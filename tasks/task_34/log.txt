@@ -273,3 +273,145 @@ ACTIONS TAKEN:
   tab in the same run to confirm it was not disturbed.
 - Re-synced the delivered copy, wrote the phase brief, the handoff update and
   this log.
+
+---
+
+MESSAGE:
+
+Phase 4 was meant to be the closing phase — put the harnesses somewhere
+permanent, sweep for legacy — and the sweep is where the value was. Two readers
+of the same rows disagreed, and both were the kind of defect this work exists to
+remove: the tab that reads the record and the tab that reads the scene were
+telling the user two different things about the same three scenes.
+
+The first: `hasBeats` was `!!sb`. Two of the fixture's three `scene_beats`
+records are empty placeholders, so the Journey tab's coverage line said "beat
+lists exist for 3" while the Beats tab's own empty state said "Beat list missing"
+for two of them. Same rows, opposite answers. `hasBeats` now requires
+`beats.length`, and the Beats tab's dot and footer use the same notion, so the
+strip cannot warn about a pane that disagrees with it.
+
+The second was found while writing the assertion for the first. `renderSceneBeats`
+keyed its empty state on the whole pane — `body || emptyHtml(scene)` — so a
+scene with value turns but no beats rendered the header and said nothing at all,
+while the strip's dot said "No beat list yet". A dot over a silent pane is worse
+than no dot. The empty state now sits exactly where the beat spine would have
+gone, so the header still renders and the missing list is still said.
+
+4.1 wrote the inventory before the tests, against the landed files rather than
+the plan, and it changed one assignment: the act focus is node, not Chrome. The
+fixture has one act and `DASH.loadSampleData()` has none, so there is no chip to
+click on any page the repo can build. The render is pure and the click handler is
+a three-line delegation to it, so the harness covers the behaviour and a Chrome
+check would have needed a fixture that does not exist.
+
+4.2's real finding was that `--dump-dom` makes substring assertions meaningless.
+The dumped page carries the whole minified bundle and the injected payload, so
+`"sb-gap" in dom`, `"jr-row" in dom` and `"Kael" in dom` are all true whether or
+not the tab rendered anything. The two Chrome tests Phase 1 added asserted
+exactly those, and would have passed against an empty pane. `_probe` now runs
+the dashboard's JS and reads the live DOM into `document.title`, which is also
+the only way the four ribbon invariants are measurable. Both weak tests were
+rewritten rather than kept alongside stronger ones.
+
+The node harness became `tests/dashboard_tabs_harness.js` and its payload stopped
+being a synthetic story: it is what `get_dashboard_data` produced for the repo's
+own fixture, so the reader is exercised on the shape that ships. The synthetic
+story survives only where the fixture cannot reach. `test_no_bare_inline_handlers`
+was carrying a hand-kept copy of `JS_ORDER` that had already dropped six files,
+including all four tab and value files — the guard could not see a bare handler
+in any of them. It reads `JS_ORDER` now.
+
+The 4.4 sweep removed nothing, which is the honest result: `entity-panels.js`
+has no reference to beats at all, so the tabs made no panel code redundant. What
+it found was two defects and one decision owed. The decision is recorded rather
+than taken: `renderSectionsHtml` renders an unfilled section's placeholder as
+content in every entity's Overview, while the Beats tab filters that marker out
+of the beat record's notes. That is pre-existing behaviour for every panel, and
+changing it is a structural change I am not making unilaterally.
+
+---
+
+ACTIONS TAKEN:
+- Wrote the 4.1 inventory against the landed files, before writing any test,
+  and assigned each item to node or Chrome with the reason.
+- Re-read the Phase 1 harness, the Phase 3 probes and the fixture's own
+  `scene_beats` records to see what was actually being asserted.
+- Found `hasBeats` counting a placeholder record as a beat list; fixed it in
+  `track-data.js` and pointed the Beats tab's dot and footer at the same notion.
+- Found the empty state keyed on the whole pane; moved it to the beat spine's
+  position so a placeholder scene's pane is no longer silent.
+- Moved the node harness to `tests/dashboard_tabs_harness.js` with a permanent
+  name, reading the landed modules in `JS_ORDER`'s dependency order, and gave it
+  the fixture's real payload through `tests/test_dashboard_tabs.py`.
+- Carried the Phase 2 and Phase 3 assertions over: `deepestRung`'s type, the
+  `>plot</text>` axis label with the value graph's own callers still on `beats`,
+  and the slot rule read from the width the panel rendered.
+- Added the naming contracts to the harness: a class must resolve in the
+  dashboard's CSS or its own tab's, never another tab's; every `data-*` read must
+  be emitted or a documented protocol; every `var()` must resolve.
+- Added `_probe` to `tests/test_dashboard.py` and moved the Chrome checks onto it,
+  then rewrote the two tab tests that were passing by accident.
+- Added eight Chrome checks: the exchange's content, the self-directed arrowhead,
+  the empty state, the lane/stacked fold, the chip's routing, the ribbon and
+  timeline, the four ribbon invariants, and the hover card both ways.
+- Replaced the hand-kept JS list in `test_no_bare_inline_handlers` with `JS_ORDER`.
+- Added `test_the_llm_view_and_the_dashboard_agree`, pinning that the two readers
+  of the same rows cannot disagree.
+- Deleted the four scratch copies that have permanent homes, after checking
+  nothing in the repo names them.
+- Re-synced the delivered copies, wrote the phase brief, the handoff and this log.
+
+- Hit a flake in the lane/stacked Chrome check and traced it rather than
+  lengthening the timeout: `--dump-dom` produces no frames, so a ResizeObserver
+  callback is never delivered and requestAnimationFrame never fires. Rewrote the
+  check to narrow the panel before activating the tab, so the fold is the tab's
+  first render; 6/6 then 3/3 runs.
+- Re-ran the full suite (1191 passed) and the Chrome class three times.
+
+---
+
+MESSAGE:
+
+The placeholder decision came back as "we don't want placeholders", so the
+remaining reader was closed. The finding I recorded as "not changed" was the
+largest of them: `renderSectionsHtml` had no filter at all, so every Overview
+typeset `[placeholder — scene/Objective]` under a `panel-section-title` as if
+the author had written it. Three readers of section bodies could do it, and two
+of them each carried their own copy of the filter — the shared renderer, the
+Beats tab's notes, and the scene Content read directly in `entity-panels.js`.
+
+The fix is one predicate, `DASH.isPlaceholderSection`, in the sections module
+where `renderSectionsHtml` lives, so every reader agrees. The Beats tab's
+`notesHtml` now delegates to the renderer instead of keeping its own regex, and
+`entity-panels.js` guards the scene Content with the same predicate. The fixture
+has placeholders in every entity type, so the Chrome checks cover the scene,
+plot and sequence panels and assert the real sections survive alongside.
+
+Writing those checks surfaced a trap in `_probe` itself, which was worth more
+than the check. It joined `open_js` and the probe with a newline, so a caller
+whose `open_js` did not end in a semicolon produced
+`showScenePanel('x')\n(function () {...})()` — one call, applied to the return
+value of `showScenePanel`. That throws, the title is never set, and the failure
+reads as "the probe never ran", which points at the probe rather than at the
+join. The helper now terminates `open_js` itself, so no caller can hit it; the
+earlier tab probes only worked because their `open_js` happened to end in `;`.
+
+The probes stay, per instruction.
+
+---
+
+ACTIONS TAKEN:
+- Traced every reader of a section body: `renderSectionsHtml`, the Beats tab's
+  notes, and `entity-panels.js`'s scene Content. All three now guarded.
+- Confirmed nothing in Python generates the marker — it is written into the
+  markdown by hand, so the fix belongs in the UI readers, not in the import.
+- Added `DASH.isPlaceholderSection` to `panel-manager.js` and filtered in the
+  shared renderer; pointed the scene Content reader at the same predicate.
+- Collapsed the Beats tab's notes onto the shared renderer, removing the
+  duplicated filter.
+- Added four Chrome checks (scene, plot, sequence: no placeholder; the real
+  sections survive) and four harness checks (the predicate, the renderer, the
+  all-placeholder case, the Beats notes).
+- Found and closed the ASI trap in `_probe`, and recorded why the `;` matters.
+- Re-ran the full suite: 1196 passed.

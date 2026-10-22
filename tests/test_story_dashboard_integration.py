@@ -133,15 +133,15 @@ class TestDashboardIntegration:
     def test_no_bare_inline_handlers_in_index_html(self):
         """All inline event handlers must use DASH.* prefix (not bare globals)."""
         import re
+        from tools.story_dashboard import JS_ORDER
+
         index_html = Path("src/dashboard/index.html").read_text()
+        # The file list is JS_ORDER, not a copy of it: a hand-kept list is a
+        # second source of truth that drifts, and this one had already dropped
+        # the tab files, value-graph.js and charts.js — so the guard could not
+        # see a bare handler in any of them.
         js_content = ""
-        for js_file in ["core.js", "colors.js", "utils.js", "navigation.js", "data-load.js",
-                        "views/scenes.js", "views/locations.js", "views/plots.js",
-                        "views/relationships.js", "views/worlds.js", "views/story.js",
-                        "panels/panel-manager.js", "panels/entity-panels.js",
-                        "graph/network.js",
-                        "statistics/statistics.js", "statistics/charts.js",
-                        "script-view.js"]:
+        for js_file in JS_ORDER:
             js_content += Path(f"src/dashboard/js/{js_file}").read_text() + "\n"
         all_content = index_html + js_content
         handler_fns = [

@@ -1,12 +1,69 @@
 # Phase 1 → Phase 2/3/4 handoff
 
-**Update — Phase 3 is done.** Everything below still holds; the changes Phase 3
-made are in the "Phase 3 — done" section, so Phase 4 reads that first.
+**Update — Phase 4 is done. The work is closed.** Read the "Phase 4 — done"
+section first; everything below is history and is kept because later phases
+edited the files it describes.
 
 Written at the end of Phase 1. Everything below was verified against the code and
 the running page, not assumed. Where a line number is given it is the **landed**
 file (`src/dashboard/...`), which is what later phases edit — the delivered copies
 in `tasks/task_34/` are reference artefacts and are now identical to them.
+
+## Phase 4 — done
+
+``` 
+1191 passed
+tests/dashboard_tabs_harness.js   63 node checks
+tests/test_dashboard_tabs.py      3 tests
+tests/test_dashboard.py           15 Chrome checks in TestActuallyRenders
+```
+
+**The harnesses are permanent and read the LANDED files.**
+`tests/dashboard_tabs_harness.js` + `tests/test_dashboard_tabs.py` (node, 63
+checks) take their payload from `core.db.get_dashboard_data` on the repo's own
+fixture — no synthetic story, except where the fixture cannot reach (the act
+focus, and the fill rule at 1–48 scenes). `tests/test_dashboard.py` gained
+`_probe()`, which reads the **live DOM** into `document.title`, synchronously.
+
+**`--dump-dom` produces no frames.** A `ResizeObserver` callback is never
+delivered and `requestAnimationFrame` never fires, so a probe that waits for a
+resize-driven re-render is a flake — the first fold check passed 5 runs and
+failed the 6th with the pane correctly narrow. Anything that needs a different
+width must arrange it *before* the tab renders: the fold check narrows the panel
+first, then activates the tab.
+
+**`--dump-dom` makes substring assertions meaningless.** The dumped page includes
+the whole minified bundle and the injected payload, so `"sb-gap" in dom`,
+`"jr-row" in dom` and `"Kael" in dom` are all true whether or not the tab
+rendered. The two Phase 1 Chrome tab tests asserted exactly those, and would have
+passed against an empty pane. Anything asserting on rendered content must go
+through `_probe`.
+
+**Two cross-reader defects were found and fixed at the source:**
+
+1. `hasBeats` counted a placeholder record as a beat list, so the Journey tab
+   said "beat lists exist for 3" while the Beats tab said "Beat list missing" for
+   two of those scenes. `track-data.js` now requires `beats.length`; the dot and
+   footer in `scene-beats-tab.js` use the same notion.
+2. The Beats empty state was keyed on the whole pane, so a placeholder scene with
+   value turns showed its header and said nothing while the strip's dot warned.
+   `renderSceneBeats` now puts `emptyHtml(scene)` exactly where the beat spine
+   would have gone.
+
+**`test_no_bare_inline_handlers_in_index_html` carried a hand-kept copy of
+`JS_ORDER`** and had already dropped the four tab/value files. It reads `JS_ORDER`
+now.
+
+**Changed: placeholders are not content.** `DASH.isPlaceholderSection` (in
+`panel-manager.js`) is the one predicate; `renderSectionsHtml` and the scene
+Content reader in `entity-panels.js` both use it, and the Beats tab's `notesHtml`
+delegates to the renderer instead of keeping its own copy. Four Chrome checks pin
+it, and `_probe` now terminates `open_js` itself — a caller without a trailing
+`;` used to produce `showScenePanel('x')(function () {...})()` and a title that
+never got set.
+
+**Scratch deleted:** `t34_harness.js`, `ribbon_geom.js`, `ribbon_chrome_check.py`,
+`t34_story.json`. The remaining probes were never carried over.
 
 ## Where things stand
 
@@ -261,13 +318,9 @@ and its DB is **built** by `conftest.py`, never committed.
 
 ## Not done, deliberately
 
-- **Scratch probes** at `~/.hermes/cache/scratch/ribbon_geom.js`,
-  `ribbon_chrome_check.py`, `ribbon_probe.py`, `ribbon_label.js`,
-  `ribbon_aspect.js`, `ribbon_axis.js`. They auto-prune in 24h. Phase 4 task 4.2
-  is what gives the harnesses permanent homes; `ribbon_geom.js` and
-  `ribbon_chrome_check.py` are the two worth carrying over.
-- **Phases 3 and 4** — Phase 3 is complete (see above); `phase_4_tests_and_legacy.md`
-  is untouched. Phase 4 is what closes the work.
+- **Nothing.** Phase 4 closed the work: the harnesses have permanent homes, the
+  scratch copies are deleted, and the two defects the sweep found are fixed. The
+  one open item is a decision, not work — see "Found, not changed" above.
 - **The delivered copies in `tasks/task_34/`** are synced to the landed files
   again (byte-identical, re-verified after the Phase 3 edit). They remain
   reference artefacts, not the code that ships — `JS_ORDER` is what loads the

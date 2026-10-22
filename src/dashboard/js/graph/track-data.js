@@ -103,7 +103,10 @@ window.DASH = window.DASH || {};
         i, id: s.id, title: s.title || s.name || s.id, number: i + 1, status: s.status || '',
         inCast, drives, objective: drives ? (sb.scene_objective || '') : '',
         change: changes.join(' '), choices, acted, answered, turns,
-        hasBeats: !!sb, milestone: arr(s.milestone),
+        // A record that exists but holds no beats is a placeholder, not a beat
+        // list: the Beats tab's own empty state calls it "missing", and the
+        // coverage count must not disagree with the tab that reads the same row.
+        hasBeats: !!sb && beats.length > 0, milestone: arr(s.milestone),
       });
     });
 

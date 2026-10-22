@@ -155,13 +155,12 @@ window.DASH = window.DASH || {};
       </div>`).join('')}</div>`;
   }
 
-  // Conflict / Findings / Notes. Placeholder text from stubs is not shown as content.
+  // Conflict / Findings / Notes. A placeholder marker is not a note: the shared
+  // renderer already drops it, so there is one rule for every section.
   function notesHtml(sb) {
-    const data = (window.__SECTIONS__ && window.__SECTIONS__.scene_beats && window.__SECTIONS__.scene_beats[sb.id]) || {};
-    const parts = Object.entries(data).filter(([, v]) => v && !/^\s*\[placeholder/i.test(v));
-    if (!parts.length) return '';
-    return `<details class="sb-notes"><summary>Analysis notes</summary>${parts.map(([name, v]) =>
-      `<div class="panel-section-title">${h(name)}</div><div class="panel-text">${h(v).replace(/\n/g, '<br>')}</div>`).join('')}</details>`;
+    const inner = D.renderSectionsHtml('scene_beats', sb.id);
+    if (!inner) return '';
+    return `<details class="sb-notes"><summary>Analysis notes</summary>${inner}</details>`;
   }
 
   // ---- the empty state: say what is expected, not just that nothing is there ----------------
@@ -190,8 +189,16 @@ window.DASH = window.DASH || {};
     const sb = D.sceneBeatsOf(sceneId, st);
     if (!sb) return `<div class="sb">${emptyHtml(scene)}</div>`;
     const lanes = lanesOf(sb);
-    const body = headHtml(sb, scene) + rhythmHtml(sb, lanes) + exchangeHtml(sb, lanes, width) + changesHtml(sb) + choicesHtml(sb) + notesHtml(sb);
-    return `<div class="sb">${body || emptyHtml(scene)}</div>`;
+    // The empty state belongs to the beat spine, not to the pane as a whole: a
+    // scene with value turns but no beats still shows its header, and must still
+    // say the list is missing. The strip's dot warns about exactly that case, and
+    // a dot over a silent pane is worse than no dot.
+    const beats = arr(sb.beats);
+    const spine = beats.length
+      ? rhythmHtml(sb, lanes) + exchangeHtml(sb, lanes, width)
+      : emptyHtml(scene);
+    const body = headHtml(sb, scene) + spine + changesHtml(sb) + choicesHtml(sb) + notesHtml(sb);
+    return `<div class="sb">${body}</div>`;
   };
 
   function after(pane) {
@@ -209,7 +216,10 @@ window.DASH = window.DASH || {};
     D.panelTabs.register('scene', id => {
       const scene = (D.story.scenes || []).find(s => String(s.id) === String(id));
       if (!scene) return null;
-      const has = !!D.sceneBeatsOf(id);
+      // A placeholder record is not a beat list: the dot and the footer must
+      // both say there is nothing to analyse yet, exactly as the pane does.
+      const rec = D.sceneBeatsOf(id);
+      const has = arr(rec && rec.beats).length > 0;
       const name = scene.title || scene.name || id;
       return [{
         id: 'beats', label: 'Beats', wide: true,

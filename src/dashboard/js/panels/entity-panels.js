@@ -420,11 +420,12 @@ DASH.showScenePanel = function(sceneId) {
     return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${roleLabel}</span></button>`;
   }).filter(Boolean).join('');
 
-  // Content from __SECTIONS__.scenes[slug]["Content"]
+  // Content from __SECTIONS__.scenes[slug]["Content"]. A placeholder marker is
+  // not content — it is the same marker the section renderer drops.
   let contentHtml = '';
   const sections = window.__SECTIONS__;
   const sceneContent = sections?.scene?.[sceneId]?.Content;
-  if (sceneContent) {
+  if (sceneContent && !DASH.isPlaceholderSection(sceneContent)) {
     contentHtml = `<div class="fountain-content">${DASH.escapeHtml(sceneContent)}</div>`;
   } else {
     contentHtml = '<div class="panel-muted">No content yet.</div>';

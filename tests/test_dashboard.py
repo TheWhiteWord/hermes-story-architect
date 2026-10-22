@@ -144,6 +144,49 @@ class TestSceneBeatsReachTheDashboard:
             assert not pointer or pointer in ids, (
                 f"scene {scene['id']} points at '{pointer}', which is not in the payload")
 
+    def test_the_llm_view_and_the_dashboard_agree(self, vault, data):
+        """Two readers of the same rows must not disagree.
+
+        `story_load`'s `dramatic_elements` view and `get_dashboard_data` both
+        read the `scene_beats` records. The view emits the pointer and the two
+        facts; the dashboard emits the record whole and the same two facts. A
+        scene-first/record-fallback rule that changed in one reader only would
+        give the LLM and the dashboard different objectives for the same scene,
+        and nothing else in the suite would see it.
+        """
+        from tools.story_load import handler as load_handler
+
+        view = json.loads(load_handler(
+            {"project": "stc", "view": "dramatic_elements", "root_path": str(vault)}))
+        rows = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                if "id" in node and "scene_beats" in node:
+                    rows.append(node)
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+
+        walk(view["acts"])
+        assert rows, "the view emitted no scene carrying a scene_beats pointer"
+
+        by_id = {r["id"]: r for r in data["scenes"]}
+        records = {r["id"]: r for r in data["scene_beats"]}
+        for row in rows:
+            scene = by_id.get(row["id"])
+            assert scene, f"the view named a scene the dashboard does not carry: {row['id']}"
+            # The pointer names the same record, and the objective is the same
+            # fact — the view takes the scene's own field first, the dashboard
+            # the same way, so neither can drift ahead of the other.
+            assert row["scene_beats"] in records, f"{row['id']}: unknown record"
+            assert row.get("scene_objective", "") == scene.get("scene_objective", ""), (
+                f"{row['id']}: the view and the dashboard disagree on the objective")
+            assert row.get("turning_point", "") == records[row["scene_beats"]].get("turning_point", ""), (
+                f"{row['id']}: the view's turning point is not the record's")
+
     def test_a_scene_carries_its_records_objective(self, data):
         """The Beats tab reads `scene_objective` off the SCENE, not the record.
 
@@ -390,6 +433,402 @@ class TestActuallyRenders:
         assert "Uncaught" not in out.stderr, out.stderr[-800:]
         return out.stdout
 
+    def _probe(self, html, tmp_path, name, open_js, probe):
+        """Run `open_js`, then `probe`, which must write JSON to `document.title`.
+
+        `--dump-dom` returns the whole bundle, so a substring assertion over it
+        can be satisfied by a string literal in the minified JS — `sb-gap` and
+        `jr-row` are both literals in the tab files, and the fixture's text is in
+        the injected payload. Reading the live DOM into the title is the only way
+        to assert on what was actually built, and it is what makes the width and
+        overlap checks possible at all.
+
+        It is synchronous on purpose. `--dump-dom` produces no frames, so a
+        `ResizeObserver` callback is never delivered and `requestAnimationFrame`
+        never fires — a probe that waits for a resize-driven re-render is a flake.
+        Anything that needs a different width must arrange it *before* the tab
+        renders. See `test_the_beats_exchange_folds_into_one_column_when_narrow`.
+        """
+        served = tmp_path / name
+        served.mkdir()
+        # `*{transition:none}` because #detail-panel animates its width over
+        # 0.2s and a synchronous read mid-transition returns 0.
+        # The `;` after `open_js` is load-bearing: a newline does not terminate a
+        # statement, so without it `open_js` followed by an IIFE parses as one
+        # call — `showScenePanel('x')(function () {...})` — which throws and
+        # leaves the title unset, looking exactly like a probe that never ran.
+        page = html.replace(
+            "</body>",
+            "<style>*{transition:none !important;}</style>"
+            f"<script>{open_js};\n{probe}</script></body>")
+        (served / "index.html").write_text(page)
+        out = subprocess.run(
+            ["google-chrome", "--headless=new", "--disable-gpu", "--no-sandbox",
+             "--virtual-time-budget=6000", "--dump-dom",
+             f"file://{served / 'index.html'}"],
+            capture_output=True, text=True, timeout=120)
+        assert "Uncaught" not in out.stderr, out.stderr[-800:]
+        m = re.search(r"<title>(\{.*?\})</title>", out.stdout, re.S)
+        assert m, f"the probe never ran\n{out.stdout[-600:]}"
+        return json.loads(m.group(1))
+
+    # Each pane is probed in its own page: `mount()` replaces the whole panel
+    # body, so opening a second panel destroys the first one's panes.
+    _BEATS_PROBE = r"""
+(function () {
+  var pane = document.querySelector('.ptab-pane[data-pane="beats"]');
+  if (!pane) { document.title = JSON.stringify({ error: 'no beats pane' }); return; }
+  var q = s => pane.querySelector(s), qa = s => pane.querySelectorAll(s);
+  var self = q('.sb-link.is-self');
+  var tip = self ? self.querySelector('.sb-tip') : null;
+  document.title = JSON.stringify({
+    paneW: pane.clientWidth,
+    lanes: qa('.sb-lane').length,
+    beats: qa('.sb-beat').length,
+    gaps: qa('.sb-gap').length,
+    selfLinks: qa('.sb-link.is-self').length,
+    selfPath: self ? self.querySelector('path').getAttribute('d') : null,
+    selfTip: tip ? tip.style.left : null,
+    cracks: qa('.sb-crack').length,
+    exchange: q('.sb-exchange') ? q('.sb-exchange').className : '',
+    empty: q('.panel-empty') ? q('.panel-empty').className : '',
+    emptyText: q('.panel-empty') ? q('.panel-empty').textContent.replace(/\s+/g, ' ').trim() : '',
+    laneNames: Array.prototype.map.call(qa('.sb-lane span'), e => e.textContent),
+    objective: q('.sb-objective') ? q('.sb-objective').textContent : '',
+    changes: qa('.sb-change-text').length,
+    choices: qa('.sb-choice').length,
+    notes: qa('.sb-notes').length,
+    rhythm: q('.sb-rhythm') ? q('.sb-rhythm').textContent.replace(/\\s+/g, ' ').slice(0, 60) : '',
+  });
+})();
+"""
+
+    _JOURNEY_PROBE = r"""
+(function () {
+  var pane = document.querySelector('.ptab-pane[data-pane="journey"]');
+  if (!pane) { document.title = JSON.stringify({ error: 'no journey pane' }); return; }
+  var q = s => pane.querySelector(s), qa = s => pane.querySelectorAll(s);
+  var svg = q('svg.jr-svg'), scroll = q('.jr-scroll');
+  var box = el => { if (!el) return null; var r = el.getBoundingClientRect();
+    return { l: r.left, r: r.right, w: r.width }; };
+  var sr = box(scroll), vr = box(svg);
+  var hits = Array.prototype.map.call(qa('.jr-hit'), box).filter(Boolean);
+  var texts = Array.prototype.map.call(qa('svg.jr-svg text'), t => {
+    var r = t.getBoundingClientRect();
+    return { l: r.left, r: r.right, t: r.top, b: r.bottom, s: (t.textContent || '').slice(0, 24) };
+  });
+  var overlap = [];
+  for (var i = 0; i < texts.length; i++) {
+    for (var j = i + 1; j < texts.length; j++) {
+      var a = texts[i], b = texts[j];
+      if (a.l >= b.r || a.r <= b.l || a.t >= b.b || a.b <= b.t) continue;
+      overlap.push([a.s, b.s]);
+    }
+  }
+  var hit = q('.jr-hit.has');
+  if (hit) hit.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 200, clientY: 200 }));
+  var tip = document.querySelector('.jr-tip');
+  document.title = JSON.stringify({
+    paneW: pane.clientWidth,
+    svgW: vr ? Math.round(vr.w) : null,
+    scrollClientW: scroll ? scroll.clientWidth : null,
+    scrollScrollW: scroll ? scroll.scrollWidth : null,
+    overflow: scroll ? scroll.scrollWidth > scroll.clientWidth : null,
+    hits: hits.length,
+    hitsOutside: hits.filter(h => sr && (h.l < sr.l - 0.5 || h.r > sr.r + 0.5)).length,
+    labelsPastRight: texts.filter(t => vr && t.r > vr.r + 0.5).length,
+    overlaps: overlap.length, overlapSample: overlap.slice(0, 3),
+    rows: qa('.jr-row').length,
+    milestones: Array.prototype.map.call(qa('.tag-struct'), e => e.textContent),
+    stats: qa('.jr-stat').length,
+    focus: qa('.jr-focus').length,
+    tip: tip ? { display: tip.style.display, text: (tip.textContent || '').replace(/\\s+/g, ' ').slice(0, 90) } : null,
+  });
+})();
+"""
+
+    def test_the_beats_pane_renders_the_exchange(self, vault, tmp_path):
+        """End to end: the assembled page renders the Beats tab, not a stub.
+
+        The node and Chrome harnesses of the tab work read the delivered files
+        directly. This drives `story_dashboard.handler` → `assemble_dashboard` →
+        the dashboard's own JS, which is the shipping path: it is the only check
+        that proves the tab files are in `JS_ORDER`, that the panel-tabs wrap
+        landed, and that the records actually reach the panel.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "site_beats",
+                        "DASH.showScenePanel('central-room-day');"
+                        "DASH.panelTabs.activate('beats');", self._BEATS_PROBE)
+        assert "error" not in g, g
+        # The strip and the pane are the wrap; the pane's CONTENT is the tab.
+        assert g["beats"] == 2, "the beat exchange never drew — no record reached the tab"
+        assert g["gaps"] == 1, "a gap opened but never rendered"
+        assert g["changes"] == 2, "the closing changes never rendered"
+        assert g["choices"] == 1, "the true-character card never rendered"
+        assert g["notes"] == 1, "the analysis notes never rendered"
+        assert g["lanes"] == 2, f"the lanes never drew: {g['laneNames']}"
+        assert g["laneNames"] == ["Kael", "The Central Room"], g["laneNames"]
+        assert "whether the door was ever locked" in g["objective"], (
+            "the scene objective never reached the tab — the payload carries it "
+            "on the scene, not only on the record")
+        assert g["exchange"] == "sb-exchange", g["exchange"]
+        assert g["empty"] == "", "a scene with a beat list must not show an empty state"
+
+    def test_the_self_directed_arrow_draws_with_its_head_at_the_turn(self, vault, tmp_path):
+        """The fixture's first beat is Kael answering himself.
+
+        The head belongs at the turn, not on the answering bubble: a self-directed
+        arrow is the one beat whose path comes back to the lane it left, so a tip
+        at the answering coordinate sits where the path never reaches.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "site_beats_self",
+                        "DASH.showScenePanel('central-room-day');"
+                        "DASH.panelTabs.activate('beats');", self._BEATS_PROBE)
+        assert g["selfLinks"] == 1, "the inner-conflict beat did not draw its own arrow"
+        assert g["cracks"] == 1, "the gap's crack marker did not draw"
+        m = re.search(r"C ([\d.]+) ", g["selfPath"])
+        assert m, g["selfPath"]
+        assert g["selfTip"] == m.group(1) + "%", (
+            f"the head is at {g['selfTip']}, the turn is at {m.group(1)}%")
+
+    _OVERVIEW_PROBE = r"""
+(function () {
+  var body = document.getElementById('panel-body');
+  if (!body) { document.title = JSON.stringify({ error: 'no panel body' }); return; }
+  document.title = JSON.stringify({
+    placeholders: (body.innerHTML.match(/\[placeholder/g) || []).length,
+    titles: Array.prototype.map.call(body.querySelectorAll('.panel-section-title'), e => e.textContent),
+    muted: Array.prototype.map.call(body.querySelectorAll('.panel-muted'), e => e.textContent),
+  });
+})();
+"""
+
+    @pytest.mark.parametrize("open_js,name", [
+        ("DASH.showScenePanel('central-room-day')", "ov_scene"),
+        ("DASH.showPlotPanel('the-resistance')", "ov_plot"),
+        ("DASH.showSequencePanel('seq-discovery')", "ov_seq"),
+    ])
+    def test_a_placeholder_is_not_rendered_as_content(self, vault, tmp_path, open_js, name):
+        """`[placeholder — type/Section]` is a marker, not something the author wrote.
+
+        The fixture's scene, sequence and plot files carry them, and the payload
+        carries them too — so this asserts on the **rendered pane**, never on the
+        page. An instruction to the writer must not be typeset as the writer's own
+        prose, in any panel.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, name, open_js, self._OVERVIEW_PROBE)
+        assert "error" not in g, g
+        assert g["placeholders"] == 0, f"{name}: a placeholder reached the panel"
+
+    def test_the_overview_keeps_the_sections_that_are_real(self, vault, tmp_path):
+        """Dropping the placeholders must not drop the content beside them.
+
+        The fixture's scene has three placeholder sections and three real ones;
+        only the placeholders go.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "ov_real",
+                        "DASH.showScenePanel('central-room-day')", self._OVERVIEW_PROBE)
+        assert "error" not in g, g
+        # The panel has other section titles of its own (Characters, Location…),
+        # so assert on what must be there and what must not.
+        assert "Dramatic Function" in g["titles"] and "Notes" in g["titles"], g["titles"]
+        assert not {"Objective", "Value Turn", "Production"} & set(g["titles"]), (
+            f"a placeholder section was rendered: {g['titles']}")
+
+    def test_the_scene_content_is_the_same_rule(self, vault, tmp_path):
+        """A scene's Content is read outside the section renderer, so it needs the
+        same guard — a `[placeholder — scene/Content]` would otherwise render as
+        the scene's screenplay.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        # The fixture's scenes all have real Content; swap one for a placeholder
+        # in the injected page and read the pane the panel built.
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text().replace(
+            "The children step through the door. Blinking. Silent. The sky is impossibly large.",
+            "[placeholder — scene/Content]")
+        g = self._probe(html, tmp_path, "ov_content",
+                        "DASH.showScenePanel('the-core-day')", self._OVERVIEW_PROBE)
+        assert "error" not in g, g
+        assert g["placeholders"] == 0, g
+        # A placeholder Content falls back to the "nothing here" state rather
+        # than typesetting the marker as the scene's screenplay.
+        assert "No content yet." in g["muted"], g
+
+    def test_the_beats_pane_says_when_a_scene_has_no_beat_list(self, vault, tmp_path):
+        """The fixture's other two records are placeholders, on purpose.
+
+        The pane is not empty — the scene's value turns still render — so an
+        empty state keyed on the whole pane would stay silent while the strip's
+        dot warns about exactly that. This is the real page, not a synthetic story.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "site_beats_empty",
+                        "DASH.showScenePanel('central-room-night');"
+                        "DASH.panelTabs.activate('beats');", self._BEATS_PROBE)
+        assert "error" not in g, g
+        assert g["beats"] == 0 and g["lanes"] == 0, "the placeholder record drew an exchange"
+        assert "is-missing" in g["empty"], f"the pane did not say the list is missing: {g['empty']!r}"
+        assert "Beat list missing" in g["emptyText"], g["emptyText"]
+
+    def test_the_beats_exchange_folds_into_one_column_when_narrow(self, vault, tmp_path):
+        """Lane mode needs room, so the exchange folds at a narrow pane.
+
+        `panel-tabs.js` opens a `wide: true` tab at the wide panel, so the widen
+        button *narrows* it — a probe that assumes the opposite measures nothing.
+
+        The panel is narrowed **before** the tab is activated, so the tab's first
+        render is the narrow one. `--dump-dom` produces no frames, which means the
+        `ResizeObserver` that would redraw it never fires: waiting for that
+        re-render is a flake, not a test.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        wide = self._probe(html, tmp_path, "site_beats_wide",
+                           "DASH.showScenePanel('central-room-day');"
+                           "DASH.panelTabs.activate('beats');", self._BEATS_PROBE)
+        assert wide["exchange"] == "sb-exchange", wide["exchange"]
+        narrow = self._probe(html, tmp_path, "site_beats_narrow",
+                             "DASH.showScenePanel('central-room-day');"
+                             "document.querySelector('.ptab-widen').click();"
+                             "DASH.panelTabs.activate('beats');", self._BEATS_PROBE)
+        assert "is-stacked" in narrow["exchange"], (
+            f"the exchange did not fold at a {narrow.get('paneW')}px pane: "
+            f"{narrow['exchange']!r}")
+        assert narrow["paneW"] < 480, f"the panel did not narrow: {narrow.get('paneW')}px"
+
+    def test_a_chip_opens_that_entitys_own_panel(self, vault, tmp_path):
+        """`data-ent="type:id"` is the protocol between a chip and its panel.
+
+        A chip that renders but does not route leaves the tab a dead end, with no
+        error anywhere.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(
+            html, tmp_path, "site_beats_chip",
+            "DASH.showScenePanel('central-room-day');"
+            "DASH.panelTabs.activate('beats');",
+            "var c = document.querySelector('.ptab-pane[data-pane=\"beats\"] [data-ent]');"
+            "var ref = c && c.getAttribute('data-ent');"
+            "if (c) c.click();"
+            "document.title = JSON.stringify({ ref: ref,"
+            "  after: document.getElementById('panel-name').textContent,"
+            "  type: document.getElementById('panel-type').textContent });")
+        assert g["ref"] == "character:kael", f"the chip does not name its entity: {g}"
+        assert g["after"] == "Kael", f"the chip opened {g['after']!r}, not Kael's panel"
+        assert g["type"] == "Protagonist", g
+
+    def test_the_character_panel_opens_with_its_journey_tab(self, vault, tmp_path):
+        """The Journey tab, same shipping path. Kael is the fixture's protagonist.
+
+        The ribbon needs a value model, so this also proves `track-data.js`
+        loaded after `value-graph.js` in the assembled bundle — a reorder would
+        leave `D.valueModel` undefined and the pane rendering nothing.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "site_journey",
+                        "DASH.showCharacterPanel(DASH.story.characters.find(c=>c.id==='kael'));"
+                        "DASH.panelTabs.activate('journey');", self._JOURNEY_PROBE)
+        assert "error" not in g, g
+        assert g["paneW"] > 0, "the journey pane has no width"
+        assert g["rows"] == 3, f"the journey timeline rendered {g['rows']} of 3 scene rows"
+        assert g["stats"] == 4, "the coverage stats never rendered"
+        assert g["hits"] == 3, f"{g['hits']} hit columns for 3 scenes"
+        # The milestone labels are D.milestoneLabel's output, not the raw keys.
+        assert g["milestones"] == ["Inciting Incident", "Climax", "Resolution"], g["milestones"]
+        assert g["svgW"] == g["paneW"], (
+            f"the ribbon is {g['svgW']}px of a {g['paneW']}px pane — it no longer fills it")
+
+    def test_the_ribbon_does_not_overflow_and_no_labels_overlap(self, vault, tmp_path):
+        """The four invariants Phase 3 measured, now permanent.
+
+        Overflow, a hit column outside the scroll box, a label past the ribbon's
+        right edge, and two labels sharing space. Only a browser can see any of
+        them, and the last is the one that mattered: comparing text against marks
+        gives false positives, because a label sitting on the mark it labels is
+        normal chart practice.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        open_js = ("DASH.showCharacterPanel(DASH.story.characters.find(c=>c.id==='kael'));"
+                   "DASH.panelTabs.activate('journey');")
+        for label, drive in (("wide", open_js),
+                             ("narrow", open_js + "document.querySelector('.ptab-widen').click();")):
+            g = self._probe(html, tmp_path, f"site_journey_{label}", drive, self._JOURNEY_PROBE)
+            assert "error" not in g, g
+            assert not g["overflow"], f"{label}: the ribbon overflows its pane"
+            assert g["hitsOutside"] == 0, f"{label}: {g['hitsOutside']} hit columns outside the scroll box"
+            assert g["labelsPastRight"] == 0, f"{label}: {g['labelsPastRight']} labels past the ribbon's right edge"
+            assert g["overlaps"] == 0, f"{label}: overlapping labels: {g['overlapSample']}"
+            assert g["svgW"] == g["paneW"], f"{label}: the ribbon is {g['svgW']}px of {g['paneW']}px"
+
+    def test_the_journey_hover_card_shows_the_scene_behind_a_hit_column(self, vault, tmp_path):
+        """Hover is the ribbon's only detail view; it must name the scene.
+
+        A card that appears but is empty, or that never appears, is invisible to
+        every other check here.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "site_journey_hover",
+                        "DASH.showCharacterPanel(DASH.story.characters.find(c=>c.id==='kael'));"
+                        "DASH.panelTabs.activate('journey');", self._JOURNEY_PROBE)
+        assert g["tip"], "the hover card never appeared"
+        assert g["tip"]["display"] == "block", g["tip"]
+        assert "Central Room" in g["tip"]["text"], g["tip"]
+
+    def test_the_journey_hover_card_is_quiet_without_a_hit_column(self, vault, tmp_path):
+        """`mouseleave` must hide it, or the card follows the cursor for good."""
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(
+            html, tmp_path, "site_journey_leave",
+            "DASH.showCharacterPanel(DASH.story.characters.find(c=>c.id==='kael'));"
+            "DASH.panelTabs.activate('journey');",
+            "var p = document.querySelector('.ptab-pane[data-pane=\"journey\"]');"
+            "var h = p.querySelector('.jr-hit.has');"
+            "h.dispatchEvent(new MouseEvent('mousemove', {bubbles:true, clientX:200, clientY:200}));"
+            "var shown = document.querySelector('.jr-tip').style.display;"
+            "p.dispatchEvent(new MouseEvent('mouseleave'));"
+            "document.title = JSON.stringify({ shown: shown,"
+            "  after: document.querySelector('.jr-tip').style.display });")
+        assert g["shown"] == "block", g
+        assert g["after"] == "none", f"the card stayed up: {g}"
+
     def test_a_scenes_plot_role_reaches_the_dom(self, vault, tmp_path):
         """Phase 7, end to end: `scene.plots[].role` must survive Python -> JS.
 
@@ -458,63 +897,38 @@ class TestActuallyRenders:
             assert f">{role}<" in dom, f"the {role} section is missing"
 
     def test_the_scene_panel_opens_with_its_beats_tab(self, vault, tmp_path):
-        """End to end: the assembled page renders the Beats tab, not a stub.
+        """The strip and the pane are the wrap; the wrap must be there.
 
-        The node and Chrome harnesses of the tab work read the delivered files
-        directly. This drives `story_dashboard.handler` → `assemble_dashboard` →
-        the dashboard's own JS, which is the shipping path: it is the only check
-        that proves the tab files are in `JS_ORDER`, that the panel-tabs wrap
-        landed, and that the records actually reach the panel.
+        Content is `test_the_beats_pane_renders_the_exchange` — this one only
+        proves the panel-tabs wrap landed, which is what `JS_ORDER` buys.
         """
         _make(vault, "stc")
         _import(vault, "stc")
         url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
         html = Path(url.replace("file://", "")).read_text()
-        dom = self._dom(html, tmp_path, "site_beats",
+        dom = self._dom(html, tmp_path, "site_strip",
                         "DASH.showScenePanel('central-room-day');"
                         "DASH.panelTabs.activate('beats');")
         assert "ptab-strip" in dom, "the panel opened with no tab strip — the wrap did not land"
         assert "Beats" in dom, "the Beats tab never registered"
-        # The tab's own pane, not the Overview it lifted in.
         assert 'data-pane="beats"' in dom, "the Beats pane was never built"
-        assert "ptab-pane" in dom
-        # The pane's CONTENT. A strip that opens and an empty pane is the
-        # failure this phase is about: the tab files loaded but the record
-        # never reached them, which renders the shell with nothing in it.
-        assert "sb-exchange" in dom, "the beat exchange never drew — no record reached the tab"
-        assert "sb-beat" in dom, "no beat row rendered"
-        assert "sb-gap" in dom, "a gap opened but never rendered"
-        assert "Kael" in dom, "the beat participants never rendered"
-        # The fixture's record names the scene's objective; the payload must
-        # carry it on the scene, not only on the record.
-        assert "whether the door was ever locked" in dom, (
-            "the scene objective never reached the tab")
 
     def test_the_character_panel_opens_with_its_journey_tab(self, vault, tmp_path):
-        """The Journey tab, same shipping path. Kael is the fixture's protagonist.
+        """The same wrap on the character panel. Content is the probe's.
 
-        The ribbon needs a value model, so this also proves `track-data.js`
-        loaded after `value-graph.js` in the assembled bundle — a reorder would
-        leave `D.valueModel` undefined and the pane rendering nothing.
+        A character panel opens with no tabs at all when the wrap is missing, and
+        it renders exactly as it did before — no error.
         """
         _make(vault, "stc")
         _import(vault, "stc")
         url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
         html = Path(url.replace("file://", "")).read_text()
-        dom = self._dom(html, tmp_path, "site_journey",
+        dom = self._dom(html, tmp_path, "site_strip_char",
                         "DASH.showCharacterPanel(DASH.story.characters.find(c=>c.id==='kael'));"
                         "DASH.panelTabs.activate('journey');")
         assert "ptab-strip" in dom, "the panel opened with no tab strip — the wrap did not land"
         assert "Journey" in dom, "the Journey tab never registered"
         assert 'data-pane="journey"' in dom, "the Journey pane was never built"
-        # The ribbon is the part that needs the value model and the geometry.
-        assert "jr-svg" in dom, "the journey ribbon never drew"
-        # The timeline is the part that needs the payload's scenes and the
-        # milestone labels; a ribbon that draws and a timeline that stays
-        # empty is a half-wired tab.
-        assert "jr-row" in dom, "the journey timeline never rendered a scene row"
-        assert "In words" in dom, "the timeline section never rendered"
-        assert "Kael" in dom, "the character never reached the pane"
 
 
 class TestAssembledOrder:
