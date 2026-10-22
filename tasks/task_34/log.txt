@@ -211,3 +211,65 @@ ACTIONS TAKEN:
 - Added DASH.ENTITY_KIND_COLORS and pointed entityRef and both views' pips at it.
 - Re-ran the node harness, the headless-Chrome harness and the full suite.
 - Wrote the phase brief, the handoff update and this log.
+
+---
+
+MESSAGE:
+
+Phase 3 was a one-constant fix, and the brief's own instruction — measure a
+30+ scene story before changing it — is what decided it, against the option the
+brief offered first.
+
+The finding was reproduced before touching anything: 204px of a 647px pane,
+32%, no overflow, exactly as recorded. Then I read the width the panel itself
+rendered for 1 to 48 scenes at both panel widths, out of the `svg.jr-svg` it
+produced rather than a copy of its rule. That is what settled it. The cap binds
+only while the uncapped slot still exceeds 46px — 12 scenes or fewer at 680px,
+7 or fewer at 320px. From 20 scenes up the uncapped slot is already below the
+cap, so `MAX_SLOT` is inert on long stories. It was never a readability guard;
+it only ever bit the short stories where the fill is worst. The widest mark the
+ribbon draws per scene is the drives ring at 10.6px across (r 4.3 + a 2px
+stroke), so a wide column cannot make a marker unreadable — it only makes it
+small relative to its column.
+I removed it, and the `Math.max(280, …)` floor on W with it, since the pane is
+647px wide and 287px narrowed and neither ever reached 280.
+
+I also checked the one candidate fix that could have broken something: an
+aspect cap on the slot. It would have cut the shared axis's act names to
+"The…" at 680px, because the axis cuts a name to `floor(bandWidth/6)`. That is
+why the answer to 3.3 is "the axis" rather than "the slot rule" — and why the
+ribbon does not simply call `valueGeometry`: its 360px W floor would make a
+3-scene story at the default panel 360px wide and overflow it, which is the
+clipping 3.2 exists to prevent.
+
+Two corrections to the brief: the slot rule is at `value-graph.js:149`, not
+`142` (that is inside `valueLabelWidth`), and the finding itself was right.
+
+Verification was DOM assertions, not screenshots — the vision tool was down.
+The Chrome probe drives the dashboard's own JS and computes four invariants from
+the built DOM: no overflow, every hit column inside the scroll box, no label past
+the ribbon's right edge, and no two labels sharing space. The text-vs-text
+overlap check is the one that mattered; comparing text against marks gives
+false positives, because a label sitting on the mark it labels is normal chart
+practice and every text sits inside a transparent hit column.
+
+---
+
+ACTIONS TAKEN:
+- Reproduced the 32% finding on the assembled page before editing anything, and
+  confirmed the delivered copies were byte-identical to the landed files.
+- Read the width the panel itself rendered, out of the `svg.jr-svg` it produced,
+  for 1–48 scenes at 680px and 320px — not a copy of the rule.
+- Measured the readability question directly: the widest per-scene mark is 10px,
+  so a wide column cannot make a marker unreadable.
+- Tested the aspect-cap alternative and rejected it: it cuts the shared axis's
+  act names at 680px.
+- Removed MAX_SLOT and the 280px W floor; the slot is now
+  max(MIN_SLOT, (W - LABEL_W - PAD_R) / n).
+- Recorded the decision, the measurements and the 3.3 statement in the phase file.
+- Re-verified before/after on the assembled page: 204px/32% → 647px/100% and
+  204px/71% → 287px/100%, no overflow at either width.
+- Added the four journey DOM invariants to a Chrome probe, and checked the Beats
+  tab in the same run to confirm it was not disturbed.
+- Re-synced the delivered copy, wrote the phase brief, the handoff update and
+  this log.

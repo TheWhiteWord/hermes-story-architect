@@ -1,7 +1,7 @@
 # Phase 1 → Phase 2/3/4 handoff
 
-**Update — Phase 2 is done.** Everything below still holds; the changes Phase 2
-made are listed at the end, so Phase 3 reads that section first.
+**Update — Phase 3 is done.** Everything below still holds; the changes Phase 3
+made are in the "Phase 3 — done" section, so Phase 4 reads that first.
 
 Written at the end of Phase 1. Everything below was verified against the code and
 the running page, not assumed. Where a line number is given it is the **landed**
@@ -94,17 +94,75 @@ the brief's "confirm the chips match the cards" was really about. Phase 4.4,
 which sweeps for legacy, should treat `ENTITY_KIND_COLORS` as the single source
 for these two colours.
 
-## What Phase 3 must know
+## What Phase 3 needed to know (now historical)
 
-`character-journey-tab.js` changed, so its line numbers from Phase 1 are stale.
-Phase 3 edits it for the ribbon width. The things it will meet:
+`character-journey-tab.js` changed in Phase 2, so its Phase 1 line numbers were
+stale. Phase 3 edited it for the ribbon width and the things it met:
 
 - `deepestRung`, not `deepest`.
-- The axis call is now `D.valueAxisSvg(view, geo, null, 'plot')` — the third
+- The axis call is `D.valueAxisSvg(view, geo, null, 'plot')` — the third
   argument is `plotId` (null = story-level milestones) and the fourth is the row
-  label. Phase 3 must not reintroduce a string replacement here.
-- `MAX_SLOT` and the geometry are **untouched** — the 204px fill finding stands
-  exactly as measured.
+  label. It must not reintroduce a string replacement here.
+- `MAX_SLOT` and the geometry were untouched by Phase 2 — the 204px fill finding
+  stood exactly as measured.
+
+## Phase 3 — done, and the premise it was written from is discharged
+
+The finding was real and measured, not guessed. On the assembled page at the wide
+panel (680px), with the Journey tab open:
+
+```
+jrPaneW=647          jrScroll clientW=647 scrollW=647
+ribbonW=204          ribbonH=367
+```
+
+The ribbon was **204px of a 647px pane — 32%** — and `jr-scroll` did not overflow
+(clientW == scrollW), so it simply left 443px empty. Cause:
+`character-journey-tab.js:24,224` — `MAX_SLOT = 46` capped the per-scene column,
+and for a 3-scene story the uncapped slot was already 204px.
+
+**3.1 asked for a 30+ scene measurement before touching the constant, and it
+settled the question.** The cap binds only while the uncapped slot still exceeds
+46px — `n ≤ 12` at 680px, `n ≤ 7` at 320px. From 20 scenes up the uncapped slot
+is already *below* the cap, so `MAX_SLOT` is inert there. It was never a
+readability guard; it only ever bit short stories, exactly where the fill was
+worst. The widest mark the ribbon draws per scene is the drives ring at 10.6px
+across (r 4.3 + a 2px stroke), so a wide column cannot make a marker unreadable
+— it only makes it small relative to its column.
+
+**Landed:** `MAX_SLOT` is gone, and the `Math.max(280, …)` floor on `W` with it
+(a second arbitrary constant that never bound — the pane is 647px wide and 287px
+narrowed). The slot is now `max(MIN_SLOT, (W - LABEL_W - PAD_R) / n)`. The ribbon
+fills the pane; when `MIN_SLOT` binds it exceeds the pane and `.jr-scroll`
+scrolls it, which is what that container is for. The act-focus chips remain the
+zoom for a short story.
+
+Before/after on the assembled page:
+
+```
+                    BEFORE                    AFTER
+default   pane 647  ribbon 204  32%           ribbon 647  100%
+narrow    pane 287  ribbon 204  71%           ribbon 287  100%
+                    slot 46 (capped)          slot 193.8 / 86.0
+```
+
+**3.3's answer:** the ribbon and the value graph now share the axis and the
+*form* of the slot rule (fill, floor, scroll) — the one real disagreement, one
+capped and one not, is gone. They differ in the floor values (1.5px vs 12px, and
+a 360px `W` floor the ribbon does not have) because the containers differ: a
+360px floor would make a 3-scene story at the *default* panel 360px wide and
+overflow it. That is the clipping 3.2 exists to prevent, so the difference is
+deliberate.
+
+**Corrected:** the phase cited `value-graph.js:142` for the slot rule. It is
+`value-graph.js:149` (`valueGeometry`); line 142 is inside `valueLabelWidth`.
+The finding itself was right and reproduced.
+
+**Verification was DOM assertions, not screenshots** — the vision tool was down.
+The probe drives the dashboard's own JS and reads the width the panel actually
+rendered; the overlap check is computed from the built DOM. Both probes are
+still scratch files at `~/.hermes/cache/scratch/ribbon_geom.js` and
+`ribbon_chrome_check.py`; Phase 4.2 gives them permanent homes.
 
 ## What Phase 4 must know
 
@@ -118,26 +176,15 @@ Phase 3 edits it for the ribbon width. The things it will meet:
   item 4.4 is asking about.
 - **`--role-supporting` is not a location colour.** Do not "fix" `entityRef` back
   to it.
-
-## Phase 3 — measurement already done
-
-The finding is real and measured, not guessed. On the assembled page at the wide
-panel (680px), with the Journey tab open:
-
-```
-jrPaneW=647          jrScroll clientW=647 scrollW=647
-ribbonW=204          ribbonH=367
-```
-
-The ribbon is **204px of a 647px pane — 32%** — and `jr-scroll` does not overflow
-(clientW == scrollW), so it simply leaves 443px empty. Cause:
-`character-journey-tab.js:24,224` — `MAX_SLOT = 46` caps the per-scene column, and
-for a 3-scene story the uncapped slot is already 204px. `value-graph.js:146` has
-no such cap (`valueGeometry` lets the slot grow with the width), which is why the
-two charts disagree.
-
-Phase 3 task 3.1 wants the rule chosen from a 30+ scene story, not this fixture.
-The probe used is described below; reuse it.
+- **The ribbon's geometry is now `max(MIN_SLOT, (W - LABEL_W - PAD_R) / n)`.**
+  `MAX_SLOT` and the `280` floor are deleted, so 4.4 should not "restore" them:
+  the fill rule is the deliberate outcome of Phase 3, measured at 1–48 scenes.
+  The constants that survive are `LABEL_W = 58` (= `GEO.minLabelW` in
+  `value-graph.js`), `PAD_R = 8`, `MIN_SLOT = 12`.
+- **Two new scratch probes** worth giving permanent homes in 4.2:
+  `~/.hermes/cache/scratch/ribbon_geom.js` (node; reports the fill share for any
+  scene count) and `~/.hermes/cache/scratch/ribbon_chrome_check.py` (Chrome; the
+  four journey DOM invariants).
 
 ## Verification — what actually works
 
@@ -152,6 +199,14 @@ appends `<script>drive_js</script>` before `</body>`, and `--dump-dom`s it. Both
 tab checks call the dashboard's own JS (`DASH.showScenePanel(...)`,
 `DASH.panelTabs.activate('beats')`) and assert on the **pane content**, not just
 the strip.
+
+## Phase 3's probe, and its pitfalls
+
+Phase 3 measured with two probes, both still scratch:
+`~/.hermes/cache/scratch/ribbon_geom.js` (node, reads the landed modules, reports
+the width the panel itself rendered for any scene count) and
+`~/.hermes/cache/scratch/ribbon_chrome_check.py` (Chrome, drives the assembled
+page and asserts on the built DOM). Phase 4.2 gives them homes.
 
 ### Pitfalls that cost real time here
 
@@ -173,6 +228,21 @@ minified vis-network CSS embedded in the page. Write probe output to
 `document.title` and extract with a narrow regex, or write the probe to a file and
 run it as a script rather than a heredoc.
 
+**A probe's own bug reads like a code failure.** Phase 3 hit two: the probe
+constant was defined but never concatenated into the drive string, and the
+node harness recomputed the old formula instead of reading the rendered
+`width` attribute — so it reported the *pre-fix* numbers after the fix landed.
+Read the width the panel rendered, never a copy of the rule.
+
+**The panel's default state is WIDE.** `panel-tabs.js` initialises
+`memory = { tab: {}, wide: true }`, and a tab marked `wide: true` calls
+`setWide(true)` on open — so the Journey tab opens at 680px and the widen button
+*narrows* it. A probe that assumes "click widen → wider" measures the opposite.
+
+**A `.ptab-pane` is `display:none` until active.** Querying it before
+`DASH.panelTabs.activate(...)` gives `clientWidth = 0` and no children, which
+looks like a rendering failure.
+
 ## Fixture state — read before writing tests
 
 `tests/fixtures/save-the-children/` is the only fixture the dashboard tests use,
@@ -191,15 +261,14 @@ and its DB is **built** by `conftest.py`, never committed.
 
 ## Not done, deliberately
 
-- **The ribbon fill** (Phase 3). Measured, recorded above, untouched — Phase 2
-  did not change the geometry or `MAX_SLOT`.
-- **Scratch probes** at `~/.hermes/cache/scratch/geo_probe.py` and
-  `click_probe.py`. They auto-prune in 24h. Phase 4 task 4.2 is what gives the
-  harnesses permanent homes; these were measurement probes, not harnesses.
-- **Phases 3 and 4** — untouched. Their briefs are `phase_3_ribbon_fill.md` and
-  `phase_4_tests_and_legacy.md`. Phase 2 is complete: `phase_2_naming.md` carries
-  what was landed and the two places it deliberately departed from its brief.
+- **Scratch probes** at `~/.hermes/cache/scratch/ribbon_geom.js`,
+  `ribbon_chrome_check.py`, `ribbon_probe.py`, `ribbon_label.js`,
+  `ribbon_aspect.js`, `ribbon_axis.js`. They auto-prune in 24h. Phase 4 task 4.2
+  is what gives the harnesses permanent homes; `ribbon_geom.js` and
+  `ribbon_chrome_check.py` are the two worth carrying over.
+- **Phases 3 and 4** — Phase 3 is complete (see above); `phase_4_tests_and_legacy.md`
+  is untouched. Phase 4 is what closes the work.
 - **The delivered copies in `tasks/task_34/`** are synced to the landed files
-  again (they were byte-identical at the start of Phase 2 and are again now).
-  They remain reference artefacts, not the code that ships — `JS_ORDER` is what
-  loads the landed copies.
+  again (byte-identical, re-verified after the Phase 3 edit). They remain
+  reference artefacts, not the code that ships — `JS_ORDER` is what loads the
+  landed copies.

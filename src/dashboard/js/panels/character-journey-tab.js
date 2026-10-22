@@ -21,7 +21,7 @@ window.DASH = window.DASH || {};
   const LEVEL_SHORT = { inner: 'inner', personal: 'personal', 'extra-personal': 'extra-pers.' };
   const RUNG = ['P', 'C', 'CD', 'NN'];
   const PINK = '#e06b9b';                                               // a true-character moment (--c-choice)
-  const LABEL_W = 58, PAD_R = 8, MIN_SLOT = 12, MAX_SLOT = 46;
+  const LABEL_W = 58, PAD_R = 8, MIN_SLOT = 12;
 
   const plotColor = p => (D.plotColor ? D.plotColor(p) : '#8a8a8a');
   const cutText = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, Math.max(1, n - 1)) + '\u2026' : s; };
@@ -220,8 +220,13 @@ window.DASH = window.DASH || {};
     const band = act === 'all' ? null : model.acts[act];
     const lo = band ? band.start : 0, hi = band ? band.end : model.n - 1;
     const view = band ? D.valueSlice(model, lo, hi) : model;
-    const W = Math.max(280, Math.floor(opts.width || 640));
-    const slot = Math.min(MAX_SLOT, Math.max(MIN_SLOT, (W - LABEL_W - PAD_R) / Math.max(view.n, 1)));
+    const W = Math.floor(opts.width || 640);
+    // The ribbon fills the pane: the slot is whatever the pane can give each scene.
+    // Floored at MIN_SLOT because below that the per-scene marks (a 10.6px drives
+    // ring, a 10px choice diamond) touch their neighbours — the excess then scrolls,
+    // which is what `.jr-scroll`'s overflow-x is for. There is no upper cap: a wide
+    // pane should be used, and the act-focus chips are the zoom for a short story.
+    const slot = Math.max(MIN_SLOT, (W - LABEL_W - PAD_R) / Math.max(view.n, 1));
     const geo = { slot, labelW: LABEL_W, W: Math.ceil(LABEL_W + slot * view.n + PAD_R) };
     return `<div class="jr" data-char="${h(charId)}">
       ${statsHtml(track)}
