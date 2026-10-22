@@ -58,7 +58,7 @@
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  background: var(--card);
+  background: var(--background);
 }
 .graph-tab {
   padding: 8px 14px;

@@ -266,7 +266,7 @@
 #script-view .view-body {
   flex: 1;
   overflow-y: auto;
-  background: var(--card);
+  background: var(--background);
   display: flex;
   justify-content: center;
 }

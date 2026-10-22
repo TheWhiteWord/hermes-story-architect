@@ -8,6 +8,10 @@
   --accent: #7b9cf0;
   --border: rgba(255,255,255,0.1);
   --card: rgba(255,255,255,0.04);
+  /* Shell and panel share one surface, so the whole dashboard reads as one
+     dark system. The frame paints its own background behind this, so it must
+     be opaque: a transparent shell lets the frame's light background through
+     as white panels. */
   --background: #111;
   /* Panel must always be opaque — not just var(--card) which is translucent */
   --panel-bg: #181818;
@@ -48,7 +52,7 @@
 
 html, body {
   height: 100%;
-  background: transparent;
+  background: var(--background);
   color: var(--foreground);
   font-family: inherit;
   font-size: var(--font-size-base);
@@ -78,7 +82,9 @@ html, body {
   gap: 2px;
   transition: width 0.18s ease;
   overflow: hidden;
-  background: var(--card);
+  /* Opaque: --card is translucent white and would let the frame's light
+     background show through as a white rail. */
+  background: var(--background);
   z-index: 10;
 }
 
@@ -131,9 +137,12 @@ html, body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* The view bodies have none of their own, so this is the shell surface.
+     Opaque, or the frame's light background shows through as white panels. */
+  background: var(--background);
 }
 
-.view { display: none; flex-direction: column; height: 100%; }
+.view { display: none; flex-direction: column; height: 100%; background: var(--background); }
 .view.active { display: flex; }
 
 

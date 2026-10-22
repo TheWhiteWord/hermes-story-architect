@@ -931,6 +931,67 @@ class TestActuallyRenders:
         assert 'data-pane="journey"' in dom, "the Journey pane was never built"
 
 
+class TestTheShellIsOpaque:
+    """Every full-canvas surface must paint an opaque background.
+
+    The dashboard runs in a frame that paints its own background behind the
+    document. A surface left transparent — or set to `var(--card)`, which is
+    `rgba(255,255,255,0.04)` — lets that light background through, and the
+    panels read as white cards while the detail panel beside them stays dark.
+    This failed once, visibly, after a refactor that added a new surface.
+
+    Checked as text, not pixels: the failure mode is exactly a rule whose
+    declaration is present but transparent, and a screenshot would be needed to
+    catch a colour. The guard is the declaration itself.
+    """
+
+    # The surfaces that cover the whole viewport. Anything here that is
+    # transparent shows the frame's background instead of the dashboard's.
+    SURFACES = {
+        "html, body": "base.css",
+        "#sidebar": "base.css",
+        "#main": "base.css",
+        ".view": "base.css",
+        "#loading-screen": "components.css",
+        ".graph-tabs": "graph.css",
+        "#script-view .view-body": "views.css",
+    }
+
+    @pytest.fixture
+    def css_by_file(self):
+        css_dir = Path(__file__).parent.parent / "src" / "dashboard" / "css"
+        return {f: (css_dir / f).read_text() for f in set(self.SURFACES.values())}
+
+    def _rule(self, css: str, selector: str) -> str:
+        """The full declaration block for `selector`, or '' when absent."""
+        m = re.search(rf"(?m)^{re.escape(selector)}\s*\{{(.*?)\}}", css, re.S)
+        return m.group(1) if m else ""
+
+    @pytest.mark.parametrize("selector", sorted(SURFACES))
+    def test_a_surface_paints_an_opaque_background(self, css_by_file, selector):
+        css = css_by_file[self.SURFACES[selector]]
+        block = self._rule(css, selector)
+        assert block, f"{selector} has no rule in {self.SURFACES[selector]}"
+        bg = re.search(r"background(?:-color)?\s*:\s*([^;]+);", block)
+        assert bg, f"{selector} declares no background — it shows the frame"
+        value = bg.group(1).strip()
+        assert "transparent" not in value, f"{selector} is transparent: {value}"
+        # var(--card) is the translucent-white trap, not a colour.
+        assert "--card" not in value, (
+            f"{selector} uses --card ({value}), which is translucent white"
+        )
+
+    def test_no_surface_uses_the_translucent_card_token_as_a_surface(self, css_by_file):
+        """One sweep: `--card` may tint a row, never carry a viewport surface."""
+        offenders = []
+        for filename, css in css_by_file.items():
+            for selector in self.SURFACES:
+                block = self._rule(css, selector)
+                if re.search(r"background(?:-color)?\s*:\s*var\(--card\)", block):
+                    offenders.append(f"{filename}: {selector}")
+        assert not offenders, f"translucent surfaces: {offenders}"
+
+
 class TestAssembledOrder:
     """`CSS_ORDER`/`JS_ORDER` are the only thing that loads the tab files.
 
