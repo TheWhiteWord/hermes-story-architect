@@ -148,3 +148,66 @@ ACTIONS :
 
 
 
+
+---
+
+MESSAGE:
+Phase 2 was a naming-and-coupling cleanup, and the brief had two places where
+the stated fix contradicted the stated goal. I checked both against the code
+before touching anything rather than implementing them as written.
+
+The first: 2.4 says to replace the hard-coded location/world colours with
+"--role-supporting and --role-rival", then in the same breath says to confirm
+the chips match the entity cards. They cannot both hold. The entity views do not
+use those tokens — views/locations.js and views/worlds.js hard-code the same two
+hex values for their pips, and components.css's .tag-location uses the same teal.
+So --role-supporting is the token for the supporting *role*, and roleColor
+('supporting') returns exactly that teal: a location chip would become
+indistinguishable from a supporting character, and REL_TYPE_COLORS.ally is the
+same colour again. Three kinds would have collapsed into one colour, which is the
+defect this phase exists to remove. I put one table in colors.js
+(ENTITY_KIND_COLORS, beside ROLE_COLORS and REL_TYPE_COLORS, which JS_ORDER loads
+first) and pointed entityRef and both views' pips at it. Four copies became one.
+
+The second: 2.1 says to add the assertion to "the node/JS check", but no such
+check is in the repo. Phase 1's 44 checks are a scratch file, and Phase 4.2 is
+what gives them a home. I added it there and made it stronger than asked — it now
+asserts every path's deepestRung is null or a number in 0..3, not just paths[0],
+and it fails on the word form. The harness also had its own stale assertion on
+the old field name, updated with it.
+
+2.2 offered a choice and I took the rule. It is not decoration: core/constants.py
+already states "the same character on both sides means inner conflict" as a
+checkable fact, and the class was load-bearing — it is what made the arrowhead
+land at the turn rather than on the answering bubble. While verifying that I
+found the head was positioned at xb unconditionally, which for a self-directed
+arrow is a coordinate the path never reaches; it now sits at the turn.
+
+Verification was DOM assertions, not screenshots — the vision tool was down, and
+the assertions are stronger evidence anyway. The rendered SVG shows the inner-
+conflict link as M 50 0 C 94 1 94 21 50 22 with its head at 94, against the two
+exchange arrows at M 25 ... 75 22 and back. 41 node checks, 25 headless-Chrome
+checks, full suite green.
+
+---
+
+ACTIONS TAKEN:
+- Verified the four Phase 2 targets against the landed files and the running page.
+- Confirmed the landed copies were byte-identical to the delivered ones first, so
+  the diff would be exactly the phase's changes.
+- Found no node check in the repo; located the scratch harness that holds the
+  Phase 1 checks and read what it actually loads (the landed files, not the
+  delivered copies).
+- Read core/constants.py, components.css, colors.js and the two entity views to
+  settle what a location and a world's colour actually is.
+- Renamed the JS field `deepest` to `deepestRung` in track-data.js and its one
+  consumer; left core/track.py alone.
+- Added the deepestRung type assertion to the harness, and updated the harness's
+  own stale assertion on the old field name.
+- Gave .sb-link.is-self a rule (actor's lane colour, solid stroke) and fixed the
+  arrowhead position for a self-directed arrow.
+- Gave D.valueAxisSvg a beatLabel parameter; the journey ribbon passes 'plot' and
+  the string-replace chain is gone.
+- Added DASH.ENTITY_KIND_COLORS and pointed entityRef and both views' pips at it.
+- Re-ran the node harness, the headless-Chrome harness and the full suite.
+- Wrote the phase brief, the handoff update and this log.

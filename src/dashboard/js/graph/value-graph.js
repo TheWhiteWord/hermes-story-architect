@@ -165,10 +165,14 @@ window.DASH = window.DASH || {};
   };
 
   // ---------- axis: acts, sequences, milestones
-  D.valueAxisSvg = function (model, geo, plotId) {
+  // `beatLabel` names the milestone row. The story and plot graphs show
+  // milestones; the character journey reuses this axis and shows the scene's
+  // plot role instead, so it passes its own word rather than editing this
+  // markup after the fact.
+  D.valueAxisSvg = function (model, geo, plotId, beatLabel) {
     const H = 62, X = i => geo.labelW + (i + 0.5) * geo.slot, d = Math.max(0.65, lodOf(geo)), p = [];
     const rowLabel = (txt, y) => p.push(`<text class="vg-code" x="${geo.labelW - 8}" y="${y}" text-anchor="end">${txt}</text>`);
-    rowLabel('act', 12); rowLabel('seq', 33); rowLabel('beats', 50);
+    rowLabel('act', 12); rowLabel('seq', 33); rowLabel(beatLabel || 'beats', 50);
     model.acts.forEach((a, k) => {
       const x = geo.labelW + a.start * geo.slot, w = (a.end - a.start + 1) * geo.slot;
       p.push(`<rect class="vg-band ${k % 2 ? 'odd' : 'even'}" x="${x}" y="0" width="${w}" height="18"/>`);

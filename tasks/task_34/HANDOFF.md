@@ -1,5 +1,8 @@
 # Phase 1 → Phase 2/3/4 handoff
 
+**Update — Phase 2 is done.** Everything below still holds; the changes Phase 2
+made are listed at the end, so Phase 3 reads that section first.
+
 Written at the end of Phase 1. Everything below was verified against the code and
 the running page, not assumed. Where a line number is given it is the **landed**
 file (`src/dashboard/...`), which is what later phases edit — the delivered copies
@@ -58,34 +61,63 @@ when the tabs were written.
 `{id, label, wide, dot, render(pane, id), redraw, footer(id)}`. Remove both calls
 and the panel is exactly what it was.
 
-## Phase 2 targets — verified present, with locations
+## Phase 2 targets — all four fixed
 
-All four are still unfixed in the landed files. Line numbers are the landed files.
+All four were still unfixed in the landed files when Phase 2 began. Line numbers
+below are the **pre-Phase-2** landed files; the files have since moved, so read
+the phase file (`phase_2_naming.md`) for the landed state.
 
-**2.1 `deepest` means two things.**
-`src/dashboard/js/graph/track-data.js:121` builds it as a **rung index** (`0..3`);
-`src/dashboard/js/panels/character-journey-tab.js:101` renders it as `RUNG[p.deepest]`.
-`core/track.py:204-227` builds the LLM-facing `deepest` as the **word** and must be
-left alone. Rename the JS field to `deepestRung` in both files.
+**2.1 `deepest` means two things — fixed.**
+`track-data.js` now builds `deepestRung` (an index, `0..3`, or `null`) and
+`character-journey-tab.js` reads it. `core/track.py` is untouched and still
+emits the word. The scratch harness asserts the type for every path.
 
-**2.2 `is-self` is emitted and unstyled.**
-`src/dashboard/js/panels/scene-beats-tab.js:91`. No `.sb-link.is-self` rule exists
-in `scene-beats.css`. Give it a rule or delete the class and the `same` ternary —
-do not leave it dangling.
+**2.2 `is-self` is emitted and unstyled — fixed.** `scene-beats.css` now gives
+`.sb-link.is-self` the actor's lane colour and a solid stroke. The arrowhead's
+`left` was also wrong for a self-directed arrow (it was drawn at a coordinate the
+path never reaches); it is now placed at the turn.
 
-**2.3 the journey ribbon edits the value graph's SVG output.**
-`src/dashboard/js/panels/character-journey-tab.js:132` string-replaces
-`'>beats</text>'` with `'>plot</text>'`. `src/dashboard/js/graph/value-graph.js:168`
-is `D.valueAxisSvg(model, geo, plotId)`; the label is written at `:171`
-(`rowLabel('beats', 50)`). Add a `beatLabel` parameter defaulting to `'beats'`,
-pass `'plot'` from the journey tab, delete the `.replace()` chain. The value
-graph's own two callers (`:499`, `:518`) pass nothing.
+**2.3 the journey ribbon edits the value graph's SVG output — fixed.**
+`D.valueAxisSvg(model, geo, plotId, beatLabel)`; the ribbon passes `'plot'`. The
+`.replace('>beats</text>', '>plot</text>')` chain is gone. The graph's own two
+callers still get `'beats'`.
 
-**2.4 hard-coded entity colours.**
-`src/dashboard/js/graph/track-data.js:43,45` hard-code `#6bbfb0` (location) and
-`#e0a86b` (world). The character branch already goes through `D.roleColor`. Note
-these are the same values as `--role-supporting` / `--role-rival` and as
-`PLOT_TYPE_COLORS.Setup` / `.Complicating` — pick the token, don't add a new one.
+**2.4 hard-coded entity colours — fixed, differently than briefed.**
+`D.entityRef` no longer carries hex literals. **It does not use
+`--role-supporting`/`--role-rival`**: those tokens name *roles*, and
+`roleColor('supporting')` is the same teal as a location, so using them would
+have made a place indistinguishable from a supporting character (and an ally
+relationship chip the same teal again). Instead `colors.js` gained
+`DASH.ENTITY_KIND_COLORS = { location, world }`, read by `entityRef` **and** by
+the hard-coded pips in `views/locations.js` / `views/worlds.js` — which is what
+the brief's "confirm the chips match the cards" was really about. Phase 4.4,
+which sweeps for legacy, should treat `ENTITY_KIND_COLORS` as the single source
+for these two colours.
+
+## What Phase 3 must know
+
+`character-journey-tab.js` changed, so its line numbers from Phase 1 are stale.
+Phase 3 edits it for the ribbon width. The things it will meet:
+
+- `deepestRung`, not `deepest`.
+- The axis call is now `D.valueAxisSvg(view, geo, null, 'plot')` — the third
+  argument is `plotId` (null = story-level milestones) and the fourth is the row
+  label. Phase 3 must not reintroduce a string replacement here.
+- `MAX_SLOT` and the geometry are **untouched** — the 204px fill finding stands
+  exactly as measured.
+
+## What Phase 4 must know
+
+- **The node harness is still a scratch file.** Phase 2 added its assertion
+  there, and it is 41 checks now (Phase 1 counted 44 including 3 source-level
+  checks run separately). Phase 4.2 gives it a permanent home; the new
+  `deepestRung` type assertion and the `>plot</text>` axis assertions are the ones
+  to carry over.
+- **`ENTITY_KIND_COLORS`** is new and read in three places (`colors.js`,
+  `track-data.js`, `views/locations.js`, `views/worlds.js`) — that is the sweep
+  item 4.4 is asking about.
+- **`--role-supporting` is not a location colour.** Do not "fix" `entityRef` back
+  to it.
 
 ## Phase 3 — measurement already done
 
@@ -159,9 +191,15 @@ and its DB is **built** by `conftest.py`, never committed.
 
 ## Not done, deliberately
 
-- **The ribbon fill** (Phase 3). Measured, recorded above, untouched.
+- **The ribbon fill** (Phase 3). Measured, recorded above, untouched — Phase 2
+  did not change the geometry or `MAX_SLOT`.
 - **Scratch probes** at `~/.hermes/cache/scratch/geo_probe.py` and
   `click_probe.py`. They auto-prune in 24h. Phase 4 task 4.2 is what gives the
   harnesses permanent homes; these were measurement probes, not harnesses.
-- **Phases 2, 3, 4** — untouched. Their briefs are `phase_2_naming.md`,
-  `phase_3_ribbon_fill.md`, `phase_4_tests_and_legacy.md`.
+- **Phases 3 and 4** — untouched. Their briefs are `phase_3_ribbon_fill.md` and
+  `phase_4_tests_and_legacy.md`. Phase 2 is complete: `phase_2_naming.md` carries
+  what was landed and the two places it deliberately departed from its brief.
+- **The delivered copies in `tasks/task_34/`** are synced to the landed files
+  again (they were byte-identical at the start of Phase 2 and are again now).
+  They remain reference artefacts, not the code that ships — `JS_ORDER` is what
+  loads the landed copies.

@@ -87,10 +87,13 @@ window.DASH = window.DASH || {};
     const path = same
       ? `M ${xa} 0 C ${xa + 44} 1 ${xa + 44} 21 ${xa} 22`         // inner conflict: the arrow turns back on itself
       : `M ${xa} 0 C ${xa} 13 ${xb} 9 ${xb} 22`;
+    // A self-directed arrow's tip is at the turn, not at the answering bubble:
+    // the arrow comes back to the lane it left, so its head lands mid-path.
+    const tip = same ? xa + 44 : xb;
     const mid = same ? xa + 33 : (xa + xb) / 2;
     return `<div class="sb-link${gap ? ' has-gap' : ''}${same ? ' is-self' : ''}" style="grid-column:${lo + 2} / span ${span}">
       <svg viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" vector-effect="non-scaling-stroke"/></svg>
-      <i class="sb-tip" style="left:${xb}%"></i>
+      <i class="sb-tip" style="left:${tip}%"></i>
       ${gap ? `<span class="sb-crack" style="left:${mid}%"><svg viewBox="0 0 12 14"><polyline points="7,0 3,6.5 8.5,7.5 4.5,14"/></svg></span>` : ''}
     </div>`;
   }

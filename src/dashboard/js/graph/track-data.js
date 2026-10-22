@@ -31,7 +31,8 @@ window.DASH = window.DASH || {};
   };
 
   // Who or what an id names, with the colour the dashboard already gives that kind of entity:
-  // characters by role, locations teal, worlds amber, relationships by their type.
+  // characters by role, locations and worlds by their kind, relationships by their type.
+  const kind = k => (D.ENTITY_KIND_COLORS || {})[k] || '#8a8a8a';
   D.entityRef = function (id, story) {
     const st = S(story), sid = String(id == null ? '' : id);
     let e = arr(st.characters).find(x => String(x.id) === sid);
@@ -40,9 +41,9 @@ window.DASH = window.DASH || {};
       return { id: sid, type: 'character', name: e.name || sid, role, color: D.roleColor ? D.roleColor(role) : '#8a8a8a' };
     }
     e = arr(st.locations).find(x => String(x.id) === sid);
-    if (e) return { id: sid, type: 'location', name: e.name || sid, color: '#6bbfb0' };
+    if (e) return { id: sid, type: 'location', name: e.name || sid, color: kind('location') };
     e = arr(st.worlds).find(x => String(x.id) === sid);
-    if (e) return { id: sid, type: 'world', name: e.name || sid, color: '#e0a86b' };
+    if (e) return { id: sid, type: 'world', name: e.name || sid, color: kind('world') };
     e = arr(st.relationships).find(x => String(x.id) === sid);
     if (e) {
       const first = Object.values(e.perspectives || {})[0] || {};
@@ -118,7 +119,10 @@ window.DASH = window.DASH || {};
       p.steps.forEach(s => { if (s.fromRung != null) rungs.push(s.fromRung); if (s.toRung != null) rungs.push(s.toRung); });
       return Object.assign(p, {
         first: p.steps[0].from, last: p.steps[p.steps.length - 1].to,
-        deepest: rungs.length ? Math.max.apply(null, rungs) : null,
+        // An index (0..3), not the rung's word: the LLM-facing `story_load` view
+        // says `deepest` and means the word ("imprisoned"), so the two must not
+        // share a field name. Null when no step resolved to a rung.
+        deepestRung: rungs.length ? Math.max.apply(null, rungs) : null,
       });
     });
 

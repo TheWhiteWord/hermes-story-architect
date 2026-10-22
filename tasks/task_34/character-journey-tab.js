@@ -98,7 +98,7 @@ window.DASH = window.DASH || {};
         if (!steps.length) return;
         const rowH = 10, top = y + 13;
         const col = plotColor(p.plot);
-        const deep = p.deepest == null ? '' : ` &middot; deepest ${RUNG[p.deepest]}`;
+        const deep = p.deepestRung == null ? '' : ` &middot; deepest ${RUNG[p.deepestRung]}`;
         parts.push(`<text class="vg-label" x="${geo.labelW}" y="${y + 8}" font-size="9.5" fill="${col}">${h(p.value)}<tspan class="vg-code" dx="8" fill="var(--muted-foreground)" font-size="8.5">${h(p.first)} &rarr; ${h(p.last)}${deep}</tspan></text>`);
         for (let r = 0; r < 4; r++) {
           const ly = top + r * rowH + rowH / 2;
@@ -129,7 +129,7 @@ window.DASH = window.DASH || {};
       const has = inView.some(r => r.ri === i);
       parts.push(`<rect class="jr-hit${has ? ' has' : ''}" data-i="${i + a0}" x="${geo.labelW + i * geo.slot}" y="0" width="${geo.slot}" height="${H}"/>`);
     }
-    const axis = D.valueAxisSvg(view, geo).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').replace('>beats</text>', '>plot</text>');
+    const axis = D.valueAxisSvg(view, geo, null, 'plot').replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
     return `<svg class="vg-svg jr-svg" width="${geo.W}" height="${H}" viewBox="0 0 ${geo.W} ${H}">${axis}${parts.join('')}</svg>`;
   }
 

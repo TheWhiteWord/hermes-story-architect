@@ -21,6 +21,19 @@ DASH.REL_TYPE_COLORS = {
   'neutral':      '#7a8a9a',
 };
 
+// The colour of an entity kind that carries no role of its own: a location, a
+// world. These are the colours the entity views already paint their pips with
+// (views/locations.js, views/worlds.js) and the tags already use
+// (.tag-location, .tag-variant), so the chips in the panel tabs and the cards
+// in the views are the same colour rather than two copies that can drift.
+// Kept as literals and not as the role tokens: an ally is also teal, and
+// --role-supporting would make a relationship chip indistinguishable from a
+// place.
+DASH.ENTITY_KIND_COLORS = {
+  location: '#6bbfb0',
+  world:    '#e0a86b',
+};
+
 // The dramatic roles a plot holds — must match PLOT_ROLES in core/constants.py.
 // One list, so adding a role is an edit here and nowhere else.
 DASH.PLOT_ROLES = ['setup', 'inciting_incident', 'complication', 'crisis', 'climax', 'resolution'];
