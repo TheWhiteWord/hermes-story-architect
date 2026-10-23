@@ -42,6 +42,7 @@ for (const f of [
   'graph/value-graph.js',
   'graph/track-data.js',
   'panels/panel-manager.js',
+  'panels/entity-panels.js',
   'panels/panel-tabs.js',
   'panels/scene-beats-tab.js',
   'panels/character-journey-tab.js',
@@ -157,8 +158,8 @@ check('labels all six milestones, and strips the plot_ prefix', function () {
   assert.strictEqual(D.milestoneLabel('plot_climax'), 'Climax');
 });
 
-console.log('--- characterTrack ---');
-const tr = D.characterTrack('kael', D.story);
+console.log('--- entityTrack ---');
+const tr = D.entityTrack('kael', D.story);
 check('rows cover every scene that names the character', function () {
   // Presence alone earns a row: the track shows the scenes where nothing was
   // recorded too, grouped as "present, nothing recorded" in the timeline.
@@ -193,6 +194,68 @@ check('deepestRung is a rung index, never the rung\'s word', function () {
       (typeof p.deepestRung === 'number' && p.deepestRung >= 0 && p.deepestRung <= 3),
       'deepestRung is ' + JSON.stringify(p.deepestRung));
   });
+});
+
+console.log('--- entityTrack: the non-character kinds ---');
+// The location, world and relationship panels read the same walk. Their presence
+// test is what differs, and it is the whole feature: a location is in a scene
+// because the scene says so, a world through that location, a relationship only
+// through a closing change.
+check('a location is in the scenes that set it', function () {
+  const t = D.entityTrack('the-central-room', D.story);
+  assert.deepStrictEqual(t.rows.map(r => r.id),
+    ['central-room-day', 'central-room-night']);
+});
+check('a location carries the change recorded for it, and only that', function () {
+  const t = D.entityTrack('the-central-room', D.story);
+  const day = t.rows.find(r => r.id === 'central-room-day');
+  const night = t.rows.find(r => r.id === 'central-room-night');
+  assert.strictEqual(day.change, 'Stops being a boundary and becomes an exit.');
+  assert.strictEqual(night.change, '', 'a scene with no change must not invent one');
+});
+check('a world is in the scenes of its locations, transitively', function () {
+  // Both fixture locations belong to The I, so its row set is the union of theirs.
+  const t = D.entityTrack('the-i', D.story);
+  assert.strictEqual(t.rows.length, 3);
+  assert.deepStrictEqual(t.rows.map(r => r.id),
+    ['central-room-day', 'central-room-night', 'the-core-day']);
+});
+check('a change belongs to the entity it names, not to the world around it', function () {
+  // The fixture's change names the-central-room. The I is in that scene, but the
+  // change is the location's: a world must not inherit its locations' changes.
+  const t = D.entityTrack('the-i', D.story);
+  assert.ok(t.rows.every(r => r.change === ''), JSON.stringify(t.rows.map(r => r.change)));
+});
+check('a world with no location in a scene is not in it', function () {
+  assert.strictEqual(D.entityTrack('the-real-world', D.story).rows.length, 0);
+});
+check('a relationship is tracked only by its changes', function () {
+  // The fixture declares `scenes` on its relationships but records no change for
+  // any of them, so the track is empty — the declared list is not a scene link.
+  assert.strictEqual(D.entityTrack('kael-mira', D.story).rows.length, 0);
+});
+check('an unknown id is in nothing', function () {
+  assert.strictEqual(D.entityTrack('nobody', D.story).rows.length, 0);
+});
+
+console.log('--- entityScenesHtml ---');
+check('the section lists every scene, and the change under the one that has it', function () {
+  const html = D.entityScenesHtml('the-central-room', D.story);
+  assert.ok(html.includes('>Scenes<'), html.slice(0, 200));
+  assert.strictEqual((html.match(/class="jr-row"/g) || []).length, 2);
+  assert.ok(html.includes('Stops being a boundary and becomes an exit.'));
+  assert.ok(html.includes('Central Room - Day') && html.includes('Central Room - Night'));
+});
+check('a scene link names its scene, so the panel protocol can open it', function () {
+  const html = D.entityScenesHtml('the-i', D.story);
+  assert.ok(html.includes('data-ent="scene:central-room-day"'), html.slice(0, 300));
+});
+check('an entity in no scene renders no section at all', function () {
+  assert.strictEqual(D.entityScenesHtml('kael-mira', D.story), '');
+});
+check('the section groups by act and sequence, as the Journey tab does', function () {
+  const html = D.entityScenesHtml('the-central-room', D.story);
+  assert.ok(html.includes('jr-act') && html.includes('jr-seq'), html.slice(0, 300));
 });
 
 console.log('--- sections: a placeholder is not content ---');

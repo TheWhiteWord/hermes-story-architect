@@ -931,6 +931,82 @@ class TestActuallyRenders:
         assert 'data-pane="journey"' in dom, "the Journey pane was never built"
 
 
+    _SCENES_PROBE = r"""
+(function () {
+  var body = document.getElementById('panel-body');
+  if (!body) { document.title = JSON.stringify({ error: 'no panel body' }); return; }
+  var qa = s => body.querySelectorAll(s);
+  document.title = JSON.stringify({
+    titles: Array.prototype.map.call(qa('.panel-section-title'), e => e.textContent),
+    rows: qa('.jr-row').length,
+    changes: Array.prototype.map.call(qa('.jr-line'), e => e.textContent.replace(/\s+/g, ' ').trim()),
+    scenes: Array.prototype.map.call(qa('.jr-scene'), e => e.getAttribute('data-ent')),
+  });
+})();
+"""
+
+    # The location, world and relationship panels have no tab of their own, so
+    # their scene list lives in the Overview pane. This is the shipping path:
+    # payload -> panel function -> the shared rows.
+    @pytest.mark.parametrize("open_js,name,want_rows,want_changes,want_title", [
+        ("DASH.showLocationPanel('the-central-room')", "scenes_loc", 2, 1, True),
+        ("DASH.showWorldPanel('the-i')", "scenes_world", 3, 0, True),
+        ("DASH.showRelationshipPanel(DASH.story.relationships.find(r=>r.id==='kael-mira'))",
+         "scenes_rel", 0, 0, False),
+    ])
+    def test_the_panel_lists_its_scenes_and_changes(self, vault, tmp_path, open_js, name,
+                                                    want_rows, want_changes, want_title):
+        """Every scene the entity is in, and the change under the one that has it.
+
+        The relationship case is the fixture's own shape: it declares `scenes` but
+        records no change for any of them, so there is no section at all — a
+        relationship has no scene link of its own, the closing change is it.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, name, open_js, self._SCENES_PROBE)
+        assert "error" not in g, g
+        assert ("Scenes" in g["titles"]) is want_title, f"{name}: {g['titles']}"
+        assert g["rows"] == want_rows, f"{name}: {g['rows']} rows, wanted {want_rows}"
+        assert len(g["changes"]) == want_changes, g["changes"]
+
+    def test_a_location_shows_the_change_recorded_for_it(self, vault, tmp_path):
+        """The change line is the record's sentence, not a paraphrase.
+
+        `.jr-k` is a styled span, so the label and the sentence are adjacent in
+        `textContent` — the space is the span's margin, not a character.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(html, tmp_path, "scenes_loc_change",
+                        "DASH.showLocationPanel('the-central-room');", self._SCENES_PROBE)
+        assert g["changes"] == ["nowStops being a boundary and becomes an exit."], g["changes"]
+
+    def test_a_scene_link_opens_that_scene_from_a_panel_without_tabs(self, vault, tmp_path):
+        """`data-ent` is the panel-wide protocol, not a tab's.
+
+        The location panel registers no tabs, so the delegated click handler was
+        never installed for it — the links rendered and did nothing.
+        """
+        _make(vault, "stc")
+        _import(vault, "stc")
+        url = _dash(vault, "stc")["dashboard_url"].split("?")[0]
+        html = Path(url.replace("file://", "")).read_text()
+        g = self._probe(
+            html, tmp_path, "scenes_loc_click",
+            "DASH.showLocationPanel('the-central-room');"
+            "document.querySelector('#panel-body .jr-scene').click();",
+            "document.title = JSON.stringify({"
+            "  type: document.getElementById('panel-type').textContent,"
+            "  name: document.getElementById('panel-name').textContent });")
+        assert g["type"] == "Scene", g
+        assert g["name"] == "Central Room - Day", g
+
+
 class TestTheShellIsOpaque:
     """Every full-canvas surface must paint an opaque background.
 

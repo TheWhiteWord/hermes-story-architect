@@ -62,21 +62,28 @@ window.DASH = window.DASH || {};
     };
   }
 
-  // One character across the story, in story order.
+  // One entity across the story, in story order. A character reads its driving,
+  // its true-character moments, its value path and the effects recorded for it; a
+  // location, world or relationship reads only the scenes it is recorded in and
+  // the closing change it goes through there.
   //
-  //   rows       one per scene where the character appears or has anything recorded
+  //   rows       one per scene where the entity appears or has anything recorded
   //   coverage   how much of that is actually written down (the picture must not look
   //              complete when it is not)
   //   paths      per (plot, value): the states the character is carried through
   //   protagonist  true when a plot names them, or a value turn reaches them: only then do
   //              conflict levels and value paths exist
-  D.characterTrack = function (charId, story) {
-    const st = S(story), id = String(charId);
+  D.entityTrack = function (entityId, story) {
+    const st = S(story), id = String(entityId);
     if (!D.valueModel) return null;
     const model = D.valueModel(st);
     const rungOf = rungFinder(model);
     const sbByScene = new Map(arr(st.scene_beats).map(sb => [String(sb.scene || sb.parent_id), sb]));
     const plotsOf = arr(st.plots).filter(p => arr(p.characters).map(String).includes(id)).map(p => p.id);
+    const kind = D.entityRef(id, st).type;
+    // A world reaches a scene only through the location set on it, so the world
+    // of each location is resolved once rather than per scene.
+    const worldOfLoc = new Map(arr(st.locations).map(l => [String(l.id), String(l.parent_id || '')]));
 
     const rows = [];
     model.scenes.forEach((s, i) => {
@@ -98,7 +105,18 @@ window.DASH = window.DASH || {};
           fromRung: rungOf(t.value, t.from), toRung: rungOf(t.value, t.to), levels,
         });
       }));
-      if (!(inCast || acted || answered || drives || changes.length || choices.length || turns.length)) return;
+      // Which scenes the entity is IN. A character is named by the scene itself —
+      // its cast, the driver, a beat, a true-character moment, a value turn. A
+      // location by the scene's `locations`; a world by the world of those. A
+      // relationship has no scene link of its own, so only a closing change puts
+      // it in one. A change earns a row for every kind: it is the one scene-level
+      // record any of them can leave.
+      const here = changes.length || (
+        kind === 'location' ? arr(s.locations).map(String).includes(id)
+        : kind === 'world' ? arr(s.locations).map(String).some(l => worldOfLoc.get(l) === id)
+        : kind === 'character' ? (inCast || drives || acted || answered || choices.length || turns.length)
+        : false);
+      if (!here) return;
       rows.push({
         i, id: s.id, title: s.title || s.name || s.id, number: i + 1, status: s.status || '',
         inCast, drives, objective: drives ? (sb.scene_objective || '') : '',

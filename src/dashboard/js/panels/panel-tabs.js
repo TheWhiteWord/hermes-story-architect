@@ -149,6 +149,10 @@ window.DASH = window.DASH || {};
       if (current && current.ro) current.ro.disconnect();
       current = null;
       setWide(false);
+      // `data-ent` is the panel-wide protocol, not a tab's. Without this a panel
+      // that registers no tabs — location, world, relationship — leaves its scene
+      // links dead, because the delegated click only existed once a tab mounted.
+      wireOnce();
       return base.apply(this, arguments);
     };
   });

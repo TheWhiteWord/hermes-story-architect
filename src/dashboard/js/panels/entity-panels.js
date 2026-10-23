@@ -1,5 +1,29 @@
 window.DASH = window.DASH || {};
 
+// The scenes an entity is in, and what changed there. The same rows the Journey
+// tab draws, minus the character-only lines: a scene link for every scene the
+// entity is recorded in, the closing change beneath it when there is one.
+//
+// The location, world and relationship panels have no tab of their own — their
+// Overview IS the panel — so this section lives there rather than in a new tab.
+DASH.entityScenesHtml = function(id, story) {
+  const track = DASH.entityTrack(id, story || DASH.story);
+  if (!track || !track.rows.length) return '';
+  const h = DASH.escapeHtml;
+  const out = [];
+  let lastAct = null, lastSeq = null;
+  track.rows.forEach(r => {
+    const place = DASH.trackPlace(track.model, r.i);
+    if (place.act && place.act !== lastAct) { out.push(`<div class="jr-act">${h(place.act.name)}</div>`); lastAct = place.act; lastSeq = null; }
+    if (place.seq && place.seq !== lastSeq) { out.push(`<div class="jr-seq">${h(place.seq.name)}</div>`); lastSeq = place.seq; }
+    out.push(`<div class="jr-row" id="jr-s${r.i}" data-i="${r.i}">
+      <div class="jr-row-head"><span class="jr-num">${r.number}</span><button type="button" class="jr-scene" data-ent="scene:${h(r.id)}">${h(r.title)}</button></div>
+      ${r.change ? `<div class="jr-line"><span class="jr-k">now</span>${h(r.change)}</div>` : ''}
+    </div>`);
+  });
+  return `<div><div class="panel-section-title">Scenes</div><div class="jr-timeline">${out.join('')}</div></div>`;
+};
+
 DASH.showActPanel = function(actId) {
   const act = (DASH.story.acts || []).find(a => a.id === actId);
   if (!act) return;
@@ -156,14 +180,6 @@ DASH.showLocationPanel = function(locId) {
     return `<span class="tag tag-scene">${ref}</span>`;
   }).join('');
 
-  // Find scenes that reference this location for "Appears in" section
-  const appearScenes = (DASH.story.scenes || []).filter(s => s.location === loc.id);
-  const appearsIn = appearScenes.map(s => {
-    const num = s.number != null ? String(s.number) : '';
-    const label = num ? `${num}. ${s.heading || s.id}` : (s.heading || s.id);
-    return `<span class="tag tag-scene" style="cursor:pointer" onclick="DASH.showScenePanel('${s.id}')">${label}</span>`;
-  }).join('');
-
   // Characters in this location (via their scenes)
   const charIds = new Set();
   sceneRefs.forEach(ref => {
@@ -203,10 +219,7 @@ DASH.showLocationPanel = function(locId) {
       <div class="panel-section-title">Characters here</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
     </div>` : ''}
-    ${appearsIn ? `<div>
-      <div class="panel-section-title">Appears in</div>
-      <div class="panel-tags">${appearsIn}</div>
-    </div>` : ''}
+    ${DASH.entityScenesHtml(loc.id)}
     ${DASH.renderSectionsHtml('location', loc.id)}
   `;
 
@@ -336,16 +349,6 @@ DASH.showRelationshipPanel = function(rel) {
       </div>`;
   }
 
-  const sceneTags = (rel.scenes || []).map(sid => {
-    const s = (DASH.story.scenes || []).find(x => String(x.id) === String(sid));
-    if (s) {
-      const num = s.number != null ? String(s.number) : '';
-      const label = num ? `${num}. ${s.title || s.id}` : (s.title || s.id);
-      return `<span class="tag tag-scene" style="cursor:pointer" onclick="DASH.showScenePanel('${s.id}')">${label}</span>`;
-    }
-    return sid ? `<span class="tag tag-scene">${sid}</span>` : '';
-  }).filter(Boolean).join('');
-
   document.getElementById('panel-type').textContent = 'Relationship';
   document.getElementById('panel-name').textContent = rel.name || `${a} & ${b}`;
 
@@ -361,14 +364,11 @@ DASH.showRelationshipPanel = function(rel) {
         ${perspectiveHtml(charB?.name, charB?.role, pb)}
       </div>
     </div>
-    ${sceneTags ? `<div>
-      <div class="panel-section-title">Scenes</div>
-      <div class="panel-tags">${sceneTags}</div>
-    </div>` : ''}
     ${rel.status ? `<div>
       <div class="panel-section-title">Status</div>
       <span class="status-badge ${rel.status}">${rel.status}</span>
     </div>` : ''}
+    ${DASH.entityScenesHtml(rel.id)}
     ${rel.history ? `<div>
       <div class="panel-section-title">History</div>
       <div class="panel-text">${DASH.escapeHtml(rel.history).replace(/\n/g, '<br>')}</div>
@@ -622,6 +622,7 @@ DASH.showWorldPanel = function(worldId) {
       <div class="panel-section-title">Plot threads</div>
       <div style="display:flex;flex-direction:column;gap:4px;">${plotLinks}</div>
     </div>` : ''}
+    ${DASH.entityScenesHtml(world.id)}
     ${DASH.renderSectionsHtml('world', world.id)}
   `;
 

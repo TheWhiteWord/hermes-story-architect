@@ -10,7 +10,7 @@
 //
 // Nothing here scores intensity: the theory gives no scale. Position is the circle (inner,
 // personal, extra-personal) or the rung of a value, both of which are the data itself.
-// Data: DASH.characterTrack (track-data.js).
+// Data: DASH.entityTrack (track-data.js).
 window.DASH = window.DASH || {};
 
 (function (D) {
@@ -208,7 +208,7 @@ window.DASH = window.DASH || {};
   D.renderCharacterJourney = function (charId, story, opts) {
     opts = opts || {};
     const st = story || D.story || {};
-    const track = D.characterTrack(charId, st);
+    const track = D.entityTrack(charId, st);
     if (!track) return '<div class="jr"><div class="panel-empty"><div class="panel-empty-lead">Journey unavailable</div></div></div>';
     const ref = D.entityRef(charId, st);
     if (!track.rows.length) {
@@ -276,7 +276,7 @@ window.DASH = window.DASH || {};
       const hit = ev.target.closest && ev.target.closest('.jr-hit');
       const el = tip();
       if (!hit) { el.style.display = 'none'; return; }
-      el.innerHTML = tipHtml(D.characterTrack(charId), Number(hit.dataset.i));
+      el.innerHTML = tipHtml(D.entityTrack(charId), Number(hit.dataset.i));
       el.style.display = 'block';
       const x = Math.min(ev.clientX + 14, window.innerWidth - el.offsetWidth - 8);
       el.style.left = Math.max(8, x) + 'px';
