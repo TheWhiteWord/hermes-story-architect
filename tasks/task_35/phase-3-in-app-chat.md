@@ -91,8 +91,8 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - Streaming is async (async iterator). Store access can be sync behind a thread offload if simpler.
 
 **Checklist**
-- [ ] Interface, events, store, service
-- [ ] Tests with the fake backend: new conversation, multi-turn, cancellation mid-stream, backend error, reload from disk, two projects isolated
+- [x] Interface, events, store, service
+- [x] Tests with the fake backend: new conversation, multi-turn, cancellation mid-stream, backend error, reload from disk, two projects isolated
 
 ---
 

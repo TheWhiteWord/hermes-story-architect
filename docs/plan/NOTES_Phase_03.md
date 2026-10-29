@@ -17,3 +17,7 @@
 - Manual Phase 2 check: not performed (no Hermes profile available in this session); recorded as skipped.
 - Overview updated: Phase 2 marked done; hermes serve conflict note replaced; port note added.
 
+## Phase 3 Task 2 (chat core)
+- Package: src/story_architect/chat/ — events (TextDelta, ToolStarted, ToolFinished, Done, Error), ChatBackend protocol, store (chat.db per project, two tables), ChatService, FakeBackend. No FastAPI/Hermes imports.
+- Tests: tests/test_chat_core.py — 6 passing (new conv, multi-turn, reload, isolation, error, cancellation).
+- Deviations: cancellation status may be 'streaming'/'cancelled' depending on close timing; store access sync.
