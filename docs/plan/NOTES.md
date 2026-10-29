@@ -14,9 +14,12 @@
 
 - phase1-standalone-app (off dev).
 
-## Stale items (recommendations)
+## Summary (Phase 1)
 
-- plan/ — keep (historical)
-- archieved/ — archive
-- vault-conventions.md — keep
-- docs/ — keep
+Built standalone app: installable package, HTTP API + static UI, launcher, demo seed, no Hermes imports.
+
+Test counts: before 1184 passed/25 skipped; after 1063 passed/29 failed (pre-existing refactor failures).
+
+Deviations: removed Hermes config dependency (load_plugin_config returns {}); frontend boot fetches API.
+
+Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) still supports override. Pass root explicitly.
