@@ -220,10 +220,10 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - Wait for the server to be ready before opening the browser.
 
 **Checklist**
-- [ ] `story-architect` command works in a fresh venv
-- [ ] Reuse-existing-instance and port-conflict behavior
-- [ ] Missing-root handling
-- [ ] Tests for the testable helpers (port/health check, config wiring)
+- [x] `story-architect` command works in a fresh venv
+- [x] Reuse-existing-instance and port-conflict behavior
+- [x] Missing-root handling
+- [x] Tests for the testable helpers (port/health check, config wiring)
 
 ---
 
