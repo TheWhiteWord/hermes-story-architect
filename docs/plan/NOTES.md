@@ -14,6 +14,9 @@
 
 - phase1-standalone-app (off dev).
 
-## Deviations / unrelated problems
+## Stale items (recommendations)
 
-- (none yet)
+- plan/ — keep (historical)
+- archieved/ — archive
+- vault-conventions.md — keep
+- docs/ — keep
