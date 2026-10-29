@@ -277,4 +277,3 @@ def _parse_scene_location(heading):
     }
 
 
-def assemble_dashboard(dashboard_dir: Path) -> str:
