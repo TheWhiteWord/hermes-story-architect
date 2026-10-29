@@ -147,16 +147,42 @@ def status(argv=None, profile_name="story-architect"):
             cfg = yaml.safe_load(cp.read_text()) or {}
         except Exception:
             cfg = {}
+    mcp_cfg = (cfg.get("mcp_servers") or {}).get("story") or {}
     check("MCP entry", "story" in (cfg.get("mcp_servers") or {}))
+    port = C.load_config().port
+    expected_url = f"http://127.0.0.1:{port}/mcp"
+    check("MCP URL", mcp_cfg.get("url") == expected_url, f"expected {expected_url}")
     check("token present", T.load_token() is not None)
     # app reachable
     import urllib.request
-    port = C.load_config().port
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as r:
             app_ok = r.status == 200
     except Exception:
         app_ok = False
     check("app reachable", app_ok, "start story-architect")
+    # MCP endpoint authenticates and lists expected tools
+    mcp_ok = False
+    tok = T.load_token()
+    if app_ok and tok:
+        try:
+            import asyncio
+            from mcp.client.streamable_http import streamable_http_client
+            from mcp import ClientSession
+            async def _list():
+                import httpx2 as httpx
+                http_client = httpx.AsyncClient(headers={"Authorization": f"Bearer {tok}"}, timeout=5.0)
+                async with streamable_http_client(f"http://127.0.0.1:{port}/mcp", http_client=http_client) as (r, w):
+                    async with ClientSession(r, w) as session:
+                        await session.initialize()
+                        res = await session.list_tools()
+                        return [t.name for t in res.tools]
+            names = asyncio.run(_list())
+            from story_architect.app.mcp_server import build_registry
+            expected = {n for n, _, _ in build_registry()}
+            mcp_ok = set(names) == expected
+        except Exception:
+            mcp_ok = False
+    check("MCP endpoint", mcp_ok, "token or tool list mismatch")
     print("ALL OK" if ok else "FAILURES PRESENT")
     return 0 if ok else 1
