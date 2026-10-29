@@ -1,0 +1,1 @@
+"""Hermes adapter: setup/status for the story-architect agent profile."""

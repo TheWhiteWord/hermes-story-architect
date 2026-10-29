@@ -1,17 +1,32 @@
 """FastAPI app factory."""
 from __future__ import annotations
 
+import hmac
+
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from story_architect.app.config import Config
 from story_architect.app import services
+from story_architect.app import token as token_mod
+from story_architect.app.mcp_server import create_mcp_server, StreamableHTTPSessionManager
 
 
 def create_app(config: Config) -> FastAPI:
-    app = FastAPI(docs_url=None, redoc_url=None)
+    server = create_mcp_server(config)
+    manager = StreamableHTTPSessionManager(app=server, stateless=True, json_response=True)
+
+    @asynccontextmanager
+    async def _lifespan(app):
+        async with manager.run():
+            yield
+
+    app = FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     app.state.config = config
+    app.state.mcp_manager = manager
 
     @app.middleware("http")
     async def host_check(request: Request, call_next):
@@ -22,6 +37,16 @@ def create_app(config: Config) -> FastAPI:
         resp = await call_next(request)
         resp.headers["Cache-Control"] = "no-store"
         return resp
+
+    @app.middleware("http")
+    async def mcp_auth(request: Request, call_next):
+        if request.url.path.startswith("/mcp"):
+            expected = token_mod.load_token()
+            auth = request.headers.get("authorization", "")
+            ok = bool(expected) and auth.startswith("Bearer ") and hmac.compare_digest(auth[7:].encode(), expected.encode())
+            if not ok:
+                return JSONResponse(status_code=401, content={"error": {"code": "unauthorized", "message": "Missing or invalid token"}})
+        return await call_next(request)
 
     @app.get("/healthz")
     def healthz():
@@ -41,9 +66,15 @@ def create_app(config: Config) -> FastAPI:
             return JSONResponse(status_code=500, content={"error": {"code": "error", "message": str(e)}})
         return data
 
-    # static UI
+    class _MCPApp:
+        def __init__(self, mgr):
+            self.mgr = mgr
+        async def __call__(self, scope, receive, send):
+            await self.mgr.handle_request(scope, receive, send)
+
+    app.mount("/mcp", app=_MCPApp(manager))
+
     from pathlib import Path
-    web_dir = Path(__file__).parent.parent / "web" if False else None
     import story_architect
     web_dir = Path(story_architect.__file__).parent / "web"
     if web_dir.exists():

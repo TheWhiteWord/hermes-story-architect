@@ -25,6 +25,13 @@ def main(argv=None):
     import sys
     if argv is None:
         argv = sys.argv[1:]
+    if argv and argv[0] == "hermes":
+        from story_architect.adapters.hermes.setup import setup, status
+        sub = argv[1:2]
+        rest = argv[2:]
+        if sub and sub[0] == "status":
+            return status(rest)
+        return setup(rest)
     if argv and argv[0] == "seed-demo":
         # seed demo project from fixture
         parser = argparse.ArgumentParser(prog="story-architect seed-demo")

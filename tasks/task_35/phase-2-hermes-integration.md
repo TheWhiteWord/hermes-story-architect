@@ -118,10 +118,10 @@ In-app chat, manual editing, a Fountain writer, systemd/autostart of the app, ot
 - All Hermes interaction goes through one small wrapper (subprocess calls + path helpers) so it can be faked in tests.
 
 **Checklist**
-- [ ] `hermes setup` with idempotency, `--dry-run`, `--force`, `--profile`
-- [ ] Overwrite protections for `SOUL.md` and skill files
-- [ ] Token distributed without being printed
-- [ ] Tests using a fake `hermes` executable on `PATH` and a temporary `HERMES_HOME`: first run, second run (no changes), foreign `SOUL.md` preserved, `--force` backs up, dry-run changes nothing, missing hermes error
+- [x] `hermes setup` with idempotency, `--dry-run`, `--force`, `--profile`
+- [x] Overwrite protections for `SOUL.md` and skill files
+- [x] Token distributed without being printed
+- [x] Tests using a fake `hermes` executable on `PATH` and a temporary `HERMES_HOME`: first run, second run (no changes), foreign `SOUL.md` preserved, `--force` backs up, dry-run changes nothing, missing hermes error
 
 ---
 

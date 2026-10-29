@@ -24,6 +24,11 @@ Deviations: removed Hermes config dependency (load_plugin_config returns {}); fr
 
 Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) still supports override. Pass root explicitly.
 
+## Task 1 reconciliation
+
+Baseline 1209 tests; current 1009. Removed/rewritten obsolete dashboard-assembly tests (test_dashboard, test_dashboard_tabs, test_field_coverage, test_phase2_db_reads, test_story_dashboard_stats, test_root_path_config) plus post_tool_call refresh tests. Added 4 tests. Reconciles: 1209 = 1009 - 4 + 204 justified removals.
+
+
 ## Phase 2 hand-off
 
 - Tool handlers get root via `resolve_root(kwargs)` reading `kwargs["root_path"]`; MCP layer should pass `root_path=<projects root>` in kwargs. Simplest: call handler(args, root_path=root).
@@ -31,6 +36,14 @@ Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) 
 - Tools return JSON string; success usually `{"success": true, ...}`; errors `{"success": false, "error": "..."}` or raised exceptions translated at boundary.
 - core changes beyond imports: removed Hermes config path/load_plugin_config; resolve_root now free of Hermes; dashboard assembly removed; stats moved to app.stats.
 
-## Task 1 reconciliation
+## Phase 2 Task 0 (baseline)
+- Suite green: 1009 passed (2026-10-29), ruff? not run.
+- Overview updated: Phase 1/1b marked done; decisions recorded.
 
-Baseline 1209 tests; current 1009. Removed/rewritten obsolete dashboard-assembly tests (test_dashboard, test_dashboard_tabs, test_field_coverage, test_phase2_db_reads, test_story_dashboard_stats, test_root_path_config) plus post_tool_call refresh tests. Added 4 tests. Reconciles: 1209 = 1009 - 4 + 204 justified removals.
+## Phase 2 Task 1 (spike) findings
+- H1: mcp SDK 2.3.0 provides StreamableHTTP server mountable in FastAPI/Starlette via StreamableHTTPSessionManager + StreamableHTTPASGIApp; client usable. FastMCP renamed to MCPServer in v2.
+- H2: Hermes v0.22.5 connects to HTTP MCP with bearer header; token stored in profile .env as MCP_<NAME>_API_KEY and referenced via ${...}; config uses headers.Authorization: Bearer ${...}.
+- H3: Tools appear (final name mcp_<server>_<tool>, e.g. mcp_scratch_hello); hermes mcp test lists them.
+- H4: profile create works but has no model/provider by default; keys inherited from shell. Setup should clone config or instruct.
+- H5: profile layout confirmed: ~/.hermes/profiles/<name>/ with config.yaml, .env, SOUL.md, skills/. Respect HERMES_HOME.
+- Desktop profile user answer: "Yes, i can select any profile and use it independently."
