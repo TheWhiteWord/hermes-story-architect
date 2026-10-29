@@ -64,7 +64,7 @@ The exact subpackage names can change if the code suggests better ones. The pack
 | Phase | Outcome | File |
 |---|---|---|
 | **1** | **Standalone app**: launch it with one command, browse projects, view a project with the full dashboard, no Hermes required | `phase-1-standalone-app.md` |
-| 2 | **Hermes integration**: app exposes tools via MCP; adapter creates the Hermes agent (profile, SOUL.md, skill, MCP registration). Chat still happens in Hermes Desktop | written after Phase 1 |
+| 2 | **Hermes integration**: app exposes tools via MCP; adapter creates the Hermes agent (profile, SOUL.md, skill, MCP registration). Chat still happens in Hermes Desktop | written after Phase 1 | **DONE** |
 | 3 | **In-app chat**: chat panel talks to the Hermes agent from the app | written after Phase 2 |
 | 4 | **Manual editing**: project/entity creation, script editor (scene by scene), reorder, field edits; compare-and-swap concurrency between UI and agent | written after Phase 3 |
 
@@ -96,7 +96,7 @@ Installed: Hermes Agent v0.22.5, local gateway, Python 3.14.9.
 - **Tool naming:** MCP tools appear as `mcp_<server>_<tool>`. Choose MCP tool names knowing that prefix (e.g. server `story`, tool `load` rather than `story_load`).
 - **Profiles:** `hermes profile create <name>`; each profile is `~/.hermes/profiles/<name>/` with `config.yaml`, `.env`, `SOUL.md` (agent identity), `skills/`, sessions, memory. Select with `-p <name>` / `HERMES_HOME`. Config can be set non-interactively with `hermes config set`.
 - **Skills:** a directory with `SKILL.md` (YAML frontmatter: `name`, `description`, optional `metadata.hermes.requires_toolsets` etc.). Installing into a profile = placing the directory in that profile's `skills/`.
-- **`hermes serve`:** starts the headless backend. **Conflict to resolve in Phase 3:** one research pass says it is a JSON-RPC/WebSocket gateway (same as `hermes dashboard`); an earlier local check reported an OpenAI-compatible HTTP API. Phase 3 begins with a spike to find out which, before any chat UI is designed. `hermes acp` is another candidate.
+- **`hermes serve`:** starts the headless backend. Phase 3 finding: integration surface is the gateway API server (OpenAI-compatible), not `hermes serve`. See `docs/plan/NOTES_Phase_03.md`.
 - **Ports:** `hermes dashboard`/`serve` default to 9119; an API server example uses 8642. This app's default is **8731**, configurable.
 - **`mcp` Python SDK:** `pip install mcp` (2.3.0 at time of research) supports Python 3.14.
 
