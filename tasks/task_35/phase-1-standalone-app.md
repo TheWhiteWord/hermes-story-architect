@@ -242,10 +242,10 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - Don't let the demo become a maintenance burden: keep it small but varied enough to exercise every dashboard tab.
 
 **Checklist**
-- [ ] Demo project command/script
-- [ ] "No Hermes imports" test
-- [ ] Ruff configured, lint clean, formatting commit separate
-- [ ] Final test counts recorded in `NOTES.md`
+- [x] Demo project command/script
+- [x] "No Hermes imports" test
+- [x] Ruff configured, lint clean, formatting commit separate
+- [x] Final test counts recorded in `NOTES.md`
 
 ---
 

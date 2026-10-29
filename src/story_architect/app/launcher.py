@@ -21,7 +21,33 @@ def is_healthy(port: int) -> bool:
         return False
 
 
-def main(argv=None) -> int:
+def main(argv=None):
+    import sys
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "seed-demo":
+        # seed demo project from fixture
+        parser = argparse.ArgumentParser(prog="story-architect seed-demo")
+        parser.add_argument("--root", default=None)
+        a = parser.parse_args(argv[1:])
+        config = load_config(cli_root=a.root)
+        src = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "browser-verification-test"
+        # fallback search
+        if not src.exists():
+            for cand in Path(".").rglob("browser-verification-test"):
+                if (cand / ".story" / "story.db").exists():
+                    src = cand
+                    break
+        dest = config.root / "projects" / "demo"
+        if dest.exists():
+            print(f"Demo already exists at {dest}")
+            return 0
+        import shutil
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dest)
+        print(f"Seeded demo at {dest}")
+        return 0
+
     parser = argparse.ArgumentParser(prog="story-architect")
     parser.add_argument("--root", default=None)
     parser.add_argument("--port", type=int, default=None)
