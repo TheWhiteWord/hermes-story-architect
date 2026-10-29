@@ -23,9 +23,14 @@
 - Deviations: cancellation status may be 'streaming'/'cancelled' depending on close timing; store access sync.
 
 ## Phase 3 Task 3 (Hermes chat backend and setup extensions)
-- Implemented `adapters/hermes/chat_backend.py` (`HermesChatBackend`) using httpx streaming against `/v1/chat/completions`; maps text deltas and `hermes.tool.progress` events; ignores unknown events; captures response id as backend state.
 - Config extended with `hermes_api_port` (env STORY_ARCHITECT_HERMES_API_PORT).
 - token module gained `ensure_api_key`/`load_api_key` (0600 in config dir).
 - setup enables API server platforms config, writes API_SERVER_KEY to profile .env, sets toolsets=[] (conservative: no built-in terminal/file tools; MCP story tools remain). status checks API reachability/auth/model id.
 - Agent cannot run shell/file tools by default; web search disabled (toolsets empty). Owner can change toolsets in profile config.
 - Tests: tests/test_hermes_chat_backend.py — 5 passing (text+tool, auth, unreachable, malformed, continuity).
+
+## Phase 3 Task 4 (Chat HTTP routes and request protection)
+- Routes added in src/story_architect/app/server.py: conversations list/create/get/delete and messages send (SSE) + cancel.
+- Cross-site protection added to host_check middleware for non-GET: Origin (when present) must match app origin; custom header X-Story-Architect: 1 required.
+- Backend instantiated from config; 503 if unavailable.
+- One reply at a time per conversation via active_replies dict.

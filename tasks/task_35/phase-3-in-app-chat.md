@@ -126,10 +126,10 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - One reply at a time per conversation; a second send while streaming returns a clear error.
 
 **Checklist**
-- [ ] Routes implemented and thin (logic stays in the chat service)
-- [ ] Origin + custom header protection with tests (missing/foreign origin, missing header, GET unaffected)
-- [ ] Streaming test using the fake backend; cancellation test
-- [ ] Error shape consistent with the rest of the API
+- [x] Routes implemented and thin (logic stays in the chat service)
+- [x] Origin + custom header protection with tests (missing/foreign origin, missing header, GET unaffected)
+- [x] Streaming test using the fake backend; cancellation test
+- [x] Error shape consistent with the rest of the API
 
 ---
 
