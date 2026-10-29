@@ -757,10 +757,8 @@ class TestScreenplayStatsFromSceneContent:
         scene_text = get_screenplay_text(project_path)
         assert scene_text, "get_screenplay_text returned empty string"
 
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-
-        stats = mod._compute_screenplay_stats(scene_text)
+        from story_architect.app.stats import _compute_screenplay_stats
+        stats = _compute_screenplay_stats(scene_text)
         assert stats is not None
         assert "scriptHtml" in stats
         assert stats["scriptHtml"], "scriptHtml should not be empty for valid scene content"

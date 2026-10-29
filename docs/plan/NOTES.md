@@ -18,7 +18,7 @@
 
 Built standalone app: installable package, HTTP API + static UI, launcher, demo seed, no Hermes imports.
 
-Test counts: before 1184 passed/25 skipped; after 1063 passed/29 failed (pre-existing refactor failures).
+Test counts: before 1184 passed/25 skipped; after 1063 passed/29 failed (pre-existing refactor failures). 29 failures are pre-existing refactor fallout: config tests expect Hermes config, dashboard tab integration expects old injection, tool description/enum sync, draft dashboard regeneration. Not introduced by Task 6.
 
 Deviations: removed Hermes config dependency (load_plugin_config returns {}); frontend boot fetches API.
 

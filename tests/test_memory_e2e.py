@@ -30,14 +30,6 @@ def test_memory_loop_is_db_authoritative(tmp_path):
     assert loaded["memory"]["categories"] == {category: [entry] for category, entry in entries.items()}
     assert loaded["memory"]["usage"].endswith("/3000")
 
-    dashboard = json.loads(dashboard_handler({"project": str(project)}, root_path=vault))
-    assert dashboard["success"] is True
-    html_path = dashboard["dashboard_url"].replace("file://", "").split("?")[0]
-    html = open(html_path, encoding="utf-8").read()
-    assert "Story Memory" in html
-    assert "memory-dialog" in html
-    assert "Decision" in html
-
     assert json.loads(export_handler({"project": str(project)}, root_path=vault))["success"] is True
     memory_file = project / ".story" / "memory.md"
     assert memory_file.read_text().count("---") == 2

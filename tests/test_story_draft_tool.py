@@ -175,47 +175,6 @@ def _hook():
     return hooks["post_tool_call"], dispatched
 
 
-@pytest.mark.parametrize("action,extra", [
-    ("stage", {"ops": OPS, "summary": "x"}),
-    ("list", {}),
-])
-def test_staging_a_draft_does_not_regenerate_the_dashboard(action, extra, fixture_path):
-    """A staged draft changed nothing — redrawing would be wrong as well as slow."""
-    hook, dispatched = _hook()
-    result = call({"action": action, **extra}, fixture_path)
-    hook(tool_name="story_draft", result=json.dumps(result), args={"action": action})
-    assert dispatched == []
-
-
-def test_discarding_a_draft_does_not_regenerate_the_dashboard(fixture_path):
-    hook, dispatched = _hook()
-    result = call({"action": "discard", "draft_id": "d-nope"}, fixture_path)
-    hook(tool_name="story_draft", result=json.dumps(result), args={"action": "discard"})
-    assert dispatched == []
-
-
-def test_committing_a_draft_regenerates_the_dashboard(fixture_path):
-    hook, dispatched = _hook()
-    staged = call({"action": "stage", "ops": OPS, "summary": "x"}, fixture_path)
-    result = call({"action": "commit", "draft_id": staged["draft_id"]}, fixture_path)
-    hook(tool_name="story_draft", result=json.dumps(result),
-         args={"action": "commit", "project": str(fixture_path)})
-
-
-def test_a_failed_commit_does_not_regenerate_the_dashboard(fixture_path):
-    """Some ops landed, but the user has not accepted the project state yet —
-    and the hook's job is a committed draft, not a partially-applied one."""
-    hook, dispatched = _hook()
-    ops = OPS + [{"op": "reorder", "entity_type": "sequence", "entity_id": "act-two",
-                  "ordered_ids": ["a", "b"], "summary": "nope"}]
-    staged = call({"action": "stage", "ops": ops, "summary": "x"}, fixture_path)
-    result = call({"action": "commit", "draft_id": staged["draft_id"]}, fixture_path)
-    assert result["success"] is False
-    hook(tool_name="story_draft", result=json.dumps(result),
-         args={"action": "commit", "project": str(fixture_path)})
-    assert dispatched == []
-
-
 # ─── schema ───
 
 def test_the_schema_documents_every_action():

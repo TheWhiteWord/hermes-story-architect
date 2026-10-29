@@ -30,17 +30,17 @@ class TestDescribeScope:
     def test_every_tool_carries_its_own_description(self):
         """What story_describe gave up, each tool now carries itself."""
         for name in ALL_TOOLS:
-            schema = importlib.import_module(f"tools.{name}").SCHEMA
+            schema = importlib.import_module(f"story_architect.tools.{name}").SCHEMA
             assert len(schema.get("description", "")) > 20, f"{name} has no description"
 
     def test_destructive_tool_says_so(self):
-        desc = importlib.import_module("tools.story_import").SCHEMA["description"]
+        desc = importlib.import_module("story_architect.tools.story_import").SCHEMA["description"]
         assert "DESTRUCTIVE" in desc
 
     def test_no_description_promises_a_missing_parameter(self):
         """A description must never tell the model to pass something the schema lacks."""
         for name in ALL_TOOLS:
-            schema = importlib.import_module(f"tools.{name}").SCHEMA
+            schema = importlib.import_module(f"story_architect.tools.{name}").SCHEMA
             props = set(schema.get("properties", {}))
             description = schema.get("description", "")
             for claim in ("dry_run", "view=", "fields=[", "id="):
@@ -321,7 +321,7 @@ class TestEntityTypeEnumsStayInSync:
     def test_enum_matches_entity_schemas(self, tool, path):
         from story_architect.core.constants import ENTITY_SCHEMAS
 
-        node = importlib.import_module(f"tools.{tool}").SCHEMA["properties"]
+        node = importlib.import_module(f"story_architect.tools.{tool}").SCHEMA["properties"]
         for key in path:
             node = node[key]
         assert set(node["enum"]) == set(ENTITY_SCHEMAS), (

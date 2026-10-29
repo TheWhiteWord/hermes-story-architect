@@ -37,7 +37,7 @@ def project(tmp_path):
     proj = root / "stc"
     shutil.copytree(str(Path(__file__).resolve().parent / "fixtures" / "save-the-children"),
                     str(proj))
-    from tests.conftest import build_fixture_db
+    from conftest import build_fixture_db
     build_fixture_db(proj, tmp_path)
     return proj
 
