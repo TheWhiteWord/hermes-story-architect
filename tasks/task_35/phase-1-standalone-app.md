@@ -167,10 +167,10 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - Use standard logging; avoid noisy per-request logs at default level.
 
 **Checklist**
-- [ ] App factory
-- [ ] The four routes working
-- [ ] Host validation, traversal protection, consistent errors
-- [ ] API tests (FastAPI `TestClient`): health, list, dashboard, 404, bad host, traversal attempt
+- [x] App factory
+- [x] The four routes working
+- [x] Host validation, traversal protection, consistent errors
+- [x] API tests (FastAPI `TestClient`): health, list, dashboard, 404, bad host, traversal attempt
 
 ---
 
