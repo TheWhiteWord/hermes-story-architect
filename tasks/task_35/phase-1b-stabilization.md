@@ -50,16 +50,16 @@ Follow "Definition of done" in `phase-1-standalone-app.md` literally, in a **fre
 - point 7 (`grep -ri hermes` over the package source).
 
 **Checklist**
-- [ ] All 8 acceptance points run and recorded
-- [ ] Any failure fixed and re-run
+- [x] All 8 acceptance points run and recorded
+- [x] Any failure fixed and re-run
 
 ### Task 4: Finish the skipped Phase 1 deliverables
 
-- [ ] Ruff configured; lint clean; formatting applied in its own commit
-- [ ] Test that fails if the package imports Hermes (if it does not already exist)
-- [ ] `README.md` rewritten for the standalone app
-- [ ] Plan files placed under `docs/plan/` with checklists ticked
-- [ ] Stale-items list (`plan/`, `archieved/`, `docs/`, `vault-conventions.md`, `core/screenplay.py`, anything else) with keep/archive/delete recommendations in `NOTES.md`. Delete nothing without the owner's decision.
+- [x] Ruff configured; lint clean; formatting applied in its own commit
+- [x] Test that fails if the package imports Hermes (if it does not already exist)
+- [x] `README.md` rewritten for the standalone app
+- [x] Plan files placed under `docs/plan/` with checklists ticked
+- [x] Stale-items list (`plan/`, `archieved/`, `docs/`, `vault-conventions.md`, `core/screenplay.py`, anything else) with keep/archive/delete recommendations in `NOTES.md`. Delete nothing without the owner's decision.
 
 ### Task 5: Hand-off notes for Phase 2
 
