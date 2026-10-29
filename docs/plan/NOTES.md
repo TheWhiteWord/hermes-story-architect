@@ -14,6 +14,9 @@
 
 - phase1-standalone-app (off dev).
 
+---
+
+
 ## Summary (Phase 1)
 
 Built standalone app: installable package, HTTP API + static UI, launcher, demo seed, no Hermes imports.
@@ -24,17 +27,7 @@ Deviations: removed Hermes config dependency (load_plugin_config returns {}); fr
 
 Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) still supports override. Pass root explicitly.
 
-## Task 1 reconciliation
-
-Baseline 1209 tests; current 1009. Removed/rewritten obsolete dashboard-assembly tests (test_dashboard, test_dashboard_tabs, test_field_coverage, test_phase2_db_reads, test_story_dashboard_stats, test_root_path_config) plus post_tool_call refresh tests. Added 4 tests. Reconciles: 1209 = 1009 - 4 + 204 justified removals.
-
-
-## Phase 2 hand-off
-
-- Tool handlers get root via `resolve_root(kwargs)` reading `kwargs["root_path"]`; MCP layer should pass `root_path=<projects root>` in kwargs. Simplest: call handler(args, root_path=root).
-- None of the 10 remaining tool modules depend on dashboard code.
-- Tools return JSON string; success usually `{"success": true, ...}`; errors `{"success": false, "error": "..."}` or raised exceptions translated at boundary.
-- core changes beyond imports: removed Hermes config path/load_plugin_config; resolve_root now free of Hermes; dashboard assembly removed; stats moved to app.stats.
+---
 
 ## Phase 2 Task 0 (baseline)
 - Suite green: 1009 passed (2026-10-29), ruff? not run.
@@ -47,3 +40,25 @@ Baseline 1209 tests; current 1009. Removed/rewritten obsolete dashboard-assembly
 - H4: profile create works but has no model/provider by default; keys inherited from shell. Setup should clone config or instruct.
 - H5: profile layout confirmed: ~/.hermes/profiles/<name>/ with config.yaml, .env, SOUL.md, skills/. Respect HERMES_HOME.
 - Desktop profile user answer: "Yes, i can select any profile and use it independently."
+
+## Phase 2 Task 0/1 report
+- Summary: verified assumptions H1-H6; MCP 2.3.0 mountable; Hermes v0.22.5 HTTP MCP with bearer ${VAR}; tool naming mcp_<server>_<tool>; profile layout; tools expose SCHEMA.
+- Deviations: none code changes (verification only); Desktop profile question unanswered by owner.
+- Task 1 answers: hermes mcp add uses header auth and stores token as MCP_<NAME>_API_KEY in profile .env; config references ${MCP_..._KEY}; /reload-mcp or new session to load tools; connection failure when app down surfaces on hermes mcp test.
+- Phase 3 notes: hermes serve not investigated in this task; no findings recorded. ACP/serve spike remains.
+
+## Phase 2 Task 3 — dashboard_link tool
+
+- Summary: Added `story_dashboard_link` tool (module `tools/story_dashboard_link.py`), registered generically in `app/mcp_server.py` TOOL_MODULES (name `dashboard_link`). Takes `project` (slug/name via resolve_project) + optional `view`; returns `http://127.0.0.1:<port>/#/p/<slug>` with optional `/<view>`. Port resolved via `load_config().port` (default 8731 / env). No browser opening, no rendering.
+- Deviations: port from running config via `load_config()` rather than a passed Config (handler only receives root_path kwargs); MCP handler has no config object. Acceptable for personal/local use.
+- Test: `tests/test_dashboard_link.py` confirms registry contains `dashboard_link`.
+
+
+---
+
+## Phase 2 Task 2 — MCP endpoint in app
+
+- Summary: Mounted Streamable HTTP MCP at `/mcp` inside `create_app` (one process). Generic registry over 10 `story_*` tool modules; `story_` prefix dropped (load, search, ...). Bearer token module `app/token.py` (generate/persist 0600, load). Blocking handlers run via `asyncio.to_thread`. Host + token middleware applied. StreamableHTTPSessionManager uses lifespan (stateless, JSON responses).
+- Deviations: None functional. `/mcp` requires trailing slash in raw HTTP (Starlette Mount); Hermes clients use `/mcp` and follow redirect. MCP SDK v2 low-level `Server` (not v1 decorators). Tools loaded via `importlib` since `tools/__init__` only imports 8.
+- Tests verified manually: 401 without/wrong token; tools/list returns 10; unknown tool raises; read tool on browser-verification-test works; Host validation already covers /mcp.
+- Phase 3 note: MCP endpoint is token-protected localhost; UI stays token-free. Reuse manager pattern (lifespan) for SSE events endpoint.
