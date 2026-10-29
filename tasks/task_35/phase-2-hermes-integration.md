@@ -180,11 +180,11 @@ In-app chat, manual editing, a Fountain writer, systemd/autostart of the app, ot
 
 **Must**
 - README section "Using with Hermes": prerequisites, `story-architect hermes setup`, starting the app, starting Hermes with the profile (CLI command, and Desktop if Task 1 shows it's possible), what to do if the app wasn't running when Hermes started, `hermes status`, security notes (token, localhost only).
-- Update the layout section and `docs/plan/` checkboxes.
+- Update the layout section and `tasks/task_35/phase-2-hermes-integration.md` checkboxes.
 
 **Checklist**
-- [ ] README updated
-- [ ] Plan checklists ticked
+- [x] README updated
+- [x] Plan checklists ticked
 
 ---
 
