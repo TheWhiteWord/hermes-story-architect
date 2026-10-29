@@ -18,8 +18,8 @@ import sqlite3
 
 import pytest
 
-from core.writes import create_entity, create_project
-from tools.story_retrieve import handler as retrieve_handler
+from story_architect.core.writes import create_entity, create_project
+from story_architect.tools.story_retrieve import handler as retrieve_handler
 
 
 @pytest.fixture
@@ -149,14 +149,14 @@ class TestUnknownField:
     def test_the_schema_does_not_advertise_a_nested_form(self, vault):
         """The description is what an agent reads before writing. It once said
         "nested goals.short also accepted", which nothing implemented."""
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         for field in ("goals_short", "goals_long"):
             assert "nested" not in ENTITY_SCHEMAS["character"][field]["description"]
 
     def test_every_valid_field_of_every_type_is_accepted(self, vault):
         """A guard that rejects real fields is worse than no guard."""
-        from core.constants import ENTITY_SCHEMAS
-        from core.entity import ENTITY_COLUMN_MAP, relation_fields
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        from story_architect.core.entity import ENTITY_COLUMN_MAP, relation_fields
         rejected = []
         for entity_type, schema in ENTITY_SCHEMAS.items():
             if entity_type == "project":

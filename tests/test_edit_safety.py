@@ -16,9 +16,9 @@ import sqlite3
 
 import pytest
 
-from core.writes import current_values, delete_entity, edit_entity
-from tools.story_import import handler as import_handler
-from tools.story_retrieve import handler as retrieve_handler
+from story_architect.core.writes import current_values, delete_entity, edit_entity
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_retrieve import handler as retrieve_handler
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ class TestColumnMap:
     def test_no_local_map_remains(self):
         """The duplication is the bug; a test that only checks behaviour can
         regress to a second copy without noticing."""
-        from core import writes
+        from story_architect.core import writes
         assert not hasattr(writes, "ENTITY_COLUMN_MAP")
 
     def test_other_types_still_write_their_columns(self, proj):

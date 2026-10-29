@@ -18,8 +18,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
-from core.constants import PLOT_ROLES
-from core.entity import PLOT_BEAT_FIELDS
+from story_architect.core.constants import PLOT_ROLES
+from story_architect.core.entity import PLOT_BEAT_FIELDS
 
 
 class TestVocabulary:
@@ -45,7 +45,7 @@ class TestVocabulary:
         and sits second there, not last, which is the same
         field-name-is-not-role-name trap as `crisis` staying singular.
         """
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         role_fields = [f for f in ENTITY_SCHEMAS["plot"] if f in PLOT_BEAT_FIELDS]
         assert role_fields == ["setups", "inciting_incident", "complications",
                                "crisis", "climax", "resolutions"]
@@ -54,7 +54,7 @@ class TestVocabulary:
         """What a plot IS, then WHO it involves, then what it does. A reader
         meeting `one_sentence` halfway through the role list has to hold the
         plot's identity in their head while reading its beats."""
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         order = list(ENTITY_SCHEMAS["plot"])
         assert order[:7] == ["name", "one_sentence", "status", "characters",
                              "value_arc", "plot_scope", "plot_type"]
@@ -73,7 +73,7 @@ class TestVocabulary:
         not an error.
         """
         from pathlib import Path
-        js = (REPO / "src/dashboard/js/colors.js").read_text()
+        js = (REPO / "src/story_architect/web/js/colors.js").read_text()
         found = re.search(r"DASH\.PLOT_ROLES = \[([^\]]*)\]", js)
         assert found, "colors.js no longer declares DASH.PLOT_ROLES"
         assert [r.strip().strip("'\"") for r in found.group(1).split(",") if r.strip()] == PLOT_ROLES
@@ -88,7 +88,7 @@ class TestVocabulary:
 @pytest.fixture
 def full_role_project(tmp_path):
     """A project where one plot fills every role, in one sequence inside one act."""
-    from core.writes import create_entity, create_project, edit_entity
+    from story_architect.core.writes import create_entity, create_project, edit_entity
 
     root = tmp_path / "v"
     (root / "projects").mkdir(parents=True)
@@ -123,7 +123,7 @@ class TestHasRoleFlags:
 
     @pytest.mark.parametrize("owner", ["sequence", "act"])
     def test_every_role_raises_its_flag(self, full_role_project, owner):
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
 
         data = get_dashboard_data(full_role_project)["story_data"]
         rows = (data["sequences"] if owner == "sequence" else data["acts"])
@@ -136,7 +136,7 @@ class TestHasRoleFlags:
 
     def test_flag_set_is_exactly_the_roles(self, full_role_project):
         """No stale hardcoded flag survives, and none is missing."""
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
 
         data = get_dashboard_data(full_role_project)["story_data"]
         plot = next(p for p in data["sequences"][0]["plots"])

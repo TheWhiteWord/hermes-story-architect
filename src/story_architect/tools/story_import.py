@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from core.entity import plot_role_relations
+from story_architect.core.entity import plot_role_relations
 
 SCHEMA = {
     "description": "DESTRUCTIVE. Rebuilds the database from the Markdown vault: deletes every row "
@@ -30,7 +30,7 @@ def _backup(project_path: Path) -> str:
     Delegates to core.db.backup_database — the WAL-safe, collision-free copy that
     story_backup also uses.
     """
-    from core.db import backup_database
+    from story_architect.core.db import backup_database
     return backup_database(project_path)
 
 
@@ -45,7 +45,7 @@ def _diff(project_path: Path) -> dict:
     folder name). A missed warning only means the guard stays quiet; a false
     "you will lose data" would block every legitimate re-import.
     """
-    from core.db import get_db
+    from story_architect.core.db import get_db
 
     conn = get_db(project_path)
     try:
@@ -92,7 +92,7 @@ def _diff(project_path: Path) -> dict:
 def handler(args, **kwargs) -> str:
     """Import markdown vault into SQLite."""
     from .story_resolve import resolve_project
-    from core.config import resolve_root
+    from story_architect.core.config import resolve_root
 
     root_path = resolve_root(kwargs)
 
@@ -101,7 +101,7 @@ def handler(args, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    from core.db import (
+    from story_architect.core.db import (
         get_db, create_schema, has_schema, get_project_memory,
         empty_memory, validate_memory,
     )
@@ -245,7 +245,7 @@ def _import_all(conn, project_path: Path) -> None:
 def _import_project(conn, project_path: Path) -> None:
     """Import project.md."""
     import frontmatter
-    from core.section_parser import list_sections, get_section
+    from story_architect.core.section_parser import list_sections, get_section
 
     fm_file = project_path / "project.md"
     if not fm_file.exists():
@@ -254,7 +254,7 @@ def _import_project(conn, project_path: Path) -> None:
     fm = dict(post.metadata)
     body = post.content
 
-    from core.db import empty_memory
+    from story_architect.core.db import empty_memory
     extra = {"memory": empty_memory()}
     skip = {"name", "logline", "memory"}
     for k, v in fm.items():
@@ -319,7 +319,7 @@ def _import_values(conn, project_path: Path) -> None:
     text = values_file.read_text()
     if not text.strip():
         return
-    from core.writes import validate_value
+    from story_architect.core.writes import validate_value
     for fm, body in _iter_value_blocks(text):
         entity_id = str(fm.get("id") or "").strip()
         name = str(fm.get("name") or "").strip()
@@ -338,7 +338,7 @@ def _import_values(conn, project_path: Path) -> None:
 def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str) -> None:
     """Import all entities from a flat folder."""
     import frontmatter
-    from core.section_parser import list_sections, get_section
+    from story_architect.core.section_parser import list_sections, get_section
 
     folder = project_path / folder_name
     if not folder.exists():
@@ -380,8 +380,8 @@ def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:
     create and edit paths. The section set is closed, so a heading outside it
     is prose nothing will ever read back as a section of this type.
     """
-    from core.section_parser import list_sections, get_section
-    from core.entity import standard_sections
+    from story_architect.core.section_parser import list_sections, get_section
+    from story_architect.core.entity import standard_sections
 
     headings = list_sections(body)
     standard = standard_sections(entity_type)
@@ -498,7 +498,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     `goals: {short, long}` survives nowhere, because every reader looks for the
     flat `goals_short`.
     """
-    from core.constants import ENTITY_SCHEMAS
+    from story_architect.core.constants import ENTITY_SCHEMAS
 
     # The VALUE checks, which `_extra_for` was missing and the write paths both
     # have. A hand-edited note carrying a retired value reads back as a value no
@@ -507,7 +507,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     #
     # Only the value checks, NOT the structural ones. `value_problems` is the
     # split, and it lives beside the checks so the two kinds cannot drift.
-    from core.entity import value_problems
+    from story_architect.core.entity import value_problems
     problems = value_problems(entity_type, fm)
     if problems:
         raise ValueError(
@@ -557,7 +557,7 @@ def _extra_for(entity_type: str, fm: dict) -> dict:
     # any other, so it enforces the same invariant — otherwise a hand-edited
     # note could import a contradiction the write tools would have refused.
     if entity_type == "scene":
-        from core.entity import validate_scene_dramatic_role
+        from story_architect.core.entity import validate_scene_dramatic_role
         validate_scene_dramatic_role(extra.get("dramatic_role", ""),
                                      fm.get("plot_roles", []))
     return extra

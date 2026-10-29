@@ -10,10 +10,10 @@ The counterpart to story_load ("what exists and where" vs "what does this say").
 import json
 from pathlib import Path
 
-from core.constants import ENTITY_SCHEMAS
-from core.entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS as REVERSED_KINDS,
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS as REVERSED_KINDS,
                           _RELATION_FIELDS)
-from core.value_focus import for_act, for_plot, for_project, for_sequence
+from story_architect.core.value_focus import for_act, for_plot, for_project, for_sequence
 
 # The computed `value_focus` read-back per unit type, with the project beside
 # it: the project row is a singleton, so `_resolve` ignores its id and its
@@ -201,7 +201,7 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
 
 
 def _unfilled(conn, data: dict, entity_type: str) -> list:
-    from core.entity import unfilled_fields
+    from story_architect.core.entity import unfilled_fields
     extra = json.loads(data.get("extra") or "{}")
     # A plot beat is filled only when its relation row exists, not when extra has a key.
     for field, (kind, _) in _RELATION_FIELDS.get(entity_type, {}).items():
@@ -235,8 +235,8 @@ def _sections(conn, entity_id: str, wanted) -> dict:
 
 def handler(args: dict, **kwargs) -> str:
     """Return the requested fields and sections for one or more entities."""
-    from core.config import resolve_root
-    from core.db import get_db, has_schema
+    from story_architect.core.config import resolve_root
+    from story_architect.core.db import get_db, has_schema
     from .story_resolve import resolve_project
 
     root_path = resolve_root(kwargs)

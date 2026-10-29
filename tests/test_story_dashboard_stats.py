@@ -1,4 +1,3 @@
-"""Test server-side stats computation for story_dashboard."""
 import json
 from pathlib import Path
 
@@ -25,7 +24,7 @@ class TestStatsComputation:
 
     def test_parse_produces_tokens(self, fountain_text):
         """parse() returns tokens list."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         assert 'tokens' in result
         assert isinstance(result['tokens'], list)
@@ -33,7 +32,7 @@ class TestStatsComputation:
 
     def test_scene_heading_tokens(self, fountain_text):
         """Scene headings are correctly identified."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         scenes = [t for t in result['tokens'] if t['type'] == 'scene_heading']
         assert len(scenes) > 0
@@ -43,7 +42,7 @@ class TestStatsComputation:
 
     def test_dialogue_has_duration(self, fountain_text):
         """Dialogue tokens have time estimate."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         dialogue = [t for t in result['tokens'] if t['type'] == 'dialogue']
         assert len(dialogue) > 0
@@ -52,7 +51,7 @@ class TestStatsComputation:
 
     def test_character_stats_build(self, fountain_text):
         """Character stats can be aggregated from tokens."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         tokens = result['tokens']
 
@@ -75,7 +74,7 @@ class TestStatsComputation:
 
     def test_scene_type_classification(self, fountain_text):
         """Scene headings classified as int/ext/mixed."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         scenes = [t for t in result['tokens'] if t['type'] == 'scene_heading']
 
@@ -90,14 +89,14 @@ class TestStatsComputation:
 
     def test_tokens_to_html_produces_classes(self, fountain_text):
         """tokens_to_html produces fountain class names."""
-        from core.fountain_lexer import parse, tokens_to_html
+        from story_architect.core.fountain_lexer import parse, tokens_to_html
         result = parse(fountain_text)
         html = tokens_to_html(result['tokens'])
         assert 'fountain-scene_heading' in html or 'fountain-scene_heading' in html.replace('-', '_')
 
     def test_parse_returns_action_dialogue_lengths(self, fountain_text):
         """parse() returns lengthAction and lengthDialogue."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         assert 'lengthAction' in result
         assert 'lengthDialogue' in result
@@ -105,14 +104,14 @@ class TestStatsComputation:
 
     def test_parse_returns_script_html(self, fountain_text):
         """parse() returns scriptHtml for pre-rendered HTML."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         assert 'scriptHtml' in result
         assert isinstance(result['scriptHtml'], str)
 
     def test_duration_chart_buckets(self, fountain_text):
         """Duration chart produces 20 buckets."""
-        from core.fountain_lexer import parse
+        from story_architect.core.fountain_lexer import parse
         result = parse(fountain_text)
         tokens = result['tokens']
 
@@ -130,12 +129,10 @@ class TestStatsComputation:
 
 
 class TestStatsInjection:
-    """Test that story_dashboard injects stats correctly."""
 
     def test_stats_injected_before_boot(self):
         """Boot comment is present in assembled HTML for injection."""
-        from tools.story_dashboard import assemble_dashboard
-        dashboard_dir = Path("src/dashboard")
+        dashboard_dir = Path("src/story_architect/web")
         html = assemble_dashboard(dashboard_dir)
         assert "// ─── Boot" in html
 
@@ -150,8 +147,8 @@ class TestStructuralStats:
         only plot_role/transition/non-event — so this asserts the real role
         names, and that `plot_role` is not itself reported as a role.
         """
-        from tools.story_import import handler as import_handler
-        from core.db import get_dashboard_data
+        from story_architect.tools.story_import import handler as import_handler
+        from story_architect.core.db import get_dashboard_data
 
         import_handler({"project": str(fixture_path), "root_path": fixture_path.parent})
 

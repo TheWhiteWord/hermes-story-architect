@@ -14,10 +14,10 @@ third-party validator agrees.
 import pytest
 
 
-from core import drafts
-from core.constants import ENTITY_SCHEMAS
-from core.writes import REORDERABLE_TYPES
-from tools.story_draft import _op_schemas
+from story_architect.core import drafts
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.writes import REORDERABLE_TYPES
+from story_architect.tools.story_draft import _op_schemas
 
 
 def _branches():

@@ -20,18 +20,14 @@ reason the survivor of the sweep is correct rather than a leftover.
 import json
 import shutil
 import sqlite3
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
-
-from core.constants import ENTITY_SCHEMAS
-from core.db import get_db, get_unfilled_map
-from core.entity import ENTITY_COLUMN_MAP, unfilled_fields
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.db import get_db, get_unfilled_map
+from story_architect.core.entity import ENTITY_COLUMN_MAP, unfilled_fields
 
 
 @pytest.fixture
@@ -39,16 +35,16 @@ def project(tmp_path):
     root = tmp_path / "projects"
     root.mkdir(exist_ok=True)
     proj = root / "stc"
-    shutil.copytree(str(REPO / "tests" / "fixtures" / "save-the-children"),
+    shutil.copytree(str(Path(__file__).resolve().parent / "fixtures" / "save-the-children"),
                     str(proj))
-    from conftest import build_fixture_db
+    from tests.conftest import build_fixture_db
     build_fixture_db(proj, tmp_path)
     return proj
 
 
 def reported(project, entity_type, entity_id):
     """What story_retrieve reports as unfilled, through its own path."""
-    from tools.story_retrieve import _resolve, _row_data, _unfilled
+    from story_architect.tools.story_retrieve import _resolve, _row_data, _unfilled
     conn = get_db(project)
     try:
         row, err = _resolve(conn, entity_type, entity_id)
@@ -59,7 +55,7 @@ def reported(project, entity_type, entity_id):
 
 
 def field_value(project, entity_type, entity_id, field):
-    from tools.story_retrieve import _resolve, _row_data, _entity_fields
+    from story_architect.tools.story_retrieve import _resolve, _row_data, _entity_fields
     conn = get_db(project)
     try:
         row, err = _resolve(conn, entity_type, entity_id)

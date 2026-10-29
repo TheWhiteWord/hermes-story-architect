@@ -16,9 +16,9 @@ tasks/task_28/draft-staging-design.md.
 """
 import json
 
-from core.constants import ENTITY_SCHEMAS
-from core.drafts import OP_ORDER, REQUIRED_OP_KEYS
-from core.writes import REORDERABLE_TYPES
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.drafts import OP_ORDER, REQUIRED_OP_KEYS
+from story_architect.core.writes import REORDERABLE_TYPES
 
 
 def _op_schemas() -> list[dict]:
@@ -168,8 +168,8 @@ SCHEMA = {
 
 
 def handler(args: dict, **kwargs) -> str:
-    from core.config import resolve_root
-    from core.drafts import DraftError, commit, discard, list_drafts, stage
+    from story_architect.core.config import resolve_root
+    from story_architect.core.drafts import DraftError, commit, discard, list_drafts, stage
     from .story_resolve import resolve_project
 
     action = args["action"]

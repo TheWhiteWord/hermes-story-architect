@@ -3,25 +3,29 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hermes-story-architect"
+name = "story-architect"
 version = "0.1.0"
-description = "Story-writing environment for Hermes Desktop"
+description = "Story-writing environment"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 dependencies = [
     "rapidfuzz>=3.0",
     "python-frontmatter>=1.0",
     "pyyaml>=6.0",
     "regex>=2026.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+story-architect = "story_architect.app.launcher:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["plugin*"]
-namespaces = true
+where = ["src"]
+
+[tool.setuptools.package-data]
+story_architect = ["web/**/*"]

@@ -15,8 +15,8 @@ import sqlite3
 
 import pytest
 
-from core.writes import create_entity
-from tools.story_import import handler as import_handler
+from story_architect.core.writes import create_entity
+from story_architect.tools.story_import import handler as import_handler
 
 
 def _ids(project_path):

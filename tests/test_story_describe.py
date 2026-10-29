@@ -10,10 +10,9 @@ import json
 
 import pytest
 
-from tools import story_describe
+from story_architect.tools import story_describe
 
 ALL_TOOLS = [
-    "story_admin", "story_backup", "story_dashboard", "story_describe",
     "story_draft", "story_export", "story_import", "story_load",
     "story_memory", "story_retrieve", "story_search",
 ]
@@ -57,7 +56,7 @@ class TestEntityFields:
         # Derived from ENTITY_SCHEMAS, not a remembered number: scene_beats was
         # added after this test first ran, and a literal count is exactly how a
         # new type silently stops being described.
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         assert len(_handler({})["entity_schemas"]) == len(ENTITY_SCHEMAS)
 
     def test_relation_backed_fields_are_flagged(self):
@@ -94,7 +93,7 @@ class TestStructuredFieldShapesAreVisible:
     """
 
     def test_sub_fields_present_on_every_field_that_has_them(self):
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
 
         out = _handler({})["entity_schemas"]
         expected = {
@@ -130,7 +129,7 @@ class TestStructuredFieldShapesAreVisible:
         This is the assertion that would have caught the original bug, and it
         keeps catching it if someone adds a key to ENTITY_SCHEMAS later.
         """
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
 
         out = _handler({})["entity_schemas"]
         missing = set()
@@ -150,7 +149,7 @@ class TestStorageLabelsAreTrue:
     """
 
     def test_no_field_is_labelled_with_storage_it_does_not_have(self):
-        from core.entity import ENTITY_COLUMN_MAP, relation_fields
+        from story_architect.core.entity import ENTITY_COLUMN_MAP, relation_fields
 
         out = _handler({})["entity_schemas"]
         wrong = []
@@ -168,8 +167,8 @@ class TestStorageLabelsAreTrue:
         assert not wrong, wrong
 
     def test_every_declared_reference_is_labelled(self):
-        from core.constants import ENTITY_SCHEMAS
-        from core.entity import ENTITY_COLUMN_MAP, relation_fields
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        from story_architect.core.entity import ENTITY_COLUMN_MAP, relation_fields
 
         out = _handler({})["entity_schemas"]
         declared = set()
@@ -209,7 +208,7 @@ class TestStorageLabelsAreTrue:
         field could only ever render blank. The guard below therefore has nothing
         left to act on today, and stays only as a backstop should one reappear.
         """
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         for et in ("scene", "act"):
             assert "id" not in ENTITY_SCHEMAS[et], (
                 f"{et} declares an id field, which the write path discards "
@@ -235,7 +234,7 @@ class TestOneVocabularyAcrossReadAndWrite:
     """
 
     def _load_payload(self, project):
-        from core.db import get_project_summary
+        from story_architect.core.db import get_project_summary
         return get_project_summary(project)
 
     def test_story_load_does_not_emit_the_old_abbreviations(self, fixture_db):
@@ -255,7 +254,7 @@ class TestOneVocabularyAcrossReadAndWrite:
         Scoped to entity nodes (dicts carrying an `id`); the `memory` subtree
         has its own vocabulary and is not entity fields.
         """
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
 
         out = _handler({})["entity_schemas"]
         known = {f for fields in out.values() for f in fields}
@@ -302,7 +301,7 @@ class TestOneVocabularyAcrossReadAndWrite:
         This description once ended "an entity's `id` is the `slug` argument of its
         op" — a sentence that exists only because the two names disagreed.
         """
-        from tools.story_describe import SCHEMA
+        from story_architect.tools.story_describe import SCHEMA
 
         assert "slug" not in SCHEMA["description"]
 
@@ -320,7 +319,7 @@ class TestEntityTypeEnumsStayInSync:
         ("story_describe", ["entity_type"]),
     ])
     def test_enum_matches_entity_schemas(self, tool, path):
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
 
         node = importlib.import_module(f"tools.{tool}").SCHEMA["properties"]
         for key in path:

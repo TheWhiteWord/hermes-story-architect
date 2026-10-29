@@ -30,15 +30,15 @@ FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 def project(tmp_path):
     vault = tmp_path / "v"
     shutil.copytree(FIXTURE, vault / "projects" / "save-the-children")
-    import core.config
-    from tools.story_import import handler as import_handler
+    import story_architect.core.config
+    from story_architect.tools.story_import import handler as import_handler
     import_handler({"project": "save-the-children", "confirm": True},
                    root_path=str(vault))
     return vault / "projects" / "save-the-children"
 
 
 def load(project, **args):
-    from tools.story_load import handler
+    from story_architect.tools.story_load import handler
     return json.loads(handler({"project": "save-the-children", "view": "values",
                                **args}, root_path=str(project.parent.parent)))
 
@@ -155,7 +155,7 @@ class TestEdges:
     def test_scene_with_no_plot_roles_and_no_primary_plot(self, tmp_path):
         # A scene whose sequence names no primary_plot and which has no
         # plot_roles relations serves no plot: `plots` is empty, no crash.
-        from core.writes import create_project, create_entity
+        from story_architect.core.writes import create_project, create_entity
         root = tmp_path / "v"
         (root / "projects").mkdir(parents=True)
         assert create_project("solo", {"name": "Solo"}, root)["success"]
@@ -175,7 +175,7 @@ class TestEdges:
                                         "effects": [{"character": "kael",
                                                      "levels": [{"conflict_level": "inner",
                                                                  "effect": "He notices."}]}]}]})
-        from tools.story_load import handler
+        from story_architect.tools.story_load import handler
         out = json.loads(handler(
             {"project": "solo", "view": "values", "scene": "s1"},
             root_path=str(proj.parent.parent)))
@@ -187,14 +187,14 @@ class TestEmptyProject:
 
     @pytest.fixture
     def empty(self, tmp_path):
-        from core.writes import create_project
+        from story_architect.core.writes import create_project
         root = tmp_path / "v"
         (root / "projects").mkdir(parents=True)
         assert create_project("empty", {"name": "Empty"}, root)["success"]
         return root / "projects" / "empty"
 
     def test_no_args_on_empty_project(self, empty):
-        from tools.story_load import handler
+        from story_architect.tools.story_load import handler
         out = json.loads(handler(
             {"project": "empty", "view": "values"},
             root_path=str(empty.parent.parent)))
@@ -202,7 +202,7 @@ class TestEmptyProject:
         assert out.get("message")
 
     def test_unit_on_empty_project(self, empty):
-        from tools.story_load import handler
+        from story_architect.tools.story_load import handler
         out = json.loads(handler(
             {"project": "empty", "view": "values", "plot": "none"},
             root_path=str(empty.parent.parent)))

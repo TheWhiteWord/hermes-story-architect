@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from core.db import milestone_label
+from story_architect.core.db import milestone_label
 
 
 SCHEMA = {
@@ -88,7 +88,7 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Load project nested index into context."""
-    from core.config import resolve_root
+    from story_architect.core.config import resolve_root
     from .story_resolve import resolve_project
 
     root_path = resolve_root(kwargs)
@@ -105,8 +105,8 @@ def handler(args: dict, **kwargs) -> str:
     if not db_path.exists():
         return json.dumps({"error": "Database not found. Run story_import first."})
 
-    from core.db import has_schema
-    from core.db import get_project_summary
+    from story_architect.core.db import has_schema
+    from story_architect.core.db import get_project_summary
     import sqlite3
 
     view = args.get("view")
@@ -163,7 +163,7 @@ def _view_track(project_path, args: dict) -> dict:
     to the scenes where its state changed. The reader is `core.track`, which
     owns the shape; this is only the call.
     """
-    from core.track import for_entity
+    from story_architect.core.track import for_entity
 
     entity = args.get("entity")
     if not entity:
@@ -460,7 +460,7 @@ def _view_unfilled(project_path, args: dict) -> dict:
     high because nothing writes it, not because it matters more. To ask about
     a specific one, filter — a filtered answer is never truncated.
     """
-    from core.db import get_unfilled_map
+    from story_architect.core.db import get_unfilled_map
 
     unfilled = get_unfilled_map(project_path)
     field = args.get("field")
@@ -564,8 +564,8 @@ def _view_values(conn, project_path, args: dict) -> dict:
       plot/sequence/act (opt. value) → the unit's major/minor, and per value its
                        turns in story order (scene, plot, from, to).
     """
-    from core.db import get_scene_value_turns
-    from core.value_focus import for_act, for_plot, for_project, for_sequence
+    from story_architect.core.db import get_scene_value_turns
+    from story_architect.core.value_focus import for_act, for_plot, for_project, for_sequence
 
     turns = get_scene_value_turns(project_path)
     schemas = _value_schemas(conn)
@@ -595,7 +595,7 @@ def _values_for_scene(conn, project_path, scene_id, turns, schemas) -> dict:
     and act, and for each plot it serves, where each of the plot's values was
     last left and where it turns next.
     """
-    from core.value_focus import for_act, for_sequence
+    from story_architect.core.value_focus import for_act, for_sequence
 
     row = conn.execute(
         "SELECT id, parent_id FROM entities "

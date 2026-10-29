@@ -16,8 +16,8 @@ import sqlite3
 
 import pytest
 
-from tools.story_export import handler as export_handler
-from tools.story_import import handler as import_handler
+from story_architect.tools.story_export import handler as export_handler
+from story_architect.tools.story_import import handler as import_handler
 
 from test_round_trip import note_for, note_rel
 
@@ -196,8 +196,8 @@ class TestNestedFieldsKeepTheirDeclaredOrder:
 
     def test_an_undeclared_key_is_kept_not_dropped(self):
         """Reordering must not become a filter, or a key vanishes silently."""
-        from core.constants import ENTITY_SCHEMAS
-        from tools.story_export import _ordered
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        from story_architect.tools.story_export import _ordered
 
         meta = ENTITY_SCHEMAS["scene"]["value_turns"]
         turn = {"effects": [], "plot": "x", "surprise": "keep me", "to": "b",

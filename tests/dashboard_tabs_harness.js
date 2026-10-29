@@ -3,7 +3,7 @@
 //
 //   node tests/dashboard_tabs_harness.js <dashboard_dir> <payload.json>
 //
-// `<dashboard_dir>` is `src/dashboard`: the modules under test are the ones the
+// `<dashboard_dir>` is `src/story_architect/web`: the modules under test are the ones the
 // dashboard actually loads, not the delivered copies in tasks/. `<payload.json>`
 // is what `core.db.get_dashboard_data` produced for the fixture project —
 // `{"story": …, "sections": …}` — so the reader is exercised on the shape that

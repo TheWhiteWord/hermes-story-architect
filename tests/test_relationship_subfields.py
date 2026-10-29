@@ -10,7 +10,7 @@ import shutil
 import tempfile
 
 
-from core.constants import ENTITY_SCHEMAS
+from story_architect.core.constants import ENTITY_SCHEMAS
 
 
 def _load(project_dir):
@@ -19,7 +19,7 @@ def _load(project_dir):
     `get_project_summary` emits bare slug strings there; `get_dashboard_data`
     emits the {with, label, type, strength} shape the schema declares.
     """
-    from core.db import get_dashboard_data
+    from story_architect.core.db import get_dashboard_data
 
     return get_dashboard_data(project_dir)["story_data"]
 
@@ -38,7 +38,7 @@ def test_declared_sub_fields_match_the_load_payload(fixture_path):
 
 
 def test_describe_surfaces_the_sub_fields():
-    from tools.story_describe import handler
+    from story_architect.tools.story_describe import handler
 
     out = json.loads(handler({"entity_type": "character"}))
     sub = out["entity_schemas"]["character"]["relationships"]["sub_fields"]

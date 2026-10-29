@@ -47,10 +47,10 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 **Guidance:** read `__init__.py`, `core/config.py`, `core/db.py`, `tools/story_dashboard.py`, `tools/story_resolve.py`, `src/dashboard/index.html`, `js/core.js`, and `tests/test_dashboard_tabs.py`. Read whatever the existing `plan/` and `archieved/` folders contain, but do **not** delete them (see Task 9).
 
 **Checklist**
-- [ ] Branch created
-- [ ] Baseline test results recorded
-- [ ] A1-A7 verified and noted
-- [ ] `NOTES.md` created
+- [x] Branch created
+- [x] Baseline test results recorded
+- [x] A1-A7 verified and noted
+- [x] `NOTES.md` created
 
 ---
 
@@ -94,10 +94,10 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - If something in `tools/` only existed to support the dashboard tool or the hook, remove it. If you are unsure whether it is used by something else, leave it and note it.
 
 **Checklist**
-- [ ] Plugin entry, hook, skills registration, `plugin.yaml` removed
-- [ ] `story_dashboard` tool removed; reusable logic identified for Task 4
-- [ ] No Hermes imports remain
-- [ ] Tests green (remove or adapt only tests of deleted code)
+- [x] Plugin entry, hook, skills registration, `plugin.yaml` removed
+- [x] `story_dashboard` tool removed; reusable logic identified for Task 4
+- [x] No Hermes imports remain
+- [x] Tests green (remove or adapt only tests of deleted code)
 
 ---
 
@@ -118,9 +118,9 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - Choose a default root that makes sense for first-time use (for example a folder in the user's home) and document it.
 
 **Checklist**
-- [ ] Config module with documented precedence
-- [ ] Unit tests for precedence and error cases
-- [ ] No Hermes config dependency left in the app path
+- [x] Config module with documented precedence
+- [x] Unit tests for precedence and error cases
+- [x] No Hermes config dependency left in the app path
 
 ---
 

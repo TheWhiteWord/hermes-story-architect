@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.story_import import handler as import_handler
-from tools.story_search import handler as search_handler
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_search import handler as search_handler
 
 
 @pytest.fixture

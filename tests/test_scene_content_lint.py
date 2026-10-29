@@ -9,7 +9,7 @@ something that renders, or missing something that does not.
 import pytest
 
 
-from core.scene_content_lint import check_scene_content, check_scenes
+from story_architect.core.scene_content_lint import check_scene_content, check_scenes
 
 
 # ── Renders, so must not be flagged ────────────────────────────────────────
@@ -70,7 +70,7 @@ def test_the_premise_holds_against_the_live_renderer():
     means the scene renders but the text before it vanishes. Only the first
     shows up as an empty script.
     """
-    from core.screenplay import extract_scenes
+    from story_architect.core.screenplay import extract_scenes
 
     for name, content in sorted(INVISIBLE.items()):
         assert extract_scenes(content) == [], (
@@ -88,7 +88,7 @@ def test_the_premise_holds_against_the_live_renderer():
 def test_forced_headings_are_accepted_as_headings():
     """`.SNIPER SCOPE POV` and `.OPENING TITLES` are headings, not errors. The
     linter reuses the renderer's own regex, so this cannot disagree with it."""
-    from core.fountain_lexer import SCENE_HEADING_RE
+    from story_architect.core.fountain_lexer import SCENE_HEADING_RE
 
     for text in (".SNIPER SCOPE POV", ".OPENING TITLES", ".opening titles"):
         assert SCENE_HEADING_RE.match(text), text

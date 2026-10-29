@@ -10,8 +10,8 @@ with nothing in it and the agent got no signal that anything was missing.
 """
 import pytest
 
-from core.constants import ENTITY_SCHEMAS
-from core.entity import unfilled_fields
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.entity import unfilled_fields
 
 
 def _unfilled(entity_type, **extra):
@@ -52,7 +52,7 @@ class TestRealContent:
         if a placeholder is ever added back.
         """
         import re
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
 
         prose = re.compile(r"not set|not described|not defined|not recorded", re.I)
         offenders = [
@@ -98,7 +98,7 @@ class TestNeverUnfilled:
         Every other computed field stays out: a character's `relationships`
         summarises entities that live elsewhere and are reported there.
         """
-        from core.entity import _RELATION_FIELDS
+        from story_architect.core.entity import _RELATION_FIELDS
         for entity_type, fields in ENTITY_SCHEMAS.items():
             computed = [f for f, m in fields.items() if m.get("computed")]
             relation_fields = _RELATION_FIELDS.get(entity_type, {})

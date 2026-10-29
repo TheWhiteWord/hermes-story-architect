@@ -9,7 +9,7 @@ validator skipped every op that was not a `create`.
 import json
 
 
-from tools.story_draft import handler
+from story_architect.tools.story_draft import handler
 
 
 def _stage(project, ops):
@@ -50,7 +50,7 @@ def test_editing_an_ordinary_field_reports_nothing(fixture_path):
 
 def test_the_write_path_also_refuses_it(fixture_path):
     """The preview is not the only guard; `edit_entity` drops it and says so."""
-    from core.writes import edit_entity
+    from story_architect.core.writes import edit_entity
 
     r = edit_entity(fixture_path, "character", "kael",
                     data={"relationships": [{"with": "marcus-chen"}]},

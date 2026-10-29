@@ -14,10 +14,10 @@ import shutil
 
 import pytest
 
-from core.db import get_project_memory
-from tools.story_import import handler as import_handler
-from tools.story_memory import handler as memory_handler
-from tools.story_resolve import PROJECT_THRESHOLD, resolve_project
+from story_architect.core.db import get_project_memory
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_memory import handler as memory_handler
+from story_architect.tools.story_resolve import PROJECT_THRESHOLD, resolve_project
 
 
 @pytest.fixture
@@ -32,10 +32,10 @@ def vault(tmp_path, _built_fixture):
         dest = v / "projects" / slug
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(str(_built_fixture), str(dest))
-    import core.config
+    import story_architect.core.config
     import pytest as _p
     _monkey = _p.MonkeyPatch()
-    _monkey.setattr(core.config, "load_plugin_config",
+    _monkey.setattr(story_architect.core.config, "load_plugin_config",
                     lambda: {"root_path": str(v)})
     yield v
     _monkey.undo()
@@ -47,7 +47,7 @@ def _mem(vault, **args):
 
 class TestThreshold:
     def test_project_threshold_is_stricter_than_the_shared_one(self):
-        from core.constants import FUZZY_THRESHOLD
+        from story_architect.core.constants import FUZZY_THRESHOLD
         assert PROJECT_THRESHOLD > FUZZY_THRESHOLD
 
     def test_exact_slug_still_resolves(self, vault):
@@ -70,7 +70,7 @@ class TestThreshold:
     def test_screenplay_threshold_is_untouched(self):
         """The shared constant belongs to screenplay matching; we only added
         a local one, so a screenplay title match behaves exactly as before."""
-        from core.constants import FUZZY_THRESHOLD
+        from story_architect.core.constants import FUZZY_THRESHOLD
         assert FUZZY_THRESHOLD == 40
 
 

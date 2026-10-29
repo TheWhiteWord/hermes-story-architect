@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-VALUE_GRAPH = PLUGIN_ROOT / "src/dashboard/js/graph/value-graph.js"
+VALUE_GRAPH = PLUGIN_ROOT / "src/story_architect/web/js/graph/value-graph.js"
 
 pytestmark = pytest.mark.skipif(
     not shutil.which("node"), reason="node not available"

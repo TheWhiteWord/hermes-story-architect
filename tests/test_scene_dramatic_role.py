@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from core.constants import SCENE_DRAMATIC_ROLES
-from core.db import get_dashboard_data, get_project_summary
-from core.entity import validate_scene_dramatic_role
-from core.writes import create_entity, create_project, edit_entity
+from story_architect.core.constants import SCENE_DRAMATIC_ROLES
+from story_architect.core.db import get_dashboard_data, get_project_summary
+from story_architect.core.entity import validate_scene_dramatic_role
+from story_architect.core.writes import create_entity, create_project, edit_entity
 
 
 @pytest.fixture

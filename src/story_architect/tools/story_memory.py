@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 
-from core.constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT
-from core.db import (
+from story_architect.core.constants import MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT
+from story_architect.core.db import (
     empty_memory,
     get_project_memory,
     memory_serialized_length,
@@ -79,7 +79,7 @@ def _match_confidence(user_input: str, resolved: Path) -> dict | None:
 def handler(args: dict, **kwargs) -> str:
     """Apply one exact-entry mutation to project.extra.memory."""
     from .story_resolve import resolve_project
-    from core.config import resolve_root
+    from story_architect.core.config import resolve_root
 
     root_path = resolve_root(kwargs)
     try:

@@ -12,8 +12,8 @@ import json
 import pytest
 
 
-from core.entity import standard_sections
-from tools.story_describe import handler
+from story_architect.core.entity import standard_sections
+from story_architect.tools.story_describe import handler
 
 
 def _describe(entity_type=None):
@@ -51,7 +51,7 @@ def test_sections_say_they_are_a_closed_set():
 
 def test_sections_do_not_shadow_a_field():
     """Merged flat, so the synthetic key must not collide with a real field."""
-    from core.constants import ENTITY_SCHEMAS
+    from story_architect.core.constants import ENTITY_SCHEMAS
 
     for entity_type, entry in _describe().items():
         assert entity_type in ENTITY_SCHEMAS

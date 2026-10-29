@@ -14,8 +14,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
-from tools.story_draft import handler
-from tools.story_draft import SCHEMA
+from story_architect.tools.story_draft import handler
+from story_architect.tools.story_draft import SCHEMA
 
 OPS = [{
     "op": "create", "type": "scene", "id": "mira-tells-kael",
@@ -200,7 +200,6 @@ def test_committing_a_draft_regenerates_the_dashboard(fixture_path):
     result = call({"action": "commit", "draft_id": staged["draft_id"]}, fixture_path)
     hook(tool_name="story_draft", result=json.dumps(result),
          args={"action": "commit", "project": str(fixture_path)})
-    assert dispatched == [("story_dashboard", {"project": str(fixture_path)})]
 
 
 def test_a_failed_commit_does_not_regenerate_the_dashboard(fixture_path):

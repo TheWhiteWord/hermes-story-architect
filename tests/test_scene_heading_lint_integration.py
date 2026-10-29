@@ -6,7 +6,7 @@ finding has to survive the whole path an agent actually takes.
 import json
 
 
-from tools.story_draft import handler
+from story_architect.tools.story_draft import handler
 
 GOOD = "INT. THE CENTRAL ROOM - DAY\n\nHe waits at the door."
 BAD = "KAEL stands before the door, hand on the handle."

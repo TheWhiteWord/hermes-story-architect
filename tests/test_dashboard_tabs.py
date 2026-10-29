@@ -1,6 +1,5 @@
 """The Beats and Journey tabs, executed in node against the real payload.
 
-`tests/test_dashboard.py` proves the shipping path: `story_dashboard.handler`
 builds a page and headless Chrome renders the panes. This file proves the two
 tabs' own logic — the payload reader, the empty states, the lane/stacked switch,
 the self-directed arrow, the act focus, the ribbon's fill rule — by running the
@@ -30,21 +29,21 @@ pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="node not avail
 @pytest.fixture
 def payload(tmp_path):
     """The dashboard payload for the fixture project, as the dashboard gets it."""
-    import core.config
+    import story_architect.core.config
 
     vault = tmp_path / "v"
     dest = vault / "projects" / "stc"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(str(FIXTURE), str(dest))
 
-    from tools.story_import import handler as import_handler
+    from story_architect.tools.story_import import handler as import_handler
 
-    core.config.load_plugin_config = lambda: {"root_path": str(vault)}
+    story_architect.core.config.load_plugin_config = lambda: {"root_path": str(vault)}
     result = json.loads(import_handler(
         {"project": "stc", "confirm": True, "root_path": str(vault)}))
     assert result.get("success"), result
 
-    from core.db import get_dashboard_data
+    from story_architect.core.db import get_dashboard_data
 
     data = get_dashboard_data(dest)
     path = tmp_path / "payload.json"
@@ -78,7 +77,7 @@ class TestTheTabsRun:
         """The checks are about the dashboard's own files, not a copy of them.
 
         Pointing it at a tree with a broken module must fail: that is what proves
-        the 60-odd checks above are reading `src/dashboard`, and not something
+        the 60-odd checks above are reading `src/story_architect/web`, and not something
         cached, delivered, or skipped.
         """
         broken = tmp_path / "dashboard"

@@ -1,7 +1,7 @@
 """Test suite for Fountain lexer — port of Better Fountain."""
 import pytest
 from pathlib import Path
-from core.fountain_lexer import (
+from story_architect.core.fountain_lexer import (
     parse,
     tokenize,
     tokens_to_html,
@@ -417,7 +417,7 @@ class TestSceneExtraction:
         assert "FADE OUT." in content
 
     def test_extract_all_scenes(self, save_the_children_fountain):
-        from core.screenplay import extract_scenes
+        from story_architect.core.screenplay import extract_scenes
         scenes = extract_scenes(save_the_children_fountain)
         assert len(scenes) == 9
         # Verify all scene headings
@@ -436,7 +436,7 @@ class TestSceneExtraction:
             assert scenes[i]["heading"] == heading
 
     def test_scene_characters(self, save_the_children_fountain):
-        from core.screenplay import extract_scenes
+        from story_architect.core.screenplay import extract_scenes
         scenes = extract_scenes(save_the_children_fountain)
         # Verify characters in each scene
         assert "KAEL" in scenes[1]["characters"]

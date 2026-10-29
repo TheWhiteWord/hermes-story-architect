@@ -85,7 +85,7 @@ SCHEMA = {
 
 
 def handler(args: dict, **kwargs) -> str:
-    from core.config import resolve_root
+    from story_architect.core.config import resolve_root
 
     root_path = resolve_root(kwargs)
     action = args["action"]
@@ -115,7 +115,7 @@ def _resolve(args: dict, root_path: Path) -> Path:
 # ─── the five actions ───
 
 def _create_project(args: dict, root_path: Path) -> dict:
-    from core.writes import create_project
+    from story_architect.core.writes import create_project
     return create_project(
         args.get("project", ""), args.get("frontmatter") or {}, root_path)
 
@@ -206,7 +206,7 @@ def _backup_outside(project_path: Path, root_path: Path) -> str:
     """
     from datetime import datetime
 
-    from core.db import backup_database
+    from story_architect.core.db import backup_database
 
     snapshot = Path(backup_database(project_path))
     backups = root_path / "backups"
@@ -235,7 +235,7 @@ def _purge_deleted(args: dict, project_path: Path) -> dict:
     """
     from datetime import datetime, timedelta
 
-    from core.db import backup_database, get_db
+    from story_architect.core.db import backup_database, get_db
 
     required = f"DELETE {project_path.name}"
     given = args.get("purge_confirm", "")
@@ -298,7 +298,7 @@ def _restore_entity(args: dict, project_path: Path) -> dict:
     alternative is a dead plot's rows silently reattaching, which is worse.
     See the delete sweep in core/writes.py.
     """
-    from core.db import get_db
+    from story_architect.core.db import get_db
 
     target = args.get("target") or {}
     entity_type = target.get("entity_type") or ""

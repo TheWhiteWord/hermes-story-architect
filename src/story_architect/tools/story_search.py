@@ -29,8 +29,8 @@ SCHEMA = {
 
 def handler(args: dict, **kwargs) -> str:
     """Search across project section prose."""
-    from core.config import resolve_root
-    from core.db import get_db, has_schema, search_sections
+    from story_architect.core.config import resolve_root
+    from story_architect.core.db import get_db, has_schema, search_sections
     from .story_resolve import resolve_project
 
     root_path = resolve_root(kwargs)

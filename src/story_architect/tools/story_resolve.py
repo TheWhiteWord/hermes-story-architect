@@ -8,7 +8,7 @@ is tuned for this job — see the table in tasks/task_21*/final_tools.
 """
 from pathlib import Path
 from rapidfuzz import fuzz, process
-from core.constants import FUZZY_THRESHOLD
+from story_architect.core.constants import FUZZY_THRESHOLD
 
 # Stricter than FUZZY_THRESHOLD on purpose, and local to this module: a miss
 # here silently writes to the wrong project, whereas a screenplay title miss

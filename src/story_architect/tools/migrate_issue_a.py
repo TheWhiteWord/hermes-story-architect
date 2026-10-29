@@ -22,7 +22,7 @@ NOT_CARRIED_OVER = ["is_sequence_climax", "is_act_climax"]
 
 
 def migrate(project_path: Path, dry_run: bool = True) -> dict:
-    from core.db import get_db
+    from story_architect.core.db import get_db
 
     conn = get_db(project_path)
     try:

@@ -6,14 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from core.constants import ENTITY_SCHEMAS
-from core.writes import create_entity, create_project, edit_entity
-from tools.story_load import handler as load_handler
-from tools.story_retrieve import handler as retrieve_handler
-from tools.story_search import handler as search_handler
-from tools.story_dashboard import handler as dashboard_handler
-from tools.story_import import handler as import_handler
-from tools.story_export import handler as export_handler
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.writes import create_entity, create_project, edit_entity
+from story_architect.tools.story_load import handler as load_handler
+from story_architect.tools.story_retrieve import handler as retrieve_handler
+from story_architect.tools.story_search import handler as search_handler
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_export import handler as export_handler
 
 
 def _make_beats(n=2):
@@ -462,7 +461,7 @@ def test_import_preserves_all_plot_beats(tmp_path):
 
     import_handler({"project": str(proj), "root_path": tmp_path})
 
-    from core.db import get_db
+    from story_architect.core.db import get_db
     conn = get_db(proj)
     try:
         rows = conn.execute(
@@ -503,7 +502,7 @@ def test_import_skips_recycle_bin(tmp_path):
 
     import_handler({"project": str(proj), "root_path": tmp_path})
 
-    from core.db import get_db
+    from story_architect.core.db import get_db
     conn = get_db(proj)
     try:
         rows = conn.execute("SELECT id FROM entities WHERE id LIKE 'soren%'").fetchall()

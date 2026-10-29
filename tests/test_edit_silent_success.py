@@ -28,15 +28,15 @@ def vault(tmp_path, monkeypatch):
     dest = v / "projects" / "save-the-children"
     dest.parent.mkdir(parents=True)
     shutil.copytree(str(FIXTURE), str(dest))
-    import core.config
-    monkeypatch.setattr(core.config, "load_plugin_config",
+    import story_architect.core.config
+    monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
                         lambda: {"root_path": str(v)})
     _import(v)
     return v
 
 
 def _import(root):
-    from tools.story_import import handler
+    from story_architect.tools.story_import import handler
     handler({"project": "save-the-children", "confirm": True}, root_path=str(root))
 
 
@@ -45,7 +45,7 @@ def _project(vault):
 
 
 def _edit(vault, data, entity_type="character", slug="kael"):
-    from core.writes import edit_entity
+    from story_architect.core.writes import edit_entity
     return edit_entity(_project(vault), entity_type, slug, data, "t")
 
 
@@ -108,7 +108,7 @@ def _has_reference_site(meta: dict) -> bool:
 
 
 def _field(vault, name, entity_type="character", entity_id="kael"):
-    from tools.story_retrieve import handler
+    from story_architect.tools.story_retrieve import handler
     r = json.loads(handler({
         "project": "save-the-children", "entity_type": entity_type,
         "id": [entity_id], "fields": [name]}, root_path=str(vault)))
@@ -142,7 +142,7 @@ class TestUnrecognisedKeysAreRejected:
     def test_error_offers_the_valid_names(self, vault):
         """Same reason: an error naming nothing actionable just gets retried
         the same wrong way."""
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         with pytest.raises(ValueError) as exc:
             _edit(vault, {"nonsense_key": 1})
         message = str(exc.value)
@@ -192,7 +192,7 @@ class TestSuccessNamesWhatLanded:
 
     def test_computed_only_edit_warns_that_nothing_landed(self, vault):
         """A read-only field must not look like a successful write."""
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         computed = [f for f, m in ENTITY_SCHEMAS["character"].items()
                     if m.get("computed")]
         if not computed:
@@ -211,7 +211,7 @@ class TestValidKeysStillWork:
         assert _field(vault, "goals_short") == "ESCAPE OR DIE"
 
     def test_section_prose_applies(self, vault):
-        from tools.story_retrieve import handler
+        from story_architect.tools.story_retrieve import handler
         _edit(vault, {"Background": "PROSE MARKER."})
         r = json.loads(handler({
             "project": "save-the-children", "entity_type": "character",
@@ -220,10 +220,10 @@ class TestValidKeysStillWork:
 
     def test_every_valid_key_of_every_entity_type_is_accepted(self, vault):
         """Sweeps the whole surface, so a schema addition cannot be locked out."""
-        from core.constants import ENTITY_SCHEMAS
-        from core.entity import (ENTITY_COLUMN_MAP, relation_fields,
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        from story_architect.core.entity import (ENTITY_COLUMN_MAP, relation_fields,
                                  standard_sections)
-        from core.writes import _FIELDS_TO_SKIP
+        from story_architect.core.writes import _FIELDS_TO_SKIP
 
         conn = sqlite3.connect(str(_project(vault) / ".story" / "story.db"))
         try:

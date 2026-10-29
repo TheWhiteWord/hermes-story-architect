@@ -19,7 +19,7 @@ SCHEMA = {
 def handler(args, **kwargs) -> str:
     """Backup story.db to a timestamped copy."""
     from .story_resolve import resolve_project
-    from core.config import resolve_root
+    from story_architect.core.config import resolve_root
 
     root_path = resolve_root(kwargs)
 
@@ -32,7 +32,7 @@ def handler(args, **kwargs) -> str:
     if not db_path.exists():
         return json.dumps({"error": "No story.db found. Run story_import first."})
 
-    from core.db import backup_database
+    from story_architect.core.db import backup_database
     backup_path = backup_database(project_path)
 
     return json.dumps({

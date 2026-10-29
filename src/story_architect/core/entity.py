@@ -686,7 +686,7 @@ def relations_for_insert(entity_type: str, slug: str, fm: dict) -> list[dict]:
 
 def validate_scene_act_id(project_path, sequence_id: str, act_id: str) -> None:
     """Raise ValueError if sequence's act_id doesn't match the provided act_id."""
-    from core.db import get_db
+    from story_architect.core.db import get_db
     conn = get_db(project_path)
     try:
         row = conn.execute(
@@ -716,7 +716,7 @@ def validate_scene_location(project_path, location: str) -> None:
     """
     if not location:
         return
-    from core.db import get_db
+    from story_architect.core.db import get_db
     conn = get_db(project_path)
     try:
         row = conn.execute(
@@ -779,7 +779,7 @@ def check_references(project_path, entity_type: str, frontmatter: dict) -> None:
     `plot.characters`) and a sub-field `ref` (nested inside entries, like
     `plot_roles.plot`).
     """
-    from core.db import get_db
+    from story_architect.core.db import get_db
     from .constants import ENTITY_SCHEMAS
 
     refs = []
@@ -824,7 +824,7 @@ def validate_scene_beats(project_path, merged: dict) -> None:
     record to another scene is checked against the state that will be stored
     rather than against the keys the caller happened to send.
     """
-    from core.db import get_db
+    from story_architect.core.db import get_db
 
     scene_id = str(merged.get("scene") or "")
     if not scene_id:
@@ -878,7 +878,7 @@ def validate_beat_references(project_path, beats, true_character, changes=None) 
     scene's closing state, not one exchange's), so it is passed separately
     rather than read out of each beat.
     """
-    from core.db import get_db
+    from story_architect.core.db import get_db
 
     if not isinstance(beats, list):
         return

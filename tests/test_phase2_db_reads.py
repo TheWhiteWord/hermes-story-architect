@@ -6,13 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from tools.story_import import handler as import_handler
-from tools.story_load import handler as load_handler
-from tools.story_retrieve import handler as retrieve_handler
-from tools.story_search import handler as search_handler
-from tools.story_dashboard import handler as dashboard_handler
-from core.writes import create_entity, edit_entity
-from tools.story_resolve import resolve_project
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_load import handler as load_handler
+from story_architect.tools.story_retrieve import handler as retrieve_handler
+from story_architect.tools.story_search import handler as search_handler
+from story_architect.core.writes import create_entity, edit_entity
+from story_architect.tools.story_resolve import resolve_project
 
 
 @pytest.fixture
@@ -199,7 +198,7 @@ class TestEmbeddedCrossReferences:
         {with, label, type, strength} shape the schema declares.
         """
         proj, vault = db_project
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
         result = get_dashboard_data(proj)["story_data"]
         for char in result["characters"]:
             if "relationships" in char:
@@ -253,7 +252,7 @@ class TestUnfilledInverted:
 
     def test_unfilled_inverted_shape(self, db_project):
         """unfilled maps field names to lists of entity slugs."""
-        from core.db import get_unfilled_map
+        from story_architect.core.db import get_unfilled_map
         proj, vault = db_project
         unfilled = get_unfilled_map(proj)
         assert isinstance(unfilled, dict)
@@ -263,7 +262,7 @@ class TestUnfilledInverted:
 
     def test_unfilled_excludes_stubs(self, db_project):
         """Stub entities do not appear in unfilled lists."""
-        from core.db import get_unfilled_map
+        from story_architect.core.db import get_unfilled_map
         proj, vault = db_project
         unfilled = get_unfilled_map(proj)
         # Collect all entity slugs mentioned in unfilled
@@ -280,7 +279,7 @@ class TestUnfilledInverted:
 
     def test_character_goals_unfilled(self, db_project):
         """New character has goals_short/goals_long unfilled."""
-        from core.db import get_unfilled_map
+        from story_architect.core.db import get_unfilled_map
         proj, vault = db_project
         # Create a new character
         create_entity(proj, "character", "unfilled-test",
@@ -292,7 +291,7 @@ class TestUnfilledInverted:
 
     def test_unfilled_excludes_status_booleans_numbers(self, db_project):
         """unfilled must not contain status, booleans, or numbers — only string/placeholder fields."""
-        from core.db import get_unfilled_map
+        from story_architect.core.db import get_unfilled_map
         proj, vault = db_project
         unfilled = get_unfilled_map(proj)
         # No boolean fields
@@ -348,7 +347,7 @@ class TestNavigationalQueries:
         each scene as `plot_roles`, which IS in `["all"]`.
         """
         proj, vault = db_project
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         result = json.loads(retrieve_handler({
             "project": str(proj), "entity_type": "plot",
             "id": ["the-resistance"],
@@ -464,7 +463,6 @@ class TestStorySearchDB:
 
 
 class TestStoryDashboardDB:
-    """story_dashboard uses DB path when story.db exists."""
 
     def test_dashboard_all_injections(self, db_project):
         proj, vault = db_project
@@ -502,7 +500,7 @@ class TestAutoReimport:
         assert result["success"] is True
 
         # DB should now have the new entity
-        from core.db import get_db
+        from story_architect.core.db import get_db
         import sqlite3
         conn = sqlite3.connect(str(proj / ".story" / "story.db"))
         row = conn.execute(
@@ -520,7 +518,7 @@ class TestAutoReimport:
         assert result["success"] is True
 
         # DB should reflect the change
-        from core.db import get_db
+        from story_architect.core.db import get_db
         import sqlite3
         conn = sqlite3.connect(str(proj / ".story" / "story.db"))
         row = conn.execute(

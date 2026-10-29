@@ -3,8 +3,8 @@ import json
 import re
 from pathlib import Path
 
-from core.constants import ENTITY_SCHEMAS
-from core.entity import PLOT_BEAT_FIELDS
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.entity import PLOT_BEAT_FIELDS
 
 SCHEMA = {
     "description": "Write the whole database back out to Markdown files. Use to publish the "
@@ -21,7 +21,7 @@ SCHEMA = {
 def handler(args, **kwargs) -> str:
     """Export SQLite to markdown vault."""
     from .story_resolve import resolve_project
-    from core.config import resolve_root
+    from story_architect.core.config import resolve_root
 
     root_path = resolve_root(kwargs)
 
@@ -30,7 +30,7 @@ def handler(args, **kwargs) -> str:
     except ValueError as e:
         return json.dumps({"error": str(e)})
 
-    from core.db import get_db
+    from story_architect.core.db import get_db
 
     conn = get_db(project_path)
     try:
@@ -222,7 +222,7 @@ def _export_all(conn, project_path: Path) -> set:
         if entity_type == "project":
             _write_note(project_path / "project.md", fm, body)
             written.add(project_path / "project.md")
-            from core.db import get_project_memory
+            from story_architect.core.db import get_project_memory
             _write_note(project_path / ".story" / "memory.md", get_project_memory(project_path), "")
             written.add(project_path / ".story" / "memory.md")
             continue

@@ -10,8 +10,8 @@ carries its own `description` instead, which is where the model actually reads i
 """
 import json
 
-from core.constants import ENTITY_SCHEMAS
-from core.entity import (
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.entity import (
     FIELDS_TO_SKIP,
     ENTITY_COLUMN_MAP,
     relation_fields,

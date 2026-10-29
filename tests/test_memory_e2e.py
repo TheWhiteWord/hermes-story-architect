@@ -3,11 +3,10 @@ import json
 
 import pytest
 
-from core.writes import create_project
-from tools.story_dashboard import handler as dashboard_handler
-from tools.story_export import handler as export_handler
-from tools.story_load import handler as load_handler
-from tools.story_memory import handler as memory_handler
+from story_architect.core.writes import create_project
+from story_architect.tools.story_export import handler as export_handler
+from story_architect.tools.story_load import handler as load_handler
+from story_architect.tools.story_memory import handler as memory_handler
 
 
 def test_memory_loop_is_db_authoritative(tmp_path):

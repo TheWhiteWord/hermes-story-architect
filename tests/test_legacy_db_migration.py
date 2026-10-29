@@ -21,7 +21,7 @@ table existing, which is the same rule the soft-delete repair follows.
 import sqlite3
 
 
-from core.db import ensure_soft_delete_columns, get_db
+from story_architect.core.db import ensure_soft_delete_columns, get_db
 
 
 def test_get_db_migrates_a_legacy_database(tmp_path):
@@ -69,7 +69,7 @@ def test_migrations_are_idempotent(tmp_path):
     Needs a real project: get_db guards the repair on the table existing, and
     calling it directly on a brand-new project is calling it out of contract.
     """
-    from core.writes import create_project
+    from story_architect.core.writes import create_project
     root = tmp_path / "v"
     (root / "projects").mkdir(parents=True)
     create_project("stc", {"name": "STC", "logline": "L"}, root)
