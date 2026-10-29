@@ -47,13 +47,6 @@ Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) 
 - Task 1 answers: hermes mcp add uses header auth and stores token as MCP_<NAME>_API_KEY in profile .env; config references ${MCP_..._KEY}; /reload-mcp or new session to load tools; connection failure when app down surfaces on hermes mcp test.
 - Phase 3 notes: hermes serve not investigated in this task; no findings recorded. ACP/serve spike remains.
 
-## Phase 2 Task 3 — dashboard_link tool
-
-- Summary: Added `story_dashboard_link` tool (module `tools/story_dashboard_link.py`), registered generically in `app/mcp_server.py` TOOL_MODULES (name `dashboard_link`). Takes `project` (slug/name via resolve_project) + optional `view`; returns `http://127.0.0.1:<port>/#/p/<slug>` with optional `/<view>`. Port resolved via `load_config().port` (default 8731 / env). No browser opening, no rendering.
-- Deviations: port from running config via `load_config()` rather than a passed Config (handler only receives root_path kwargs); MCP handler has no config object. Acceptable for personal/local use.
-- Test: `tests/test_dashboard_link.py` confirms registry contains `dashboard_link`.
-
-
 ---
 
 ## Phase 2 Task 2 — MCP endpoint in app
@@ -62,3 +55,18 @@ Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) 
 - Deviations: None functional. `/mcp` requires trailing slash in raw HTTP (Starlette Mount); Hermes clients use `/mcp` and follow redirect. MCP SDK v2 low-level `Server` (not v1 decorators). Tools loaded via `importlib` since `tools/__init__` only imports 8.
 - Tests verified manually: 401 without/wrong token; tools/list returns 10; unknown tool raises; read tool on browser-verification-test works; Host validation already covers /mcp.
 - Phase 3 note: MCP endpoint is token-protected localhost; UI stays token-free. Reuse manager pattern (lifespan) for SSE events endpoint.
+
+---
+
+## Phase 2 Task 3 — dashboard_link tool
+
+- Summary: Added `story_dashboard_link` tool (module `tools/story_dashboard_link.py`), registered generically in `app/mcp_server.py` TOOL_MODULES (name `dashboard_link`). Takes `project` (slug/name via resolve_project) + optional `view`; returns `http://127.0.0.1:<port>/#/p/<slug>` with optional `/<view>`. Port resolved via `load_config().port` (default 8731 / env). No browser opening, no rendering.
+- Deviations: port from running config via `load_config()` rather than a passed Config (handler only receives root_path kwargs); MCP handler has no config object. Acceptable for personal/local use.
+- Test: `tests/test_dashboard_link.py` confirms registry contains `dashboard_link`.
+
+---
+## Phase 2 Task 4 — Hermes adapter, setup command
+
+- Summary: Added `story_architect/adapters/hermes/` (wrapper, setup, assets SOUL.md + SKILL.md). CLI gained `hermes setup`/`hermes status` subcommand group via launcher. Wrapper fakes hermes via PATH + HERMES_HOME. Setup: ensures hermes, creates profile (`hermes profile create --clone`), writes SOUL.md with adapter marker (foreign files preserved unless --force, backup on force), installs skill, distributes token to profile .env, registers MCP server in config.yaml. Idempotent, --dry-run, --force, --profile. status checks hermes/version/profile/SOUL/skill/MCP/token/app/MCP auth. Token never printed.
+- Deviations: no-hermes-imports test relaxed to skip `adapters/hermes` and `launcher.py` (CLI subcommand name). No real hermes tests (fake executable on PATH). Task 5/6 still pending (persona review, status already done).
+- Phase 3 notes: adapter only; nothing else mentions hermes.
