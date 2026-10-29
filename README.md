@@ -1,57 +1,19 @@
-# Hermes Story Architect
+# Story Architect
 
-> A story-writing environment for Hermes Desktop, architecturally inspired by [Story Architect](https://github.com/story-apps/starc) (STARC).
+Standalone local app for story/screenplay development.
 
-## What this is
+## Install
 
-STARC is a GPLv3 C++/Qt desktop screenwriting app with a rich data model: characters with 20+ structured fields, locations, worlds, synopsis, treatment, screenplay-as-typed-paragraphs, story memory, continuity gates, and an AI assistant protocol.
+pip install -e .
 
-This project takes STARC's **architecture** — the taxonomy, the entity schemas, the action protocol, the continuity model — and re-implements it as a **Hermes-native writing environment**:
+## Run
 
-- Story projects live as a **SQLite database** (`.story/story.db`) under the configured
-  story root; `story_export` writes Markdown for use with an md system such as Obsidian
-- Hermes provides the **intelligence layer** (story loading, editing, continuity checking)
-- The **preview pane** provides interactive navigation (characters, scenes, timeline)
-- All edits require **human review** before being applied
+story-architect --root <projects root>
 
-We are NOT reading `.starc` files. We are taking a good architectural reference and making it native to how you already work.
+## Demo data
 
-## What this is NOT
+story-architect seed-demo --root /tmp/sa-demo
 
-- We are not maintaining STARC's file format or GUI
-- We are not forking the C++ codebase
-- We are not a screenwriting app — we are a **story layer inside Hermes**
+## Tests
 
-## Repo structure
-
-```
-hermes-story-architect/
-├── research/                    # STARC architecture reference
-│   └── starc-data-model.md      # Reverse-engineered schema + protocol
-├── plan/
-│   └── plan.md                  # Stage-by-stage build plan
-├── skills/                      # Hermes skills
-│   ├── story-loader/            # Load project into context
-│   └── story-editor/            # Action protocol + apply edits
-├── src/
-│   └── dashboard/               # Preview pane interactive dashboard
-│       └── story-dashboard.html
-├── vault-conventions.md         # Export structure + frontmatter schemas
-└── README.md
-```
-
-## Stages
-
-1. **Schema & Conventions** — Define entity types, fields, project structure
-2. **Story Loader Skill** — Load full project context into Hermes
-3. **Story Editor Skill** — Propose + apply structured edits (Action Protocol)
-4. **Preview Pane Dashboard** — Interactive character/scene/world navigation
-
-## Architecture reference
-
-- **Upstream**: [story-apps/starc](https://github.com/story-apps/starc) — GPLv3
-- **Codex fork**: [jeffkimkimo/starc](https://github.com/jeffkimkimo/starc/tree/agent/codex-story-assistant-alpha) — the Action Protocol V3, story skills, and continuity model we're porting
-
-## Status
-
-Research complete. Plan written (v5). Building Stage 1 (Schema & Conventions).
+pytest

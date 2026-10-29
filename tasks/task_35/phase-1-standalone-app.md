@@ -259,9 +259,9 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - Do **not** delete `plan/`, `archieved/`, `docs/`, or `vault-conventions.md` on your own. List each stale-looking item in `NOTES.md` with a one-line recommendation (keep/archive/delete) for the owner to decide.
 
 **Checklist**
-- [ ] README rewritten
-- [ ] Plan files in `docs/plan/`, checklists ticked
-- [ ] Stale-items list with recommendations in `NOTES.md`
+- [x] README rewritten
+- [x] Plan files in `docs/plan/`, checklists ticked
+- [x] Stale-items list with recommendations in `NOTES.md`
 
 ---
 
