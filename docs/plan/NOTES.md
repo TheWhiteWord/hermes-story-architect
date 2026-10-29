@@ -30,3 +30,7 @@ Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) 
 - None of the 10 remaining tool modules depend on dashboard code.
 - Tools return JSON string; success usually `{"success": true, ...}`; errors `{"success": false, "error": "..."}` or raised exceptions translated at boundary.
 - core changes beyond imports: removed Hermes config path/load_plugin_config; resolve_root now free of Hermes; dashboard assembly removed; stats moved to app.stats.
+
+## Task 1 reconciliation
+
+Baseline 1209 tests; current 1009. Removed/rewritten obsolete dashboard-assembly tests (test_dashboard, test_dashboard_tabs, test_field_coverage, test_phase2_db_reads, test_story_dashboard_stats, test_root_path_config) plus post_tool_call refresh tests. Added 4 tests. Reconciles: 1209 = 1009 - 4 + 204 justified removals.
