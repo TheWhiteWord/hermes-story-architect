@@ -34,3 +34,8 @@
 - Cross-site protection added to host_check middleware for non-GET: Origin (when present) must match app origin; custom header X-Story-Architect: 1 required.
 - Backend instantiated from config; 503 if unavailable.
 - One reply at a time per conversation via active_replies dict.
+## Phase 3 Task 5 (Agent availability)
+- Added src/story_architect/adapters/hermes/gateway.py: agent_state() returns not_configured/gateway_stopped/api_unreachable/ready; start_gateway() invokes hermes -p <profile> gateway start and polls API readiness (timeout 15s). App never kills a gateway it did not start (started_by_app tracked in app.state).
+- Config gained agent_autostart (env STORY_ARCHITECT_AGENT_AUTOSTART / config.toml), default off.
+- Routes: GET /api/agent/state, POST /api/agent/start.
+- Shutdown: no process cleanup; gateway persists per Task 1 (systemd/user service). App only cancels its own in-flight replies.

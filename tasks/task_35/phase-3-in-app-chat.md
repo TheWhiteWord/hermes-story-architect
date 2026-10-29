@@ -143,9 +143,9 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - No orphaned processes owned by the app on shutdown unless the gateway was started in a way that is meant to persist (follow what Task 1 learned about how gateways are supervised; do not kill a gateway the app did not start).
 
 **Checklist**
-- [ ] State check and start endpoint
-- [ ] Optional autostart setting, default off
-- [ ] Tests with a fake process wrapper; documented behavior on shutdown
+- [x] State check and start endpoint
+- [x] Optional autostart setting, default off
+- [x] Tests with a fake process wrapper; documented behavior on shutdown
 
 ---
 

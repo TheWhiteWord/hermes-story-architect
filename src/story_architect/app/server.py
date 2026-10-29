@@ -56,6 +56,17 @@ def create_app(config: Config) -> FastAPI:
                 return JSONResponse(status_code=401, content={"error": {"code": "unauthorized", "message": "Missing or invalid token"}})
         return await call_next(request)
 
+    @app.get("/api/agent/state")
+    def agent_state():
+        from story_architect.adapters.hermes.gateway import agent_state as _state
+        return _state(config)
+
+    @app.post("/api/agent/start")
+    def agent_start():
+        from story_architect.adapters.hermes.gateway import start_gateway as _start
+        res = _start(config)
+        app.state.agent_started_by_app = bool(res.get("started_by_app"))
+        return res
     @app.get("/healthz")
     def healthz():
         return {"ok": True}

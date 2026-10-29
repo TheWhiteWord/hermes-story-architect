@@ -18,6 +18,7 @@ class Config:
     port: int = DEFAULT_PORT
     open_browser: bool = True
     hermes_api_port: int = 8642
+    agent_autostart: bool = False
 
 
 def _config_file() -> Path:
@@ -60,4 +61,11 @@ def load_config(*, cli_root=None, cli_port=None, cli_no_open=False) -> Config:
         elif "open_browser" in file_vals:
             open_browser = bool(file_vals["open_browser"])
 
-    return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser, hermes_api_port=int(hermes_api_port_raw))
+    agent_autostart = False
+    env = os.environ.get(ENV_PREFIX + "AGENT_AUTOSTART")
+    if env is not None:
+        agent_autostart = env.lower() not in ("0", "false", "no")
+    elif "agent_autostart" in file_vals:
+        agent_autostart = bool(file_vals["agent_autostart"])
+
+    return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser, hermes_api_port=int(hermes_api_port_raw), agent_autostart=agent_autostart)
