@@ -23,9 +23,9 @@ The Phase 1 report shows the suite went from **1184 passed / 25 skipped / 0 fail
 - Count must reconcile: baseline total = current total - added tests + justified removals.
 
 **Checklist**
-- [ ] Baseline and current test ID lists diffed
-- [ ] Table of missing/newly-skipped tests in `NOTES.md`, each with a decision
-- [ ] Every non-justified one restored or rewritten (see Task 2)
+- [x] Baseline and current test ID lists diffed
+- [x] Table of missing/newly-skipped tests in `NOTES.md`, each with a decision
+- [x] Every non-justified one restored or rewritten (see Task 2)
 
 ### Task 2: Fix the 29 failures
 
