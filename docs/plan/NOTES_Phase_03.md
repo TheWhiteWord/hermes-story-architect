@@ -28,3 +28,4 @@
 - token module gained `ensure_api_key`/`load_api_key` (0600 in config dir).
 - setup enables API server platforms config, writes API_SERVER_KEY to profile .env, sets toolsets=[] (conservative: no built-in terminal/file tools; MCP story tools remain). status checks API reachability/auth/model id.
 - Agent cannot run shell/file tools by default; web search disabled (toolsets empty). Owner can change toolsets in profile config.
+- Tests: tests/test_hermes_chat_backend.py — 5 passing (text+tool, auth, unreachable, malformed, continuity).
