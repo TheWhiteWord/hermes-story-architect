@@ -68,9 +68,9 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - Remove all scratch artifacts afterwards.
 
 **Checklist**
-- [ ] C1-C7 answered in `NOTES_Phase_03.md` with evidence
-- [ ] Recommended endpoint and continuity mechanism chosen
-- [ ] Scratch profile and processes removed
+- [x] C1-C7 answered in `NOTES_Phase_03.md` with evidence
+- [x] Recommended endpoint and continuity mechanism chosen
+- [x] Scratch profile and processes removed
 
 ---
 
