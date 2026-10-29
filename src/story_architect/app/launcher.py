@@ -31,7 +31,7 @@ def main(argv=None):
         parser.add_argument("--root", default=None)
         a = parser.parse_args(argv[1:])
         config = load_config(cli_root=a.root)
-        src = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "browser-verification-test"
+        src = Path(__file__).resolve().parents[1] / "data" / "browser-verification-test"
         # fallback search
         if not src.exists():
             for cand in Path(".").rglob("browser-verification-test"):

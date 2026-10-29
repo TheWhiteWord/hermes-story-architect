@@ -37,10 +37,10 @@ Group them (the report suggests four groups) and resolve each group by intent, n
 - **Draft dashboard regeneration:** `core/drafts.py` (or its tool) apparently triggered a dashboard refresh after commits. The dashboard is now live-from-DB, so the refresh is obsolete. Remove the refresh code and rewrite the tests to assert the draft behavior that still matters (stage, commit, discard, results).
 
 **Checklist**
-- [ ] All 29 failures resolved with the intent preserved
-- [ ] Hermes config path and `load_plugin_config` stub removed from `core`
-- [ ] No test skipped/xfailed to hide a problem
-- [ ] Full suite green; final counts and the reconciliation from Task 1 in `NOTES.md`
+- [x] All 29 failures resolved with the intent preserved
+- [x] Hermes config path and `load_plugin_config` stub removed from `core`
+- [x] No test skipped/xfailed to hide a problem
+- [x] Full suite green; final counts and the reconciliation from Task 1 in `NOTES.md`
 
 ### Task 3: Run the real acceptance test
 

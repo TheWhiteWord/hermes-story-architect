@@ -1,0 +1,633 @@
+window.DASH = window.DASH || {};
+
+// The scenes an entity is in, and what changed there. The same rows the Journey
+// tab draws, minus the character-only lines: a scene link for every scene the
+// entity is recorded in, the closing change beneath it when there is one.
+//
+// The location, world and relationship panels have no tab of their own — their
+// Overview IS the panel — so this section lives there rather than in a new tab.
+DASH.entityScenesHtml = function(id, story) {
+  const track = DASH.entityTrack(id, story || DASH.story);
+  if (!track || !track.rows.length) return '';
+  const h = DASH.escapeHtml;
+  const out = [];
+  let lastAct = null, lastSeq = null;
+  track.rows.forEach(r => {
+    const place = DASH.trackPlace(track.model, r.i);
+    if (place.act && place.act !== lastAct) { out.push(`<div class="jr-act">${h(place.act.name)}</div>`); lastAct = place.act; lastSeq = null; }
+    if (place.seq && place.seq !== lastSeq) { out.push(`<div class="jr-seq">${h(place.seq.name)}</div>`); lastSeq = place.seq; }
+    out.push(`<div class="jr-row" id="jr-s${r.i}" data-i="${r.i}">
+      <div class="jr-row-head"><span class="jr-num">${r.number}</span><button type="button" class="jr-scene" data-ent="scene:${h(r.id)}">${h(r.title)}</button></div>
+      ${r.change ? `<div class="jr-line"><span class="jr-k">now</span>${h(r.change)}</div>` : ''}
+    </div>`);
+  });
+  return `<div><div class="panel-section-title">Scenes</div><div class="jr-timeline">${out.join('')}</div></div>`;
+};
+
+DASH.showActPanel = function(actId) {
+  const act = (DASH.story.acts || []).find(a => a.id === actId);
+  if (!act) return;
+
+  document.getElementById('panel-type').textContent = 'Act';
+  document.getElementById('panel-name').textContent = act.title || act.id;
+
+  const seqRows = (act.sequences_list || []).map(sid => {
+    const seq = (DASH.story.sequences || []).find(s => s.id === sid);
+    return seq ? `<button class="entity-link" onclick="DASH.showSequencePanel('${sid}')">${seq.title || sid}<span style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-left:4px">${seq.scene_count || 0} scenes</span></button>` : '';
+  }).join('');
+
+  // Plot threads in this act — same chip style as the scene panel
+  const plotRows = (act.plots || []).map(p => {
+    const pl = (DASH.story.plots || []).find(x => x.id === p.id);
+    if (!pl) return '';
+    const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+    const col = DASH.plotColor(pl.id);
+    const badges = DASH.plotRoleBadges(p);
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scope}${badges ? ' · ' + badges : ''}</span></button>`;
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div><span class="status-badge ${act.status || ''}">${act.status || 'planned'}</span></div>
+    ${(() => {
+      const projectSpine = (DASH.story.project || {}).spine;
+      const actObj = act.act_objective;
+      if (!projectSpine && !actObj) return '';
+      return `<div style="margin-top:8px">
+        ${projectSpine ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:4px">Story spine: <span style="font-style:italic">${projectSpine}</span></div>` : ''}
+        ${actObj ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground)">Act objective: <span style="color:var(--foreground);font-weight:500">${actObj}</span></div>` : ''}
+      </div>`;
+    })()}
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
+    <div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink('story')}</div>
+      ${DASH.valueFocusHtml(act.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
+    ${seqRows ? `<div><div class="panel-section-title">Sequences (${act.sequence_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${seqRows}</div></div>` : '<div class="panel-muted">No sequences in this act yet.</div>'}
+    ${DASH.renderSectionsHtml('act', actId)}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="What is the dramatic arc of '${act.title || act.id}'?">Ask Hermes about this act</button>
+  `;
+
+  DASH.openPanel();
+}
+
+
+DASH.showCharacterPanel = function(char) {
+  document.getElementById('panel-type').textContent = char.role || char.story_role || 'Character';
+  document.getElementById('panel-name').textContent = char.name;
+
+  // Scenes: char.scenes is normalised to an array of scene ids (strings)
+  const scenes = (char.scenes || []).map(sid => {
+    const s = (DASH.story.scenes || []).find(x => String(x.id) === String(sid));
+    if (s) {
+      const num = s.number != null ? String(s.number) : '';
+      const label = num ? `${num}. ${s.title || s.id}` : (s.title || s.id);
+      return `<span class="tag tag-scene" style="cursor:pointer" onclick="DASH.showScenePanel('${s.id}')">${label}</span>`;
+    }
+    return sid ? `<span class="tag tag-scene">${sid}</span>` : '';
+  }).filter(Boolean).join('');
+
+  // Relationships: use relationships[] (new schema) with type + strength
+  const rels = (char.relationships || []).map(rel => {
+    const c = (DASH.story.characters || []).find(x => x.id === rel.with);
+    const nameEl = c
+      ? `<button class="relationship-name entity-link" onclick="DASH.showCharacterPanel(DASH.story.characters.find(x=>x.id==='${c.id}'))">${c.name}</button>`
+      : `<span class="relationship-name">${rel.with}</span>`;
+    const secretIcon = rel.secret ? ' 🔒' : '';
+    const typeTag = rel.type ? `<span class="tag" style="background:${DASH.relTypeColor(rel.type)}22;color:${DASH.relTypeColor(rel.type)}">${rel.type}</span>` : '';
+    return `
+      <div class="relationship-row">
+        ${nameEl}${secretIcon}
+        ${rel.label ? `<span class="relationship-label">${rel.label}</span>` : ''}
+        ${typeTag}
+        ${rel.strength !== undefined ? `<span class="relationship-feeling">strength: ${rel.strength > 0 ? '+' : ''}${rel.strength}</span>` : ''}
+      </div>`;
+  }).join('');
+
+  // Knowledge: may be array (_knowledge_arr) or string
+  const knowledgeArr = char._knowledge_arr || (char.knowledge ? [char.knowledge] : []);
+  const knowledgeHtml = knowledgeArr.length
+    ? knowledgeArr.map(k => `<div class="knowledge-item">${k}</div>`).join('')
+    : '';
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">In one sentence</div>
+      <div class="panel-text">${char.one_sentence || '—'}</div>
+    </div>
+    ${char.age ? `<div><div class="panel-section-title">Age</div><div class="panel-muted">${char.age}</div></div>` : ''}
+    ${char.goals_short ? `<div>
+      <div class="panel-section-title">Immediate goal</div>
+      <div class="panel-text">${char.goals_short}</div>
+    </div>` : ''}
+    ${char.goals_long ? `<div>
+      <div class="panel-section-title">Deeper goal</div>
+      <div class="panel-muted">${char.goals_long}</div>
+    </div>` : ''}
+    ${knowledgeHtml ? `<div>
+      <div class="panel-section-title">What they know</div>
+      ${knowledgeHtml}
+    </div>` : ''}
+    ${scenes ? `<div>
+      <div class="panel-section-title">Appears in</div>
+      <div class="panel-tags">${scenes}</div>
+    </div>` : ''}
+    ${rels ? `<div>
+      <div class="panel-section-title">Relationships</div>
+      ${rels}
+    </div>` : ''}
+    ${DASH.renderSectionsHtml('character', char.id)}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Tell me more about ${char.name}'s character development.">Ask Hermes about ${char.name}</button>
+  `;
+
+  DASH.openPanel();
+
+  if (DASH.network) {
+    DASH.network.selectNodes([char.id]);
+    DASH.network.focus(char.id, { scale: 1.2, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+  }
+}
+
+
+DASH.showLocationPanel = function(locId) {
+  // Deselect all entity cards, select the one clicked
+  document.querySelectorAll('#location-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#location-list .entity-card[data-id="${locId}"]`);
+  if (card) card.classList.add('selected');
+
+  const loc = (DASH.story.locations || []).find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('panel-type').textContent = 'Location';
+  document.getElementById('panel-name').textContent = loc.name;
+
+  // Backend gives loc.scenes as heading strings; find scene objects by heading
+  const sceneRefs = loc._scene_headings || loc.scenes || [];
+  const scenes = sceneRefs.map(ref => {
+    const s = (DASH.story.scenes || []).find(x =>
+      x.heading === ref || String(x.id) === String(ref)
+    );
+    if (s) {
+      const num = s.number != null ? String(s.number) : '';
+      const label = num ? `${num}. ${s.heading || s.id}` : (s.heading || s.id);
+      return `<span class="tag tag-scene" style="cursor:pointer" onclick="DASH.showScenePanel('${s.id}')">${label}</span>`;
+    }
+    return `<span class="tag tag-scene">${ref}</span>`;
+  }).join('');
+
+  // Characters in this location (via their scenes)
+  const charIds = new Set();
+  sceneRefs.forEach(ref => {
+    const s = (DASH.story.scenes || []).find(x => x.heading === ref || String(x.id) === String(ref));
+    if (s) (s.characters || []).forEach(cid => charIds.add(cid));
+  });
+  const charLinks = [...charIds].map(cid => {
+    const c = (DASH.story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c ? `<button class="entity-link" onclick="DASH.showCharacterPanel(DASH.story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${DASH.roleColor(c.role)}">${c.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">In one sentence</div>
+      <div class="panel-text">${loc.one_sentence || '—'}</div>
+    </div>
+    ${loc.mood ? `<div>
+      <div class="panel-section-title">Mood</div>
+      <div class="panel-text" style="font-style:italic">${loc.mood}</div>
+    </div>` : ''}
+    ${loc.dramatic_function ? `<div>
+      <div class="panel-section-title">Dramatic function</div>
+      <div class="panel-text">${loc.dramatic_function}</div>
+    </div>` : ''}
+    ${loc.world ? `<div>
+      <div class="panel-section-title">World</div>
+      <div class="panel-text">${loc.world}</div>
+    </div>` : ''}
+    ${loc.variant_of ? `<div>
+      <div class="panel-section-title">Variant of</div>
+      ${(() => {
+        const v = DASH.findLocation(loc.variant_of);
+        return v ? `<button class="entity-link" onclick="DASH.showLocationPanel('${v.id}')">${v.name}</button>` : `<div class="panel-text" style="color:#e0a86b">${loc.variant_of}</div>`;
+      })()}
+    </div>` : ''}
+    ${charLinks ? `<div>
+      <div class="panel-section-title">Characters here</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${charLinks}</div>
+    </div>` : ''}
+    ${DASH.entityScenesHtml(loc.id)}
+    ${DASH.renderSectionsHtml('location', loc.id)}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Describe ${loc.name} and its role in the DASH.story.">Ask Hermes about this location</button>
+  `;
+
+  DASH.openPanel();
+}
+
+
+DASH.showPlotPanel = function(plotId) {
+  document.querySelectorAll('#plot-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#plot-list .entity-card[data-id="${plotId}"]`);
+  if (card) card.classList.add('selected');
+
+  const plot = (DASH.story.plots || []).find(p => p.id === plotId || String(p.id) === String(plotId));
+  if (!plot) return;
+
+  const scope = plot.plot_scope === 'main' ? 'MAIN' : (plot.plot_type || '');
+  const col = plot.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[plot.plot_type] || '#888');
+  const scopeHtml = scope ? `<span class="tag" style="background:${col}22;color:${col}">${scope}</span>` : '';
+  const arcHtml = (plot.plot_scope === 'main' && plot.value_arc) ? `<div style="margin-top:4px"><span style="color:var(--muted-foreground);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.06em">Value Arc</span><div style="font-size:var(--font-size-sm);color:var(--foreground)">${plot.value_arc}</div></div>` : '';
+
+  document.getElementById('panel-type').textContent = plot.plot_scope === 'main' ? 'Main Plot' : 'Subplot';
+  document.getElementById('panel-name').textContent = plot.name;
+
+  const chars = (plot.characters || []).map(cid => {
+    const c = (DASH.story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c
+      ? `<button class="entity-link" onclick="DASH.showCharacterPanel(DASH.story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${DASH.roleColor(c.role)}">${c.name}</button>`
+      : '';
+  }).filter(Boolean).join('');
+
+  // Role fields: [{scene_id, description}] (backend-normalized)
+  function renderBeats(arr) {
+    if (!arr || !arr.length) return '';
+    return arr.map(item => {
+      if (typeof item === 'string') {
+        return `<div class="entity-row">${item}</div>`;
+      }
+      // Backend normalizes to {scene_id, description}
+      const sceneObj = (DASH.story.scenes || []).find(s => String(s.id) === String(item.scene_id));
+      const displayNum = sceneObj && sceneObj.order != null ? String(sceneObj.order) : '';
+      const sceneName = sceneObj ? (sceneObj.title || sceneObj.id) : (item.scene_id || '');
+      if (!sceneName) return '';
+      const sceneLink = sceneObj
+        ? `<span class="entity-row-name" onclick="DASH.showScenePanel('${sceneObj.id}')" style="cursor:pointer">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`
+        : `<span class="entity-row-name">${displayNum ? displayNum + '. ' : ''}${sceneName}</span>`;
+      return `<div class="entity-row">${sceneLink}${item.description ? `<span class="entity-row-sub">${item.description}</span>` : ''}</div>`;
+    }).join('');
+  }
+
+  // Plot role sections, one per role — must match PLOT_ROLES in core/constants.py.
+  // The plot's field is the pluralised role (`complications` for `complication`);
+  // the singular is the fallback for payloads that key by role name directly.
+  const roleSections = DASH.PLOT_ROLES.map(r => {
+    const html = renderBeats(plot[r + 's'] || plot[r] || []);
+    return html ? `<div>
+      <div class="panel-section-title">${r[0].toUpperCase() + r.slice(1)}</div>
+      ${html}
+    </div>` : '';
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Thread</div>
+      <div class="panel-text">${plot.one_sentence || '—'}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${scopeHtml}
+      <span class="status-badge ${plot.status || ''}">${plot.status || 'active'}</span>
+    </div>
+    ${arcHtml}
+    <div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink(plot.id)}</div>
+      ${DASH.valueFocusHtml(plot.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters involved</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${roleSections}
+    ${DASH.renderSectionsHtml('plot', plot.id)}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  DASH.openPanel();
+}
+
+
+DASH.showRelationshipPanel = function(rel) {
+  const a = rel.characters[0];
+  const b = rel.characters[1];
+  const charA = (DASH.story.characters || []).find(c => c.id === a);
+  const charB = (DASH.story.characters || []).find(c => c.id === b);
+  const pa = (rel.perspectives || {})[a] || {};
+  const pb = (rel.perspectives || {})[b] || {};
+
+  const nameA = charA
+    ? `<button class="entity-link" onclick="DASH.showCharacterPanel(DASH.story.characters.find(x=>x.id==='${a}'))" style="border-left:2px solid ${DASH.roleColor(charA.role)}">${charA.name}</button>`
+    : `<span class="panel-muted">${a}</span>`;
+  const nameB = charB
+    ? `<button class="entity-link" onclick="DASH.showCharacterPanel(DASH.story.characters.find(x=>x.id==='${b}'))" style="border-left:2px solid ${DASH.roleColor(charB.role)}">${charB.name}</button>`
+    : `<span class="panel-muted">${b}</span>`;
+
+  function perspectiveHtml(charName, charRole, p) {
+    if (!charName) return '';
+    const col = DASH.relTypeColor(p.type);
+    const typeTag = p.type ? `<span class="tag" style="background:${col}22;color:${col}">${p.type}</span>` : '';
+    const secretBadge = p.secret ? `<span class="tag" style="background:rgba(224,107,155,0.18);color:#e06b9b">secret 🔒</span>` : '';
+    const strengthBar = p.strength !== undefined ? `
+      <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+        <div style="flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div style="width:${Math.abs(p.strength) * 50}%;height:100%;background:${p.strength >= 0 ? col : '#e07070'};margin-left:${p.strength >= 0 ? '50%' : (50 - Math.abs(p.strength) * 50) + '%'}"></div>
+        </div>
+        <span style="font-size:var(--font-size-xs);color:var(--muted-foreground)">${p.strength > 0 ? '+' : ''}${p.strength}</span>
+      </div>` : '';
+    return `
+      <div class="panel-perspective" style="flex:1">
+        <div style="font-size:var(--font-size-sm);font-weight:500;margin-bottom:4px">${charName}</div>
+        ${charRole ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);margin-bottom:6px">${charRole}</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">${typeTag}${secretBadge}</div>
+        ${p.label ? `<div style="font-size:var(--font-size-sm);margin-bottom:2px">${p.label}</div>` : ''}
+        ${p.feeling ? `<div style="font-size:var(--font-size-xs);color:var(--muted-foreground);font-style:italic">${p.feeling}</div>` : ''}
+        ${strengthBar}
+      </div>`;
+  }
+
+  document.getElementById('panel-type').textContent = 'Relationship';
+  document.getElementById('panel-name').textContent = rel.name || `${a} & ${b}`;
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">Characters</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${nameA}${nameB}</div>
+    </div>
+    <div>
+      <div class="panel-section-title">Perspectives</div>
+      <div style="display:flex;gap:16px">
+        ${perspectiveHtml(charA?.name, charA?.role, pa)}
+        ${perspectiveHtml(charB?.name, charB?.role, pb)}
+      </div>
+    </div>
+    ${rel.status ? `<div>
+      <div class="panel-section-title">Status</div>
+      <span class="status-badge ${rel.status}">${rel.status}</span>
+    </div>` : ''}
+    ${DASH.entityScenesHtml(rel.id)}
+    ${rel.history ? `<div>
+      <div class="panel-section-title">History</div>
+      <div class="panel-text">${DASH.escapeHtml(rel.history).replace(/\n/g, '<br>')}</div>
+    </div>` : ''}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="Update the relationship between ${charA?.name || a} and ${charB?.name || b}. Current status: ${rel.status || 'active'}. Tell me what changed and why.">Edit with Hermes</button>
+  `;
+
+  DASH.openPanel();
+}
+
+
+DASH.showScenePanel = function(sceneId) {
+  const scene = (DASH.story.scenes || []).find(s => String(s.id) === String(sceneId));
+  if (!scene) return;
+
+  document.querySelectorAll('.scene-item').forEach(el => el.classList.remove('selected'));
+  const sceneEl = document.querySelector(`.scene-item[data-id="${sceneId}"]`);
+  if (sceneEl) sceneEl.classList.add('selected');
+
+  document.getElementById('panel-type').textContent = 'Scene';
+  document.getElementById('panel-name').textContent = scene.title || scene.id;
+
+  const chars = (scene.characters || []).map(cid => {
+    const c = (DASH.story.characters || []).find(x => x.id === cid || String(x.id) === String(cid));
+    return c
+      ? `<button class="entity-link" onclick="DASH.showCharacterPanel(DASH.story.characters.find(x=>x.id==='${c.id}'))" style="border-left:2px solid ${DASH.roleColor(c.role)}">${c.name}</button>`
+      : '';
+  }).filter(Boolean).join('');
+
+  const locs = (scene.locations || []).map(lref => {
+    const l = DASH.findLocation(lref);
+    return l ? `<button class="entity-link" onclick="DASH.showLocationPanel('${l.id}')">${l.name}</button>` : '';
+  }).filter(Boolean).join('');
+
+  // Plots: backend populates scene.plots from the plot's role rows
+  const plotRefs = (scene.plots || []);
+  const plots = plotRefs.map(pref => {
+    const pid = (typeof pref === 'object' && pref !== null) ? pref.id : pref;
+    const role = (typeof pref === 'object' && pref !== null) ? (pref.role || '') : '';
+    const pl = (DASH.story.plots || []).find(x => x.id === pid || String(x.id) === String(pid));
+    if (!pl) return '';
+    const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+    const col = pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888');
+    const roleLabel = role ? ` · ${role.toUpperCase()}` : '';
+    const scopeLabel = scope ? ` · ${scope}` : '';
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scopeLabel}${roleLabel}</span></button>`;
+  }).filter(Boolean).join('');
+
+  // Content from __SECTIONS__.scenes[slug]["Content"]. A placeholder marker is
+  // not content — it is the same marker the section renderer drops.
+  let contentHtml = '';
+  const sections = window.__SECTIONS__;
+  const sceneContent = sections?.scene?.[sceneId]?.Content;
+  if (sceneContent && !DASH.isPlaceholderSection(sceneContent)) {
+    contentHtml = `<div class="fountain-content">${DASH.escapeHtml(sceneContent)}</div>`;
+  } else {
+    contentHtml = '<div class="panel-muted">No content yet.</div>';
+  }
+
+  // Dramatic metadata — only show positive values.
+  // The role is per plot, so each `plots[]` entry becomes its own tag naming
+  // the plot and the role it plays there. `dramatic_role` is only surfaced
+  // when the scene serves no plot at all — otherwise it says "plot_role",
+  // which restates the storage and tells a reader nothing.
+  const dramaTags = [];
+  (scene.plots || []).forEach(p => {
+    const plot = (DASH.story.plots || []).find(x => x.id === p.id);
+    dramaTags.push({
+      l: 'role',
+      v: plot ? `${plot.name}: ${p.role}` : p.role,
+      title: p.description || '',
+    });
+  });
+  if ((scene.plots || []).length === 0
+      && (scene.dramatic_role === 'transition' || scene.dramatic_role === 'non-event')) {
+    dramaTags.push({ l: 'role', v: scene.dramatic_role });
+  }
+  (scene.milestone || []).forEach(m => dramaTags.push({ l: m, v: m }));
+
+  const conflicts = (scene.conflict_levels || []).filter(Boolean);
+
+  // Value turns: the value pass recorded on this scene, one row per shift
+  // (value, from → to), tagged with the plot it serves. Nothing here is
+  // stored on the scene itself — the words belong to the value entity, so
+  // the row names the value and leaves the rungs implicit.
+  const turnRows = (scene.value_turns || []).map(t => {
+    const pl = (DASH.story.plots || []).find(x => x.id === t.plot);
+    const plotLabel = pl ? pl.name : (t.plot || '');
+    const col = pl
+      ? (pl.plot_scope === 'main' ? '#b07be0' : (DASH.PLOT_TYPE_COLORS[pl.plot_type] || '#888'))
+      : '#888';
+    const from = DASH.escapeHtml(t.from || '');
+    const to = DASH.escapeHtml(t.to || '');
+    const shift = from && to ? `${from} <span style="opacity:0.5">→</span> ${to}`
+                 : from || to || '';
+    const sub = [shift, plotLabel ? DASH.escapeHtml(plotLabel) : ''].filter(Boolean)
+      .join('<span style="opacity:0.5;margin:0 4px">·</span>');
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${t.plot || ''}')" style="border-left:2px solid ${col}">
+      <span style="font-weight:500;margin-right:6px">${DASH.escapeHtml(t.value || '')}</span>
+      <span style="font-size:var(--font-size-xs);color:var(--muted-foreground)">${sub}</span>
+    </button>`;
+  }).join('');
+
+  const turnsHtml = turnRows ? `<div>
+    <div class="panel-section-title">Value turns ${DASH.valueGraphLink('story')}</div>
+    <div style="display:flex;flex-direction:column;gap:4px;">${turnRows}</div>
+  </div>` : '';
+
+  const dramaHtml = (dramaTags.length || conflicts.length) ? `
+    <div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+        ${dramaTags.map(t => `<span class="tag tag-struct">${t.v}</span>`).join('')}
+        ${conflicts.map(c => `<span class="tag tag-char" style="font-size:var(--font-size-xs)">${c}</span>`).join('')}
+      </div>
+    </div>` : '';
+
+  document.getElementById('panel-body').innerHTML = `
+    ${dramaHtml}
+    ${chars ? `<div>
+      <div class="panel-section-title">Characters</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${chars}</div>
+    </div>` : ''}
+    ${locs ? `<div>
+      <div class="panel-section-title">Location</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${locs}</div>
+    </div>` : ''}
+    ${plots ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plots}</div>
+    </div>` : ''}
+    ${turnsHtml}
+    ${scene.heading ? `<div>
+      <div class="panel-section-title">Screenplay heading</div>
+      <div class="panel-muted">${DASH.escapeHtml(scene.heading)}</div>
+    </div>` : ''}
+    <div>
+      <div class="panel-section-title">Content</div>
+      ${contentHtml}
+    </div>
+    ${DASH.renderSectionsHtml('scene', sceneId, ['Content'])}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="What happens in ${scene.title || scene.id}?">Ask Hermes about this scene</button>
+  `;
+
+  DASH.openPanel();
+}
+
+
+DASH.showSequencePanel = function(seqId) {
+  const seq = (DASH.story.sequences || []).find(s => s.id === seqId);
+  if (!seq) return;
+
+  document.getElementById('panel-type').textContent = 'Sequence';
+  document.getElementById('panel-name').textContent = seq.title || seq.id;
+
+  const sceneRows = (seq.scenes_list || []).map((sid, i) => {
+    const scene = (DASH.story.scenes || []).find(s => s.id === sid);
+    if (!scene) return '';
+    return `<button class="entity-link" onclick="DASH.showScenePanel('${sid}')">${i + 1}. ${scene.title || sid}</button>`;
+  }).join('');
+
+  // Plot threads in this sequence — same chip style as the scene panel
+  const plotRows = (seq.plots || []).map(p => {
+    const pl = (DASH.story.plots || []).find(x => x.id === p.id);
+    if (!pl) return '';
+    const scope = pl.plot_scope === 'main' ? 'MAIN' : (pl.plot_type || '');
+    const col = DASH.plotColor(pl.id);
+    const badges = DASH.plotRoleBadges(p);
+    return `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')" style="border-left:2px solid ${col}">${pl.name}<span style="color:${col};font-size:var(--font-size-xs);margin-left:4px">${scope}${badges ? ' · ' + badges : ''}</span></button>`;
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div><span class="status-badge ${seq.status || ''}">${seq.status || 'planned'}</span></div>
+    ${plotRows ? `<div><div class="panel-section-title">Plot threads</div><div style="display:flex;flex-direction:column;gap:4px;">${plotRows}</div></div>` : ''}
+    <div>
+      <div class="panel-section-title">Value focus ${DASH.valueGraphLink('story')}</div>
+      ${DASH.valueFocusHtml(seq.value_focus) || '<div class="panel-muted">No values recorded yet.</div>'}
+    </div>
+    ${sceneRows ? `<div><div class="panel-section-title">Scenes (${seq.scene_count || 0})</div><div style="display:flex;flex-direction:column;gap:4px;">${sceneRows}</div></div>` : '<div class="panel-muted">No scenes in this sequence yet.</div>'}
+    ${DASH.renderSectionsHtml('sequence', seqId)}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = `
+    <button class="btn btn-hermes" data-hermes-send="What is the dramatic function of the sequence '${seq.title || seq.id}'?">Ask Hermes about this sequence</button>
+  `;
+
+  DASH.openPanel();
+}
+
+
+DASH.showWorldPanel = function(worldId) {
+  document.querySelectorAll('#world-list .entity-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`#world-list .entity-card[data-id="${worldId}"]`);
+  if (card) card.classList.add('selected');
+
+  const world = (DASH.story.worlds || []).find(w => w.id === worldId);
+  if (!world) return;
+
+  document.getElementById('panel-type').textContent = 'World';
+  document.getElementById('panel-name').textContent = world.name;
+
+  const rules = (world.rules || []).map(r =>
+    `<div class="world-rule">${r}</div>`
+  ).join('');
+
+  const sections = (world.sections || []).join(', ');
+
+  // Plots in this world
+  const worldPlots = (DASH.story.plots || []).filter(pl =>
+    (pl.worlds || []).includes(worldId) ||
+    (pl.world === worldId)
+  );
+  const plotLinks = worldPlots.map(pl =>
+    `<button class="entity-link" onclick="DASH.showPlotPanel('${pl.id}')">${pl.name}</button>`
+  ).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div>
+      <div class="panel-section-title">In one sentence</div>
+      <div class="panel-text">${world.one_sentence || '—'}</div>
+    </div>
+    ${world.period ? `<div>
+      <div class="panel-section-title">Period</div>
+      <div class="panel-text">${world.period}</div>
+    </div>` : ''}
+    ${(world.values && world.values.length) ? `<div>
+      <div class="panel-section-title">Values</div>
+      <div class="panel-text">${world.values.map(v => `<div class="world-rule">${v}</div>`).join('')}</div>
+    </div>` : ''}
+    ${(world.power && world.power.length) ? `<div>
+      <div class="panel-section-title">Power</div>
+      <div class="panel-text">${world.power.map(p => `<div class="world-rule">${p}</div>`).join('')}</div>
+    </div>` : ''}
+    ${rules ? `<div>
+      <div class="panel-section-title">Rules</div>
+      ${rules}
+    </div>` : ''}
+    ${world.variant_of ? `<div>
+      <div class="panel-section-title">Variant of</div>
+      ${(() => {
+        const v = (DASH.story.worlds || []).find(w => w.id === world.variant_of);
+        return v ? `<button class="entity-link" onclick="DASH.showWorldPanel('${v.id}')">${v.name}</button>` : `<div class="panel-text" style="color:#e0a86b">${world.variant_of}</div>`;
+      })()}
+    </div>` : ''}
+    ${plotLinks ? `<div>
+      <div class="panel-section-title">Plot threads</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${plotLinks}</div>
+    </div>` : ''}
+    ${DASH.entityScenesHtml(world.id)}
+    ${DASH.renderSectionsHtml('world', world.id)}
+  `;
+
+  document.getElementById('panel-footer').innerHTML = '';
+  DASH.openPanel();
+}
+
+
