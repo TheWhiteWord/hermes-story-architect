@@ -70,3 +70,15 @@ Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) 
 - Summary: Added `story_architect/adapters/hermes/` (wrapper, setup, assets SOUL.md + SKILL.md). CLI gained `hermes setup`/`hermes status` subcommand group via launcher. Wrapper fakes hermes via PATH + HERMES_HOME. Setup: ensures hermes, creates profile (`hermes profile create --clone`), writes SOUL.md with adapter marker (foreign files preserved unless --force, backup on force), installs skill, distributes token to profile .env, registers MCP server in config.yaml. Idempotent, --dry-run, --force, --profile. status checks hermes/version/profile/SOUL/skill/MCP/token/app/MCP auth. Token never printed.
 - Deviations: no-hermes-imports test relaxed to skip `adapters/hermes` and `launcher.py` (CLI subcommand name). No real hermes tests (fake executable on PATH). Task 5/6 still pending (persona review, status already done).
 - Phase 3 notes: adapter only; nothing else mentions hermes.
+
+---
+
+## Phase 2 Task 5 — Persona and skill content
+
+- Summary: Filled `adapters/hermes/assets/SOUL.md` (adapter marker + short durable persona) and `assets/skills/story-architect/SKILL.md` (valid Hermes frontmatter `name`/`description`/`metadata.hermes`, tool-name list derived from registry, workflow: orient/load, retrieve before answering, draft stage + commit only after approval, search vs load, dashboard_link usage). Added `tests/test_task5_assets.py` (marker, frontmatter parse, every mentioned tool name exists in registry). Plan checklist ticked (code + tests); owner tone review remains manual.
+- Deviations: none.
+- Phase 3 notes: none.
+
+---
+
+
