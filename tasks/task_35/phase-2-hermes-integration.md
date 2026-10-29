@@ -134,14 +134,14 @@ In-app chat, manual editing, a Fountain writer, systemd/autostart of the app, ot
 - `SKILL.md` has valid Hermes frontmatter (`name`, `description`, optional `metadata.hermes`).
 - Content requirements:
   - **SOUL.md:** who the agent is (a story/screenplay development collaborator working inside Story Architect), tone, how it collaborates (proposes before committing, asks when intent is unclear, respects the owner's creative authority), and the boundary that it works on the story through the tools and does not invent data outside them. Keep it short and durable; workflow detail belongs in the skill.
-  - **SKILL.md:** how to use the tools well: the typical workflow (orient on the project, retrieve before answering, stage changes with the draft protocol and commit only after the owner's approval, when to search vs load), how to refer to the app (`dashboard_link`), the project conventions from `vault-conventions.md` and the tool descriptions. Derive it from the real tool descriptions and conventions in the repo rather than inventing behaviors. Reference tools by the names the agent actually sees (from Task 1).
+  - **SKILL.md:** how to use the tools well: the typical workflow (orient on the project, retrieve before answering, stage changes with the draft protocol and commit only after the owner's approval, when to search vs load), how to refer to the app (`dashboard_link`), and the tool descriptions. Derive it from the real tool descriptions and conventions in the repo rather than inventing behaviors. Reference tools by the names the agent actually sees (from Task 1).
 - Tests: the frontmatter parses; every tool name mentioned in the skill exists in the registry.
 
 **Owner step:** review `SOUL.md` and `SKILL.md` and adjust the tone. These are the most personal part of the setup.
 
 **Checklist**
-- [ ] SOUL.md and SKILL.md written from the repo's real conventions
-- [ ] Frontmatter and tool-name tests
+- [x] SOUL.md and SKILL.md written from the repo's real conventions
+- [x] Frontmatter and tool-name tests
 - [ ] Owner reviewed
 
 ---
