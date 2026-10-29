@@ -49,3 +49,10 @@
 - Config gained agent_autostart (env STORY_ARCHITECT_AGENT_AUTOSTART / config.toml), default off.
 - Routes: GET /api/agent/state, POST /api/agent/start.
 - Shutdown: no process cleanup; gateway persists per Task 1 (systemd/user service). App only cancels its own in-flight replies.
+
+## Phase 3 Task 7 (Docs)
+- README updated with Chat section: requirements, starting agent, autostart, status, capabilities, chat storage, refresh banner. Setup/status sections updated for new hermes setup behavior.
+- Plan checklist (phase-3-in-app-chat.md Task 7) ticked.
+- Deviations carried: no markdown rendering in chat (plain text only, XSS-safe); no agent state UI button beyond /api/agent/state + start endpoint; web search disabled by default (owner call still open).
+- Task 1 findings recap: endpoint POST /v1/chat/completions streaming SSE; continuity via /v1/responses previous_response_id; tool-progress events hermes.tool.progress; toolsets=[] (no terminal/file/web). Agent can read/query via MCP story tools and stage/commit via drafts; cannot shell/write files/web by default.
+- Phase 4 note: agent and UI both touch story.db via writes.py single path; compare-and-swap/concurrency needed when both active; refresh banner is current reconciliation mechanism.

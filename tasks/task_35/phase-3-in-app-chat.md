@@ -184,8 +184,8 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - Update the layout section and tick checklists in `docs/plan/`.
 
 **Checklist**
-- [ ] README updated
-- [ ] Plan checklists ticked
+- [x] README updated
+- [x] Plan checklists ticked
 
 ---
 
