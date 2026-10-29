@@ -40,7 +40,7 @@ def create_app(config: Config) -> FastAPI:
                 own = {f"http://127.0.0.1:{config.port}", f"http://localhost:{config.port}"}
                 if origin not in own:
                     return JSONResponse(status_code=403, content={"error": {"code": "forbidden_origin", "message": "Foreign origin"}})
-            if request.headers.get("x-story-architect") != "1":
+            if request.headers.get("x-story-architect") != "1" and not request.url.path.startswith("/mcp"):
                 return JSONResponse(status_code=403, content={"error": {"code": "missing_custom_header", "message": "Missing custom header"}})
         resp = await call_next(request)
         resp.headers["Cache-Control"] = "no-store"

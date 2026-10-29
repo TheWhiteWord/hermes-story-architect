@@ -42,7 +42,10 @@ class HermesChatBackend:
             parts.append(f"Current project name: {name}.")
         system_text = " ".join(parts)
 
-        payload_messages = [{"role": "system", "content": system_text}] + list(messages or [])
+        payload_messages = [{"role": "system", "content": system_text}] + [
+            {"role": m.get("role", "user"), "content": m.get("content", m.get("text", ""))}
+            for m in (messages or [])
+        ]
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": payload_messages,

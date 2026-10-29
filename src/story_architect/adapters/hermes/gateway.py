@@ -28,7 +28,10 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
         return {"state": "not_configured", "detail": "api key missing"}
     # reachability
     try:
-        import httpx
+        try:
+            import httpx
+        except ImportError:
+            import httpx2 as httpx
         r = httpx.get(f"{_base_url(config)}/v1/models", headers={"Authorization": f"Bearer {key}"}, timeout=2.0)
     except Exception as e:
         return {"state": "gateway_stopped", "detail": str(e)}

@@ -204,7 +204,10 @@ def status(argv=None, profile_name="story-architect"):
             from mcp.client.streamable_http import streamable_http_client
             from mcp import ClientSession
             async def _list():
-                import httpx2 as httpx
+                try:
+                    import httpx
+                except ImportError:
+                    import httpx2 as httpx
                 http_client = httpx.AsyncClient(headers={"Authorization": f"Bearer {tok}"}, timeout=5.0)
                 async with streamable_http_client(f"http://127.0.0.1:{port}/mcp", http_client=http_client) as (r, w):
                     async with ClientSession(r, w) as session:
@@ -226,7 +229,10 @@ def status(argv=None, profile_name="story-architect"):
     ap = C.load_config().hermes_api_port
     if ak:
         try:
-            import httpx
+            try:
+                import httpx
+            except ImportError:
+                import httpx2 as httpx
             r = httpx.get(f"http://127.0.0.1:{ap}/v1/models", headers={"Authorization": f"Bearer {ak}"}, timeout=2.0)
             api_ok = r.status_code == 200
             if api_ok:
