@@ -1,0 +1,10 @@
+#sa-chat-panel{position:fixed;right:0;top:0;height:100vh;width:360px;background:var(--card);border-left:1px solid var(--border);display:none;flex-direction:column;z-index:9998;font-size:14px}
+#sa-chat-panel.open{display:flex}
+#sa-chat-header{padding:10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+#sa-chat-messages{flex:1;overflow:auto;padding:10px}
+#sa-chat-input{border-top:1px solid var(--border);padding:8px}
+#sa-chat-input textarea{width:100%;box-sizing:border-box;resize:none}
+#sa-chat-msg{margin:6px 0}
+#sa-chat-msg.user{font-weight:600}
+#sa-tool{font-size:12px;opacity:.7;font-style:italic}
+#sa-chat-toggle{position:fixed;bottom:12px;right:12px;z-index:9999}

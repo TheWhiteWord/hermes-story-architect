@@ -167,13 +167,13 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - Don't build a design system. A clean, readable panel is enough; visual polish comes later.
 
 **Checklist**
-- [ ] Panel, list, input, stop
-- [ ] Streaming + tool indicators
-- [ ] Safe rendering with tests (an XSS-style string renders as text)
-- [ ] State handling (not running, lost, failed)
-- [ ] `DASH.askAgent` wired to chat
-- [ ] Persistence/restore verified manually
-- [ ] No console errors; manual pass of all tabs still fine
+- [x] Panel, list, input, stop
+- [x] Streaming + tool indicators
+- [x] Safe rendering with tests (an XSS-style string renders as text)
+- [x] State handling (not running, lost, failed)
+- [x] `DASH.askAgent` wired to chat
+- [x] Persistence/restore verified manually
+- [x] No console errors; manual pass of all tabs still fine
 
 ---
 

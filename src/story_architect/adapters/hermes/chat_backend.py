@@ -4,7 +4,10 @@ from __future__ import annotations
 import json
 from typing import Any, AsyncIterator
 
-import httpx
+try:
+    import httpx
+except ModuleNotFoundError:
+    import httpx2 as httpx
 
 from story_architect.chat.backend import ChatBackend  # noqa: F401
 from story_architect.chat.events import Done, Error, TextDelta, ToolStarted

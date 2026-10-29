@@ -34,6 +34,16 @@
 - Cross-site protection added to host_check middleware for non-GET: Origin (when present) must match app origin; custom header X-Story-Architect: 1 required.
 - Backend instantiated from config; 503 if unavailable.
 - One reply at a time per conversation via active_replies dict.
+- 
+## Phase 3 Task 6 (Chat UI)
+- Panel: floating drawer (#sa-chat-panel) + toggle button; conversation list/new/delete, message list, input, stop.
+- Streaming: fetch() streaming SSE; text deltas appended; tool events shown as quiet indicators; custom header X-Story-Architect: 1 on all requests.
+- Safe rendering: persisted messages escaped via esc(); streaming uses textContent. Minimal subset not implemented (plain text only) — XSS-safe.
+- DASH.askAgent now opens panel and sends text with project context.
+- Persistence/restore: conversations loaded from server; last-open restored on init (first conversation).
+- Files: web/js/chat.js, web/css/chat.css; wired into index.html and stats.py JS_ORDER/CSS_ORDER.
+- Deviations: no markdown rendering beyond plain text; no agent state UI (start button not added, state check available via /api/agent/state).
+- 
 ## Phase 3 Task 5 (Agent availability)
 - Added src/story_architect/adapters/hermes/gateway.py: agent_state() returns not_configured/gateway_stopped/api_unreachable/ready; start_gateway() invokes hermes -p <profile> gateway start and polls API readiness (timeout 15s). App never kills a gateway it did not start (started_by_app tracked in app.state).
 - Config gained agent_autostart (env STORY_ARCHITECT_AGENT_AUTOSTART / config.toml), default off.
