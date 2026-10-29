@@ -23,3 +23,10 @@ Test counts: before 1184 passed/25 skipped; after 1063 passed/29 failed (pre-exi
 Deviations: removed Hermes config dependency (load_plugin_config returns {}); frontend boot fetches API.
 
 Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) still supports override. Pass root explicitly.
+
+## Phase 2 hand-off
+
+- Tool handlers get root via `resolve_root(kwargs)` reading `kwargs["root_path"]`; MCP layer should pass `root_path=<projects root>` in kwargs. Simplest: call handler(args, root_path=root).
+- None of the 10 remaining tool modules depend on dashboard code.
+- Tools return JSON string; success usually `{"success": true, ...}`; errors `{"success": false, "error": "..."}` or raised exceptions translated at boundary.
+- core changes beyond imports: removed Hermes config path/load_plugin_config; resolve_root now free of Hermes; dashboard assembly removed; stats moved to app.stats.
