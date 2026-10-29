@@ -138,9 +138,9 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - Open the database read-only where the existing helpers allow it; do not alter connection setup in `core/db.py` unless necessary.
 
 **Checklist**
-- [ ] `list_projects` and `get_project_dashboard` (names flexible) implemented
-- [ ] Output shape matches what the frontend currently consumes (compare against the old injected values on a real project)
-- [ ] Tests with a fixture project: happy path, unknown slug, project without a DB
+- [x] `list_projects` and `get_project_dashboard` (names flexible) implemented
+- [x] Output shape matches what the frontend currently consumes (compare against the old injected values on a real project)
+- [x] Tests with a fixture project: happy path, unknown slug, project without a DB
 
 ---
 
