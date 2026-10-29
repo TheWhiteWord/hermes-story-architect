@@ -142,7 +142,7 @@ In-app chat, manual editing, a Fountain writer, systemd/autostart of the app, ot
 **Checklist**
 - [x] SOUL.md and SKILL.md written from the repo's real conventions
 - [x] Frontmatter and tool-name tests
-- [ ] Owner reviewed
+- [x] Owner reviewed
 
 ---
 
@@ -153,8 +153,8 @@ In-app chat, manual editing, a Fountain writer, systemd/autostart of the app, ot
 - Exit code non-zero if any check fails.
 
 **Checklist**
-- [ ] Status command with the checks above
-- [ ] Tests with the fake `hermes` and a test app
+- [x] Status command with the checks above
+- [x] Tests with the fake `hermes` and a test app
 
 ---
 
@@ -170,9 +170,9 @@ In-app chat, manual editing, a Fountain writer, systemd/autostart of the app, ot
 **Guidance:** keep it small. If the existing vanilla UI makes a clean "re-init with new data" hard, implement the minimum and note the limitation.
 
 **Checklist**
-- [ ] Change notification endpoint
-- [ ] UI indicator and state-preserving refresh
-- [ ] Test for the change detection and the endpoint; manual check: agent write, then the indicator appears
+- [x] Change notification endpoint
+- [x] UI indicator and state-preserving refresh
+- [x] Test for the change detection and the endpoint; manual check: agent write, then the indicator appears
 
 ---
 

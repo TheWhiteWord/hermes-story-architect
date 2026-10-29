@@ -31,6 +31,7 @@ DASH.boot = async function() {
     window.__SCREENPLAY_STATS__ = data.screenplay_stats;
     document.getElementById('loading-screen').style.display = 'none';
     DASH.initStory(data.story_data);
+    DASH.watchUpdates(slug);
   } catch (e) {
     DASH.showError();
   }
@@ -55,6 +56,35 @@ DASH.showPicker = async function() {
   } catch (e) {
     DASH.showError();
   }
+};
+
+DASH.watchUpdates = function(slug) {
+  try {
+    if (DASH._es) DASH._es.close();
+    const es = new EventSource('/api/projects/' + encodeURIComponent(slug) + '/events');
+    DASH._es = es;
+    es.addEventListener('update', function() {
+      DASH.showUpdateIndicator(slug);
+    });
+    es.onerror = function() { /* auto-reconnect by browser */ };
+  } catch (e) {}
+};
+
+DASH.showUpdateIndicator = function(slug) {
+  let el = document.getElementById('sa-update-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sa-update-banner';
+    el.style.cssText = 'position:fixed;top:8px;right:8px;background:#222;color:#fff;padding:8px 12px;border-radius:6px;z-index:9999;font-size:13px;';
+    el.innerHTML = 'Project updated <button id="sa-refresh-btn">Refresh</button>';
+    document.body.appendChild(el);
+    document.getElementById('sa-refresh-btn').onclick = function() { DASH.refreshProject(slug); };
+  }
+  el.style.display = 'block';
+};
+
+DASH.refreshProject = async function(slug) {
+  window.location.reload();
 };
 
 DASH.showError = function() {

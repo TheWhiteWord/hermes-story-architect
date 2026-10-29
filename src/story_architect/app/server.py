@@ -66,13 +66,50 @@ def create_app(config: Config) -> FastAPI:
             return JSONResponse(status_code=500, content={"error": {"code": "error", "message": str(e)}})
         return data
 
+    @app.get("/api/projects/{slug}/events")
+    async def project_events(slug: str, request: Request):
+        from fastapi.responses import StreamingResponse
+        import asyncio
+        import sqlite3
+        from pathlib import Path
+
+        root = Path(config.root)
+        db_path = root / "projects" / slug / ".story" / "story.db"
+        # also resolve via services? keep simple
+
+        async def gen():
+            last = None
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    conn = sqlite3.connect(str(db_path))
+                    v = conn.execute("PRAGMA data_version").fetchone()[0]
+                    conn.close()
+                except Exception:
+                    v = None
+                if last is None:
+                    last = v
+                elif v is not None and v != last:
+                    last = v
+                    yield "event: update\ndata: changed\n\n"
+                await asyncio.sleep(1)
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
+
     class _MCPApp:
         def __init__(self, mgr):
             self.mgr = mgr
         async def __call__(self, scope, receive, send):
             await self.mgr.handle_request(scope, receive, send)
 
-    app.mount("/mcp", app=_MCPApp(manager))
+    from starlette.responses import RedirectResponse
+
+    @app.api_route("/mcp", methods=["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS", "HEAD"])
+    async def _mcp_redirect(request: Request):
+        return RedirectResponse(url="/mcp/", status_code=307)
+
+    app.mount("/mcp/", app=_MCPApp(manager))
 
     from pathlib import Path
     import story_architect
