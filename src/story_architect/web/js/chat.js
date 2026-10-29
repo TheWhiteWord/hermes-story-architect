@@ -6,13 +6,14 @@
   function ensureUI(){
     if(document.getElementById('sa-chat-panel')) return;
     const p=document.createElement('div'); p.id='sa-chat-panel';
-    p.innerHTML='<div id="sa-chat-header"><strong>Chat</strong><button id="sa-chat-close">✕</button></div>'+
+    p.innerHTML='<div id="sa-chat-header"><strong>Chat</strong><button id="sa-chat-start">Start agent</button><button id="sa-chat-close">✕</button></div>'+
       '<div id="sa-chat-messages"></div>'+
       '<div id="sa-chat-input"><textarea id="sa-chat-text" rows="3"></textarea><div><button id="sa-chat-send">Send</button><button id="sa-chat-stop" style="display:none">Stop</button><button id="sa-chat-new">New</button></div></div>';
     document.body.appendChild(p);
     const t=document.createElement('button'); t.id='sa-chat-toggle'; t.textContent='Chat'; document.body.appendChild(t);
     t.onclick=toggle;
     document.getElementById('sa-chat-close').onclick=toggle;
+    document.getElementById('sa-chat-start').onclick=startAgent;
     document.getElementById('sa-chat-send').onclick=send;
     document.getElementById('sa-chat-stop').onclick=stop;
     document.getElementById('sa-chat-new').onclick=newConv;
@@ -40,6 +41,16 @@
   }
   function appendText(text){ const el=document.getElementById('sa-chat-messages'); let last=el.lastElementChild; if(!last||!last.classList.contains('assistant')){ last=document.createElement('div'); last.className='assistant'; last.innerHTML='<div></div>'; el.appendChild(last);} last.querySelector('div').textContent += text; el.scrollTop=el.scrollHeight; }
   function appendTool(name){ const el=document.getElementById('sa-chat-messages'); const d=document.createElement('div'); d.className='sa-tool'; d.textContent='… '+name; el.appendChild(d); el.scrollTop=el.scrollHeight; }
+  async function startAgent(){
+    const el=document.getElementById('sa-chat-messages');
+    const b=document.getElementById('sa-chat-start'); b.disabled=true; b.textContent='Starting…';
+    try{
+      const r=await fetch('/api/agent/start',{method:'POST',headers:H});
+      const d=await r.json();
+      const msg=document.createElement('div'); msg.textContent = (d && d.message) ? d.message : ('Agent: '+(d && d.state ? d.state : 'done')); el.appendChild(msg);
+    } catch(e){ const msg=document.createElement('div'); msg.textContent='Failed: '+e; el.appendChild(msg); }
+    b.disabled=false; b.textContent='Start agent';
+  }
   async function send(){
     const ta=document.getElementById('sa-chat-text'); const text=ta.value.trim(); if(!text||streaming) return;
     ta.value=''; streaming=true; document.getElementById('sa-chat-stop').style.display='inline';
