@@ -107,10 +107,10 @@ Enabling it is done through gateway configuration/env vars of the profile; the e
 - Config: add the API port and key location to the app's config module (same precedence rules as other settings).
 
 **Checklist**
-- [ ] `HermesChatBackend` implemented
-- [ ] Setup enables API server, key, restricted toolsets; still idempotent; still never touches other profiles or the default `SOUL.md`
-- [ ] Status checks extended
-- [ ] Tests with a fake API server (local test server emitting recorded streaming events from Task 1): text streaming, tool events, continuity state round trip, auth failure, unreachable server, malformed events
+- [x] `HermesChatBackend` implemented
+- [x] Setup enables API server, key, restricted toolsets; still idempotent; still never touches other profiles or the default `SOUL.md`
+- [x] Status checks extended
+- [x] Tests with a fake API server (local test server emitting recorded streaming events from Task 1): text streaming, tool events, continuity state round trip, auth failure, unreachable server, malformed events
 
 ---
 

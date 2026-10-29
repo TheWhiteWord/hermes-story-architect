@@ -95,6 +95,29 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
         lines.append(f"STORY_ARCHITECT_TOKEN={tok}")
         env_path.write_text("\n".join(lines) + "\n")
         out.append("token written (not printed)")
+    # API key for Hermes API server
+    api_key = T.ensure_api_key() if hasattr(T, "ensure_api_key") else None
+    # ensure function added below; fallback
+    if api_key is None:
+        import secrets
+        akp = T.config_dir() / "api_key"
+        if akp.exists():
+            api_key = akp.read_text().strip()
+        else:
+            api_key = secrets.token_urlsafe(32)
+            akp.write_text(api_key)
+            try:
+                akp.chmod(0o600)
+            except OSError:
+                pass
+    if dry:
+        out.append("[dry-run] would write API key to .env")
+    else:
+        lines = env_path.read_text().splitlines() if env_path.exists() else []
+        lines = [l for l in lines if not l.startswith("API_SERVER_KEY=")]
+        lines.append(f"API_SERVER_KEY={api_key}")
+        env_path.write_text("\n".join(lines) + "\n")
+        out.append("API key written (not printed)")
     # MCP registration via YAML safe edit
     import yaml
     cfg_path = pd / "config.yaml"
@@ -110,6 +133,17 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
         "url": f"http://127.0.0.1:{port}/mcp",
         "headers": {"Authorization": "Bearer ${STORY_ARCHITECT_TOKEN}"},
     }
+    # API server enablement
+    cfg.setdefault("platforms", {})
+    cfg["platforms"].setdefault("api_server", {})
+    cfg["platforms"]["api_server"].update({
+        "enabled": True,
+        "host": "127.0.0.1",
+        "port": C.load_config().hermes_api_port,
+        "key": "${API_SERVER_KEY}",
+    })
+    # conservative toolsets: no built-in terminal/file tools
+    cfg["toolsets"] = []
     if dry:
         out.append("[dry-run] would register MCP server")
     else:
@@ -184,5 +218,24 @@ def status(argv=None, profile_name="story-architect"):
         except Exception:
             mcp_ok = False
     check("MCP endpoint", mcp_ok, "token or tool list mismatch")
+    # API server reachable + auth + model id
+    api_ok = False
+    model_ok = False
+    gateway_ok = True
+    ak = T.load_api_key()
+    ap = C.load_config().hermes_api_port
+    if ak:
+        try:
+            import httpx
+            r = httpx.get(f"http://127.0.0.1:{ap}/v1/models", headers={"Authorization": f"Bearer {ak}"}, timeout=2.0)
+            api_ok = r.status_code == 200
+            if api_ok:
+                data = r.json()
+                models = [m.get("id") for m in data.get("data", [])]
+                model_ok = pname in models
+        except Exception:
+            api_ok = False
+    check("API server reachable", api_ok, "start gateway / run setup")
+    check("API model id matches profile", model_ok, f"expected {pname}")
     print("ALL OK" if ok else "FAILURES PRESENT")
     return 0 if ok else 1

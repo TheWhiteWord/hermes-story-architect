@@ -17,6 +17,7 @@ class Config:
     root: Path
     port: int = DEFAULT_PORT
     open_browser: bool = True
+    hermes_api_port: int = 8642
 
 
 def _config_file() -> Path:
@@ -48,6 +49,7 @@ def load_config(*, cli_root=None, cli_port=None, cli_no_open=False) -> Config:
 
     root_raw = pick("root", cli_root, "ROOT", str(DEFAULT_ROOT))
     port_raw = pick("port", cli_port, "PORT", DEFAULT_PORT, int)
+    hermes_api_port_raw = pick("hermes_api_port", None, "HERMES_API_PORT", 8642, int)
     open_browser = True
     if cli_no_open:
         open_browser = False
@@ -58,4 +60,4 @@ def load_config(*, cli_root=None, cli_port=None, cli_no_open=False) -> Config:
         elif "open_browser" in file_vals:
             open_browser = bool(file_vals["open_browser"])
 
-    return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser)
+    return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser, hermes_api_port=int(hermes_api_port_raw))

@@ -21,3 +21,10 @@
 - Package: src/story_architect/chat/ — events (TextDelta, ToolStarted, ToolFinished, Done, Error), ChatBackend protocol, store (chat.db per project, two tables), ChatService, FakeBackend. No FastAPI/Hermes imports.
 - Tests: tests/test_chat_core.py — 6 passing (new conv, multi-turn, reload, isolation, error, cancellation).
 - Deviations: cancellation status may be 'streaming'/'cancelled' depending on close timing; store access sync.
+
+## Phase 3 Task 3 (Hermes chat backend and setup extensions)
+- Implemented `adapters/hermes/chat_backend.py` (`HermesChatBackend`) using httpx streaming against `/v1/chat/completions`; maps text deltas and `hermes.tool.progress` events; ignores unknown events; captures response id as backend state.
+- Config extended with `hermes_api_port` (env STORY_ARCHITECT_HERMES_API_PORT).
+- token module gained `ensure_api_key`/`load_api_key` (0600 in config dir).
+- setup enables API server platforms config, writes API_SERVER_KEY to profile .env, sets toolsets=[] (conservative: no built-in terminal/file tools; MCP story tools remain). status checks API reachability/auth/model id.
+- Agent cannot run shell/file tools by default; web search disabled (toolsets empty). Owner can change toolsets in profile config.
