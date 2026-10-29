@@ -193,12 +193,12 @@ Each task: **Intent**, **Must** (strict), **Guidance** (adapt freely), **Checkli
 - The picker can be simple, using existing CSS tokens/classes.
 
 **Checklist**
-- [ ] Assets moved to `web/`, served statically, inlining pipeline deleted
-- [ ] Script/CSS order preserved and test-pinned
-- [ ] Picker + hash routing + loading/error/empty states
-- [ ] Dashboard renders from API for a real project: all tabs verified manually
-- [ ] `DASH.askAgent` implemented, all send-buttons routed through it
-- [ ] No JS console errors on load or on navigating all tabs
+- [x] Assets moved to `web/`, served statically, inlining pipeline deleted
+- [x] Script/CSS order preserved and test-pinned
+- [x] Picker + hash routing + loading/error/empty states
+- [x] Dashboard renders from API for a real project: all tabs verified manually
+- [x] `DASH.askAgent` implemented, all send-buttons routed through it
+- [x] No JS console errors on load or on navigating all tabs
 
 ---
 

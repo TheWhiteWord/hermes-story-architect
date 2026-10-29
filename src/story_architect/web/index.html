@@ -10,11 +10,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <!-- Better Fountain screenplay styling -->
-<!-- SCREENPLAY_CSS_PLACEHOLDER -->
+<link rel="stylesheet" href="screenplay.css">
 
 <!-- D3.js for statistics charts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<!-- CSS_PLACEHOLDER -->
+<link rel="stylesheet" href="screenplay.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/views.css">
+<link rel="stylesheet" href="css/statistics.css">
+<link rel="stylesheet" href="css/graph.css">
+<link rel="stylesheet" href="css/value-graph.css">
+<link rel="stylesheet" href="css/panel-tabs.css">
+<link rel="stylesheet" href="css/scene-beats.css">
+<link rel="stylesheet" href="css/character-journey.css">
 </head>
 
 <body>
@@ -504,6 +513,29 @@
 <!-- Hidden file input for manual load -->
 <input type="file" id="file-input" accept=".yaml,.yml" style="display:none" onchange="DASH.handleFileLoad(this)">
 
-<!-- JS_PLACEHOLDER -->
+<script src="js/core.js"></script>
+<script src="js/colors.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/data-load.js"></script>
+<script src="js/views/scenes.js"></script>
+<script src="js/views/locations.js"></script>
+<script src="js/views/plots.js"></script>
+<script src="js/views/relationships.js"></script>
+<script src="js/views/worlds.js"></script>
+<script src="js/views/story.js"></script>
+<script src="js/panels/panel-manager.js"></script>
+<script src="js/panels/entity-panels.js"></script>
+<script src="js/panels/memory-dialog.js"></script>
+<script src="js/panels/panel-tabs.js"></script>
+<script src="js/graph/network.js"></script>
+<script src="js/graph/value-graph.js"></script>
+<script src="js/graph/track-data.js"></script>
+<script src="js/panels/scene-beats-tab.js"></script>
+<script src="js/panels/character-journey-tab.js"></script>
+<script src="js/statistics/statistics.js"></script>
+<script src="js/statistics/charts.js"></script>
+<script src="js/script-view.js"></script>
+<script>DASH.boot();</script>
 </body>
 </html>

@@ -6,17 +6,56 @@ let story = null;
 let network = null;
 
 
+DASH.askAgent = function(text) {
+  try { navigator.clipboard.writeText(text); } catch (e) {}
+  alert('Prompt copied to clipboard. Paste it into Hermes chat.');
+};
+
+document.addEventListener('click', function(e){
+  const b = e.target && e.target.closest && e.target.closest('[data-hermes-send]');
+  if (b) { e.preventDefault(); DASH.askAgent(b.getAttribute('data-hermes-send')); }
+});
 DASH.boot = async function() {
   try {
-    if (window.__STORY_DATA__) {
-      DASH.initStory(window.__STORY_DATA__);
+    const m = (location.hash || '').match(/^#\/p\/(.+)$/);
+    if (!m) {
+      await DASH.showPicker();
       return;
     }
-    DASH.showError();
+    const slug = decodeURIComponent(m[1]);
+    const res = await fetch('/api/projects/' + encodeURIComponent(slug) + '/dashboard');
+    if (!res.ok) { DASH.showError(); return; }
+    const data = await res.json();
+    window.__STORY_DATA__ = data.story_data;
+    window.__SECTIONS__ = data.sections;
+    window.__SCREENPLAY_STATS__ = data.screenplay_stats;
+    document.getElementById('loading-screen').style.display = 'none';
+    DASH.initStory(data.story_data);
   } catch (e) {
     DASH.showError();
   }
-}
+};
+
+DASH.showPicker = async function() {
+  try {
+    const res = await fetch('/api/projects');
+    const data = await res.json();
+    const projects = (data.projects || []);
+    const app = document.getElementById('app');
+    const loading = document.getElementById('loading-screen');
+    if (loading) loading.style.display = 'none';
+    let html = '<div style="padding:2rem"><h2>Projects</h2>';
+    if (!projects.length) {
+      html += '<p>No projects found. Create one under projects/.</p>';
+    } else {
+      html += '<ul>' + projects.map(p => '<li><a href="#/p/' + encodeURIComponent(p.slug) + '">' + (p.name || p.slug) + '</a></li>').join('') + '</ul>';
+    }
+    html += '</div>';
+    if (app) app.innerHTML = html;
+  } catch (e) {
+    DASH.showError();
+  }
+};
 
 DASH.showError = function() {
   document.getElementById('loading-screen').style.display = 'none';
