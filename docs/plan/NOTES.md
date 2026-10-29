@@ -77,8 +77,16 @@ Phase 2: tool handlers still expect kwargs with root_path; resolve_root(kwargs) 
 - Summary: `story-architect hermes status [--profile NAME]` now checks hermes found + version, profile exists, SOUL.md + skill present, MCP entry present and pointing at configured URL, token present, app reachable (`/healthz`), and MCP endpoint authenticates with token + lists expected tools. Non-zero exit on any failure. Uses mcp SDK Streamable HTTP client (httpx2) against running app; degrades gracefully when app down.
 - Deviations: none.
 - Phase 3 notes: status relies on app running for MCP check; reuse `load_config().port` and `token.load_token()`.
+
 ## Phase 2 Task 7 — Agent changes visible in browser
 
 - Summary: Added `GET /api/projects/{slug}/events` SSE endpoint polling `PRAGMA data_version` (1s) and emitting `update` on change. UI (`core.js`) opens EventSource on boot, shows "Project updated / Refresh" banner; Refresh now `window.location.reload()` for reliable re-render (extended panels were stale on in-place reinit). Also fixed MCP mount: Starlette Mount needed trailing slash + 307 redirect from `/mcp` so Hermes' `/mcp` POST reaches the manager (was falling through to StaticFiles -> 405).
 - Deviations: in-place `DASH.initStory` re-render proved unreliable for already-open extended views, so refresh uses full reload. Change detection uses PRAGMA data_version on a fresh read connection.
 - Phase 3 note: SSE endpoint pattern reusable for chat/streaming; app must be running for both UI and agent. Extended-view staleness remains; future work should make panel render reactive to `DASH.story` updates.
+
+## Phase 2 Task 8 (docs)
+
+- README: added "Using with Hermes" (prereqs, setup, CLI/Desktop start, app-not-running recovery, status, security notes) and Layout section.
+- phase-2 checklist ticked for Task 8.
+- No code changes; suite unchanged (1009 passed). No new deviations.
+- Phase 3 note: in-app chat spike on `hermes serve` vs ACP still outstanding; no findings from this task.
