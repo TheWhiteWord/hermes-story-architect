@@ -64,25 +64,25 @@ Files are in `chat-ui/`: `css/chat.css`, `js/chat-api.js`, `js/chat-md.js`, `js/
 
 ## 5. Drafts as approval cards
 
-- [ ] **Snapshot** (JSON the UI renders; also what is stored in the message):
+- [x] **Snapshot** (JSON the UI renders; also what is stored in the message):
 `{id, status: "open"|"committed"|"discarded"|"failed", summary, created_at, changes: [...], warnings: [str], error?}`
 where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, entity_id?, label?, summary, fields?: [{field, before, after}], count?}`.
 
-- [ ]  Add a public, structured sibling of `render_preview_md` in `core/drafts.py` (for example `describe_ops(project_path, ops) -> list[dict]`) producing `changes`. Edits take `before` from the same lookup `_render_edit` uses (`writes.current_values`); every op already carries a `summary`. `warnings` come from `validate_shape`.
+- [x]  Add a public, structured sibling of `render_preview_md` in `core/drafts.py` (for example `describe_ops(project_path, ops) -> list[dict]`) producing `changes`. Edits take `before` from the same lookup `_render_edit` uses (`writes.current_values`); every op already carries a `summary`. `warnings` come from `validate_shape`.
 - [ ]  **Discarding deletes the draft row**, so card state cannot live in `drafts`. Persist the snapshot **inside the chat message** (section 6) and update it there on every status change.
 
 **Endpoints**
-- [ ]  `POST /api/projects/{slug}/drafts/{id}/approve` `{conversation_id}`: `core.drafts.commit`. Success returns `{status: "committed", draft: <snapshot>}`. A partial failure (`success: false`, `draft_kept`) returns `{status: "failed", draft: <snapshot with error and what landed>}` with HTTP 200. A missing/changed draft returns 409 with a clear message (the agent may have re-staged or discarded it).
-- [ ]  `POST .../drafts/{id}/reject` `{conversation_id}`: `core.drafts.discard`; returns `{status: "discarded", draft: <snapshot>}`.
-- [ ]  Both update the stored snapshot in that conversation's message and add a **hidden** note to the conversation ("Draft d-… was approved by the user and committed" / "…rejected") that is included in the history sent to the agent on the next turn. No extra LLM call. The agent keeps its ability to commit by itself; nothing here removes it.
+- [x]  `POST /api/projects/{slug}/drafts/{id}/approve` `{conversation_id}`: `core.drafts.commit`. Success returns `{status: "committed", draft: <snapshot>}`. A partial failure (`success: false`, `draft_kept`) returns `{status: "failed", draft: <snapshot with error and what landed>}` with HTTP 200. A missing/changed draft returns 409 with a clear message (the agent may have re-staged or discarded it).
+- [x]  `POST .../drafts/{id}/reject` `{conversation_id}`: `core.drafts.discard`; returns `{status: "discarded", draft: <snapshot>}`.
+- [x]  Both update the stored snapshot in that conversation's message and add a **hidden** note to the conversation ("Draft d-… was approved by the user and committed" / "…rejected") that is included in the history sent to the agent on the next turn. No extra LLM call. The agent keeps its ability to commit by itself; nothing here removes it.
 
 ## 6. Store changes (`chat.db`, additive only)
 
-- [ ] `messages` gains: `status` (`complete|partial|cancelled|error`, default `complete`), `tools` (JSON list of tool entries), `drafts` (JSON list of snapshots), `attachments` (JSON), `hidden` (0/1), `error` (text). Migrate with `ALTER TABLE … ADD COLUMN` if missing.
+- [x] `messages` gains: `status` (`complete|partial|cancelled|error`, default `complete`), `tools` (JSON list of tool entries), `drafts` (JSON list of snapshots), `attachments` (JSON), `hidden` (0/1), `error` (text). Migrate with `ALTER TABLE … ADD COLUMN` if missing.
 
 - [ ] The assistant message is persisted at the end of the reply **and also when cancelled or failed** (partial text kept, status set).
-- [ ] `GET .../conversations/{cid}` returns visible messages `{id, role, text, status, created_at, tools, drafts, attachments, error}`; hidden ones are omitted from the response but included when building the backend history.
-- [ ] `GET .../conversations` returns `{id, title, updated_at}` (title derived from the first user message).
+- [x] `GET .../conversations/{cid}` returns visible messages `{id, role, text, status, created_at, tools, drafts, attachments, error}`; hidden ones are omitted from the response but included when building the backend history.
+- [x] `GET .../conversations` returns `{id, title, updated_at}` (title derived from the first user message).
 
 ## 7. Retry
 

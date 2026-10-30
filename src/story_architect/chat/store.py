@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS messages (
     timestamp TEXT NOT NULL,
     metadata TEXT,
     status TEXT NOT NULL DEFAULT 'complete',
+    tools TEXT,
+    drafts TEXT,
+    attachments TEXT,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
 """
@@ -44,6 +49,18 @@ def connect(project_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(p))
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
+    # migrate older DBs: add new columns if missing
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(messages)").fetchall()}
+    for col, ddl in (
+        ("tools", "TEXT"),
+        ("drafts", "TEXT"),
+        ("attachments", "TEXT"),
+        ("hidden", "INTEGER NOT NULL DEFAULT 0"),
+        ("error", "TEXT"),
+    ):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE messages ADD COLUMN {col} {ddl}")
+    conn.commit()
     return conn
 
 
@@ -74,7 +91,7 @@ def list_conversations(project_path) -> list[dict]:
         conn.close()
 
 
-def get_conversation(project_path, cid) -> dict | None:
+def get_conversation(project_path, cid, include_hidden=False) -> dict | None:
     conn = connect(project_path)
     try:
         row = conn.execute(
@@ -84,16 +101,24 @@ def get_conversation(project_path, cid) -> dict | None:
         if not row:
             return None
         msgs = conn.execute(
-            "SELECT role, text, timestamp, metadata, status FROM messages WHERE conversation_id=? ORDER BY id",
+            "SELECT id, role, text, timestamp, metadata, status, tools, drafts, attachments, hidden, error FROM messages WHERE conversation_id=? ORDER BY id",
             (cid,),
         ).fetchall()
+        messages = []
+        for m in msgs:
+            if (m[9] or 0) and not include_hidden:
+                continue
+            messages.append({
+                "id": m[0], "role": m[1], "text": m[2], "timestamp": m[3],
+                "metadata": _loads(m[4]), "status": m[5],
+                "tools": _loads(m[6]), "drafts": _loads(m[7]),
+                "attachments": _loads(m[8]), "hidden": bool(m[9]),
+                "error": m[10],
+            })
         return {
             "id": row[0], "title": row[1], "created_at": row[2],
             "updated_at": row[3], "backend_state": _loads(row[4]),
-            "messages": [
-                {"role": m[0], "text": m[1], "timestamp": m[2],
-                 "metadata": _loads(m[3]), "status": m[4]} for m in msgs
-            ],
+            "messages": messages,
         }
     finally:
         conn.close()
@@ -109,13 +134,15 @@ def delete_conversation(project_path, cid) -> bool:
         conn.close()
 
 
-def add_message(project_path, cid, role, text, metadata=None, status="complete") -> int:  # type: ignore[return-value]
+def add_message(project_path, cid, role, text, metadata=None, status="complete",
+                tools=None, drafts=None, attachments=None, hidden=False, error=None) -> int:  # type: ignore[return-value]
     now = _now()
     conn = connect(project_path)
     try:
         cur = conn.execute(
-            "INSERT INTO messages (conversation_id, role, text, timestamp, metadata, status) VALUES (?,?,?,?,?,?)",
-            (cid, role, text, now, _dumps(metadata), status),
+            "INSERT INTO messages (conversation_id, role, text, timestamp, metadata, status, tools, drafts, attachments, hidden, error) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (cid, role, text, now, _dumps(metadata), status, _dumps(tools),
+             _dumps(drafts), _dumps(attachments), 1 if hidden else 0, error),
         )
         conn.execute("UPDATE conversations SET updated_at=? WHERE id=?", (now, cid))
         conn.commit()
@@ -125,14 +152,28 @@ def add_message(project_path, cid, role, text, metadata=None, status="complete")
         conn.close()
 
 
-def update_message(project_path, msg_id, text, status="complete", metadata=None) -> None:
+def update_message(project_path, msg_id, text, status="complete", metadata=None,
+                   tools=None, drafts=None, attachments=None, hidden=None, error=None,
+                   update_tools=False, update_drafts=False, update_attachments=False,
+                   update_hidden=False, update_error=False) -> None:
     conn = connect(project_path)
     try:
-        if metadata is None:
-            conn.execute("UPDATE messages SET text=?, status=? WHERE id=?", (text, status, msg_id))
-        else:
-            conn.execute("UPDATE messages SET text=?, status=?, metadata=? WHERE id=?",
-                         (text, status, _dumps(metadata), msg_id))
+        sets = ["text=?", "status=?"]
+        vals = [text, status]
+        if metadata is not None:
+            sets.append("metadata=?"); vals.append(_dumps(metadata))
+        if update_tools:
+            sets.append("tools=?"); vals.append(_dumps(tools))
+        if update_drafts:
+            sets.append("drafts=?"); vals.append(_dumps(drafts))
+        if update_attachments:
+            sets.append("attachments=?"); vals.append(_dumps(attachments))
+        if update_hidden:
+            sets.append("hidden=?"); vals.append(1 if hidden else 0)
+        if update_error:
+            sets.append("error=?"); vals.append(error)
+        vals.append(msg_id)
+        conn.execute(f"UPDATE messages SET {', '.join(sets)} WHERE id=?", tuple(vals))
         conn.commit()
     finally:
         conn.close()

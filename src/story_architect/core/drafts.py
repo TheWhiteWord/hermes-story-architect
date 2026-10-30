@@ -572,6 +572,59 @@ def _describe(op: dict) -> str:
     return f"{kind} {entity_type}/{op.get('entity_id') or op.get('id', '')}"
 
 
+def describe_ops(project_path: Path, ops: list) -> list[dict]:
+    """Structured sibling of ``render_preview_md``.
+
+    Returns the list of change dicts the UI renders as approval cards.
+    Edits take ``before`` from the same lookup ``_render_edit`` uses
+    (``writes.current_values``); every op already carries a ``summary``.
+    ``warnings`` come from ``validate_shape`` and are not part of this.
+    """
+    changes = []
+    for op in ops:
+        kind = op["op"]
+        if kind == "create":
+            fields = [
+                {"field": f, "before": None, "after": v}
+                for f, v in (op.get("frontmatter") or {}).items()
+            ]
+            changes.append({
+                "kind": "create",
+                "entity_type": op["type"],
+                "entity_id": op["id"],
+                "summary": op["summary"],
+                "fields": fields,
+            })
+        elif kind == "edit":
+            current = _current_values(project_path, op)
+            fields = []
+            for field, value in (op.get("data") or {}).items():
+                before, _stored = current.get(field, (None, None))
+                fields.append({"field": field, "before": before, "after": value})
+            changes.append({
+                "kind": "edit",
+                "entity_type": op["entity_type"],
+                "entity_id": op["entity_id"],
+                "summary": op["summary"],
+                "fields": fields,
+            })
+        elif kind == "delete":
+            changes.append({
+                "kind": "delete",
+                "entity_type": op["entity_type"],
+                "entity_id": op["entity_id"],
+                "summary": op["summary"],
+            })
+        elif kind == "reorder":
+            changes.append({
+                "kind": "reorder",
+                "entity_type": op["entity_type"],
+                "summary": op["summary"],
+                "count": len(op.get("ordered_ids") or []),
+            })
+    return changes
+
+
 # ─── preview renderer ───
 
 def render_preview_md(project_path: Path, ops: list, draft_id: str, project_name: str,
