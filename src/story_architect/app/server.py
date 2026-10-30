@@ -10,9 +10,12 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from story_architect.app.config import Config
-from story_architect.app import services
 from story_architect.app import token as token_mod
 from story_architect.app.mcp_server import create_mcp_server, StreamableHTTPSessionManager
+from story_architect.app.routes import agent as agent_routes
+from story_architect.app.routes import chat as chat_routes
+from story_architect.app.routes import drafts as drafts_routes
+from story_architect.app.routes import projects as projects_routes
 
 
 def create_app(config: Config) -> FastAPI:
@@ -58,214 +61,15 @@ def create_app(config: Config) -> FastAPI:
                 return JSONResponse(status_code=401, content={"error": {"code": "unauthorized", "message": "Missing or invalid token"}})
         return await call_next(request)
 
-    @app.get("/api/agent/state")
-    def agent_state():
-        from story_architect.adapters.hermes.gateway import agent_state as _state
-        return _state(config)
+    app.include_router(agent_routes.make_router(config, app))
+    app.include_router(chat_routes.make_router(config, app))
+    app.include_router(drafts_routes.make_router(config, app))
+    app.include_router(projects_routes.make_router(config, app))
 
-    @app.get("/api/agent/settings")
-    def agent_settings():
-        from story_architect.adapters.hermes.gateway import agent_settings as _settings
-        return _settings(config)
-
-    @app.patch("/api/agent/settings")
-    def agent_settings_patch(body: dict = {}):
-        from story_architect.app.state_store import save_state
-        body = body or {}
-        if "autostart" in body:
-            save_state({"agent_autostart": bool(body["autostart"])})
-            config.agent_autostart = bool(body["autostart"])
-        return {"ok": True}
-
-    @app.post("/api/agent/start")
-    def agent_start():
-        from story_architect.adapters.hermes.gateway import start_gateway as _start
-        res = _start(config)
-        app.state.agent_started_by_app = bool(res.get("started_by_app"))
-        return res
-
-    @app.post("/api/agent/stop")
-    def agent_stop():
-        from story_architect.adapters.hermes.gateway import stop_gateway as _stop
-        return _stop(config)
     @app.get("/healthz")
     def healthz():
         return {"ok": True}
 
-    @app.get("/api/projects")
-    def projects():
-        return {"projects": services.list_projects(config.root)}
-
-    @app.get("/api/projects/{slug}/dashboard")
-    def dashboard(slug: str):
-        try:
-            data = services.get_project_dashboard(config.root, slug)
-        except services.ProjectNotFound as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": {"code": "error", "message": str(e)}})
-        return data
-
-    @app.get("/api/projects/{slug}/events")
-    async def project_events(slug: str, request: Request):
-        from fastapi.responses import StreamingResponse
-        import asyncio
-        from pathlib import Path
-
-        root = Path(config.root)
-        db_path = root / "projects" / slug / ".story" / "story.db"
-
-        async def gen():
-            import sqlite3
-
-            last_version = None
-            try:
-                while True:
-                    if await request.is_disconnected():
-                        break
-                    try:
-                        conn = sqlite3.connect(str(db_path))
-                        cur = conn.execute("PRAGMA data_version")
-                        version = cur.fetchone()[0]
-                        conn.close()
-                    except Exception:
-                        version = None
-                    if last_version is not None and version != last_version:
-                        yield "event: update\ndata: {\"type\": \"update\"}\n\n"
-                    last_version = version
-                    await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                return
-
-        return StreamingResponse(gen(), media_type="text/event-stream")
-
-    @app.post("/api/projects/{slug}/drafts/{draft_id}/approve")
-    async def approve_draft(slug: str, draft_id: str, body: dict):
-        import json
-        from story_architect.tools.story_resolve import resolve_project
-        from story_architect.core.drafts import commit, describe_ops, validate_shape, DraftError
-        from story_architect.core.db import get_db
-        from story_architect.chat import store as chat_store
-        from pathlib import Path
-        root = Path(config.root)
-        try:
-            project_path = resolve_project(slug, root)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        cid = (body or {}).get("conversation_id")
-        # fetch draft row for snapshot inputs
-        conn = get_db(project_path)
-        try:
-            row = conn.execute("SELECT ops, summary, created_at, status FROM drafts WHERE id=?", (draft_id,)).fetchone()
-        finally:
-            conn.close()
-        if not row:
-            return JSONResponse(status_code=409, content={"error": {"code": "stale_draft", "message": f"No open draft: {draft_id}"}})
-        ops = json.loads(row[0]); summary = row[1] or ""; created_at = row[2]
-        warnings = validate_shape(ops)
-        try:
-            result = commit(project_path, draft_id)
-        except DraftError as e:
-            return JSONResponse(status_code=409, content={"error": {"code": "stale_draft", "message": str(e)}})
-        changes = describe_ops(project_path, ops)
-        if result.get("success") is False or result.get("failed"):
-            status = "failed"
-            error = (result.get("failed") or {}).get("error") or result.get("message")
-            snapshot = {"id": draft_id, "status": status, "summary": summary, "created_at": created_at, "changes": changes, "warnings": warnings, "error": error}
-        else:
-            status = "committed"
-            snapshot = {"id": draft_id, "status": status, "summary": summary, "created_at": created_at, "changes": changes, "warnings": warnings}
-        # update stored snapshot in conversation message
-        if cid:
-            conv = chat_store.get_conversation(project_path, cid, include_hidden=True)
-            if conv:
-                for m in conv["messages"]:
-                    drafts_list = m.get("drafts") or []
-                    for i, d in enumerate(drafts_list):
-                        if isinstance(d, dict) and d.get("id") == draft_id:
-                            drafts_list[i] = snapshot
-                            chat_store.update_message(project_path, m["id"], m["text"], status=m.get("status", "complete"), drafts=drafts_list, update_drafts=True)
-                chat_store.add_message(project_path, cid, "assistant", f"Draft {draft_id} was approved by the user and committed", hidden=True)
-        return {"status": status, "draft": snapshot}
-
-    @app.post("/api/projects/{slug}/drafts/{draft_id}/reject")
-    async def reject_draft(slug: str, draft_id: str, body: dict):
-        import json
-        from story_architect.tools.story_resolve import resolve_project
-        from story_architect.core.drafts import discard, describe_ops, validate_shape, DraftError
-        from story_architect.core.db import get_db
-        from story_architect.chat import store as chat_store
-        from pathlib import Path
-        root = Path(config.root)
-        try:
-            project_path = resolve_project(slug, root)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        cid = (body or {}).get("conversation_id")
-        conn = get_db(project_path)
-        try:
-            row = conn.execute("SELECT ops, summary, created_at FROM drafts WHERE id=?", (draft_id,)).fetchone()
-        finally:
-            conn.close()
-        if not row:
-            return JSONResponse(status_code=409, content={"error": {"code": "stale_draft", "message": f"No open draft: {draft_id}"}})
-        ops = json.loads(row[0]); summary = row[1] or ""; created_at = row[2]
-        warnings = validate_shape(ops)
-        try:
-            discard(project_path, draft_id)
-        except DraftError as e:
-            return JSONResponse(status_code=409, content={"error": {"code": "stale_draft", "message": str(e)}})
-        changes = describe_ops(project_path, ops)
-        snapshot = {"id": draft_id, "status": "discarded", "summary": summary, "created_at": created_at, "changes": changes, "warnings": warnings}
-        if cid:
-            conv = chat_store.get_conversation(project_path, cid, include_hidden=True)
-            if conv:
-                for m in conv["messages"]:
-                    drafts_list = m.get("drafts") or []
-                    for i, d in enumerate(drafts_list):
-                        if isinstance(d, dict) and d.get("id") == draft_id:
-                            drafts_list[i] = snapshot
-                            chat_store.update_message(project_path, m["id"], m["text"], status=m.get("status", "complete"), drafts=drafts_list, update_drafts=True)
-            chat_store.add_message(project_path, cid, "assistant", f"Draft {draft_id} was rejected by the user", hidden=True)
-        return {"status": "discarded", "draft": snapshot}
-
-    @app.post("/api/projects/{slug}/conversations/{cid}/retry")
-    async def retry_reply(slug: str, cid: str):
-        from fastapi.responses import StreamingResponse
-        import asyncio
-        from story_architect.tools.story_resolve import resolve_project
-        from pathlib import Path
-        root = Path(config.root)
-        try:
-            pp = resolve_project(slug, root)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        if cid in (app.state.active_replies or {}):
-            return JSONResponse(status_code=409, content={"error": {"code": "in_progress", "message": "reply in progress"}})
-        from story_architect.chat import store as chat_store
-        # 400 if no user message
-        # check by attempting prepare? Instead peek
-        conv = chat_store.get_conversation(pp, cid)
-        has_user = any(m.get("role") == "user" for m in (conv["messages"] if conv else []))
-        if not has_user:
-            return JSONResponse(status_code=400, content={"error": {"code": "no_user_message", "message": "no user message"}})
-        service = app.state.chat_service
-        async def gen():
-            task = asyncio.current_task()
-            app.state.active_replies[cid] = task
-            try:
-                async for ev in service.retry(pp, cid, {}):
-                    yield "event: " + type(ev).__name__ + "\ndata: {}\n\n".format("")
-            finally:
-                app.state.active_replies.pop(cid, None)
-        return StreamingResponse(gen(), media_type="text/event-stream")
-    @app.post("/api/projects/{slug}/conversations/{cid}/cancel")
-    async def cancel_reply(slug: str, cid: str):
-        task = app.state.active_replies.get(cid)
-        if task is not None:
-            task.cancel()
-            return {"cancelled": True}
-        return {"cancelled": False}
     class _MCPApp:
         def __init__(self, mgr):
             self.mgr = mgr

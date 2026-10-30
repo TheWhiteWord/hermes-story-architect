@@ -133,6 +133,4 @@ Contract change for UI: none.
 ## Task 12.2 implementation
 
 Implemented `stream_reply` helper in routes/chat.py plus messages/retry/cancel routes. Preflight checks for 404/400/503/409. Backend built per request from token. Cleanup in finally.
-
-### 12.2 update
 Added bus forwarder in producer; bus events now forwarded to SSE queue and bus_q unsubscribed in finally. Gap closed.
