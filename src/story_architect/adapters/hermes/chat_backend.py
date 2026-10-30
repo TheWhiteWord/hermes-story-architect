@@ -101,6 +101,8 @@ class HermesChatBackend:
                                     label = d.get("label")
                                     if status in ("completed", "finished", "done"):
                                         yield ToolFinished(name=tname, id=tid, label=label)
+                                    elif status in ("failed", "error"):
+                                        yield ToolFinished(name=tname, id=tid, label=label, status="failed")
                                     else:
                                         yield ToolStarted(name=tname, id=tid, label=label)
                             # sometimes tool name at obj["tool"]

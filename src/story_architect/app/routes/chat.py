@@ -44,7 +44,6 @@ def make_router(config, app):
             return
 
         queue: asyncio.Queue = asyncio.Queue()
-        task_holder = {}
 
         async def producer():
             try:
@@ -75,7 +74,7 @@ def make_router(config, app):
                         elif isinstance(ev, ToolStarted):
                             await queue.put(("sse", ("tool", {"type": "tool", "id": ev.id, "name": ev.name, "status": "started", "label": ev.label})))
                         elif isinstance(ev, ToolFinished):
-                            await queue.put(("sse", ("tool", {"type": "tool", "id": ev.id, "name": ev.name, "status": "finished", "label": ev.label})))
+                            await queue.put(("sse", ("tool", {"type": "tool", "id": ev.id, "name": ev.name, "status": ev.status, "label": ev.label})))
                         elif isinstance(ev, Done):
                             await queue.put(("sse", ("done", {"type": "done", "message_id": msg_id})))
                         elif isinstance(ev, Error):

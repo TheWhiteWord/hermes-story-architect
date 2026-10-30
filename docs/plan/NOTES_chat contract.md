@@ -133,4 +133,12 @@ Contract change for UI: none.
 ## Task 12.2 implementation
 
 Implemented `stream_reply` helper in routes/chat.py plus messages/retry/cancel routes. Preflight checks for 404/400/503/409. Backend built per request from token. Cleanup in finally.
-Added bus forwarder in producer; bus events now forwarded to SSE queue and bus_q unsubscribed in finally. Gap closed.
+## Task 12.3 implementation
+
+Short summary: Event mapping now matches the contract table exactly. Backend `ToolStarted` → `tool` `{id, name, status: "started", label}`; `ToolFinished` → `tool` `{id, name, status: ev.status, label}` where status is `finished` or `failed` (previously hard-coded "finished"). Hermes tool progress with `status: failed`/`error` now yields a failed ToolFinished instead of a started one. Bus event mapping unchanged (started/finished/failed → tool, draft → draft).
+
+Diagnosis findings (section 0): none new.
+
+Deviations: none. Removed unused `field`/`task_holder` imports/vars surfaced by ruff.
+
+Contract change for UI: none new; `label` already present for non-story tools, and `status` now correctly carries `failed` for failed backend tools.

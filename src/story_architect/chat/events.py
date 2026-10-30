@@ -1,7 +1,7 @@
 """Chat event model (plain dataclasses)."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -22,6 +22,7 @@ class ToolFinished:
     name: str
     id: Any = None
     label: str | None = None
+    status: str = "finished"
 
 
 @dataclass
