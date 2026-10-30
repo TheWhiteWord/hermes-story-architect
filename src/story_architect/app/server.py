@@ -27,6 +27,8 @@ def create_app(config: Config) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     app.state.config = config
     app.state.mcp_manager = manager
+    app.state.active_replies = {}
+    app.state.agent_started_by_app = False
 
     @app.middleware("http")
     async def host_check(request: Request, call_next):
