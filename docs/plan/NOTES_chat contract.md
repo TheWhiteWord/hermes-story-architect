@@ -142,3 +142,13 @@ Diagnosis findings (section 0): none new.
 Deviations: none. Removed unused `field`/`task_holder` imports/vars surfaced by ruff.
 
 Contract change for UI: none new; `label` already present for non-story tools, and `status` now correctly carries `failed` for failed backend tools.
+
+## Task 12.4 implementation
+
+Short summary: Confirmed all routes listed in 12.4 exist and match the contract (conversations CRUD, messages, retry, cancel, drafts approve/reject, events, agent state/settings/start/stop). Removed two unused imports in routes/chat.py (ChatService, config alias) so `ruff --select F` stays clean on routes/.
+
+Diagnosis findings (section 0): none new.
+
+Deviations: PATCH /api/agent/settings currently handles only `autostart`; `model` field (section 8) is not applied yet — left for the agent-settings task. Origin + X-Story-Architect header check relies on the existing middleware applied in create_app.
+
+Contract change for UI: none.

@@ -20,14 +20,13 @@ def make_router(config, app):
     async def stream_reply(slug, cid, user_text, context, retry=False):
         from story_architect.app import tool_bus
         from story_architect.chat import store as chat_store
-        from story_architect.chat.service import ChatService
+        
         pp, err = _resolve_project(slug)
         if pp is None:
             yield ("error", {"type": "error", "code": "not_found", "message": err, "retryable": False})
             return
         # backend build per request
         from story_architect.app.token import load_api_key
-        from story_architect.app import config as cfgmod
         api_key = load_api_key()
         if not api_key:
             yield ("error", {"type": "error", "code": "agent_not_configured", "message": "no api key", "retryable": False})

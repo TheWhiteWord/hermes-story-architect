@@ -168,7 +168,7 @@ Each SSE message is `event: <type>` + `data: <json including "type">`:
 
 ### 12.4 Routes the UI calls (confirm each exists and matches)
 
-`GET/POST /api/projects/{slug}/conversations` (list returns `{conversations:[{id,title,updated_at}]}`, create returns `{id}`); `GET/DELETE .../conversations/{cid}` (get returns `{id,title,messages:[{id,role,text,status,created_at,tools,drafts,attachments,error}]}`, hidden omitted); `POST .../messages` body `{text, context:{project, attachments:[{kind,id,label}]}}`; `POST .../retry`; `POST .../cancel`; `POST .../drafts/{id}/approve|reject` body `{conversation_id}` returning `{status, draft}`; `GET .../events`; `GET /api/agent/state`, `GET|PATCH /api/agent/settings`, `POST /api/agent/start|stop`. All POST/PATCH/DELETE go through the existing origin + `X-Story-Architect` header check.
+- [x] `GET/POST /api/projects/{slug}/conversations` (list returns `{conversations:[{id,title,updated_at}]}`, create returns `{id}`); `GET/DELETE .../conversations/{cid}` (get returns `{id,title,messages:[{id,role,text,status,created_at,tools,drafts,attachments,error}]}`, hidden omitted); `POST .../messages` body `{text, context:{project, attachments:[{kind,id,label}]}}`; `POST .../retry`; `POST .../cancel`; `POST .../drafts/{id}/approve|reject` body `{conversation_id}` returning `{status, draft}`; `GET .../events`; `GET /api/agent/state`, `GET|PATCH /api/agent/settings`, `POST /api/agent/start|stop`. All POST/PATCH/DELETE go through the existing origin + `X-Story-Architect` header check.
 
 ### 12.5 Tests (required for this section)
 
