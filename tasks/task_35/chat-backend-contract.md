@@ -44,7 +44,7 @@ Files are in `chat-ui/`: `css/chat.css`, `js/chat-api.js`, `js/chat-md.js`, `js/
 
 ## 3. Reply stream (SSE) from `POST .../messages` and `POST .../retry`
 
-- [ ] Each event is `event: <type>` + `data: <json>` where the JSON always has `type`. The UI also still understands the old `TextDelta` / `ToolStarted` / `ToolFinished` events, but move to these:
+- [x] Each event is `event: <type>` + `data: <json>` where the JSON always has `type`. The UI also still understands the old `TextDelta` / `ToolStarted` / `ToolFinished` events, but move to these:
 
 | type | payload |
 |---|---|

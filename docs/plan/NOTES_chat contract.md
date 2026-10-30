@@ -28,3 +28,11 @@ Diagnosis findings (section 0): unchanged from prior notes — context bug stopg
 Deviations: ChatService computes slug from project_path.name (string or Path). Project name lookup reuses core.drafts._project_name.
 
 Contract change for UI: none new; bootstrap is server-side only and never persisted/shown.
+
+## panelContext follow-up
+DASH.panelContext cleared on closePanel. Per-site setting at the 8 entity-panel open sites in panels/entity-panels.js is deferred (optional); UI currently sends only the visible label.
+
+## Task 3 — Reply stream (SSE) backend parse fix
+
+- Summary: `HermesChatBackend` now tracks the SSE `event:` line as `current_event` and treats a `hermes.tool.progress` event whether it arrives via the event line or a nested `event` field. Flat (real) payloads `{tool, status, ...}` and nested `{data:{tool}}` payloads are both parsed. `running` -> ToolStarted, `completed`/`finished`/`done` -> ToolFinished, others -> started. `reasoning_content` is ignored (only `delta.content` emitted).
+- Deviation: events module still uses TextDelta/ToolStarted/ToolFinished names; no ToolFailed class added. Contract's new `text`/`tool`/etc SSE types are handled at route layer, not here.

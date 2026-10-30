@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     import httpx2 as httpx
 
 from story_architect.chat.backend import ChatBackend  # noqa: F401
-from story_architect.chat.events import Done, Error, TextDelta, ToolStarted
+from story_architect.chat.events import Done, Error, TextDelta, ToolFinished, ToolStarted
 
 
 class HermesChatBackend:
@@ -49,6 +49,7 @@ class HermesChatBackend:
         url = f"{self.base_url}/v1/chat/completions"
 
         response_id: Any = backend_state
+        current_event: str | None = None
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 async with client.stream("POST", url, json=payload, headers=headers) as resp:
@@ -61,7 +62,7 @@ class HermesChatBackend:
                         if not line:
                             continue
                         if line.startswith("event:"):
-                            # event type; data line follows
+                            current_event = line[len("event:"):].strip()
                             continue
                         if not line.startswith("data:"):
                             continue
@@ -90,13 +91,16 @@ class HermesChatBackend:
                         # top-level hermes events
                         if isinstance(obj, dict):
                             evt = obj.get("event") or obj.get("type")
-                            if evt == "hermes.tool.progress":
-                                tname = None
-                                d = obj.get("data") or {}
-                                if isinstance(d, dict):
-                                    tname = d.get("tool") or d.get("name")
+                            is_tool_progress = evt == "hermes.tool.progress" or current_event == "hermes.tool.progress"
+                            if is_tool_progress:
+                                d = obj.get("data") if isinstance(obj.get("data"), dict) else obj
+                                tname = d.get("tool") or d.get("name")
+                                status = d.get("status")
                                 if tname:
-                                    yield ToolStarted(name=tname)
+                                    if status in ("completed", "finished", "done"):
+                                        yield ToolFinished(name=tname)
+                                    else:
+                                        yield ToolStarted(name=tname)
                             # sometimes tool name at obj["tool"]
                             if "tool" in obj and isinstance(obj["tool"], str) and evt and "tool" in str(evt):
                                 yield ToolStarted(name=obj["tool"])
