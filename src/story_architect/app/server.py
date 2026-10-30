@@ -110,81 +110,33 @@ def create_app(config: Config) -> FastAPI:
     async def project_events(slug: str, request: Request):
         from fastapi.responses import StreamingResponse
         import asyncio
-        import sqlite3
         from pathlib import Path
 
         root = Path(config.root)
         db_path = root / "projects" / slug / ".story" / "story.db"
-        # also resolve via services? keep simple
 
         async def gen():
-            task = asyncio.current_task()
-            app.state.active_replies[cid] = task
-            from story_architect.app.tool_bus import subscribe, unsubscribe
-            bus_q = subscribe()
-            out_q = asyncio.Queue()
+            import sqlite3
 
-            async def pump_service():
-                try:
-                    async for ev in service.send(pp, cid, text, context):
-                        await out_q.put(("svc", ev))
-                except Exception as e:
-                    await out_q.put(("err", e))
-                finally:
-                    await out_q.put(("done", None))
-
-            async def pump_bus():
-                while True:
-                    ev = await bus_q.get()
-                    await out_q.put(("bus", ev))
-
-            svc_task = asyncio.create_task(pump_service())
-            bus_task = asyncio.create_task(pump_bus())
+            last_version = None
             try:
                 while True:
-                    kind, payload = await out_q.get()
-                    if kind == "svc":
-                        ev = payload
-                        etype = type(ev).__name__
-                        if etype == "TextDelta":
-                            pdata = {"type": "text", "text": ev.text}
-                        elif etype == "ToolStarted":
-                            pdata = {"type": "tool", "id": getattr(ev, "id", None), "name": ev.name, "status": "started", "label": getattr(ev, "label", None)}
-                        elif etype == "ToolFinished":
-                            pdata = {"type": "tool", "id": getattr(ev, "id", None), "name": ev.name, "status": "finished", "label": getattr(ev, "label", None)}
-                        elif etype == "Done":
-                            pdata = {"type": "done", "message_id": getattr(ev, "message_id", None)}
-                        elif etype == "Error":
-                            pdata = {"type": "error", "code": "error", "message": ev.message, "retryable": True}
-                        else:
-                            pdata = {"type": etype.lower()}
-                        yield "event: " + etype + "\ndata: " + _json.dumps(pdata) + "\n\n"
-                    elif kind == "bus":
-                        ev = payload
-                        if ev.get("type") == "draft":
-                            yield "event: draft\ndata: " + _json.dumps({"type": "draft", "draft": ev.get("draft")}) + "\n\n"
-                        else:
-                            status = ev.get("status")
-                            if status == "running":
-                                status = "started"
-                            elif status in ("completed", "finished", "done"):
-                                status = "finished"
-                            pdata = {"type": "tool", "id": ev.get("id"), "name": ev.get("name"), "status": status, "args": ev.get("args"), "result_preview": ev.get("result_preview"), "duration_ms": ev.get("duration_ms")}
-                            yield "event: tool\ndata: " + _json.dumps(pdata) + "\n\n"
-                    elif kind == "err":
-                        yield "event: error\ndata: " + _json.dumps({"type": "error", "code": "error", "message": str(payload), "retryable": True}) + "\n\n"
+                    if await request.is_disconnected():
                         break
-                    elif kind == "done":
-                        break
+                    try:
+                        conn = sqlite3.connect(str(db_path))
+                        cur = conn.execute("PRAGMA data_version")
+                        version = cur.fetchone()[0]
+                        conn.close()
+                    except Exception:
+                        version = None
+                    if last_version is not None and version != last_version:
+                        yield "event: update\ndata: {\"type\": \"update\"}\n\n"
+                    last_version = version
+                    await asyncio.sleep(1)
             except asyncio.CancelledError:
-                yield "event: cancelled\ndata: {}\n\n"
-            finally:
-                svc_task.cancel()
-                bus_task.cancel()
-                unsubscribe(bus_q)
-                app.state.active_replies.pop(cid, None)
+                return
 
-        import asyncio
         return StreamingResponse(gen(), media_type="text/event-stream")
 
     @app.post("/api/projects/{slug}/drafts/{draft_id}/approve")

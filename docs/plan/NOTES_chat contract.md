@@ -109,3 +109,13 @@ Contract change for UI: settings endpoint shape as contract; stop returns {ok, d
 Test results: `tests/test_chat_core.py` + `tests/test_hermes_chat_backend.py` collect and pass (11 tests). Coverage: new conversation, multiturn, reload-from-disk, project isolation, backend error path, cancellation midstream, text+tool streaming, auth failure, unreachable backend, malformed SSE ignored, continuity roundtrip. No new tests added; existing suite already covers the minimum.
 
 Deviation: `test_hermes_chat_backend.py` had an unused `import httpx` that failed collection (httpx optional with httpx2 fallback); removed. No functional change.
+
+## 12.1 Repair first — brief
+
+Short summary: Repaired `GET /api/projects/{slug}/events` so it is only the DB-change feed: polls `PRAGMA data_version` ~1s and emits `event: update`. Removed the orphaned chat producer code that referenced undefined `cid`, `service`, `pp`, `text`, `context`. `ruff --select F` on server.py now clean.
+
+Diagnosis findings (section 0): the events route had been corrupted by a bad merge — its body was the chat reply stream (active_replies, tool_bus, service.send), making `/events` unusable and leaving `/messages` unwired. Undefined names would have been caught by `F821`.
+
+Deviations: did not split server.py into APIRouter modules (third bullet of 12.1) — deferred as a mechanical refactor; behavior unchanged. No contract changes to the SSE shape.
+
+Contract change for UI: none; `/events` now only emits `update` after DB changes.

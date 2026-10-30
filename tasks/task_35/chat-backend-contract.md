@@ -110,7 +110,7 @@ where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, en
 
 ## 10. Acceptance
 
-- [ ]  In mock mode (`?mock=1`) the panel opens/collapses, pushes the dashboard inward, and doesn't overlap any panel.
+- [x]  In mock mode (`?mock=1`) the panel opens/collapses, pushes the dashboard inward, and doesn't overlap any panel.
 - [ ]  Real mode: ask "What is this project about?"; the agent answers as the Story Architect for the open project, using tools, and the tool cards show real names, arguments, results and timings.
 - [ ]  Ask for a change: a draft card appears; **Approve** commits it (the dashboard shows it after "Project updated → Refresh"); the card flips to Approved; the next message shows the agent knows.
 - [ ]  **Reject** discards; the card flips to Rejected; the agent is told.
@@ -124,3 +124,67 @@ where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, en
 ## 11. Report back
 
 Short summary, the diagnosis findings from section 0, deviations, and any contract change you made (tell the owner so the UI can follow).
+
+Your assistant is right to ask for details instead of guessing. What it describes looks like a bad merge in `server.py`: the body of the messages route ended up inside the project-events generator, which would also explain why the `/messages` route "isn't wired". Below is a new section to paste into the contract file as **Section 12**. It's written so the agent can implement and test the route without further input from me.
+
+
+## 12. Server wiring: repair `server.py` and implement the reply routes
+
+**Context.** `server.py` is in a broken state (see "Repair" below). The reply stream routes (`messages`, `retry`) and `cancel` must be rebuilt against the contract, sharing one streaming helper. Everything the UI calls is defined in sections 3 to 8; this section says how to wire it.
+
+### 12.1 Repair first
+
+- [x] `GET /api/projects/{slug}/events` must be **only** the DB-change feed: poll `PRAGMA data_version` (about 1 s) and emit `event: update`. Nothing chat-related belongs in it. It currently references `cid`, `service`, `pp`, `text`, `context`, which are undefined there.
+Do not patch blind. Use git history (`git log -p -- src/story_architect/app/server.py`, or diff against the last commit before the chat work) to see what each route looked like when it was correct, restore each one, and re-apply only the intended changes.
+- [x] `ruff check --select F` on `server.py` and fix **every** finding. `F821` (undefined name) would have caught this. Keep `--select F` clean from now on, even though the repo's other ruff findings are pre-existing.
+- [ ] `server.py` has grown large. While rebuilding, split it into `APIRouter` modules (suggested: `routes/projects.py`, `routes/chat.py`, `routes/drafts.py`, `routes/agent.py`), with `create_app` only assembling them and the middleware. Keep this a mechanical move; do not change behavior in the same commit.
+
+### 12.2 One streaming helper for `messages` and `retry`
+
+Both routes call the same helper, `stream_reply(...)`, which returns a `StreamingResponse` (`text/event-stream`). Required behavior:
+
+- [ ] **Preflight (plain JSON errors, no stream):** unknown project 404; empty text 400; backend not configured (no API key) 503 `agent_not_configured`; a reply already active anywhere in the app 409 `reply_in_progress`. One active reply app-wide is intentional: tool-bus attribution depends on it.
+- [ ] **Backend per request, not at startup.** Build `HermesChatBackend` from current config each time (`token.load_api_key()`, `hermes_api_port`, `hermes_profile`). A key created after the app started must work, and a missing key must produce the 503 above rather than a failure at app start.
+- [ ] **Producer task plus queue.** Run the reply in its own `asyncio` task that puts contract-shaped events on an `asyncio.Queue`; the response generator only reads the queue and yields SSE. Two producers feed the queue: the backend stream (mapped, see 12.3) and the tool bus (`app/tool_bus`, subscribed for the duration of the reply, unsubscribed in `finally`). If the bus can publish from a non-loop thread, use `loop.call_soon_threadsafe`.
+- [ ] **Cancellation.** `POST .../cancel` cancels the producer task. The producer's `CancelledError` handler enqueues `{"type": "cancelled"}` with `put_nowait` and re-raises. A client disconnect (the UI's Stop aborts the fetch) must also cancel the task (do it in the generator's `finally`). **Never `yield` inside an `except CancelledError` / `GeneratorExit` handler** (the current code does; it raises "async generator ignored GeneratorExit").
+- [ ] **Persistence must survive cancellation and failure.** The assistant message is saved with `text`, `tools`, `drafts` and `status` (`complete` / `cancelled` / `error`, plus `error` text) in every outcome. Use synchronous store calls in `finally` (no awaits after cancellation). The route collects `tool` and `draft` events from the bus as they pass and hands them to the service/store for persisting (their final state, deduplicated by `id`).
+- [ ] **Cleanup:** always remove the reply from `active_replies` and unsubscribe from the bus in `finally`.
+
+### 12.3 Event mapping (route layer), the UI contract
+
+Each SSE message is `event: <type>` + `data: <json including "type">`:
+
+| Source | SSE `type` and payload |
+|---|---|
+| `TextDelta` | `text` `{text}` |
+| backend `ToolStarted/ToolFinished` (non-story tools only) | `tool` `{id, name, status: started\|finished\|failed, label}` |
+| tool bus `started/finished/failed` | `tool` `{id, name, status, args, result_preview, duration_ms}` (same `id` reused for updates) |
+| tool bus draft event | `draft` `{draft: <snapshot>}` |
+| `Done` | `done` `{message_id}` (message already persisted) |
+| `Error` | `error` `{code, message, retryable}`: `agent_unavailable` + retryable when the gateway is unreachable, `agent_error` otherwise |
+| cancellation | `cancelled` `{}` |
+
+`retry` uses the **same** helper and mapping (the earlier "minimal" mapping must go). Its only difference is the preflight and the start: delete the last assistant message and hidden notes after the last user message, then run the last user message again without adding a new one.
+
+### 12.4 Routes the UI calls (confirm each exists and matches)
+
+`GET/POST /api/projects/{slug}/conversations` (list returns `{conversations:[{id,title,updated_at}]}`, create returns `{id}`); `GET/DELETE .../conversations/{cid}` (get returns `{id,title,messages:[{id,role,text,status,created_at,tools,drafts,attachments,error}]}`, hidden omitted); `POST .../messages` body `{text, context:{project, attachments:[{kind,id,label}]}}`; `POST .../retry`; `POST .../cancel`; `POST .../drafts/{id}/approve|reject` body `{conversation_id}` returning `{status, draft}`; `GET .../events`; `GET /api/agent/state`, `GET|PATCH /api/agent/settings`, `POST /api/agent/start|stop`. All POST/PATCH/DELETE go through the existing origin + `X-Story-Architect` header check.
+
+### 12.5 Tests (required for this section)
+
+The broken wiring went unnoticed because nothing exercised the real routes, so this section needs a small route-level suite using `TestClient` and `FakeBackend`, not unit tests of the pieces:
+
+- `messages` streams `text` → `done`, and the conversation afterwards contains the user and assistant messages with `status: complete`.
+- A tool-bus `started`/`finished` pair and a `draft` event published during the reply arrive as `tool` / `draft` events and are persisted in the assistant message.
+- Cancelling mid-stream (via the cancel route, and via closing the stream) ends with `cancelled` and persists the partial text with `status: cancelled`; the app accepts a new reply afterwards.
+- A backend error yields an `error` event and persists `status: error`.
+- A second reply while one is active returns 409; missing key returns 503.
+- `retry` replaces the last assistant message and does not add a user message.
+- `approve` and `reject` update the stored snapshot, add a hidden note, and the next backend request includes that note; a stale draft returns 409.
+- `/events` emits `update` after a DB change and does not touch chat state.
+- POST without the custom header, or from a foreign origin, is rejected on the new routes.
+
+### 12.6 Things to confirm while you're in there (report, don't redo)
+
+- [ ] `can_stop: true` was set because the gateway is "dedicated per profile". Confirm that with evidence (`hermes -p story-architect gateway status`, and whether the gateway process also serves other profiles). If it's shared, `can_stop` must be false.
+- [ ] `hermes status` fails when built-in tools are exposed. Confirm with the real `pwd` test from section 8a that it can't be done through the chat.
