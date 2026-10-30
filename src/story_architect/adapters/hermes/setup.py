@@ -154,7 +154,26 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
         lines.append(f"API_SERVER_KEY={api_key}")
         env_path.write_text("\n".join(lines) + "\n")
         out.append("API key written (not printed)")
-    # MCP registration via YAML safe edit
+    # host (default) gateway must expose api_server on the shared listener so
+    # /p/<profile>/ routes are served; secondary profiles never enable it.
+    import yaml
+    host_cfg_path = W.hermes_home() / "config.yaml"
+    host_cfg = {}
+    if host_cfg_path.exists():
+        try:
+            host_cfg = yaml.safe_load(host_cfg_path.read_text()) or {}
+        except Exception:
+            host_cfg = {}
+    host_cfg.setdefault("platforms", {})
+    host_cfg["platforms"].setdefault("api_server", {})
+    host_cfg["platforms"]["api_server"].update({
+        "enabled": True,
+        "host": "127.0.0.1",
+        "port": C.load_config().hermes_api_port,
+    })
+    if not dry:
+        host_cfg_path.write_text(yaml.safe_dump(host_cfg, sort_keys=False))
+        out.append("host api_server enabled")
     import yaml
     cfg_path = pd / "config.yaml"
     cfg = {}
