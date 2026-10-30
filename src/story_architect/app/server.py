@@ -97,133 +97,70 @@ def create_app(config: Config) -> FastAPI:
         # also resolve via services? keep simple
 
         async def gen():
-            last = None
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    conn = sqlite3.connect(str(db_path))
-                    v = conn.execute("PRAGMA data_version").fetchone()[0]
-                    conn.close()
-                except Exception:
-                    v = None
-                if last is None:
-                    last = v
-                elif v is not None and v != last:
-                    last = v
-                    yield "event: update\ndata: changed\n\n"
-                await asyncio.sleep(1)
-
-        return StreamingResponse(gen(), media_type="text/event-stream")
-
-    app.state.active_replies = {}
-
-    from story_architect.app import services as _svc
-    from story_architect.tools.story_resolve import resolve_project
-    from story_architect.chat import store as chat_store
-    from story_architect.chat.service import ChatService
-    from story_architect.app import token as token_mod
-    from story_architect.adapters.hermes.chat_backend import HermesChatBackend
-    try:
-        api_key = token_mod.load_api_key() or ""
-        base_url = f"http://127.0.0.1:{config.hermes_api_port}"
-        app.state.chat_backend = HermesChatBackend(base_url=base_url, api_key=api_key, model=config.hermes_profile)
-    except Exception:
-        app.state.chat_backend = None
-
-    def _project_path(slug):
-        return resolve_project(slug, Path(config.root))
-
-    @app.get("/api/projects/{slug}/conversations")
-    def list_convs(slug: str):
-        try:
-            pp = _project_path(slug)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        return {"conversations": chat_store.list_conversations(pp)}
-
-    @app.post("/api/projects/{slug}/conversations")
-    async def create_conv(slug: str, request: Request):
-        title = ""
-        try:
-            body = await request.json()
-            title = (body.get("title") or "").strip()
-        except Exception:
-            pass
-        try:
-            pp = _project_path(slug)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        cid = chat_store.create_conversation(pp, title)
-        return {"id": cid}
-
-    @app.get("/api/projects/{slug}/conversations/{cid}")
-    def get_conv(slug: str, cid: str):
-        try:
-            pp = _project_path(slug)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        conv = chat_store.get_conversation(pp, cid)
-        if conv is None:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": "conversation not found"}})
-        return conv
-
-    @app.delete("/api/projects/{slug}/conversations/{cid}")
-    def delete_conv(slug: str, cid: str):
-        try:
-            pp = _project_path(slug)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        ok = chat_store.delete_conversation(pp, cid)
-        return {"deleted": bool(ok)}
-
-    @app.post("/api/projects/{slug}/conversations/{cid}/messages")
-    async def send_message(slug: str, cid: str, request: Request):
-        from fastapi.responses import StreamingResponse
-        import json as _json
-        try:
-            pp = _project_path(slug)
-        except ValueError as e:
-            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
-        backend = app.state.chat_backend
-        if backend is None:
-            return JSONResponse(status_code=503, content={"error": {"code": "agent_not_configured", "message": "Chat backend not configured"}})
-        try:
-            body = await request.json()
-        except Exception:
-            body = {}
-        text = (body.get("text") or "").strip()
-        if not text:
-            return JSONResponse(status_code=400, content={"error": {"code": "bad_request", "message": "text required"}})
-        context = body.get("context") or {}
-        # one reply at a time
-        if cid in app.state.active_replies:
-            return JSONResponse(status_code=409, content={"error": {"code": "reply_in_progress", "message": "A reply is already streaming"}})
-        service = ChatService(backend)
-
-        async def gen():
             task = asyncio.current_task()
             app.state.active_replies[cid] = task
+            from story_architect.app.tool_bus import subscribe, unsubscribe
+            bus_q = subscribe()
+            out_q = asyncio.Queue()
+
+            async def pump_service():
+                try:
+                    async for ev in service.send(pp, cid, text, context):
+                        await out_q.put(("svc", ev))
+                except Exception as e:
+                    await out_q.put(("err", e))
+                finally:
+                    await out_q.put(("done", None))
+
+            async def pump_bus():
+                while True:
+                    ev = await bus_q.get()
+                    await out_q.put(("bus", ev))
+
+            svc_task = asyncio.create_task(pump_service())
+            bus_task = asyncio.create_task(pump_bus())
             try:
-                async for ev in service.send(pp, cid, text, context):
-                    etype = type(ev).__name__
-                    payload = {}
-                    if etype == "TextDelta":
-                        payload = {"type": "text", "text": ev.text}
-                    elif etype == "ToolStarted":
-                        payload = {"type": "tool_started", "name": ev.name}
-                    elif etype == "ToolFinished":
-                        payload = {"type": "tool_finished", "name": ev.name}
-                    elif etype == "Done":
-                        payload = {"type": "done", "backend_state": ev.backend_state}
-                    elif etype == "Error":
-                        payload = {"type": "error", "message": ev.message}
-                    else:
-                        payload = {"type": etype.lower()}
-                    yield f"event: {etype}\ndata: {_json.dumps(payload)}\n\n"
+                while True:
+                    kind, payload = await out_q.get()
+                    if kind == "svc":
+                        ev = payload
+                        etype = type(ev).__name__
+                        if etype == "TextDelta":
+                            pdata = {"type": "text", "text": ev.text}
+                        elif etype == "ToolStarted":
+                            pdata = {"type": "tool", "id": getattr(ev, "id", None), "name": ev.name, "status": "started", "label": getattr(ev, "label", None)}
+                        elif etype == "ToolFinished":
+                            pdata = {"type": "tool", "id": getattr(ev, "id", None), "name": ev.name, "status": "finished", "label": getattr(ev, "label", None)}
+                        elif etype == "Done":
+                            pdata = {"type": "done", "message_id": getattr(ev, "message_id", None)}
+                        elif etype == "Error":
+                            pdata = {"type": "error", "code": "error", "message": ev.message, "retryable": True}
+                        else:
+                            pdata = {"type": etype.lower()}
+                        yield "event: " + etype + "\ndata: " + _json.dumps(pdata) + "\n\n"
+                    elif kind == "bus":
+                        ev = payload
+                        if ev.get("type") == "draft":
+                            yield "event: draft\ndata: " + _json.dumps({"type": "draft", "draft": ev.get("draft")}) + "\n\n"
+                        else:
+                            status = ev.get("status")
+                            if status == "running":
+                                status = "started"
+                            elif status in ("completed", "finished", "done"):
+                                status = "finished"
+                            pdata = {"type": "tool", "id": ev.get("id"), "name": ev.get("name"), "status": status, "args": ev.get("args"), "result_preview": ev.get("result_preview"), "duration_ms": ev.get("duration_ms")}
+                            yield "event: tool\ndata: " + _json.dumps(pdata) + "\n\n"
+                    elif kind == "err":
+                        yield "event: error\ndata: " + _json.dumps({"type": "error", "code": "error", "message": str(payload), "retryable": True}) + "\n\n"
+                        break
+                    elif kind == "done":
+                        break
             except asyncio.CancelledError:
                 yield "event: cancelled\ndata: {}\n\n"
             finally:
+                svc_task.cancel()
+                bus_task.cancel()
+                unsubscribe(bus_q)
                 app.state.active_replies.pop(cid, None)
 
         import asyncio

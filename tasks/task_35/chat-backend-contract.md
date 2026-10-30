@@ -57,10 +57,10 @@ Files are in `chat-ui/`: `css/chat.css`, `js/chat-api.js`, `js/chat-md.js`, `js/
 
 ## 4. Tool events come from the MCP server, not from Hermes
 
-- [ ]  In `mcp_server.on_call_tool`, publish `started` (id, name, args) before the handler and `finished`/`failed` (+ duration, `result_preview` truncated to about 800 chars) after it, to a small in-process bus.
-- [ ] The reply route subscribes while a reply is active and forwards bus events as `tool` events. MCP calls carry no conversation id, so attribute them to the **single active reply**; calls made while no reply is active (for example from Hermes Desktop) are ignored.
-- [ ]  Hermes' own `hermes.tool.progress` events (real format above) are the source for tools that are **not** story tools: map them to `tool` events with `id = toolCallId`, `name = tool`, `label = label`, `status: running -> started, completed -> finished` (treat `failed`/`error` as `failed`). For names starting with `mcp_story_` ignore them (the bus is richer). The UI shows `label` as the hint when there are no args.
-- [ ] When the finished tool is `draft` and its result contains a staged/re-staged/committed/discarded draft, also emit a `draft` event (section 5).
+- [x]  In `mcp_server.on_call_tool`, publish `started` (id, name, args) before the handler and `finished`/`failed` (+ duration, `result_preview` truncated to about 800 chars) after it, to a small in-process bus.
+- [x] The reply route subscribes while a reply is active and forwards bus events as `tool` events. MCP calls carry no conversation id, so attribute them to the **single active reply**; calls made while no reply is active (for example from Hermes Desktop) are ignored.
+- [x]  Hermes' own `hermes.tool.progress` events (real format above) are the source for tools that are **not** story tools: map them to `tool` events with `id = toolCallId`, `name = tool`, `label = label`, `status: running -> started, completed -> finished` (treat `failed`/`error` as `failed`). For names starting with `mcp_story_` ignore them (the bus is richer). The UI shows `label` as the hint when there are no args.
+- [x] When the finished tool is `draft` and its result contains a staged/re-staged/committed/discarded draft, also emit a `draft` event (section 5).
 
 ## 5. Drafts as approval cards
 

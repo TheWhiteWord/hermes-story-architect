@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import time
+import uuid
 from typing import Any
 
 from mcp import types
@@ -11,6 +14,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 import story_architect.tools as _tools_pkg
 from story_architect.app.config import Config
+from story_architect.app.tool_bus import publish as _publish_bus
 
 log = logging.getLogger(__name__)
 
@@ -60,11 +64,27 @@ def create_mcp_server(config: Config) -> Server:
             raise ValueError(f"Unknown tool: {name}")
         schema, handler = reg[name]
         args = params.arguments or {}
+        call_id = uuid.uuid4().hex
+        await _publish_bus({"type": "started", "id": call_id, "name": name, "args": args, "status": "started"})
+        start = time.monotonic()
         try:
             result = await asyncio.to_thread(handler, args, root_path=config.root)
         except Exception as e:
             log.exception("tool %s raised", name)
+            dur = int((time.monotonic() - start) * 1000)
+            await _publish_bus({"type": "failed", "id": call_id, "name": name, "status": "failed", "duration_ms": dur, "result_preview": str(e)[:800]})
             raise RuntimeError(f"{name}: {e}") from e
+        dur = int((time.monotonic() - start) * 1000)
+        preview = result[:800] if isinstance(result, str) else str(result)[:800]
+        await _publish_bus({"type": "finished", "id": call_id, "name": name, "status": "finished", "duration_ms": dur, "result_preview": preview})
+        # draft detection
+        if name == "draft":
+            try:
+                obj = json.loads(result) if isinstance(result, str) else result
+            except Exception:
+                obj = None
+            if isinstance(obj, dict) and "draft" in obj:
+                await _publish_bus({"type": "draft", "draft": obj["draft"]})
         return types.CallToolResult(content=[types.TextContent(type="text", text=result)])
 
     server = Server(

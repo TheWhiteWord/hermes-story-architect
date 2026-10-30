@@ -96,11 +96,13 @@ class HermesChatBackend:
                                 d = obj.get("data") if isinstance(obj.get("data"), dict) else obj
                                 tname = d.get("tool") or d.get("name")
                                 status = d.get("status")
-                                if tname:
+                                if tname and not str(tname).startswith("mcp_story_"):
+                                    tid = d.get("toolCallId") or d.get("id")
+                                    label = d.get("label")
                                     if status in ("completed", "finished", "done"):
-                                        yield ToolFinished(name=tname)
+                                        yield ToolFinished(name=tname, id=tid, label=label)
                                     else:
-                                        yield ToolStarted(name=tname)
+                                        yield ToolStarted(name=tname, id=tid, label=label)
                             # sometimes tool name at obj["tool"]
                             if "tool" in obj and isinstance(obj["tool"], str) and evt and "tool" in str(evt):
                                 yield ToolStarted(name=obj["tool"])

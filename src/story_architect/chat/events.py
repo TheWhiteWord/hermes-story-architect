@@ -13,11 +13,15 @@ class TextDelta:
 @dataclass
 class ToolStarted:
     name: str
+    id: Any = None
+    label: str | None = None
 
 
 @dataclass
 class ToolFinished:
     name: str
+    id: Any = None
+    label: str | None = None
 
 
 @dataclass
