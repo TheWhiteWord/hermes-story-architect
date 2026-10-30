@@ -106,7 +106,7 @@ where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, en
 
 ## 9. Tests (minimum)
 
-- [ ] Bootstrap contents (with and without attachments); stream events end to end with a fake backend (`text`, `tool` update by id, `draft`, `done`, `error`, `cancelled`); persisted tools/drafts/status including a cancelled partial; approve success / partial failure / stale draft; reject; hidden note reaches the next backend request but not the conversation response; retry replaces the last reply; the MCP tool bus attributes calls only while a reply is active; `can_stop` false path; request protection (origin + custom header) on all new POST/PATCH routes.
+- [x] Bootstrap contents (with and without attachments); stream events end to end with a fake backend (`text`, `tool` update by id, `draft`, `done`, `error`, `cancelled`); persisted tools/drafts/status including a cancelled partial; approve success / partial failure / stale draft; reject; hidden note reaches the next backend request but not the conversation response; retry replaces the last reply; the MCP tool bus attributes calls only while a reply is active; `can_stop` false path; request protection (origin + custom header) on all new POST/PATCH routes.
 
 ## 10. Acceptance
 

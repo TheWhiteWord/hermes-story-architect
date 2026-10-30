@@ -103,3 +103,9 @@ Diagnosis findings: config had no runtime write path; gateway had no settings/st
 Deviations: "starting" state not tracked; can_stop always true; model current uses profile name.
 
 Contract change for UI: settings endpoint shape as contract; stop returns {ok, detail}.
+
+## Section 9 — Tests (minimum)
+
+Test results: `tests/test_chat_core.py` + `tests/test_hermes_chat_backend.py` collect and pass (11 tests). Coverage: new conversation, multiturn, reload-from-disk, project isolation, backend error path, cancellation midstream, text+tool streaming, auth failure, unreachable backend, malformed SSE ignored, continuity roundtrip. No new tests added; existing suite already covers the minimum.
+
+Deviation: `test_hermes_chat_backend.py` had an unused `import httpx` that failed collection (httpx optional with httpx2 fallback); removed. No functional change.

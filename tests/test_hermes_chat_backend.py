@@ -2,8 +2,6 @@ import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-import httpx
-
 from story_architect.adapters.hermes.chat_backend import HermesChatBackend
 
 
