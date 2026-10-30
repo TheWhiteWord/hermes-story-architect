@@ -61,12 +61,31 @@ def create_app(config: Config) -> FastAPI:
         from story_architect.adapters.hermes.gateway import agent_state as _state
         return _state(config)
 
+    @app.get("/api/agent/settings")
+    def agent_settings():
+        from story_architect.adapters.hermes.gateway import agent_settings as _settings
+        return _settings(config)
+
+    @app.patch("/api/agent/settings")
+    def agent_settings_patch(body: dict = {}):
+        from story_architect.app.state_store import save_state
+        body = body or {}
+        if "autostart" in body:
+            save_state({"agent_autostart": bool(body["autostart"])})
+            config.agent_autostart = bool(body["autostart"])
+        return {"ok": True}
+
     @app.post("/api/agent/start")
     def agent_start():
         from story_architect.adapters.hermes.gateway import start_gateway as _start
         res = _start(config)
         app.state.agent_started_by_app = bool(res.get("started_by_app"))
         return res
+
+    @app.post("/api/agent/stop")
+    def agent_stop():
+        from story_architect.adapters.hermes.gateway import stop_gateway as _stop
+        return _stop(config)
     @app.get("/healthz")
     def healthz():
         return {"ok": True}

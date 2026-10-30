@@ -90,12 +90,12 @@ where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, en
 
 ## 8. Agent state and settings
 
-- [ ]  `GET /api/agent/state` keeps `{state, detail}`; add `starting` while a start is in progress.
-- [ ] `GET /api/agent/settings` → `{state, detail, profile, port, autostart, can_stop, model: {current, options|null}}`.
-- [ ] `PATCH /api/agent/settings` accepts `autostart` (bool) and `model` (string).
-- [ ] `POST /api/agent/stop` (and `start` as today). **Safety:** stopping must only ever stop a gateway dedicated to the story profile. If the profile is served by a shared/multiplexed gateway that also serves other profiles, set `can_stop: false` and make `stop` return 409. Do not stop a gateway you cannot prove is dedicated. Never touch other profiles.
-- [ ] `autostart` must be writable at runtime, but `config.toml` is read-only today. Prefer a small `state.json` next to it for UI-writable settings (no new dependency); precedence: CLI/env, then `state.json`, then `config.toml`, then defaults. Your call if you see a better way; note it.
-- [ ] **Model list (spike, optional):** find the supported way to list models available to the profile and to set the profile's model non-interactively (`hermes -p <profile> config set model.model …`, then whatever restart is needed). If it cannot be done reliably, return `options: null` (the UI then shows the current model read-only and hides the selector).
+- [x]  `GET /api/agent/state` keeps `{state, detail}`; add `starting` while a start is in progress.
+- [x] `GET /api/agent/settings` → `{state, detail, profile, port, autostart, can_stop, model: {current, options|null}}`.
+- [x] `PATCH /api/agent/settings` accepts `autostart` (bool) and `model` (string).
+- [x] `POST /api/agent/stop` (and `start` as today). **Safety:** stopping must only ever stop a gateway dedicated to the story profile. If the profile is served by a shared/multiplexed gateway that also serves other profiles, set `can_stop: false` and make `stop` return 409. Do not stop a gateway you cannot prove is dedicated. Never touch other profiles.
+- [x] `autostart` must be writable at runtime, but `config.toml` is read-only today. Prefer a small `state.json` next to it for UI-writable settings (no new dependency); precedence: CLI/env, then `state.json`, then `config.toml`, then defaults. Your call if you see a better way; note it.
+- [x] **Model list (spike, optional):** find the supported way to list models available to the profile and to set the profile's model non-interactively (`hermes -p <profile> config set model.model …`, then whatever restart is needed). If it cannot be done reliably, return `options: null` (the UI then shows the current model read-only and hides the selector).
 
 ### 8a. Restrict the story agent's built-in tools (security, do this early)
 

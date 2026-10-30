@@ -1,9 +1,7 @@
 """Agent (profile gateway) availability helpers."""
 from __future__ import annotations
-
 import time
 from typing import Any
-
 from story_architect.adapters.hermes import wrapper as W
 from story_architect.app.config import Config
 
@@ -18,7 +16,6 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
     pd = W.profile_dir(profile)
     if not pd.exists():
         return {"state": "not_configured", "detail": "profile missing"}
-    # api key
     try:
         from story_architect.app import token as token_mod
         key = token_mod.load_api_key()
@@ -26,7 +23,6 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
         key = None
     if not key:
         return {"state": "not_configured", "detail": "api key missing"}
-    # reachability
     try:
         try:
             import httpx
@@ -51,7 +47,6 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
 
 def start_gateway(config: Config, profile: str = PROFILE, timeout: float = 15.0) -> dict[str, Any]:
     rc, out, err = W.run_hermes("-p", profile, "gateway", "start")
-    # best effort: ignore rc, poll
     deadline = time.time() + timeout
     while time.time() < deadline:
         st = agent_state(config, profile)
@@ -59,3 +54,21 @@ def start_gateway(config: Config, profile: str = PROFILE, timeout: float = 15.0)
             return {"ok": True, "started_by_app": True, **st}
         time.sleep(0.5)
     return {"ok": False, "started_by_app": True, "detail": (err or out).strip() or "timeout"}
+
+
+def agent_settings(config: Config, profile: str = PROFILE) -> dict[str, Any]:
+    st = agent_state(config, profile)
+    return {
+        "state": st["state"],
+        "detail": st["detail"],
+        "profile": profile,
+        "port": config.hermes_api_port,
+        "autostart": bool(config.agent_autostart),
+        "can_stop": True,
+        "model": {"current": profile, "options": None},
+    }
+
+
+def stop_gateway(config: Config, profile: str = PROFILE) -> dict[str, Any]:
+    rc, out, err = W.run_hermes("-p", profile, "gateway", "stop")
+    return {"ok": rc == 0, "detail": (err or out).strip()}

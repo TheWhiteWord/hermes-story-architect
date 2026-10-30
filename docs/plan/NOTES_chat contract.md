@@ -87,10 +87,19 @@ attachments, error per message; hidden omitted from response.
 
 ## Task 7 Retry
 
-Short summary: Added store.prepare_retry, ChatService.retry, and POST .../conversations/{cid}/retry endpoint (409 in-progress, 400 no user message). Deletes messages after last user msg then reruns.
-
 Diagnosis: store had no retry helper; service.send persisted user msg, so retry must skip that. Endpoint must stream like messages.
 
 Deviations: retry SSE events not fully mapped to typed payloads (minimal); follow-up can align.
 
 Contract change: none new; endpoint streams like messages.
+
+## Section 8 — Agent state and settings
+
+Short summary: Added GET /api/agent/settings, PATCH /api/agent/settings (autostart persisted to state.json), POST /api/agent/stop. autostart precedence: CLI/env > config.toml > state.json > defaults. Model options null (spike not resolved). can_stop true (dedicated per-profile gateway).
+No non-interactive model list exists (only interactive hermes model picker with --refresh cache). Keep options: null; UI shows current model read-only and hides selector. Setting model non-interactively isn't reliably supported, so no change.
+
+Diagnosis findings: config had no runtime write path; gateway had no settings/stop helpers.
+
+Deviations: "starting" state not tracked; can_stop always true; model current uses profile name.
+
+Contract change for UI: settings endpoint shape as contract; stop returns {ok, detail}.

@@ -63,11 +63,16 @@ def load_config(*, cli_root=None, cli_port=None, cli_no_open=False) -> Config:
         elif "open_browser" in file_vals:
             open_browser = bool(file_vals["open_browser"])
 
+    from story_architect.app.state_store import load_state as _load_state
     agent_autostart = False
     env = os.environ.get(ENV_PREFIX + "AGENT_AUTOSTART")
     if env is not None:
         agent_autostart = env.lower() not in ("0", "false", "no")
     elif "agent_autostart" in file_vals:
         agent_autostart = bool(file_vals["agent_autostart"])
+    else:
+        st = _load_state()
+        if "agent_autostart" in st:
+            agent_autostart = bool(st["agent_autostart"])
 
     return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser, hermes_api_port=int(hermes_api_port_raw), hermes_profile=str(hermes_profile_raw), agent_autostart=agent_autostart)
