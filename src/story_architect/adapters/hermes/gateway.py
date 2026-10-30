@@ -46,6 +46,11 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
 
 
 def start_gateway(config: Config, profile: str = PROFILE, timeout: float = 15.0) -> dict[str, Any]:
+    # under the host multiplexer the profile is already served; just check readiness
+    st = agent_state(config, profile)
+    if st["state"] == "ready":
+        return {"ok": True, "started_by_app": False, **st}
+    # fallback: try spawning a standalone gateway
     import os
     import subprocess
     exe = W.find_hermes()
