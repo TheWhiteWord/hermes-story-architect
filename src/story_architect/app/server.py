@@ -256,6 +256,36 @@ def create_app(config: Config) -> FastAPI:
             chat_store.add_message(project_path, cid, "assistant", f"Draft {draft_id} was rejected by the user", hidden=True)
         return {"status": "discarded", "draft": snapshot}
 
+    @app.post("/api/projects/{slug}/conversations/{cid}/retry")
+    async def retry_reply(slug: str, cid: str):
+        from fastapi.responses import StreamingResponse
+        import asyncio
+        from story_architect.tools.story_resolve import resolve_project
+        from pathlib import Path
+        root = Path(config.root)
+        try:
+            pp = resolve_project(slug, root)
+        except ValueError as e:
+            return JSONResponse(status_code=404, content={"error": {"code": "not_found", "message": str(e)}})
+        if cid in (app.state.active_replies or {}):
+            return JSONResponse(status_code=409, content={"error": {"code": "in_progress", "message": "reply in progress"}})
+        from story_architect.chat import store as chat_store
+        # 400 if no user message
+        # check by attempting prepare? Instead peek
+        conv = chat_store.get_conversation(pp, cid)
+        has_user = any(m.get("role") == "user" for m in (conv["messages"] if conv else []))
+        if not has_user:
+            return JSONResponse(status_code=400, content={"error": {"code": "no_user_message", "message": "no user message"}})
+        service = app.state.chat_service
+        async def gen():
+            task = asyncio.current_task()
+            app.state.active_replies[cid] = task
+            try:
+                async for ev in service.retry(pp, cid, {}):
+                    yield "event: " + type(ev).__name__ + "\ndata: {}\n\n".format("")
+            finally:
+                app.state.active_replies.pop(cid, None)
+        return StreamingResponse(gen(), media_type="text/event-stream")
     @app.post("/api/projects/{slug}/conversations/{cid}/cancel")
     async def cancel_reply(slug: str, cid: str):
         task = app.state.active_replies.get(cid)

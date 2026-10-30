@@ -124,6 +124,30 @@ def get_conversation(project_path, cid, include_hidden=False) -> dict | None:
         conn.close()
 
 
+def prepare_retry(project_path, cid) -> str | None:
+    """Delete the last assistant message and hidden notes after the last user
+    message; return that user message's text, or None if there is none."""
+    conn = connect(project_path)
+    try:
+        rows = conn.execute(
+            "SELECT id, role FROM messages WHERE conversation_id=? ORDER BY id", (cid,)
+        ).fetchall()
+        last_user_id = None
+        for r in rows:
+            if r[1] == "user":
+                last_user_id = r[0]
+        if last_user_id is None:
+            return None
+        for r in rows:
+            if r[0] > last_user_id:
+                conn.execute("DELETE FROM messages WHERE id=?", (r[0],))
+        conn.commit()
+        row = conn.execute("SELECT text FROM messages WHERE id=?", (last_user_id,)).fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
 def delete_conversation(project_path, cid) -> bool:
     conn = connect(project_path)
     try:

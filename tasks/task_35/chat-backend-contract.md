@@ -86,7 +86,7 @@ where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, en
 
 ## 7. Retry
 
-- [ ] `POST .../conversations/{cid}/retry`: delete the last assistant message (and hidden notes after the last user message), then run the last user message again, streaming exactly like `messages`, without adding a new user message. 409 if a reply is in progress; 400 if there is no user message.
+- [x] `POST .../conversations/{cid}/retry`: delete the last assistant message (and hidden notes after the last user message), then run the last user message again, streaming exactly like `messages`, without adding a new user message. 409 if a reply is in progress; 400 if there is no user message.
 
 ## 8. Agent state and settings
 

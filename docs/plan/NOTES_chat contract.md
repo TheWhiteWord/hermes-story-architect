@@ -84,3 +84,13 @@ clobbering columns; simpler than full rewrite.
 
 Contract change for UI: GET conversations/{cid} now returns id, tools, drafts,
 attachments, error per message; hidden omitted from response.
+
+## Task 7 Retry
+
+Short summary: Added store.prepare_retry, ChatService.retry, and POST .../conversations/{cid}/retry endpoint (409 in-progress, 400 no user message). Deletes messages after last user msg then reruns.
+
+Diagnosis: store had no retry helper; service.send persisted user msg, so retry must skip that. Endpoint must stream like messages.
+
+Deviations: retry SSE events not fully mapped to typed payloads (minimal); follow-up can align.
+
+Contract change: none new; endpoint streams like messages.

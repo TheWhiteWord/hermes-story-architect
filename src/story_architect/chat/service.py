@@ -83,6 +83,49 @@ class ChatService:
         except Exception as e:
             store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
             yield Error(message=str(e))
-        finally:
-            if cancelled:
-                pass
+    async def retry(
+        self,
+        project_path,
+        conversation_id: str,
+        context: dict | None = None,
+    ) -> AsyncIterator[Any]:
+        user_text = store.prepare_retry(project_path, conversation_id)
+        if not user_text:
+            raise ValueError("no user message")
+        conv = store.get_conversation(project_path, conversation_id)
+        backend_state = conv["backend_state"] if conv else None
+        messages = [{"role": m["role"], "text": m["text"]} for m in (conv["messages"] if conv else [])]
+        from story_architect.core.drafts import _project_name
+        slug = Path(project_path).name if not isinstance(project_path, str) else str(project_path).rstrip("/").split("/")[-1]
+        name = _project_name(Path(project_path))
+        instructions = build_bootstrap(slug, name, (context or {}).get("attachments") or [])
+        assistant_text = ""
+        metadata = {"tools": []}
+        msg_id = store.add_message(project_path, conversation_id, "assistant", "", metadata=metadata, status="streaming")
+        try:
+            async for ev in self.backend.send(messages, instructions, backend_state):
+                if isinstance(ev, TextDelta):
+                    assistant_text += ev.text
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)
+                    yield ev
+                elif isinstance(ev, ToolStarted):
+                    metadata["tools"].append(ev.name)
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)
+                    yield ev
+                elif isinstance(ev, ToolFinished):
+                    yield ev
+                elif isinstance(ev, Done):
+                    store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata)
+                    store.set_backend_state(project_path, conversation_id, ev.backend_state)
+                    yield ev
+                elif isinstance(ev, Error):
+                    store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
+                    yield ev
+                else:
+                    yield ev
+        except asyncio.CancelledError:
+            store.update_message(project_path, msg_id, assistant_text, status="cancelled", metadata=metadata)
+            raise
+        except Exception as e:
+            store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
+            yield Error(message=str(e))
