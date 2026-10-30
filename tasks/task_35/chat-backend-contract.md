@@ -100,9 +100,9 @@ where each change is `{kind: "create"|"edit"|"delete"|"reorder", entity_type, en
 ### 8a. Restrict the story agent's built-in tools (security, do this early)
 
 **Must:** through the story profile's API server the agent can use **only** the story MCP tools (plus whatever the owner explicitly enables later). It must have no terminal, no file read/write/patch, no code execution and no browser/web tools by default.
-- [ ] `toolsets: []` does not do this (see the capture). Find the configuration that actually does: for example an explicit allow-list containing only the MCP toolset (`mcp-story`), and/or `agent.disabled_toolsets` for the built-ins. Verify by experiment, not by reading config: through `/v1/chat/completions`, ask the agent to run `pwd` and to read a file; it must have no such tool. Record the working keys and the test in `NOTES.md`.
-- [ ] Apply it in `hermes setup` (idempotent, same protections as before) and make `hermes status` **fail** when the profile still exposes built-in tools. If Hermes can list the effective toolset for a profile, use that for the check.
-- [ ] Tell the owner what changed; web search stays off until they decide.
+- [x] `toolsets: []` does not do this (see the capture). Find the configuration that actually does: for example an explicit allow-list containing only the MCP toolset (`mcp-story`), and/or `agent.disabled_toolsets` for the built-ins. Verify by experiment, not by reading config: through `/v1/chat/completions`, ask the agent to run `pwd` and to read a file; it must have no such tool. Record the working keys and the test in `NOTES.md`.
+- [x] Apply it in `hermes setup` (idempotent, same protections as before) and make `hermes status` **fail** when the profile still exposes built-in tools. If Hermes can list the effective toolset for a profile, use that for the check.
+- [x] Tell the owner what changed; web search stays off until they decide.
 
 ## 9. Tests (minimum)
 

@@ -142,7 +142,15 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
         "port": C.load_config().hermes_api_port,
         "key": "${API_SERVER_KEY}",
     })
-    # conservative toolsets: no built-in terminal/file tools
+    # disable every built-in toolset; only MCP (story) tools remain
+    cfg.setdefault("agent", {})
+    import sys as _sys
+    _sys.path.insert(0, "/home/davide/.hermes/hermes-agent")
+    try:
+        import toolsets as _ts
+        cfg["agent"]["disabled_toolsets"] = sorted(_ts.BUILTIN_TOOLSET_NAMES)
+    except Exception:
+        cfg["agent"]["disabled_toolsets"] = []
     cfg["toolsets"] = []
     if dry:
         out.append("[dry-run] would register MCP server")
@@ -243,5 +251,6 @@ def status(argv=None, profile_name="story-architect"):
             api_ok = False
     check("API server reachable", api_ok, "start gateway / run setup")
     check("API model id matches profile", model_ok, f"expected {pname}")
+    check("builtins disabled", "terminal" in (cfg.get("agent", {}).get("disabled_toolsets") or []), "run setup")
     print("ALL OK" if ok else "FAILURES PRESENT")
     return 0 if ok else 1

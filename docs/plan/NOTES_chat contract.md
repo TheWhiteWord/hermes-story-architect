@@ -10,3 +10,11 @@
 ## Deviations
 - Added `hermes_profile` to Config (default `story-architect`) and `STORY_ARCHITECT_HERMES_PROFILE` env override.
 - SOUL.md in profile is foreign; not overwritten automatically.
+
+## Task 8a — restrict built-in tools
+
+Working key: `agent.disabled_toolsets` (list of all builtin toolset names). `toolsets: []` means defaults, not empty. Setup now sets `agent.disabled_toolsets` to all builtin toolsets; status fails if `terminal` not in that list.
+
+Deviation: import of hermes toolsets module from /home/davide/.hermes/hermes-agent at setup time; fallback to empty list. Web search stays off.
+
+Scope note: disabled_toolsets is written only to the story-architect profile config; default and other profiles are untouched.
