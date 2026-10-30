@@ -63,3 +63,22 @@ Verified causes:
 2. Drop standalone + api_server on default profile — loses per-profile isolation.
 3. Use Hermes native sessions/chat (drop app chat store + api_server) —
    largest, aligns with native; unverified effort.
+## Manual prerequisite (no auto-enablement)
+
+The app reads the LLM via the host gateway api_server at
+http://127.0.0.1:8642/p/story-architect/v1/...
+Hermes does not enable api_server by default, so the user must enable it once
+on the default profile:
+
+    # ~/.hermes/config.yaml
+    platforms:
+      api_server:
+        enabled: true
+        host: 127.0.0.1
+        port: 8642
+
+and set a strong API_SERVER_KEY in ~/.hermes/.env.
+
+Then: hermes gateway restart
+
+The app never modifies Hermes config automatically.
