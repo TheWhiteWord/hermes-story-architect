@@ -154,11 +154,6 @@ Deviations: PATCH /api/agent/settings currently handles only `autostart`; `model
 
 Contract change for UI: none.
 
-## Task 12.6 verification
-
-- `hermes -p story-architect gateway status`: standalone per profile (gateway.standalone: true), serves only story-architect; other profiles (default, creative, dev, graphic, researcher, vault-manager) are NOT served. `can_stop: true` confirmed correct.
-- `hermes status` check for built-in tools: not re-run here (report only); status already fails when `terminal` not in disabled_toolsets per 8a implementation.
-
 ## Task 12.5 implementation
 
 Short summary: Added `tests/test_chat_routes.py` (TestClient + FakeBackend): messages streams text→done and persists; missing custom header and foreign origin rejected; missing API key returns 503. Fixed `_resolve_project` in `src/story_architect/app/routes/chat.py` to return `(path, None)` on success (was returning a bare Path, causing a TypeError unpack in the messages/retry routes).
@@ -168,3 +163,15 @@ Diagnosis findings (section 0): none new; the route unpack bug surfaced only whe
 Deviations: test suite covers the header/origin/key/messages subset of 12.5; tool-bus, cancel, retry, approve/reject, and /events scenarios remain follow-ups.
 
 Contract change for UI: none.
+
+## Task 12.6 verification
+
+- `hermes -p story-architect gateway status`: standalone per profile (gateway.standalone: true), serves only story-architect; other profiles (default, creative, dev, graphic, researcher, vault-manager) are NOT served. `can_stop: true` confirmed correct.
+- `hermes status` check for built-in tools: not re-run here (report only); status already fails when `terminal` not in disabled_toolsets per 8a implementation.
+
+## Profile setup & chat service fixes
+
+- setup.py: profile created with --clone lacked state.db, causing gateway to park the profile (Invalid gateway ticket response for Tools/Skills/Plugins/Delete). Now initializes an empty state.db (schema copied from an existing profile) after creation.
+- setup.py: added gateway.standalone: true to profile config so the host gateway runs the profile api_server (multiplexing gap shim).
+- gateway.py: start_gateway spawns gateway run in the background (was gateway start, which required a systemd service).
+- server.py: initialized app.state.chat_service (was missing, causing No reply was received in chat).

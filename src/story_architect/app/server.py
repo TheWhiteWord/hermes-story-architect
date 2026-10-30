@@ -32,6 +32,16 @@ def create_app(config: Config) -> FastAPI:
     app.state.mcp_manager = manager
     app.state.active_replies = {}
     app.state.agent_started_by_app = False
+    # chat service (backend over the profile's API server)
+    try:
+        from story_architect.adapters.hermes.chat_backend import HermesChatBackend
+        from story_architect.chat.service import ChatService
+        from story_architect.app import token as _token_mod
+        _ak = _token_mod.load_api_key()
+        _base = f"http://127.0.0.1:{config.hermes_api_port}"
+        app.state.chat_service = ChatService(HermesChatBackend(base_url=_base, api_key=_ak or "", model=config.hermes_profile))
+    except Exception:
+        app.state.chat_service = None
 
     @app.middleware("http")
     async def host_check(request: Request, call_next):

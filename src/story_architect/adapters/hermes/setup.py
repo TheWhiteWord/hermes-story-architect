@@ -50,6 +50,32 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
             out.append(f"created profile {pname}")
     else:
         out.append(f"profile {pname} exists (skipped)")
+    # ensure the profile has a session store (state.db). A profile created with
+    # --clone lacks state.db; without it the gateway parks the profile and every
+    # ticket minted for it is refused ("Invalid gateway ticket response").
+    state_db = pd / "state.db"
+    if not state_db.exists():
+        import sqlite3
+        W_home = W.hermes_home()
+        candidates = [W_home / "state.db"] + [p / "state.db" for p in (W_home / "profiles").glob("*") if p.is_dir()]
+        src = next((c for c in candidates if c.exists() and c != state_db), None)
+        if src is not None:
+            con = sqlite3.connect(str(src))
+            schema = [r[0] for r in con.execute("SELECT sql FROM sqlite_master WHERE type IN ('table','index','trigger','view') AND sql IS NOT NULL").fetchall()]
+            con.close()
+            out_db = sqlite3.connect(str(state_db))
+            for sql in schema:
+                try:
+                    out_db.execute(sql)
+                except Exception:
+                    pass
+            out_db.commit()
+            out_db.close()
+            try:
+                state_db.chmod(0o600)
+            except OSError:
+                pass
+            out.append("state.db initialized")
     # persona (SOUL.md) unless default profile
     soul_path = pd / "SOUL.md"
     is_default = pname == "default"
@@ -152,6 +178,9 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
         "port": C.load_config().hermes_api_port,
         "key": "${API_SERVER_KEY}",
     })
+    # multiplexing gap shim: let the host gateway run this profile's api_server
+    cfg.setdefault("gateway", {})
+    cfg["gateway"]["standalone"] = True
     # disable every built-in toolset; only MCP (story) tools remain
     cfg.setdefault("agent", {})
     import sys as _sys

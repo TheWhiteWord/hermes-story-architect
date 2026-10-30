@@ -46,14 +46,24 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
 
 
 def start_gateway(config: Config, profile: str = PROFILE, timeout: float = 15.0) -> dict[str, Any]:
-    rc, out, err = W.run_hermes("-p", profile, "gateway", "start")
+    import os
+    import subprocess
+    exe = W.find_hermes()
+    if not exe:
+        return {"ok": False, "started_by_app": True, "detail": "hermes not found"}
+    env = dict(os.environ)
+    env["HERMES_HOME"] = str(W.hermes_home())
+    try:
+        subprocess.Popen([exe, "-p", profile, "gateway", "run"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        return {"ok": False, "started_by_app": True, "detail": str(e)}
     deadline = time.time() + timeout
     while time.time() < deadline:
         st = agent_state(config, profile)
         if st["state"] == "ready":
             return {"ok": True, "started_by_app": True, **st}
         time.sleep(0.5)
-    return {"ok": False, "started_by_app": True, "detail": (err or out).strip() or "timeout"}
+    return {"ok": False, "started_by_app": True, "detail": "timeout"}
 
 
 def agent_settings(config: Config, profile: str = PROFILE) -> dict[str, Any]:
