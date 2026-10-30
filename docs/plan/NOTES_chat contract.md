@@ -119,3 +119,20 @@ Diagnosis findings (section 0): the events route had been corrupted by a bad mer
 Deviations: did not split server.py into APIRouter modules (third bullet of 12.1) — deferred as a mechanical refactor; behavior unchanged. No contract changes to the SSE shape.
 
 Contract change for UI: none; `/events` now only emits `update` after DB changes.
+
+## 12.1 Split — brief
+
+Short summary: Split `server.py` into `APIRouter` modules: `routes/agent.py`, `routes/chat.py`, `routes/drafts.py`, `routes/projects.py`; `create_app` now only assembles routers and middleware. Mechanical move; no behavior change. `ruff --select F` clean.
+
+Diagnosis findings (section 0): none new; routes moved verbatim.
+
+Deviations: none.
+
+Contract change for UI: none.
+
+## Task 12.2 implementation
+
+Implemented `stream_reply` helper in routes/chat.py plus messages/retry/cancel routes. Preflight checks for 404/400/503/409. Backend built per request from token. Cleanup in finally.
+
+### 12.2 update
+Added bus forwarder in producer; bus events now forwarded to SSE queue and bus_q unsubscribed in finally. Gap closed.
