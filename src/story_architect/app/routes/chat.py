@@ -170,8 +170,7 @@ def make_router(config, app):
         chat_store.delete_conversation(pp, cid)
         return {"deleted": True}
 
-    @router.post("/api/projects/{slug}/messages")
-    async def messages_route(slug: str, request: Request):
+    async def _messages_handler(slug: str, request: Request, cid_path: str | None = None):
         # preflight
         try:
             body = await request.json()
@@ -191,15 +190,22 @@ def make_router(config, app):
         active = getattr(app.state, "active_replies", None)
         if active and len(active) > 0:
             return JSONResponse(status_code=409, content={"error": {"code": "reply_in_progress", "message": "reply in progress"}})
-        cid = body.get("conversation_id")
+        cid = cid_path or body.get("conversation_id")
         if not cid:
             from story_architect.chat import store as chat_store
             cid = chat_store.create_conversation(pp, text[:60])
         async def gen():
             async for etype, data in stream_reply(slug, cid, text, context, retry=False):
-                yield f"event: {etype}\ndata: {__import__('json').dumps(data)}\n\n"
+                yield f"event: {etype}\\ndata: {__import__('json').dumps(data)}\\n\\n"
         return StreamingResponse(gen(), media_type="text/event-stream")
 
+    @router.post("/api/projects/{slug}/messages")
+    async def messages_route(slug: str, request: Request):
+        return await _messages_handler(slug, request)
+
+    @router.post("/api/projects/{slug}/conversations/{cid}/messages")
+    async def conv_messages_route(slug: str, cid: str, request: Request):
+        return await _messages_handler(slug, request, cid_path=cid)
     @router.post("/api/projects/{slug}/conversations/{cid}/retry")
     async def retry_route(slug: str, cid: str, request: Request):
         pp, err = _resolve_project(slug)
