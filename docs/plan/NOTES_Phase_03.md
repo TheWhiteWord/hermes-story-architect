@@ -43,7 +43,7 @@
 - Persistence/restore: conversations loaded from server; last-open restored on init (first conversation).
 - Files: web/js/chat.js, web/css/chat.css; wired into index.html and stats.py JS_ORDER/CSS_ORDER.
 - Deviations: no markdown rendering beyond plain text; no agent state UI (start button not added, state check available via /api/agent/state).
-- 
+
 ## Phase 3 Task 5 (Agent availability)
 - Added src/story_architect/adapters/hermes/gateway.py: agent_state() returns not_configured/gateway_stopped/api_unreachable/ready; start_gateway() invokes hermes -p <profile> gateway start and polls API readiness (timeout 15s). App never kills a gateway it did not start (started_by_app tracked in app.state).
 - Config gained agent_autostart (env STORY_ARCHITECT_AGENT_AUTOSTART / config.toml), default off.

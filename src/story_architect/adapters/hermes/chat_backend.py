@@ -33,7 +33,7 @@ class HermesChatBackend:
         backend_state: Any,
     ) -> AsyncIterator[Any]:
         # Build system instructions from context.
-        slug = (context or {}).get("project_slug") or (context or {}).get("slug")
+        slug = (context or {}).get("project_slug") or (context or {}).get("slug") or (context or {}).get("project")
         name = (context or {}).get("project_name") or (context or {}).get("display_name")
         parts = ["You are the Story Architect assistant."]
         if slug:
