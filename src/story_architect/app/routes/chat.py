@@ -11,7 +11,7 @@ def make_router(config, app):
         from story_architect.tools.story_resolve import resolve_project
         root = Path(config.root)
         try:
-            return resolve_project(slug, root)
+            return resolve_project(slug, root), None
         except ValueError as e:
             return None, str(e)
         except Exception as e:

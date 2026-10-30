@@ -133,6 +133,7 @@ Contract change for UI: none.
 ## Task 12.2 implementation
 
 Implemented `stream_reply` helper in routes/chat.py plus messages/retry/cancel routes. Preflight checks for 404/400/503/409. Backend built per request from token. Cleanup in finally.
+
 ## Task 12.3 implementation
 
 Short summary: Event mapping now matches the contract table exactly. Backend `ToolStarted` → `tool` `{id, name, status: "started", label}`; `ToolFinished` → `tool` `{id, name, status: ev.status, label}` where status is `finished` or `failed` (previously hard-coded "finished"). Hermes tool progress with `status: failed`/`error` now yields a failed ToolFinished instead of a started one. Bus event mapping unchanged (started/finished/failed → tool, draft → draft).
@@ -150,5 +151,15 @@ Short summary: Confirmed all routes listed in 12.4 exist and match the contract 
 Diagnosis findings (section 0): none new.
 
 Deviations: PATCH /api/agent/settings currently handles only `autostart`; `model` field (section 8) is not applied yet — left for the agent-settings task. Origin + X-Story-Architect header check relies on the existing middleware applied in create_app.
+
+Contract change for UI: none.
+
+## Task 12.5 implementation
+
+Short summary: Added `tests/test_chat_routes.py` (TestClient + FakeBackend): messages streams text→done and persists; missing custom header and foreign origin rejected; missing API key returns 503. Fixed `_resolve_project` in `src/story_architect/app/routes/chat.py` to return `(path, None)` on success (was returning a bare Path, causing a TypeError unpack in the messages/retry routes).
+
+Diagnosis findings (section 0): none new; the route unpack bug surfaced only when exercising real routes, as 12.5 predicted.
+
+Deviations: test suite covers the header/origin/key/messages subset of 12.5; tool-bus, cancel, retry, approve/reject, and /events scenarios remain follow-ups.
 
 Contract change for UI: none.
