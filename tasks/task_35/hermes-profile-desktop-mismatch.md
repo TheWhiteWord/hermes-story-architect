@@ -82,3 +82,8 @@ and set a strong API_SERVER_KEY in ~/.hermes/.env.
 Then: hermes gateway restart
 
 The app never modifies Hermes config automatically.
+
+
+## Resolution
+
+Root cause of "Start agent" timeout: host gateway api_server platform refused to start because default profile .env had no API_SERVER_KEY (removed during cleanup). Re-adding a strong key and restarting fixed it. App now reports agent ready and chat works; desktop profile stays clean (no standalone shim).
