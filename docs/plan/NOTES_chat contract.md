@@ -154,6 +154,11 @@ Deviations: PATCH /api/agent/settings currently handles only `autostart`; `model
 
 Contract change for UI: none.
 
+## Task 12.6 verification
+
+- `hermes -p story-architect gateway status`: standalone per profile (gateway.standalone: true), serves only story-architect; other profiles (default, creative, dev, graphic, researcher, vault-manager) are NOT served. `can_stop: true` confirmed correct.
+- `hermes status` check for built-in tools: not re-run here (report only); status already fails when `terminal` not in disabled_toolsets per 8a implementation.
+
 ## Task 12.5 implementation
 
 Short summary: Added `tests/test_chat_routes.py` (TestClient + FakeBackend): messages streams text→done and persists; missing custom header and foreign origin rejected; missing API key returns 503. Fixed `_resolve_project` in `src/story_architect/app/routes/chat.py` to return `(path, None)` on success (was returning a bare Path, causing a TypeError unpack in the messages/retry routes).
