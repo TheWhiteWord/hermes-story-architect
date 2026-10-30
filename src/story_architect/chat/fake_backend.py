@@ -14,8 +14,8 @@ class FakeBackend:
         self.cancel_after = cancel_after
         self.calls = []
 
-    async def send(self, messages, context, backend_state) -> AsyncIterator[Any]:
-        self.calls.append((messages, context, backend_state))
+    async def send(self, messages, instructions, backend_state) -> AsyncIterator[Any]:
+        self.calls.append((messages, instructions, backend_state))
         if self.tool_name:
             yield ToolStarted(name=self.tool_name)
         for r in self.replies:

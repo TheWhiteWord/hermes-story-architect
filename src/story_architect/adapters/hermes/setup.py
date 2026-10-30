@@ -56,17 +56,27 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
     if not is_default:
         src = ASSETS / "SOUL.md"
         content = src.read_text() if src.exists() else ""
-        if soul_path.exists() and MARKER not in soul_path.read_text() and not force:
+        if soul_path.exists():
+            existing = soul_path.read_text()
+            foreign = MARKER not in existing
+            default_soul = _profile("default") / "SOUL.md"
+            identical_to_default = (default_soul.exists() and existing == default_soul.read_text())
+        else:
+            existing = ""
+            foreign = False
+            identical_to_default = False
+        if foreign and not identical_to_default and not force:
             out.append("SOUL.md exists (foreign) - skipped; use --force")
         else:
             if dry:
                 out.append("[dry-run] would write SOUL.md")
             else:
-                if force and soul_path.exists():
+                if soul_path.exists() and (force or identical_to_default):
                     shutil.copy2(soul_path, soul_path.with_suffix(".md.bak"))
                 soul_path.parent.mkdir(parents=True, exist_ok=True)
                 soul_path.write_text(MARKER + "\n" + content)
                 out.append("SOUL.md written")
+
     else:
         out.append("default profile: skipping persona")
     # skill

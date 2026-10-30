@@ -11,7 +11,7 @@ class ChatBackend(Protocol):
     def send(
         self,
         messages: list[dict],
-        context: dict,
+        instructions: str,
         backend_state: Any,
     ) -> AsyncIterator[ChatEvent]:
         """Return an async iterator of chat events for a user turn."""

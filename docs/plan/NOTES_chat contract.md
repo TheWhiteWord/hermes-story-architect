@@ -18,3 +18,13 @@ Working key: `agent.disabled_toolsets` (list of all builtin toolset names). `too
 Deviation: import of hermes toolsets module from /home/davide/.hermes/hermes-agent at setup time; fallback to empty list. Web search stays off.
 
 Scope note: disabled_toolsets is written only to the story-architect profile config; default and other profiles are untouched.
+
+## Task session — Section 1 (UI wiring) + Section 2 (context) + persona
+
+Short summary: Wired the new chat UI files into the dashboard (CSS + 4 JS, JS_ORDER updated, old chat.js removed). Created chat/context.py with build_bootstrap. Changed ChatBackend.send signature to (messages, instructions, backend_state), dropping context; adapter sends instructions as system message with no persona text; FakeBackend records instructions; ChatService builds bootstrap from request context + project name. Setup now treats a SOUL.md byte-identical to the default profile's as replaceable (backs up first), still refuses genuinely custom ones without --force. Updated SOUL.md and SKILL.md to describe approval cards.
+
+Diagnosis findings (section 0): unchanged from prior notes — context bug stopgap retained until bootstrap (now implemented); agent profile on port 8642; SSE fixture captured; previous_response_id removed.
+
+Deviations: ChatService computes slug from project_path.name (string or Path). Project name lookup reuses core.drafts._project_name.
+
+Contract change for UI: none new; bootstrap is server-side only and never persisted/shown.

@@ -23,24 +23,24 @@
 
 Files are in `chat-ui/`: `css/chat.css`, `js/chat-api.js`, `js/chat-md.js`, `js/chat-render.js`, `js/chat-app.js`.
 
-- [ ] Replace `web/css/chat.css` with the new one. Put the four JS files in `web/js/` (or `web/js/chat/`; adjust paths).
-- [ ] Delete the old `web/js/chat.js`. In `index.html` replace its `<script>` with the four new ones **in this order**, after `script-view.js` and before `DASH.boot()`: `chat-api.js`, `chat-md.js`, `chat-render.js`, `chat-app.js`. Update the script/CSS order pin (the test and `JS_ORDER`).
+- [x] Replace `web/css/chat.css` with the new one. Put the four JS files in `web/js/` (or `web/js/chat/`; adjust paths).
+- [x] Delete the old `web/js/chat.js`. In `index.html` replace its `<script>` with the four new ones **in this order**, after `script-view.js` and before `DASH.boot()`: `chat-api.js`, `chat-md.js`, `chat-render.js`, `chat-app.js`. Update the script/CSS order pin (the test and `JS_ORDER`).
 - [ ] The UI builds its own DOM inside `#app` after the last panel and wraps `DASH.initStory`; no other HTML changes. It also overrides `DASH.askAgent`.
-- [ ]  **Mock mode:** open `http://127.0.0.1:8731/?mock=1#/p/<slug>` (query string before the hash). Everything works without a gateway. Use it to check the layout against the real dashboard first.
+- [x]  **Mock mode:** open `http://127.0.0.1:8731/?mock=1#/p/<slug>` (query string before the hash). Everything works without a gateway. Use it to check the layout against the real dashboard first.
 - [ ] Optional, small: set `DASH.panelContext = {type, id, name}` wherever an entity panel opens (and clear it in `DASH.closePanel`). The "attach" menu uses it to give the agent the entity id; without it the UI sends only the visible label.
 
 ## 2. Context for the agent
 
-- [ ] Create `chat/context.py` (harness-agnostic, no Hermes import):
+- [x] Create `chat/context.py` (harness-agnostic, no Hermes import):
 
 `build_bootstrap(project_slug, project_name, attachments) -> str`, sent as the system/instructions message on every request, never persisted, never shown. Starting text (refine freely):
 
 > You are working inside **Story Architect**, a local screenwriting and story-development app. The user has the project "{name}" ({slug}) open in the app and is talking to you in its side panel. Read and change the project only through the story tools (MCP server "story"); don't guess project facts. Propose changes by staging a draft: the app shows each draft to the user as a card with Approve and Reject buttons. Commit only after the user approves (you will be told), unless they explicitly ask you to apply changes directly. Never claim a change was made unless a tool confirmed it. Use `dashboard_link` when pointing the user at a place in the app.
 > {if attachments:} The user attached these parts of the app to their message: {labels with kind/id}. Use the tools to read them if relevant.
 
-- [ ] `ChatService` builds it from the request `context` (`project`, `attachments`) plus the project name lookup, and passes the final string to the backend as a separate `instructions` argument. The backend adds no persona text of its own.
-- [ ]  **Persona install:** `hermes setup` refuses to overwrite a `SOUL.md` it did not write, but `hermes profile create --clone` copies the default profile's `SOUL.md`, so the story profile always looks "foreign". Make setup treat a `SOUL.md` that is byte-identical to the default profile's as replaceable (back it up first), and still refuse genuinely custom ones without `--force`. For the owner's current profile, running `story-architect hermes setup --force` (it backs up the old file) is fine.
-- [ ]  Update `SOUL.md` and `SKILL.md` to match: the app shows drafts as approval cards; the agent is told when a draft is approved or rejected; the agent may still commit by itself when asked.
+- [x] `ChatService` builds it from the request `context` (`project`, `attachments`) plus the project name lookup, and passes the final string to the backend as a separate `instructions` argument. The backend adds no persona text of its own.
+- [x]  **Persona install:** `hermes setup` refuses to overwrite a `SOUL.md` it did not write, but `hermes profile create --clone` copies the default profile's `SOUL.md`, so the story profile always looks "foreign". Make setup treat a `SOUL.md` that is byte-identical to the default profile's as replaceable (back it up first), and still refuse genuinely custom ones without `--force`. For the owner's current profile, running `story-architect hermes setup --force` (it backs up the old file) is fine.
+- [x]  Update `SOUL.md` and `SKILL.md` to match: the app shows drafts as approval cards; the agent is told when a draft is approved or rejected; the agent may still commit by itself when asked.
 
 ## 3. Reply stream (SSE) from `POST .../messages` and `POST .../retry`
 

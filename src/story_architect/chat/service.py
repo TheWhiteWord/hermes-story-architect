@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 from . import store
 from .backend import ChatBackend
+from .context import build_bootstrap
 from .events import Done, Error, TextDelta, ToolFinished, ToolStarted
 
 
@@ -39,6 +41,11 @@ class ChatService:
         backend_state = conv["backend_state"] if conv else None
         # build message history
         messages = [{"role": m["role"], "text": m["text"]} for m in (conv["messages"] if conv else [])]
+        # build bootstrap instructions (never persisted)
+        from story_architect.core.drafts import _project_name
+        slug = Path(project_path).name if not isinstance(project_path, str) else str(project_path).rstrip("/").split("/")[-1]
+        name = _project_name(Path(project_path))
+        instructions = build_bootstrap(slug, name, (context or {}).get("attachments") or [])
         # title derive
         if title_from_first and conv and not conv.get("title"):
             store.set_title(project_path, conversation_id, user_text[:60])
@@ -49,7 +56,7 @@ class ChatService:
         msg_id = store.add_message(project_path, conversation_id, "assistant", "", metadata=metadata, status="streaming")
         cancelled = False
         try:
-            async for ev in self.backend.send(messages, context or {}, backend_state):
+            async for ev in self.backend.send(messages, instructions, backend_state):
                 if isinstance(ev, TextDelta):
                     assistant_text += ev.text
                     store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)

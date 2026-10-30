@@ -27,7 +27,7 @@ JS_ORDER = [
     "panels/scene-beats-tab.js", "panels/character-journey-tab.js",
     "statistics/statistics.js", "statistics/charts.js",
     "script-view.js",
-    "chat.js",
+    "chat-api.js", "chat-md.js", "chat-render.js", "chat-app.js",
 ]
 
 SCHEMA = {

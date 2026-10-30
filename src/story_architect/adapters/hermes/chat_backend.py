@@ -29,19 +29,10 @@ class HermesChatBackend:
     async def send(
         self,
         messages: list[dict],
-        context: dict,
+        instructions: str,
         backend_state: Any,
     ) -> AsyncIterator[Any]:
-        # Build system instructions from context.
-        slug = (context or {}).get("project_slug") or (context or {}).get("slug") or (context or {}).get("project")
-        name = (context or {}).get("project_name") or (context or {}).get("display_name")
-        parts = ["You are the Story Architect assistant."]
-        if slug:
-            parts.append(f"Current project slug: {slug}.")
-        if name:
-            parts.append(f"Current project name: {name}.")
-        system_text = " ".join(parts)
-
+        system_text = instructions or "You are the Story Architect assistant."
         payload_messages = [{"role": "system", "content": system_text}] + [
             {"role": m.get("role", "user"), "content": m.get("content", m.get("text", ""))}
             for m in (messages or [])
