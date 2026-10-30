@@ -1,6 +1,6 @@
 window.DASH = window.DASH || {};
 
-DASH.closePanel = function() { document.getElementById('detail-panel').classList.remove('open'); }
+DASH.closePanel = function() { document.getElementById('detail-panel').classList.remove('open'); DASH.panelContext = null; }
 
 
 
