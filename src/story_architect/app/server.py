@@ -127,7 +127,7 @@ def create_app(config: Config) -> FastAPI:
     try:
         api_key = token_mod.load_api_key() or ""
         base_url = f"http://127.0.0.1:{config.hermes_api_port}"
-        app.state.chat_backend = HermesChatBackend(base_url=base_url, api_key=api_key, model="story-architect")
+        app.state.chat_backend = HermesChatBackend(base_url=base_url, api_key=api_key, model=config.hermes_profile)
     except Exception:
         app.state.chat_backend = None
 

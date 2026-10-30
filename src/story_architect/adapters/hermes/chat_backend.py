@@ -51,9 +51,6 @@ class HermesChatBackend:
             "messages": payload_messages,
             "stream": True,
         }
-        if backend_state is not None:
-            payload["previous_response_id"] = backend_state
-
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "text/event-stream",

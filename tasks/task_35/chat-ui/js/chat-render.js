@@ -51,11 +51,11 @@
     d.className = 'sa-tool ' + (t.status || 'started');
     d.querySelector('summary').innerHTML =
       '<span class="sa-tstate">' + stateIcon(t.status) + '</span><span class="sa-tname">' + esc(t.name || 'tool') + '</span>' +
-      '<span class="sa-thint">' + esc(toolHint(t.args)) + '</span>' +
+      '<span class="sa-thint">' + esc(toolHint(t.args) || clip(t.label || '', 70)) + '</span>' +
       (t.duration_ms != null ? '<span class="sa-tdur">' + (t.duration_ms < 1000 ? Math.round(t.duration_ms) + ' ms' : (t.duration_ms / 1000).toFixed(1) + ' s') + '</span>' : '') +
       '<span class="sa-chev">' + icon('chev', 12) + '</span>';
     const body = d.querySelector('.sa-tool-body');
-    const a = pretty(t.args), r = pretty(t.result_preview);
+    const a = pretty(t.args) || (t.label ? String(t.label) : ''), r = pretty(t.result_preview);
     body.innerHTML = (a ? '<div class="sa-tlabel">Arguments</div><pre>' + esc(clip(a, 4000)) + '</pre>' : '') +
       (r ? '<div class="sa-tlabel">Result</div><pre>' + esc(clip(r, 4000)) + '</pre>' : '') +
       (!a && !r ? '<div class="sa-tlabel">No details available</div>' : '');

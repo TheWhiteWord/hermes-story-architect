@@ -18,6 +18,7 @@ class Config:
     port: int = DEFAULT_PORT
     open_browser: bool = True
     hermes_api_port: int = 8642
+    hermes_profile: str = "story-architect"
     agent_autostart: bool = False
 
 
@@ -51,6 +52,7 @@ def load_config(*, cli_root=None, cli_port=None, cli_no_open=False) -> Config:
     root_raw = pick("root", cli_root, "ROOT", str(DEFAULT_ROOT))
     port_raw = pick("port", cli_port, "PORT", DEFAULT_PORT, int)
     hermes_api_port_raw = pick("hermes_api_port", None, "HERMES_API_PORT", 8642, int)
+    hermes_profile_raw = pick("hermes_profile", None, "HERMES_PROFILE", "story-architect", str)
     open_browser = True
     if cli_no_open:
         open_browser = False
@@ -68,4 +70,4 @@ def load_config(*, cli_root=None, cli_port=None, cli_no_open=False) -> Config:
     elif "agent_autostart" in file_vals:
         agent_autostart = bool(file_vals["agent_autostart"])
 
-    return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser, hermes_api_port=int(hermes_api_port_raw), agent_autostart=agent_autostart)
+    return Config(root=Path(root_raw).expanduser(), port=int(port_raw), open_browser=open_browser, hermes_api_port=int(hermes_api_port_raw), hermes_profile=str(hermes_profile_raw), agent_autostart=agent_autostart)
