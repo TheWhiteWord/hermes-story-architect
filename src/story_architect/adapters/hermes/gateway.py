@@ -8,8 +8,8 @@ from story_architect.app.config import Config
 PROFILE = "story-architect"
 
 
-def _base_url(config: Config) -> str:
-    return f"http://127.0.0.1:{config.hermes_api_port}"
+def _base_url(config: Config, profile: str = PROFILE) -> str:
+    return f"http://127.0.0.1:{config.hermes_api_port}/p/{profile}"
 
 
 def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
@@ -28,7 +28,7 @@ def agent_state(config: Config, profile: str = PROFILE) -> dict[str, Any]:
             import httpx
         except ImportError:
             import httpx2 as httpx
-        r = httpx.get(f"{_base_url(config)}/v1/models", headers={"Authorization": f"Bearer {key}"}, timeout=2.0)
+        r = httpx.get(f"{_base_url(config, profile)}/v1/models", headers={"Authorization": f"Bearer {key}"}, timeout=2.0)
     except Exception as e:
         return {"state": "gateway_stopped", "detail": str(e)}
     if r.status_code == 401:

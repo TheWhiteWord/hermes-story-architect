@@ -165,23 +165,21 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
             cfg = {}
     port = C.load_config().port
     cfg.setdefault("mcp_servers", {})
+    # remove legacy standalone/api_server shim (served via host multiplexer now)
+    if isinstance(cfg.get("gateway"), dict):
+        cfg["gateway"].pop("standalone", None)
+        if not cfg["gateway"]:
+            cfg.pop("gateway", None)
+    if isinstance(cfg.get("platforms"), dict):
+        cfg["platforms"].pop("api_server", None)
+        if not cfg["platforms"]:
+            cfg.pop("platforms", None)
     cfg["mcp_servers"]["story"] = {
         "url": f"http://127.0.0.1:{port}/mcp",
         "headers": {"Authorization": "Bearer ${STORY_ARCHITECT_TOKEN}"},
     }
-    # API server enablement
-    cfg.setdefault("platforms", {})
-    cfg["platforms"].setdefault("api_server", {})
-    cfg["platforms"]["api_server"].update({
-        "enabled": True,
-        "host": "127.0.0.1",
-        "port": C.load_config().hermes_api_port,
-        "key": "${API_SERVER_KEY}",
-    })
-    # multiplexing gap shim: let the host gateway run this profile's api_server
-    cfg.setdefault("gateway", {})
-    cfg["gateway"]["standalone"] = True
-    # disable every built-in toolset; only MCP (story) tools remain
+    # API key for Hermes API server (served via host multiplexer at /p/<profile>/)
+    api_key = T.ensure_api_key() if hasattr(T, "ensure_api_key") else None
     cfg.setdefault("agent", {})
     import sys as _sys
     _sys.path.insert(0, "/home/davide/.hermes/hermes-agent")

@@ -38,7 +38,7 @@ def create_app(config: Config) -> FastAPI:
         from story_architect.chat.service import ChatService
         from story_architect.app import token as _token_mod
         _ak = _token_mod.load_api_key()
-        _base = f"http://127.0.0.1:{config.hermes_api_port}"
+        _base = f"http://127.0.0.1:{config.hermes_api_port}/p/{config.hermes_profile}"
         app.state.chat_service = ChatService(HermesChatBackend(base_url=_base, api_key=_ak or "", model=config.hermes_profile))
     except Exception:
         app.state.chat_service = None
