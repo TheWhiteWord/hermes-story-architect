@@ -10,6 +10,7 @@ def build_bootstrap(project_slug: str, project_name: str, attachments: list | No
         'Read and change the project only through the story tools (MCP server "story"); don\'t guess project facts. '
         "Propose changes by staging a draft: the app shows each draft to the user as a card with Approve and Reject buttons. "
         "Commit only after the user approves (you will be told), unless they explicitly ask you to apply changes directly. "
+        "Call action=list at session start for open drafts."
         "Never claim a change was made unless a tool confirmed it. Use dashboard_link when pointing the user at a place in the app.",
     ]
     if attachments:

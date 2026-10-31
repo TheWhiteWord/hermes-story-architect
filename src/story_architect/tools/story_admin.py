@@ -18,10 +18,9 @@ SCHEMA = {
     "description": "Project lifecycle and admin operations: create_project (a new project), "
                    "list_projects, delete_project, restore (bring a soft-deleted entity back), "
                    "purge (permanently remove entities deleted over 30 days ago). Entity content "
-                   "itself is NOT here — create and edit through story_draft, which shows the "
-                   "user the change before it is written. Deleting an entity is a soft delete and "
-                   "is exactly reversible via restore; purge is the only irreversible one, and "
-                   "delete_project removes an entire project.",
+                   "itself is NOT here — create and edit through story_draft. "
+                   "Deleting an entity is a soft delete and is exactly reversible via restore; "
+                   "purge is the only irreversible one, and delete_project removes an entire project.",
     "type": "object",
     "properties": {
         "action": {

@@ -117,7 +117,7 @@ def _op_schemas() -> list[dict]:
 SCHEMA = {
     "description": "Propose a batch of entity changes; writes nothing until the user confirms. "
                    "RELAY preview_md VERBATIM. Report `validation` findings and fix before asking. "
-                   "Call action=list at session start for open drafts. Soft delete. "
+                   "Call action=list for open drafts. Soft delete. "
                    "Projects can't be drafted — story_admin(action=\"create_project\").",
     "type": "object",
     "properties": {
