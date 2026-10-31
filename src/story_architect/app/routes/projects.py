@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 import asyncio
 from pathlib import Path
@@ -24,7 +24,7 @@ def make_router(config, app):
         return data
 
     @router.get("/api/projects/{slug}/events")
-    async def project_events(slug: str, request):
+    async def project_events(slug: str, request: Request):
         root = Path(config.root)
         db_path = root / "projects" / slug / ".story" / "story.db"
 
