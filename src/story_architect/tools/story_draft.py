@@ -115,15 +115,10 @@ def _op_schemas() -> list[dict]:
 
 
 SCHEMA = {
-    "description": "Propose a batch of entity changes, and write them only when the user confirms. "
-                   "This is the only way to create, edit or reorder an entity — every write goes through a draft, so use it "
-                   "whenever the user is still deciding, and commit once they agree. A draft "
-                   "is inert: staging writes one row in the project's drafts table and nothing else."
-                   "Report anything in `validation` alongside it, and fix a finding before asking for confirmation rather "
-                   "than after. Call action=\"list\" at the start of a session to find drafts "
-                   "left open by a previous one. Deleting is reversible, so a delete op is a "
-                   "soft delete. Projects themselves cannot be drafted — call "
-                   "story_admin(action=\"create_project\") for those.",
+    "description": "Propose a batch of entity changes; writes nothing until the user confirms. "
+                   "RELAY preview_md VERBATIM. Report `validation` findings and fix before asking. "
+                   "Call action=list at session start for open drafts. Soft delete. "
+                   "Projects can't be drafted — story_admin(action=\"create_project\").",
     "type": "object",
     "properties": {
         "action": {
@@ -143,11 +138,7 @@ SCHEMA = {
             "description": "For action=\"stage\": the changes to propose, in any order — commit "
                            "sorts them into create, edit, delete, reorder itself. Relations "
                            "such as a scene's characters ride INSIDE frontmatter, there is no "
-                           "separate relations key. Staging again with the same draft_id "
-                           "REPLACES the proposal, and the response says what was added, "
-                           "dropped or changed. Re-stage with the same draft_id when " \
-                           "correcting warnings or a failed attempt, instead of " \
-                           "creating a new draft.",
+                           "separate relations key. Re-stage with the same draft_id to replace.",
             "items": _op_schemas(),
         },
         "draft_id": {
