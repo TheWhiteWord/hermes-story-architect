@@ -50,7 +50,15 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
             out.append(f"created profile {pname}")
     else:
         out.append(f"profile {pname} exists (skipped)")
-    # ensure the profile has a session store (state.db). A profile created with
+    # ensure profile is not parked (stale marker blocks serving)
+    parked = pd / "gateway.parked"
+    if parked.exists():
+        try:
+            parked.unlink()
+            out.append("cleared parked marker")
+        except OSError:
+            pass
+    # ensure the profile has a session store (state.db).
     # --clone lacks state.db; without it the gateway parks the profile and every
     # ticket minted for it is refused ("Invalid gateway ticket response").
     state_db = pd / "state.db"
