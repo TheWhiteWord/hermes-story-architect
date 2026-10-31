@@ -748,6 +748,17 @@ def delete_entity(project_path: Path, entity_type: str, slug: str,
         ).fetchall()
         structural = [c for c in children if c[1] in ("scene", "sequence")]
 
+        affected_rels = []
+        for r in conn.execute(
+                "SELECT id, extra FROM entities WHERE type='relationship' AND is_deleted=0"
+        ).fetchall():
+            try:
+                ex = json.loads(r[1]) if r[1] else {}
+            except Exception:
+                ex = {}
+            if entity_id in (ex.get("characters") or []):
+                affected_rels.append(r[0])
+
         if not confirm:
             # What goes, and why it is being held back.
             sections = conn.execute(
@@ -762,6 +773,7 @@ def delete_entity(project_path: Path, entity_type: str, slug: str,
                 "entity_type": entity_type,
                 "would_delete": [entity_id] + [c[0] for c in children],
                 "cascade_children": [{"id": c[0], "type": c[1]} for c in children],
+                "affected_relationships": affected_rels,
                 "sections_deleted": sections,
                 "relations_deleted": relations,
                 # The report above IS the preview, so dry_run has nothing left
