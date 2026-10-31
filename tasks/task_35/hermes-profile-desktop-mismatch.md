@@ -63,6 +63,7 @@ Verified causes:
 2. Drop standalone + api_server on default profile — loses per-profile isolation.
 3. Use Hermes native sessions/chat (drop app chat store + api_server) —
    largest, aligns with native; unverified effort.
+
 ## Manual prerequisite (no auto-enablement)
 
 The app reads the LLM via the host gateway api_server at
@@ -87,3 +88,13 @@ The app never modifies Hermes config automatically.
 ## Resolution
 
 Root cause of "Start agent" timeout: host gateway api_server platform refused to start because default profile .env had no API_SERVER_KEY (removed during cleanup). Re-adding a strong key and restarting fixed it. App now reports agent ready and chat works; desktop profile stays clean (no standalone shim).
+
+## Final resolution (2026-10-31)
+
+Root causes found:
+1. Host gateway api_server platform refused to start because default profile had no API_SERVER_KEY (removed during cleanup). Re-added a strong key.
+2. A stale `gateway.parked` marker file (`profiles/story-architect/gateway.parked`) made the host multiplexer skip the profile -> 404 on `/p/story-architect/v1/models` -> app reported `api_unreachable`. Setup now removes the marker.
+3. The app's `start_gateway` fallback spawned a standalone `hermes -p story-architect gateway run`, which itself parked the profile (creating the marker) — every "Start agent" click broke serving. Removed the spawn; now it waits for the host's periodic rescan (~30s). `stop_gateway` no longer calls `gateway stop` (also parked).
+4. Host gateway ran manually and died with the desktop. Installed as a user systemd service (`hermes gateway install`) so it survives desktop closure. App never manages gateway lifecycle.
+
+Net: app connects as long as the host gateway service is up, independent of desktop.
