@@ -83,8 +83,26 @@ def create_mcp_server(config: Config) -> Server:
                 obj = json.loads(result) if isinstance(result, str) else result
             except Exception:
                 obj = None
-            if isinstance(obj, dict) and "draft" in obj:
-                await _publish_bus({"type": "draft", "draft": obj["draft"]})
+            if isinstance(obj, dict) and "draft_id" in obj:
+                from pathlib import Path
+                from datetime import datetime
+                from story_architect.tools.story_resolve import resolve_project
+                from story_architect.core.drafts import describe_ops
+                try:
+                    pp = resolve_project(args.get("project", ""), Path(config.root))
+                except Exception:
+                    pp = None
+                ops = args.get("ops") or []
+                changes = describe_ops(pp, ops) if pp is not None else []
+                snapshot = {
+                    "id": obj.get("draft_id"),
+                    "status": "open",
+                    "summary": args.get("summary", ""),
+                    "created_at": datetime.now().isoformat(timespec="seconds"),
+                    "changes": changes,
+                    "warnings": obj.get("validation") or [],
+                }
+                await _publish_bus({"type": "draft", "draft": snapshot})
         return types.CallToolResult(content=[types.TextContent(type="text", text=result)])
 
     server = Server(
