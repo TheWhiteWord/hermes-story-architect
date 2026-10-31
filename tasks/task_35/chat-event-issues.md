@@ -1,19 +1,19 @@
 # Chat event handling issues (debug notes)
 
-## 1. "No reply was received" on first send, works on Retry
+## 1. "No reply was received" on first send, works on Retry — RESOLVED
 
-Symptom: first message yields thinking then "No reply was received.";
-Retry on the same conversation returns the answer.
-Hermes desktop shows the same conversation completed successfully (no failure).
+Root cause: not the stream-draining code. The agent API was unreachable
+because the host gateway was not serving the `story-architect` profile
+(stale `gateway.parked` marker + no host gateway service + missing default
+`API_SERVER_KEY`). First send's stream closed early with no deltas; Retry
+succeeded only once the profile got served.
 
-Likely area: src/story_architect/app/routes/chat.py stream_reply queue draining
-(lines ~96-127) and src/story_architect/adapters/hermes/chat_backend.py.
-The first send adds a user + assistant message via service.send; retry uses
-service.retry + prepare_retry. Difference in persistence/state may cause the
-stream to close early on first send.
+What was done: cleared the parked marker in setup, removed the standalone
+`gateway run` spawn that was re-parking the profile, installed the host
+gateway as a user systemd service, re-added a default `API_SERVER_KEY`.
 
-Unverified: whether TextDelta events are actually yielded on first send
-(add server-side logging to confirm).
+Result: agent ready on first send; reply streams normally. No change to
+chat.py or chat_backend.py.
 
 ## 2. Duplicate tool entries
 
@@ -27,8 +27,8 @@ events. Need dedup by tool call id.
 
 ## 3. Draft card mismatch with mockup
 
-The draft card rendered in-app differs from the mockup demo. Likely a
-rendering/CSS issue in chat-render.js / chat-app.js, not event handling.
+The draft card rendered in-app differs from the mockup demo. THey appear to be agent self made reports, and are identical to the ones in hermas desktop.
+Likely a rendering/CSS issue in chat-render.js / chat-app.js, not event handling.
 
 ## 4. 422 on /api/projects/demo/events
 
