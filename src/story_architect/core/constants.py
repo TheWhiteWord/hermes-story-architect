@@ -180,7 +180,7 @@ ENTITY_SCHEMAS = {
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, drafted, written, locked"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug (denormalized shortcut)"},
         "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
-        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence (float for insertions)"},
+        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence. Integer only (1,2,3...). 0 = append at end."},
         "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},
         "location": {"type": "string", "default": "", "optional": True, "description": "Slug of an existing location"},
         "time_of_day": {"type": "string", "default": "", "optional": True, "description": "One of: DAY, NIGHT, DUSK, DAWN, CONTINUOUS, LATER"},
@@ -246,7 +246,7 @@ ENTITY_SCHEMAS = {
     "sequence": {
         "type": {"type": "string", "default": "sequence", "optional": False, "description": "Always 'sequence'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name"},
-        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent act (float for insertions)"},
+        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent act. Integer only. 0 = append at end."},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug"},
         "primary_plot": {"type": "string", "default": "", "optional": True, "description": "Primary plot slug this sequence serves"},
@@ -263,7 +263,7 @@ ENTITY_SCHEMAS = {
     "act": {
         "type": {"type": "string", "default": "act", "optional": False, "description": "Always 'act'"},
         "title": {"type": "string", "default": "", "optional": False, "description": "Display name. Use 'Act I', 'Act II', 'Act III', etc."},
-        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within story (float for insertions)"},
+        "order": {"type": "number", "default": 0, "optional": False, "description": "Position within story. Integer only. 0 = append at end."},
         "status": {"type": "string", "default": "planned", "optional": False, "description": "One of: planned, in-progress, complete"},
         "act_objective": {"type": "string", "default": "", "label": "Objective", "optional": True, "description": "Protagonist's immediate goal for this act"},
         "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
