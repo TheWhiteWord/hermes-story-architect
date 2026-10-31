@@ -28,6 +28,7 @@ class ToolFinished:
 @dataclass
 class Done:
     backend_state: Any = None
+    message_id: Any = None
 
 
 @dataclass

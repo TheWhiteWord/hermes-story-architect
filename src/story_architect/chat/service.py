@@ -70,7 +70,8 @@ class ChatService:
                 elif isinstance(ev, Done):
                     store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata)
                     store.set_backend_state(project_path, conversation_id, ev.backend_state)
-                    yield ev
+                    from .events import Done as _Done
+                    yield _Done(backend_state=ev.backend_state, message_id=msg_id)
                 elif isinstance(ev, Error):
                     store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
                     yield ev
@@ -117,7 +118,8 @@ class ChatService:
                 elif isinstance(ev, Done):
                     store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata)
                     store.set_backend_state(project_path, conversation_id, ev.backend_state)
-                    yield ev
+                    from .events import Done as _Done
+                    yield _Done(backend_state=ev.backend_state, message_id=msg_id)
                 elif isinstance(ev, Error):
                     store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
                     yield ev
