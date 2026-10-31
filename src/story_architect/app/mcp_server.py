@@ -79,6 +79,8 @@ def create_mcp_server(config: Config) -> Server:
         await _publish_bus({"type": "finished", "id": call_id, "name": name, "status": "finished", "duration_ms": dur, "result_preview": preview})
         # draft detection
         if name == "draft":
+            import pathlib as _pl
+            _pl.Path("/tmp/draft_debug.txt").write_text(repr(result)[:500])
             try:
                 obj = json.loads(result) if isinstance(result, str) else result
             except Exception:
