@@ -77,13 +77,59 @@
   const STATUS = { open: 'Awaiting approval', committed: 'Approved', discarded: 'Rejected', failed: 'Failed' };
   const blank = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
   const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-  function valueHtml(v) {
-    if (blank(v)) return '<em>not set</em>';
-    if (Array.isArray(v)) return esc(v.map((x) => (x && typeof x === 'object' ? JSON.stringify(x) : x)).join(', '));
-    if (typeof v === 'object') return esc(JSON.stringify(v));
+  // ── structured values (lists / objects / keyed objects), rendered recursively ──
+  // `node` is an optional schema hint: {type, keyed, sub_fields:{key: node}} (the entity schema's sub_fields).
+  // It only influences key order; without it the data's own order is used.
+  const isPlain = (o) => o && typeof o === 'object' && !Array.isArray(o);
+  const prettyKey = (k) => String(k).replace(/_/g, ' ');
+  const SHORT = 28;
+  function meter(v) { return '<span class="sa-meter' + (v < 0 ? ' neg' : '') + '"><i style="width:' + Math.round(Math.abs(v) * 100) + '%"></i></span> ' + esc(String(v)); }
+  function scalarHtml(v, key) {
+    if (v == null || v === '') return '<em>not set</em>';
+    if (typeof v === 'boolean') return v ? 'yes' : 'no';
+    if (typeof v === 'number') return key === 'strength' && v >= -1 && v <= 1 ? meter(v) : esc(String(v));
     return esc(v);
   }
-  function fieldRow(f) {
+  function orderKeys(obj, sub) {
+    const keys = Object.keys(obj);
+    if (!sub) return keys;
+    const first = Object.keys(sub).filter((k) => k in obj);
+    return first.concat(keys.filter((k) => first.indexOf(k) < 0));
+  }
+  function renderVal(v, depth, key, node) {
+    depth = depth || 0;
+    if (v == null || v === '' || (Array.isArray(v) && !v.length) || (isPlain(v) && !Object.keys(v).length)) return '<em>not set</em>';
+    if (depth > 5) return '<code>' + esc(JSON.stringify(v)) + '</code>';
+    const sub = node && node.sub_fields;
+    if (Array.isArray(v)) {
+      if (v.every((x) => typeof x === 'string' && x.length <= SHORT && x.indexOf('\n') < 0)) return '<div class="sa-tags">' + v.map((x) => '<span>' + esc(x) + '</span>').join('') + '</div>';
+      if (v.every((x) => x == null || typeof x !== 'object')) return '<ul class="sa-vlist">' + v.map((x) => '<li>' + scalarHtml(x, key) + '</li>').join('') + '</ul>';
+      const item = sub ? { sub_fields: sub } : null;
+      return '<div class="sa-vitems">' + v.map((x) => '<div class="sa-vitem">' + renderVal(x, depth + 1, key, item) + '</div>').join('') + '</div>';
+    }
+    if (isPlain(v)) {
+      const keyed = node && node.keyed;
+      const keys = keyed ? Object.keys(v) : orderKeys(v, sub);
+      const flat = keys.every((k) => v[k] == null || typeof v[k] !== 'object');
+      if (!keyed && flat && keys.length <= 3 && keys.every((k) => String(v[k] == null ? '' : v[k]).length <= 30)) {
+        return '<span class="sa-pairs">' + keys.map((k) => '<span class="sa-pair"><span class="k">' + esc(prettyKey(k)) + '</span> ' + scalarHtml(v[k], k) + '</span>').join('') + '</span>';
+      }
+      return '<dl class="sa-kv">' + keys.map((k) => {
+        const val = v[k], nested = val && typeof val === 'object';
+        const child = keyed ? (sub ? { sub_fields: sub } : null) : (sub ? sub[k] : null);
+        return '<div class="sa-kvrow' + (nested ? ' nested' : '') + '"><dt>' + esc(prettyKey(k)) + '</dt><dd>' + renderVal(val, depth + 1, k, child) + '</dd></div>';
+      }).join('') + '</dl>';
+    }
+    return scalarHtml(v, key);
+  }
+  const structured = (v) => v != null && typeof v === 'object';
+  function valueHtml(v) { return renderVal(v, 0); }
+  function fieldRow(f, hints) {
+    const node = hints && hints[f.field];
+    if (structured(f.after) || structured(f.before)) {
+      return '<div class="sa-frow block"><div class="sa-fk">' + esc(f.field) + '</div><div class="sa-val">' + renderVal(f.after, 0, f.field, node) +
+        (blank(f.before) ? '' : '<details class="sa-was"><summary>Previous value</summary>' + renderVal(f.before, 0, f.field, node) + '</details>') + '</div></div>';
+    }
     const val = blank(f.before)
       ? '<div class="sa-val">' + valueHtml(f.after) + '</div>'
       : '<div class="sa-val"><div class="sa-old">' + valueHtml(f.before) + '</div><div class="sa-new">' + valueHtml(f.after) + '</div></div>';
@@ -117,7 +163,7 @@
     } else if (kind === 'reorder') {
       body = orderHtml(c);
     } else {
-      body = (c.fields || []).map(fieldRow).join('') + (c.sections || []).map((x) => sectionHtml(x, kind)).join('') +
+      body = (c.fields || []).map((f) => fieldRow(f, c.schema)).join('') + (c.sections || []).map((x) => sectionHtml(x, kind)).join('') +
         ((c.unfilled || []).length ? '<div class="sa-unfilled">Not set yet: ' + c.unfilled.map(esc).join(', ') + '</div>' : '');
       if (!body) body = '<div class="sa-csum" style="padding-left:0">No field details provided.</div>';
     }
@@ -223,7 +269,7 @@
       const b = e.target.closest('[data-act=copy]');
       if (b) { try { navigator.clipboard.writeText(api.text); } catch (err) { /* ignore */ } }
     });
-    (msg.tools || []).forEach(api.upsertTool);
+    (msg.tools || []).forEach((t, i) => api.upsertTool(typeof t === 'string' ? { id: 'legacy-' + i, name: t, status: 'finished' } : t));
     (msg.drafts || []).forEach(api.upsertDraft);
     paint();
     api.setStatus(api.status, msg.error);

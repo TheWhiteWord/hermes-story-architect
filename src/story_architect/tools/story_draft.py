@@ -115,15 +115,11 @@ def _op_schemas() -> list[dict]:
 
 
 SCHEMA = {
-    "description": "Propose a batch of entity changes, show them to the user, and write them "
-                   "only when the user confirms. This is the only way to create, edit or "
-                   "reorder an entity — every write goes through a draft, so use it "
+    "description": "Propose a batch of entity changes, and write them only when the user confirms. "
+                   "This is the only way to create, edit or reorder an entity — every write goes through a draft, so use it "
                    "whenever the user is still deciding, and commit once they agree. A draft "
-                   "is inert: staging writes one row in the project's drafts table and "
-                   "nothing else. RELAY preview_md "
-                   "VERBATIM to the user; it is the whole message, and it is what they are "
-                   "approving — do not summarise it away. Report anything in `validation` "
-                   "alongside it, and fix a finding before asking for confirmation rather "
+                   "is inert: staging writes one row in the project's drafts table and nothing else."
+                   "Report anything in `validation` alongside it, and fix a finding before asking for confirmation rather "
                    "than after. Call action=\"list\" at the start of a session to find drafts "
                    "left open by a previous one. Deleting is reversible, so a delete op is a "
                    "soft delete. Projects themselves cannot be drafted — call "
@@ -149,7 +145,9 @@ SCHEMA = {
                            "such as a scene's characters ride INSIDE frontmatter, there is no "
                            "separate relations key. Staging again with the same draft_id "
                            "REPLACES the proposal, and the response says what was added, "
-                           "dropped or changed.",
+                           "dropped or changed. Re-stage with the same draft_id when " \
+                           "correcting warnings or a failed attempt, instead of " \
+                           "creating a new draft.",
             "items": _op_schemas(),
         },
         "draft_id": {

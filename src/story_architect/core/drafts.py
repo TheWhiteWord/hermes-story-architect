@@ -597,6 +597,16 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
                         for n, v in (op.get("sections") or {}).items()]
             label = _display_name(entity_type, fm.get("name") or fm.get("title")
                                   or fm.get("heading"), entity_id)
+            # optional schema hint for UI ordering of structured fields
+            schema_hint = {}
+            for f, m in schema.items():
+                if m.get("sub_fields") or m.get("keyed"):
+                    entry = {}
+                    if m.get("sub_fields"):
+                        entry["sub_fields"] = m["sub_fields"]
+                    if m.get("keyed"):
+                        entry["keyed"] = True
+                    schema_hint[f] = entry
             changes.append({
                 "kind": "create",
                 "entity_type": entity_type,
@@ -606,6 +616,7 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
                 "fields": fields,
                 "sections": sections,
                 "unfilled": unfilled,
+                "schema": schema_hint,
             })
         elif kind == "edit":
             entity_type = op["entity_type"]
@@ -627,6 +638,16 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
             # but ensure we didn't include no-ops
             fields = [f for f in fields if f["before"] != f["after"]]
             sections = [s for s in sections if s["before"] != s["after"]]
+            schema = ENTITY_SCHEMAS.get(entity_type, {})
+            schema_hint = {}
+            for f, m in schema.items():
+                if m.get("sub_fields") or m.get("keyed"):
+                    entry = {}
+                    if m.get("sub_fields"):
+                        entry["sub_fields"] = m["sub_fields"]
+                    if m.get("keyed"):
+                        entry["keyed"] = True
+                    schema_hint[f] = entry
             label = _entity_name(project_path, entity_type, entity_id) or entity_id
             changes.append({
                 "kind": "edit",
@@ -636,6 +657,7 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
                 "summary": op["summary"],
                 "fields": fields,
                 "sections": sections,
+                "schema": schema_hint,
             })
         elif kind == "delete":
             entity_type = op["entity_type"]

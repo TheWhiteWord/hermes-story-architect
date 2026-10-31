@@ -129,6 +129,26 @@
         warnings: ['Scene "mentor-hallway-night" has no characters assigned yet.'],
       };
     }
+    function structuredSnap(id) {
+      return {
+        id, status: 'open', summary: 'Add the Kael / Lio relationship and a discovery scene', created_at: iso(0),
+        changes: [
+          { kind: 'create', entity_type: 'relationship', entity_id: 'kael-lio', label: 'Kael & Lio', summary: 'Create relationship',
+            fields: [{ field: 'characters', before: null, after: ['kael', 'lio'] }, { field: 'status', before: null, after: 'active' },
+              { field: 'perspectives', before: null, after: {
+                kael: { label: 'Childhood companion', feeling: "Guilt and desperate longing he can't fully explain", type: 'ally', strength: 0.8 },
+                lio: { label: 'The one who waited', feeling: 'Fierce protective love tempered by fear of being forgotten', type: 'ally', strength: 0.9, secret: true } } }] },
+          { kind: 'create', entity_type: 'scene', entity_id: 'first-discovery', label: 'First Discovery - Night', summary: 'Create scene',
+            fields: [{ field: 'characters', before: null, after: ['kael', 'lio'] },
+              { field: 'plot_roles', before: null, after: [{ plot: 'the-resistance', role: 'setup', description: "Kael's childhood companion reappears at the moment of first discovery, reframing the door as a question about who he is." }] },
+              { field: 'value_turns', before: null, after: [{ value: 'trust', from: 'p', to: 'c', effects: [{ entity: 'kael', change: 'Stops trusting the Institute' }, { entity: 'lio', change: 'Chooses to follow' }] }] },
+              { field: 'beats', before: null, after: [{ action: { by: 'Kael', surface: 'Opens the door', subtext: 'Testing whether Lio will stop him' }, reaction: { by: 'Lio', surface: 'Says nothing', subtext: 'Afraid to be left behind' }, gap: 'Kael expects resistance and gets silence.' }] },
+              { field: 'value_focus', before: null, after: { major: [{ value: 'trust', scenes: 6 }, { value: 'hope', scenes: 2 }], minor: [{ value: 'truth', scenes: 3 }] } },
+              { field: 'knowledge', before: null, after: ['The door was never locked', 'Lio has known about the corridor for years'] }] },
+        ],
+        warnings: [],
+      };
+    }
     add('Act two pacing', 90, [
       { id: 'm1', role: 'user', text: 'Is the midpoint strong enough?', status: 'complete', created_at: iso(91) },
       { id: 'm2', role: 'assistant', status: 'complete', created_at: iso(90),
@@ -149,7 +169,7 @@
         await wait(700);
         const fin = Object.assign({ status: 'finished', result_preview: '{"success": true, "scenes": 6, "characters": 6}', duration_ms: 690 }, t);
         msg.tools.push(fin); yield Object.assign({ type: 'tool' }, fin);
-        const wantsDraft = /draft|change|rename|add|rewrite|fix/i.test(text);
+        const wantsDraft = /draft|change|rename|add|rewrite|fix|relationship|structured|beats/i.test(text);
         const body = wantsDraft
           ? 'Here is a proposal. I staged it as a draft so you can **approve or reject** it:\n\n1. Sharpen the midpoint argument\n2. Add a short mentor scene\n3. Reorder so the hallway scene comes first\n\nNothing changes until you approve.'
           : 'This project has **6 scenes** and **6 characters** across 3 acts.\n\n> The strongest thread is *The Resistance*; the Scientists\' arc is still thin.\n\nTry asking for a `draft` and I will stage some changes.';
@@ -158,7 +178,7 @@
           msg.text += w; yield { type: 'text', text: w }; await wait(18);
         }
         if (wantsDraft) {
-          const id = 'd-' + Date.now(); drafts[id] = draftSnap(id); msg.drafts.push(drafts[id]);
+          const id = 'd-' + Date.now(); drafts[id] = /relationship|structured|beats/i.test(text) ? structuredSnap(id) : draftSnap(id); msg.drafts.push(drafts[id]);
           yield { type: 'draft', draft: drafts[id] };
         }
         yield { type: 'done', message_id: msg.id };
