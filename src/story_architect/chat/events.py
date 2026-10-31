@@ -15,6 +15,7 @@ class ToolStarted:
     name: str
     id: Any = None
     label: str | None = None
+    args: Any = None
 
 
 @dataclass
@@ -23,6 +24,14 @@ class ToolFinished:
     id: Any = None
     label: str | None = None
     status: str = "finished"
+    args: Any = None
+    result_preview: str | None = None
+    duration_ms: int | None = None
+
+
+@dataclass
+class DraftEvent:
+    draft: Any = None
 
 
 @dataclass
@@ -36,5 +45,5 @@ class Error:
     message: str
 
 
-ChatEvent = TextDelta | ToolStarted | ToolFinished | Done | Error
+ChatEvent = TextDelta | ToolStarted | ToolFinished | DraftEvent | Done | Error
 """Union of all chat events yielded by a backend."""

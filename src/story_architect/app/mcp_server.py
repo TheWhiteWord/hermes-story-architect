@@ -72,11 +72,11 @@ def create_mcp_server(config: Config) -> Server:
         except Exception as e:
             log.exception("tool %s raised", name)
             dur = int((time.monotonic() - start) * 1000)
-            await _publish_bus({"type": "failed", "id": call_id, "name": name, "status": "failed", "duration_ms": dur, "result_preview": str(e)[:800]})
+            await _publish_bus({"type": "failed", "id": call_id, "name": name, "args": args, "status": "failed", "duration_ms": dur, "result_preview": str(e)[:800]})
             raise RuntimeError(f"{name}: {e}") from e
         dur = int((time.monotonic() - start) * 1000)
         preview = result[:800] if isinstance(result, str) else str(result)[:800]
-        await _publish_bus({"type": "finished", "id": call_id, "name": name, "status": "finished", "duration_ms": dur, "result_preview": preview})
+        await _publish_bus({"type": "finished", "id": call_id, "name": name, "args": args, "status": "finished", "duration_ms": dur, "result_preview": preview})
         # draft detection
         if name == "draft":
             import pathlib as _pl

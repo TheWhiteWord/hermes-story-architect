@@ -108,10 +108,19 @@ def get_conversation(project_path, cid, include_hidden=False) -> dict | None:
         for m in msgs:
             if (m[9] or 0) and not include_hidden:
                 continue
+            tools = _loads(m[6])
+            if isinstance(tools, list):
+                conv_tools = []
+                for t in tools:
+                    if isinstance(t, str):
+                        conv_tools.append({"id": t, "name": t, "status": "finished"})
+                    else:
+                        conv_tools.append(t)
+                tools = conv_tools
             messages.append({
                 "id": m[0], "role": m[1], "text": m[2], "timestamp": m[3],
                 "metadata": _loads(m[4]), "status": m[5],
-                "tools": _loads(m[6]), "drafts": _loads(m[7]),
+                "tools": tools, "drafts": _loads(m[7]),
                 "attachments": _loads(m[8]), "hidden": bool(m[9]),
                 "error": m[10],
             })

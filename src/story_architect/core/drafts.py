@@ -584,45 +584,158 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
     for op in ops:
         kind = op["op"]
         if kind == "create":
-            fields = [
-                {"field": f, "before": None, "after": v}
-                for f, v in (op.get("frontmatter") or {}).items()
-            ]
+            entity_type = op["type"]
+            entity_id = op["id"]
+            fm = op.get("frontmatter") or {}
+            schema = ENTITY_SCHEMAS.get(entity_type, {})
+            settable = [f for f, m in schema.items() if not m.get("computed")]
+            unfilled = [f for f in settable
+                        if not _is_set(fm.get(f))]
+            fields = [{"field": f, "before": None, "after": v}
+                      for f, v in fm.items()]
+            sections = [{"name": n, "before": None, "after": v}
+                        for n, v in (op.get("sections") or {}).items()]
+            label = _display_name(entity_type, fm.get("name") or fm.get("title")
+                                  or fm.get("heading"), entity_id)
             changes.append({
                 "kind": "create",
-                "entity_type": op["type"],
-                "entity_id": op["id"],
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "label": label,
                 "summary": op["summary"],
                 "fields": fields,
+                "sections": sections,
+                "unfilled": unfilled,
             })
         elif kind == "edit":
+            entity_type = op["entity_type"]
+            entity_id = op["entity_id"]
             current = _current_values(project_path, op)
             fields = []
+            sections = []
             for field, value in (op.get("data") or {}).items():
-                before, _stored = current.get(field, (None, None))
-                fields.append({"field": field, "before": before, "after": value})
+                before, stored_in = current.get(field, (None, None))
+                if stored_in in ("column", "extra"):
+                    fields.append({"field": field, "before": before, "after": value})
+                elif stored_in == "section":
+                    sections.append({"name": field, "before": before, "after": value})
+                else:
+                    # Unknown storage: default to fields, only if changed
+                    if before != value:
+                        fields.append({"field": field, "before": before, "after": value})
+            # Only keys that actually change: current_values already filters;
+            # but ensure we didn't include no-ops
+            fields = [f for f in fields if f["before"] != f["after"]]
+            sections = [s for s in sections if s["before"] != s["after"]]
+            label = _entity_name(project_path, entity_type, entity_id) or entity_id
             changes.append({
                 "kind": "edit",
-                "entity_type": op["entity_type"],
-                "entity_id": op["entity_id"],
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "label": label,
                 "summary": op["summary"],
                 "fields": fields,
+                "sections": sections,
             })
         elif kind == "delete":
+            entity_type = op["entity_type"]
+            entity_id = op["entity_id"]
+            name, detail = _entity_name_and_detail(project_path, entity_type, entity_id)
             changes.append({
                 "kind": "delete",
-                "entity_type": op["entity_type"],
-                "entity_id": op["entity_id"],
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "label": name or entity_id,
                 "summary": op["summary"],
+                "detail": detail,
+                "reversible": True,
             })
         elif kind == "reorder":
+            entity_type = op["entity_type"]
+            ordered_ids = op.get("ordered_ids") or []
+            # current positions by order_key
+            pos_map, name_map = _reorder_current(project_path, entity_type)
+            order = []
+            for i, eid in enumerate(ordered_ids, 1):
+                order.append({
+                    "id": eid,
+                    "label": name_map.get(eid, eid),
+                    "from": pos_map.get(eid),
+                    "to": i,
+                })
             changes.append({
                 "kind": "reorder",
-                "entity_type": op["entity_type"],
+                "entity_type": entity_type,
+                "entity_id": None,
+                "label": entity_type,
                 "summary": op["summary"],
-                "count": len(op.get("ordered_ids") or []),
+                "count": len(ordered_ids),
+                "order": order,
             })
     return changes
+
+
+def _display_name(entity_type, name, fallback):
+    return name if name else fallback
+
+
+def _entity_name(project_path, entity_type, slug):
+    try:
+        from .db import get_db
+        conn = get_db(project_path)
+        try:
+            row = conn.execute(
+                "SELECT name FROM entities WHERE type=? AND id=? AND is_deleted=0",
+                (entity_type, slug)).fetchone()
+            if row and row[0]:
+                return row[0]
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return None
+
+
+def _entity_name_and_detail(project_path, entity_type, slug):
+    try:
+        from .db import get_db
+        conn = get_db(project_path)
+        try:
+            row = conn.execute(
+                "SELECT name, one_sentence FROM entities WHERE type=? AND id=? AND is_deleted=0",
+                (entity_type, slug)).fetchone()
+            if row:
+                return row[0], (row[1] if row and len(row) > 1 else None)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return None, None
+
+
+def _reorder_current(project_path, entity_type):
+    pos_map = {}
+    name_map = {}
+    try:
+        from .db import get_db
+        conn = get_db(project_path)
+        try:
+            rows = conn.execute(
+                "SELECT id, name, one_sentence, order_key FROM entities "
+                "WHERE type=? AND is_deleted=0 ORDER BY order_key",
+                (entity_type,)).fetchall()
+            for i, r in enumerate(rows, 1):
+                pos_map[r[0]] = r[3] if r[3] else i
+                # use order_key as position? contract: from = current 1-based position by order_key
+                name_map[r[0]] = r[1] if r[1] else r[0]
+        finally:
+            conn.close()
+        # recompute positions by sorted order_key
+        sorted_rows = sorted(rows, key=lambda r: (r[3] if r[3] is not None else 0))
+        pos_map = {r[0]: i for i, r in enumerate(sorted_rows, 1)}
+    except Exception:
+        pass
+    return pos_map, name_map
 
 
 # ─── preview renderer ───

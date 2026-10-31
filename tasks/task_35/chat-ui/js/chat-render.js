@@ -69,30 +69,71 @@
   }
 
   // ───────── draft cards ─────────
+  // A change is: {kind, entity_type, entity_id?, label?, summary?, detail?,
+  //   fields?:[{field,before,after}], sections?:[{name,before,after}], unfilled?:[name],
+  //   order?:[{id,label,from,to}], count?, reversible?}. Everything is optional except kind;
+  // whatever the backend provides is shown, nothing is assumed per entity type.
   const KIND = { create: 'CREATE', edit: 'EDIT', delete: 'DELETE', reorder: 'REORDER' };
   const STATUS = { open: 'Awaiting approval', committed: 'Approved', discarded: 'Rejected', failed: 'Failed' };
-  function fmtVal(v) {
-    if (v == null || v === '') return '<em>not set</em>';
-    if (Array.isArray(v)) return esc(v.map((x) => (typeof x === 'object' ? JSON.stringify(x) : x)).join(', '));
+  const blank = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
+  const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  function valueHtml(v) {
+    if (blank(v)) return '<em>not set</em>';
+    if (Array.isArray(v)) return esc(v.map((x) => (x && typeof x === 'object' ? JSON.stringify(x) : x)).join(', '));
     if (typeof v === 'object') return esc(JSON.stringify(v));
     return esc(v);
   }
-  function fieldHtml(f) {
-    const long = (v) => typeof v === 'string' && (v.length > 90 || v.indexOf('\n') >= 0);
-    if (long(f.before) || long(f.after)) {
-      return '<div class="sa-field"><details><summary><span class="sa-fname">' + esc(f.field) + '</span> (show change)</summary><div class="sa-diff"><div class="b">' + fmtVal(f.before) + '</div><div>' + fmtVal(f.after) + '</div></div></details></div>';
-    }
-    return '<div class="sa-field"><span class="sa-fname">' + esc(f.field) + '</span>' +
-      (f.before == null || f.before === '' ? '' : '<del>' + fmtVal(f.before) + '</del> → ') + '<ins>' + fmtVal(f.after) + '</ins></div>';
+  function fieldRow(f) {
+    const val = blank(f.before)
+      ? '<div class="sa-val">' + valueHtml(f.after) + '</div>'
+      : '<div class="sa-val"><div class="sa-old">' + valueHtml(f.before) + '</div><div class="sa-new">' + valueHtml(f.after) + '</div></div>';
+    return '<div class="sa-frow"><div class="sa-fk">' + esc(f.field) + '</div>' + val + '</div>';
   }
-  function changeHtml(c) {
+  function sectionHtml(sec, kind) {
+    const edit = kind === 'edit', fresh = blank(sec.before);
+    return '<div class="sa-sec"><div class="sa-sec-h">' + esc(sec.name) +
+      (edit ? '<span class="sa-tag">' + (fresh ? 'new' : 'changed') + '</span>' : '') + '</div>' +
+      '<div class="sa-sec-b">' + (blank(sec.after) ? '<em>empty</em>' : esc(sec.after)) + '</div>' +
+      (edit && !fresh ? '<details class="sa-was"><summary>Previous text</summary><div class="sa-sec-b">' + esc(sec.before) + '</div></details>' : '') + '</div>';
+  }
+  function orderHtml(c) {
+    const o = c.order || [];
+    if (!o.length) return c.count ? '<div class="sa-csum" style="padding-left:0">' + plural(c.count, 'item') + ' in the new order</div>' : '';
+    return '<ol class="sa-order">' + o.map((it) => {
+      const d = it.from != null && it.to != null ? it.from - it.to : 0;
+      return '<li class="' + (d ? 'moved' : '') + '"><span class="sa-pos">' + esc(it.to != null ? it.to : '') + '</span><span class="sa-olabel">' + esc(it.label || it.id) + '</span>' +
+        (d > 0 ? '<span class="sa-mv up">↑' + d + '</span>' : d < 0 ? '<span class="sa-mv dn">↓' + -d + '</span>' : '') + '</li>';
+    }).join('') + '</ol>';
+  }
+  function changeHtml(c, open) {
     const kind = c.kind || 'edit';
-    const target = c.label || [c.entity_type, c.entity_id].filter(Boolean).join(' / ');
-    return '<div class="sa-change"><div class="sa-change-top"><span class="sa-kind k-' + esc(kind) + '">' + (KIND[kind] || esc(kind).toUpperCase()) + '</span>' +
-      '<span class="sa-target">' + esc(target) + '</span></div>' +
-      (c.summary ? '<div class="sa-csum">' + esc(c.summary) + '</div>' : '') +
-      (kind === 'reorder' && c.count ? '<div class="sa-csum">' + c.count + ' items</div>' : '') +
-      (c.fields || []).map(fieldHtml).join('') + '</div>';
+    const name = c.label || c.entity_id || '';
+    const nF = (c.fields || []).length, nS = (c.sections || []).length;
+    const counts = kind === 'reorder' ? (c.count ? plural(c.count, 'item') : '') : [nF ? plural(nF, 'field') : '', nS ? plural(nS, 'section') : ''].filter(Boolean).join(' · ');
+    let body;
+    if (kind === 'delete') {
+      body = '<div class="sa-del">Will be removed: <b>' + esc(name || c.entity_type) + '</b>' + (c.detail ? ' — ' + esc(c.detail) : '') +
+        '<div class="sa-csum" style="padding-left:0">' + (c.reversible === false ? 'This cannot be undone.' : 'Soft delete — it can be restored later.') + '</div></div>';
+    } else if (kind === 'reorder') {
+      body = orderHtml(c);
+    } else {
+      body = (c.fields || []).map(fieldRow).join('') + (c.sections || []).map((x) => sectionHtml(x, kind)).join('') +
+        ((c.unfilled || []).length ? '<div class="sa-unfilled">Not set yet: ' + c.unfilled.map(esc).join(', ') + '</div>' : '');
+      if (!body) body = '<div class="sa-csum" style="padding-left:0">No field details provided.</div>';
+    }
+    return '<details class="sa-change"' + (open ? ' open' : '') + '><summary><div class="sa-change-top">' +
+      '<span class="sa-chev">' + icon('chev', 11) + '</span><span class="sa-kind k-' + esc(kind) + '">' + (KIND[kind] || esc(kind).toUpperCase()) + '</span>' +
+      (c.entity_type ? '<span class="sa-etype">' + esc(c.entity_type) + '</span>' : '') +
+      (name ? '<span class="sa-target">' + esc(name) + '</span>' : '') +
+      (c.label && c.entity_id && c.label !== c.entity_id ? '<span class="sa-tid">' + esc(c.entity_id) + '</span>' : '') +
+      (counts ? '<span class="sa-ccount">' + esc(counts) + '</span>' : '') + '</div>' +
+      (c.summary ? '<div class="sa-csum">' + esc(c.summary) + '</div>' : '') + '</summary><div class="sa-cbody">' + body + '</div></details>';
+  }
+  function changesHtml(list) {
+    if (!list.length) return '<div class="sa-cbody sa-csum">No changes listed.</div>';
+    const items = list.reduce((n, c) => n + (c.fields || []).length + (c.sections || []).length + (c.order ? 1 : 0), 0);
+    const all = list.length === 1 || items <= 12;
+    return list.map((c, i) => changeHtml(c, all || i === 0)).join('');
   }
 
   // hooks: { approve(draft)->Promise<draft>, reject(draft)->Promise<draft>, fix(draft) }
@@ -114,7 +155,7 @@
       root.dataset.id = x.id;
       root.innerHTML = '<div class="sa-draft-head">' + icon('draft', 15) + '<div class="sa-draft-title"><div class="sa-draft-kicker">Proposed changes</div><div class="sa-draft-sum">' + esc(x.summary || x.id) +
         '</div></div><span class="sa-pill ' + st + '">' + (STATUS[st] || esc(st)) + '</span></div>' +
-        '<div class="sa-draft-changes">' + ((x.changes || []).map(changeHtml).join('') || '<div class="sa-change sa-csum">No changes listed.</div>') + '</div>' +
+        '<div class="sa-draft-changes">' + changesHtml(x.changes || []) + '</div>' +
         ((x.warnings || []).length ? '<div class="sa-draft-warn">' + x.warnings.map(esc).join('<br>') + '</div>' : '') + foot(x);
     }
     root.addEventListener('click', async (e) => {
@@ -157,9 +198,10 @@
     api.flush = () => { if (raf) cancelAnimationFrame(raf); paint(); };
     api.setWaiting = (b) => root.classList.toggle('sa-wait', !!b && !api.text && !api.tools.length);
     api.upsertTool = (t) => {
+      if (/^mcp_+story_+/.test(t.name || '')) return; // Hermes' echo of a story tool; the app's own event carries the details
       api.setWaiting(false);
       const i = api.tools.findIndex((x) => x.id === t.id);
-      if (i >= 0) api.tools[i] = Object.assign({}, api.tools[i], t); else api.tools.push(t);
+      if (i >= 0) { const m = Object.assign({}, api.tools[i]); for (const k in t) if (t[k] !== null && t[k] !== undefined) m[k] = t[k]; api.tools[i] = m; } else api.tools.push(t);
       const cur = api.tools.find((x) => x.id === t.id);
       if (toolEls[t.id]) paintTool(toolEls[t.id], cur); else { toolEls[t.id] = createTool(cur); toolsEl.appendChild(toolEls[t.id]); }
     };

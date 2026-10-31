@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, AsyncIterator
 
 try:
@@ -10,7 +11,7 @@ except ModuleNotFoundError:
     import httpx2 as httpx
 
 from story_architect.chat.backend import ChatBackend  # noqa: F401
-from story_architect.chat.events import Done, Error, TextDelta, ToolFinished, ToolStarted
+from story_architect.chat.events import Done, DraftEvent, Error, TextDelta, ToolFinished, ToolStarted
 
 
 class HermesChatBackend:
@@ -88,23 +89,26 @@ class HermesChatBackend:
                                 tname = tp.get("tool") or tp.get("name")
                                 if tname:
                                     yield ToolStarted(name=tname)
-                        # top-level hermes events
                         if isinstance(obj, dict):
                             evt = obj.get("event") or obj.get("type")
+                            # draft event
+                            if evt == "draft" or current_event == "draft":
+                                d = obj.get("draft") if isinstance(obj.get("draft"), dict) else (obj.get("data") if isinstance(obj.get("data"), dict) else obj)
+                                yield DraftEvent(draft=d)
                             is_tool_progress = evt == "hermes.tool.progress" or current_event == "hermes.tool.progress"
                             if is_tool_progress:
                                 d = obj.get("data") if isinstance(obj.get("data"), dict) else obj
                                 tname = d.get("tool") or d.get("name")
                                 status = d.get("status")
-                                if tname and not str(tname).startswith("mcp_story_"):
+                                if tname and not re.match(r"^mcp_+story_+", str(tname)):
                                     tid = d.get("toolCallId") or d.get("id")
                                     label = d.get("label")
                                     if status in ("completed", "finished", "done"):
-                                        yield ToolFinished(name=tname, id=tid, label=label)
+                                        yield ToolFinished(name=tname, id=tid, label=label, args=d.get("args"), result_preview=d.get("result_preview"), duration_ms=d.get("duration_ms"))
                                     elif status in ("failed", "error"):
-                                        yield ToolFinished(name=tname, id=tid, label=label, status="failed")
+                                        yield ToolFinished(name=tname, id=tid, label=label, status="failed", args=d.get("args"), result_preview=d.get("result_preview"), duration_ms=d.get("duration_ms"))
                                     else:
-                                        yield ToolStarted(name=tname, id=tid, label=label)
+                                        yield ToolStarted(name=tname, id=tid, label=label, args=d.get("args"))
                             # sometimes tool name at obj["tool"]
                             if "tool" in obj and isinstance(obj["tool"], str) and evt and "tool" in str(evt):
                                 yield ToolStarted(name=obj["tool"])

@@ -8,7 +8,7 @@ from typing import Any, AsyncIterator
 from . import store
 from .backend import ChatBackend
 from .context import build_bootstrap
-from .events import Done, Error, TextDelta, ToolFinished, ToolStarted
+from .events import Done, DraftEvent, Error, TextDelta, ToolFinished, ToolStarted
 
 
 class ChatService:
@@ -52,37 +52,57 @@ class ChatService:
 
         # assistant accumulator
         assistant_text = ""
-        metadata = {"tools": []}
+        tools_by_id = {}
+        drafts_by_id = {}
+        metadata = {}
         msg_id = store.add_message(project_path, conversation_id, "assistant", "", metadata=metadata, status="streaming")
         cancelled = False
         try:
             async for ev in self.backend.send(messages, instructions, backend_state):
                 if isinstance(ev, TextDelta):
                     assistant_text += ev.text
-                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 elif isinstance(ev, ToolStarted):
-                    metadata["tools"].append(ev.name)
-                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)
+                    tid = ev.id if ev.id is not None else ev.name
+                    entry = tools_by_id.get(tid, {})
+                    entry.update({k: v for k, v in {"id": tid, "name": ev.name, "label": ev.label, "args": ev.args, "status": "started"}.items() if v is not None})
+                    tools_by_id[tid] = entry
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 elif isinstance(ev, ToolFinished):
+                    tid = ev.id if ev.id is not None else ev.name
+                    entry = tools_by_id.get(tid, {"id": tid, "name": ev.name})
+                    for k, v in {"name": ev.name, "label": ev.label, "args": ev.args, "result_preview": ev.result_preview, "duration_ms": ev.duration_ms, "status": ev.status}.items():
+                        if v is not None:
+                            entry[k] = v
+                    tools_by_id[tid] = entry
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
+                    yield ev
+                elif isinstance(ev, DraftEvent):
+                    d = ev.draft or {}
+                    did = d.get("id") if isinstance(d, dict) else None
+                    if did is None:
+                        did = len(drafts_by_id)
+                    drafts_by_id[did] = d
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 elif isinstance(ev, Done):
-                    store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata)
+                    store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     store.set_backend_state(project_path, conversation_id, ev.backend_state)
                     from .events import Done as _Done
                     yield _Done(backend_state=ev.backend_state, message_id=msg_id)
                 elif isinstance(ev, Error):
-                    store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
+                    store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 else:
                     yield ev
         except asyncio.CancelledError:
             cancelled = True
-            store.update_message(project_path, msg_id, assistant_text, status="cancelled", metadata=metadata)
+            store.update_message(project_path, msg_id, assistant_text, status="cancelled", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
             raise
         except Exception as e:
-            store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
+            store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
             yield Error(message=str(e))
     async def retry(
         self,
@@ -101,33 +121,53 @@ class ChatService:
         name = _project_name(Path(project_path))
         instructions = build_bootstrap(slug, name, (context or {}).get("attachments") or [])
         assistant_text = ""
-        metadata = {"tools": []}
+        tools_by_id = {}
+        drafts_by_id = {}
+        metadata = {}
         msg_id = store.add_message(project_path, conversation_id, "assistant", "", metadata=metadata, status="streaming")
         try:
             async for ev in self.backend.send(messages, instructions, backend_state):
                 if isinstance(ev, TextDelta):
                     assistant_text += ev.text
-                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 elif isinstance(ev, ToolStarted):
-                    metadata["tools"].append(ev.name)
-                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata)
+                    tid = ev.id if ev.id is not None else ev.name
+                    entry = tools_by_id.get(tid, {})
+                    entry.update({k: v for k, v in {"id": tid, "name": ev.name, "label": ev.label, "args": ev.args, "status": "started"}.items() if v is not None})
+                    tools_by_id[tid] = entry
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 elif isinstance(ev, ToolFinished):
+                    tid = ev.id if ev.id is not None else ev.name
+                    entry = tools_by_id.get(tid, {"id": tid, "name": ev.name})
+                    for k, v in {"name": ev.name, "label": ev.label, "args": ev.args, "result_preview": ev.result_preview, "duration_ms": ev.duration_ms, "status": ev.status}.items():
+                        if v is not None:
+                            entry[k] = v
+                    tools_by_id[tid] = entry
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
+                    yield ev
+                elif isinstance(ev, DraftEvent):
+                    d = ev.draft or {}
+                    did = d.get("id") if isinstance(d, dict) else None
+                    if did is None:
+                        did = len(drafts_by_id)
+                    drafts_by_id[did] = d
+                    store.update_message(project_path, msg_id, assistant_text, status="streaming", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 elif isinstance(ev, Done):
-                    store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata)
+                    store.update_message(project_path, msg_id, assistant_text, status="complete", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     store.set_backend_state(project_path, conversation_id, ev.backend_state)
                     from .events import Done as _Done
                     yield _Done(backend_state=ev.backend_state, message_id=msg_id)
                 elif isinstance(ev, Error):
-                    store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
+                    store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
                     yield ev
                 else:
                     yield ev
         except asyncio.CancelledError:
-            store.update_message(project_path, msg_id, assistant_text, status="cancelled", metadata=metadata)
+            store.update_message(project_path, msg_id, assistant_text, status="cancelled", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
             raise
         except Exception as e:
-            store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata)
+            store.update_message(project_path, msg_id, assistant_text, status="error", metadata=metadata, tools=list(tools_by_id.values()), drafts=list(drafts_by_id.values()), update_tools=True, update_drafts=True)
             yield Error(message=str(e))

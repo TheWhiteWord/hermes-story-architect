@@ -27,8 +27,10 @@ events. Need dedup by tool call id.
 
 ## 3. Draft card mismatch with mockup
 
-The draft card rendered in-app differs from the mockup demo. THey appear to be agent self made reports, and are identical to the ones in hermas desktop.
+The draft card rendered in-app differs from the mockup demo. They appear to be agent self made reports, and are identical to the ones in hermas desktop.
 Likely a rendering/CSS issue in chat-render.js / chat-app.js, not event handling.
+
+Resolved: backend now emits `event: draft` with a snapshot (mcp_server draft detection + route forwarding). Works in new conversations; old conversations keep stale state until new chat.
 
 ## 4. 422 on /api/projects/demo/events
 

@@ -106,13 +106,25 @@
     }
     function draftSnap(id) {
       return {
-        id, status: 'open', summary: 'Tighten the Act 2 midpoint and add a mentor scene', created_at: iso(0),
+        id, status: 'open', summary: 'Add Lio, tighten the midpoint, drop a scene and reorder', created_at: iso(0),
         changes: [
-          { kind: 'edit', entity_type: 'scene', entity_id: 'central-room-night', summary: 'Sharpen the stakes of the argument',
+          { kind: 'create', entity_type: 'character', entity_id: 'lio', label: 'Lio', summary: 'Create character Lio',
+            fields: [{ field: 'name', before: null, after: 'Lio' }, { field: 'story_role', before: null, after: 'Supporting' },
+                     { field: 'one_sentence', before: null, after: "Kael's childhood companion, the one person whose trust Kael is afraid of losing." },
+                     { field: 'goals_short', before: null, after: 'Stay close to Kael; keep things simple.' }],
+            sections: [{ name: 'Identity', before: null, after: 'A child of the Institute, a few years younger than Kael. Quiet, watchful, physically small.' },
+                       { name: 'Arc', before: null, after: "From follower to someone who must decide for himself whether Kael's doubt is worth following." },
+                       { name: 'Voice', before: null, after: 'Short sentences, concrete words, questions instead of statements.' }],
+            unfilled: ['relationships', 'knowledge'] },
+          { kind: 'edit', entity_type: 'scene', entity_id: 'central-room-night', label: 'Central Room - Night', summary: 'Sharpen the stakes of the argument',
             fields: [{ field: 'scene_objective', before: 'Decide whether to wake the children', after: 'Force Voss to choose between the mission and the children' },
-                     { field: 'turning_point', before: null, after: 'Marcus reveals the reactor is failing' }] },
-          { kind: 'create', entity_type: 'scene', entity_id: 'mentor-hallway-night', label: 'Mentor Hallway - Night', summary: 'New quiet scene where the Outsider advises Kael' },
-          { kind: 'reorder', entity_type: 'scene', count: 6, summary: 'Move the hallway scene before the Core confrontation' },
+                     { field: 'turning_point', before: null, after: 'Marcus reveals the reactor is failing' }],
+            sections: [{ name: 'Conflict', before: 'Voss and Marcus argue.', after: 'Voss wants to wait; Marcus has seen the reactor readings and refuses to.' },
+                       { name: 'Notes', before: null, after: 'Keep the reactor hum under the dialogue.' }] },
+          { kind: 'delete', entity_type: 'scene', entity_id: 'old-corridor', label: 'Old Corridor - Day', detail: 'Cut scene, no longer connected to any plot', reversible: true, summary: 'Remove the unused corridor scene' },
+          { kind: 'reorder', entity_type: 'scene', count: 5, summary: 'Move the hallway scene before the Core confrontation',
+            order: [{ id: 'a', label: '1. Central Room - Day', from: 1, to: 1 }, { id: 'c', label: '2. Mentor Hallway - Night', from: 4, to: 2 },
+                    { id: 'b', label: '3. Central Room - Night', from: 2, to: 3 }, { id: 'd', label: '4. The Core - Night', from: 3, to: 4 }, { id: 'e', label: '5. The Core - Day', from: 5, to: 5 }] },
         ],
         warnings: ['Scene "mentor-hallway-night" has no characters assigned yet.'],
       };
