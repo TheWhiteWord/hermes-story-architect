@@ -50,25 +50,17 @@ def start_gateway(config: Config, profile: str = PROFILE, timeout: float = 15.0)
     st = agent_state(config, profile)
     if st["state"] == "ready":
         return {"ok": True, "started_by_app": False, **st}
-    # fallback: try spawning a standalone gateway
-    import os
-    import subprocess
-    exe = W.find_hermes()
-    if not exe:
-        return {"ok": False, "started_by_app": True, "detail": "hermes not found"}
-    env = dict(os.environ)
-    env["HERMES_HOME"] = str(W.hermes_home())
-    try:
-        subprocess.Popen([exe, "-p", profile, "gateway", "run"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        return {"ok": False, "started_by_app": True, "detail": str(e)}
+    # under the host multiplexer the profile is already served (or will be
+    # after the host's periodic rescan). Never spawn a standalone gateway run:
+    # that parks the profile and breaks the host multiplexer.
     deadline = time.time() + timeout
     while time.time() < deadline:
         st = agent_state(config, profile)
         if st["state"] == "ready":
-            return {"ok": True, "started_by_app": True, **st}
+            return {"ok": True, "started_by_app": False, **st}
         time.sleep(0.5)
-    return {"ok": False, "started_by_app": True, "detail": "timeout"}
+    st = agent_state(config, profile)
+    return {"ok": False, "started_by_app": False, "detail": st.get("detail", "timeout")}
 
 
 def agent_settings(config: Config, profile: str = PROFILE) -> dict[str, Any]:
@@ -85,5 +77,7 @@ def agent_settings(config: Config, profile: str = PROFILE) -> dict[str, Any]:
 
 
 def stop_gateway(config: Config, profile: str = PROFILE) -> dict[str, Any]:
-    rc, out, err = W.run_hermes("-p", profile, "gateway", "stop")
-    return {"ok": rc == 0, "detail": (err or out).strip()}
+    # do not call `gateway stop`: it creates a gateway.parked marker that makes
+    # the host multiplexer skip the profile. Just report current state.
+    st = agent_state(config, profile)
+    return {"ok": True, "detail": st.get("detail", "ok")}
