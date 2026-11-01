@@ -110,4 +110,4 @@ DASH.buildScriptView = function() {
   DASH._scriptBuilt = true;
 };
 
-DASH.boot();
+
