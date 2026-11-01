@@ -53,6 +53,17 @@ def make_router(config, app):
         except ValueError as e:  # refused by core.writes
             return _err(422, "invalid", str(e))
 
+    @router.post("/api/projects/{slug}/scenes/{scene_id}/script/check")
+    def check_script(slug: str, scene_id: str, body: dict):
+        """Findings/cast/stats for an unsaved draft. Writes nothing."""
+        from story_architect.core import manual_edits as me
+        try:
+            return me.check_scene_script(_project(slug), scene_id, body)
+        except me.ScriptNotFound as e:
+            return _err(404, "not_found", str(e))
+        except ValueError as e:
+            return _err(422, "invalid", str(e))
+
     @router.post("/api/projects/{slug}/script/parse")
     def parse_text(slug: str, body: dict):
         """Pasted Fountain -> blocks. Pure; used when text is pasted into the editor."""

@@ -124,23 +124,21 @@ def _adhoc_elsewhere(conn, characters: list[dict], skip: str) -> list[dict]:
             for k, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
 
 
-def load_scene_script(project_path: Path, scene_id: str) -> dict:
-    """Everything the editor needs to open one scene."""
-    conn = get_db(project_path)
-    try:
-        st = _scene_state(conn, scene_id)
-        characters, locations = _registry(conn)
-        adhoc = _adhoc_elsewhere(conn, characters, scene_id)
-    finally:
-        conn.close()
-
+def _view(st: dict, characters: list[dict], locations: dict, *, content: str,
+          lossless: bool = True) -> dict:
+    """Everything derived from one scene state. Shared by `load_scene_script`
+    (the stored state) and `check_scene_script` (an unsaved draft), so a warning
+    means the same thing before and after a save."""
     extra = st["extra"]
-    heading_line, body = ss.split_heading(st["raw_content"])
+    heading_line, body = ss.split_heading(content)
     blocks = ss.parse_blocks(body)
-    lossless = (ss.is_lossless(st["raw_content"], heading_line, blocks)
-                if st["raw_content"].strip() and not ss.is_placeholder(st["raw_content"])
-                else True)
+    return _view_from_blocks(st, characters, locations, heading_line=heading_line,
+                             blocks=blocks, content=content, lossless=lossless)
 
+
+def _view_from_blocks(st, characters, locations, *, heading_line, blocks, content,
+                      lossless=True) -> dict:
+    extra = st["extra"]
     # The heading line in Content is what the script shows, so it wins. With no
     # script yet, the scene's own fields are all there is.
     heading = ss.parse_heading(heading_line if heading_line is not None
@@ -161,6 +159,13 @@ def load_scene_script(project_path: Path, scene_id: str) -> dict:
          "cues": next((c["cues"] for c in cast if c["id"] == cid), 0)}
         for cid in dict.fromkeys(list(st["characters"]) + sorted(in_script))
         if cid in by_id]
+    # Per character block: what it resolved to. The editor underlines the ones
+    # that resolved to nothing without re-implementing the matching rules.
+    cues = []
+    for i, b in enumerate(blocks):
+        if b.get("type") == "character" and b.get("text", "").strip():
+            r = ss.resolve_cue(ss.cue_key(b["text"]), characters)
+            cues.append({"block": i, "id": r["id"], "candidates": r["candidates"]})
 
     scene = {
         "id": st["id"], "title": st["title"], "status": st["status"],
@@ -175,27 +180,90 @@ def load_scene_script(project_path: Path, scene_id: str) -> dict:
         "characters": st["characters"] or [],
         "plot_roles": [1] * st["plot_role_count"],
     }, st["row"])
-
     return {
-        "scene": scene,
-        "locked": st["status"] == "locked" or not lossless,
-        "locked_reason": ("status" if st["status"] == "locked"
-                          else "not_roundtrippable" if not lossless else None),
-        "hash": content_hash(st),
-        "heading": heading,
-        "blocks": blocks,
-        "content": st["raw_content"] if not ss.is_placeholder(st["raw_content"]) else "",
-        "location": loc,
+        "scene": scene, "heading": heading, "blocks": blocks, "location": loc,
         "cast": registered_cast,
         "adhoc": [c for c in cast if not c["registered"]],
-        "adhoc_elsewhere": adhoc,
-        "registry": {"characters": characters, "locations": list(locations.values())},
+        "cues": cues,
         "findings": ss.findings(
             scene=scene, heading=heading, heading_line=heading_line, blocks=blocks,
             cast=cast, location=loc, has_plot_roles=st["plot_role_count"] > 0,
             unfilled=unfilled, lossless=lossless),
-        "stats": ss.script_stats(st["raw_content"], cast),
+        "stats": ss.script_stats(content, cast),
     }
+
+
+def load_scene_script(project_path: Path, scene_id: str) -> dict:
+    """Everything the editor needs to open one scene."""
+    conn = get_db(project_path)
+    try:
+        st = _scene_state(conn, scene_id)
+        characters, locations = _registry(conn)
+        adhoc = _adhoc_elsewhere(conn, characters, scene_id)
+    finally:
+        conn.close()
+
+    raw = st["raw_content"]
+    placeholder = ss.is_placeholder(raw)
+    heading_line, _ = ss.split_heading(raw)
+    blocks = ss.parse_blocks(ss.split_heading(raw)[1])
+    lossless = (ss.is_lossless(raw, heading_line, blocks)
+                if raw.strip() and not placeholder else True)
+    view = _view(st, characters, locations, content="" if placeholder else raw,
+                 lossless=lossless)
+    return {
+        **view,
+        "locked": st["status"] == "locked" or not lossless,
+        "locked_reason": ("status" if st["status"] == "locked"
+                          else "not_roundtrippable" if not lossless else None),
+        "hash": content_hash(st),
+        "content": "" if placeholder else raw,
+        "adhoc_elsewhere": adhoc,
+        "registry": {"characters": characters, "locations": list(locations.values())},
+    }
+
+
+def check_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
+    """What the findings, cast and stats WOULD be for an unsaved draft.
+
+    Writes nothing. The editor calls this (debounced) while a person types so
+    the warnings come from the one set of rules the server applies on save,
+    instead of a second copy in JavaScript that would drift.
+    """
+    if not isinstance(payload, dict):
+        raise ScriptError("Request body must be an object.")
+    blocks = _validate_blocks(payload.get("blocks"))
+    hd = payload.get("heading") or {}
+    conn = get_db(project_path)
+    try:
+        st = _scene_state(conn, scene_id)
+        characters, locations = _registry(conn)
+    finally:
+        conn.close()
+
+    slug = hd.get("location") or ""
+    slug = slug if slug in locations else ""
+    tod = hd.get("time_of_day") or ""
+    extra_cast = [c for c in (payload.get("extra_cast") or [])
+                  if any(c == x["id"] for x in characters)]
+    if hd.get("mode") == "custom":
+        heading_line = (hd.get("text") or "").strip() or None
+    else:
+        name = locations[slug]["name"] if slug else (hd.get("location_text") or "").strip()
+        try:
+            heading_line = ss.compose_heading(hd.get("int_ext") or "INT.", name,
+                                              tod if tod in SCENE_TIMES_OF_DAY else "")
+        except ValueError:
+            heading_line = None
+
+    draft = {**st, "location": slug,
+             "extra": {**st["extra"], "time_of_day": tod},
+             "characters": extra_cast}
+    content = ss.compose_content(heading_line, blocks)
+    view = _view_from_blocks(draft, characters, locations, heading_line=heading_line,
+                             blocks=blocks, content=content)
+    return {k: view[k] for k in ("heading", "location", "cast", "adhoc", "cues",
+                                 "findings", "stats")}
 
 
 # ─── Writing ─────────────────────────────────────────────────────────────────

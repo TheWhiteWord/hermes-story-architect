@@ -17,7 +17,7 @@ document.addEventListener('click', function(e){
 });
 DASH.boot = async function() {
   try {
-    const m = (location.hash || '').match(/^#\/p\/(.+)$/);
+    const m = (location.hash || '').match(/^#\/p\/([^/?]+)/);
     if (!m) {
       await DASH.showPicker();
       return;
@@ -32,6 +32,7 @@ DASH.boot = async function() {
     document.getElementById('loading-screen').style.display = 'none';
     DASH.initStory(data.story_data);
     DASH.watchUpdates(slug);
+    if (DASH.routeEditor) DASH.routeEditor();   // a reload on #/p/<slug>/scene/<id>/edit reopens the editor
   } catch (e) {
     DASH.showError();
   }

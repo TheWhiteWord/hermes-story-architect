@@ -8,7 +8,7 @@ from story_architect.core.constants import ENTITY_SCHEMAS, UNFILLED
 CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css",
              "graph.css", "value-graph.css",
              "panel-tabs.css", "scene-beats.css", "character-journey.css",
-             "chat.css"]
+             "script-editor.css", "chat.css"]
 # Load-bearing order. `panel-tabs.js` wraps `openPanel`/`closePanel` and the
 # `show*Panel` functions, so it must come after everything it wraps; the two tab
 # modules call `D.panelTabs.register` at load time, so they come after it; and
@@ -26,6 +26,9 @@ JS_ORDER = [
     "graph/track-data.js",
     "panels/scene-beats-tab.js", "panels/character-journey-tab.js",
     "statistics/statistics.js", "statistics/charts.js",
+    # The editor reads DASH.roleColor / escapeHtml and wraps showUpdateIndicator,
+    # so it follows the helpers and navigation; script-view.js opens it.
+    "script-editor/model.js", "script-editor/editor.js",
     "script-view.js",
     "chat-api.js", "chat-md.js", "chat-render.js", "chat-app.js",
 ]

@@ -422,14 +422,17 @@ DASH.showScenePanel = function(sceneId) {
 
   // Content from __SECTIONS__.scenes[slug]["Content"]. A placeholder marker is
   // not content — it is the same marker the section renderer drops.
-  let contentHtml = '';
+  // The script itself is read and written in the script editor; the panel
+  // shows a card that opens it (stats and format status are filled in lazily).
   const sections = window.__SECTIONS__;
   const sceneContent = sections?.scene?.[sceneId]?.Content;
-  if (sceneContent && !DASH.isPlaceholderSection(sceneContent)) {
-    contentHtml = `<div class="fountain-content">${DASH.escapeHtml(sceneContent)}</div>`;
-  } else {
-    contentHtml = '<div class="panel-muted">No content yet.</div>';
-  }
+  const hasScript = !!(sceneContent && !DASH.isPlaceholderSection(sceneContent));
+  const preview = hasScript ? DASH.SEModel.previewLines(sceneContent, 3) : '';
+  const contentHtml = `<div class="se-card" data-scene="${DASH.escapeHtml(String(sceneId))}">
+    <div class="se-card-preview${preview ? '' : ' se-empty'}">${preview ? DASH.escapeHtml(preview) : 'No script yet.'}</div>
+    <div class="se-card-meta"></div>
+    <button class="se-open-btn" type="button" data-open-script="${DASH.escapeHtml(String(sceneId))}">${hasScript ? 'Open script' : 'Write script'}</button>
+  </div>`;
 
   // Dramatic metadata — only show positive values.
   // The role is per plot, so each `plots[]` entry becomes its own tag naming
@@ -508,7 +511,7 @@ DASH.showScenePanel = function(sceneId) {
       <div class="panel-muted">${DASH.escapeHtml(scene.heading)}</div>
     </div>` : ''}
     <div>
-      <div class="panel-section-title">Content</div>
+      <div class="panel-section-title">Script</div>
       ${contentHtml}
     </div>
     ${DASH.renderSectionsHtml('scene', sceneId, ['Content'])}
@@ -519,6 +522,7 @@ DASH.showScenePanel = function(sceneId) {
   `;
 
   DASH.openPanel();
+  if (DASH.refreshScriptCard) DASH.refreshScriptCard(sceneId);
 }
 
 

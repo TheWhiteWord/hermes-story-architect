@@ -187,3 +187,37 @@ class TestSave:
             s, blocks=[{"type": "action", "text": "A new line."}]))
         from story_architect.core.db import get_screenplay_text
         assert "A new line." in get_screenplay_text(project)
+
+
+class TestCheck:
+    """The draft's warnings come from the same rules as a saved scene's."""
+
+    def test_draft_findings_without_writing(self, project):
+        s = me.load_scene_script(project, "the-kitchen")
+        before = s["hash"]
+        blocks = s["blocks"] + [{"type": "character", "text": "NORA"}, {"type": "dialogue", "text": "Hi."}]
+        out = me.check_scene_script(project, "the-kitchen", {
+            "blocks": blocks,
+            "heading": {"mode": "structured", "int_ext": "INT.", "location": "attic", "time_of_day": ""},
+            "extra_cast": ["detective-oak"]})
+        codes = {f["code"] for f in out["findings"]}
+        assert {"character_unregistered", "location_no_world", "time_of_day_missing"} <= codes
+        assert {c["id"] for c in out["cast"]} == {"mara-chen", "detective-oak"}
+        assert out["heading"]["location"] == "attic"
+        assert me.load_scene_script(project, "the-kitchen")["hash"] == before   # nothing written
+
+    def test_cues_say_which_blocks_resolved(self, project):
+        s = me.load_scene_script(project, "the-kitchen")
+        by_block = {c["block"]: c["id"] for c in s["cues"]}
+        assert list(by_block.values()).count(None) == 1          # LEO
+        assert "mara-chen" in by_block.values()
+
+    def test_check_matches_load_for_unchanged_draft(self, project):
+        s = me.load_scene_script(project, "the-kitchen")
+        out = me.check_scene_script(project, "the-kitchen", {
+            "blocks": s["blocks"],
+            "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen", "time_of_day": "NIGHT"},
+            "extra_cast": ["mara-chen"]})
+        norm = lambda fs: sorted((f["code"], f.get("block"), f.get("field")) for f in fs)
+        assert norm(out["findings"]) == norm(s["findings"])
+        assert out["stats"]["speaking_parts"] == s["stats"]["speaking_parts"]

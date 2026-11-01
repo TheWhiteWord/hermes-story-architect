@@ -94,3 +94,16 @@ def test_parse_pasted_text(client):
                 json={"text": "MARA\nHi.\n\nShe leaves."}).json()
     assert [b["type"] for b in r["blocks"]] == ["character", "dialogue", "action"]
     assert tc.post("/api/projects/demo/script/parse", headers=H, json={"text": 5}).status_code == 422
+
+
+def test_check_route_is_a_pure_read(client):
+    tc, _ = client
+    s = tc.get("/api/projects/demo/scenes/s1/script").json()
+    r = tc.post("/api/projects/demo/scenes/s1/script/check", headers=H, json={
+        "blocks": [{"type": "character", "text": "ZED"}, {"type": "dialogue", "text": "x"}],
+        "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen", "time_of_day": "NIGHT"}})
+    assert r.status_code == 200
+    assert any(f["code"] == "character_unregistered" for f in r.json()["findings"])
+    assert tc.get("/api/projects/demo/scenes/s1/script").json()["hash"] == s["hash"]
+    assert tc.post("/api/projects/demo/scenes/nope/script/check", headers=H,
+                   json={"blocks": []}).status_code == 404
