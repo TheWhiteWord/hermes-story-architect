@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from core import drafts
-from core.entity import validate_scene_value_turns
-from core.writes import create_entity, create_project, edit_entity
+from story_architect.core import drafts
+from story_architect.core.entity import validate_scene_value_turns
+from story_architect.core.writes import create_entity, create_project, edit_entity
 
 SCHEMA = {"p": "loyalty", "c": "complicity", "cd": "betrayal",
           "nn": "fanatic love"}

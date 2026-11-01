@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from core.writes import create_project
-from tools.story_memory import handler
+from story_architect.core.writes import create_project
+from story_architect.tools.story_memory import handler
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def test_add_remove_and_replace_round_trip(project):
     call(path, vault, action="add", category="decisions", entry="Old rule")
     replaced = call(path, vault, action="replace", category="decisions", old_entry="Old rule", new_entry="New rule")
     assert replaced["entry"] == "New rule"
-    from core.db import get_project_memory
+    from story_architect.core.db import get_project_memory
     assert get_project_memory(path)["decisions"] == ["New rule"]
 
 

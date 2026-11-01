@@ -17,10 +17,10 @@ from pathlib import Path
 
 import pytest
 
-from core.db import get_project_summary
-from core.writes import create_entity as writes_create_entity
-from core.writes import edit_entity
-from tools.story_load import handler as load_handler
+from story_architect.core.db import get_project_summary
+from story_architect.core.writes import create_entity as writes_create_entity
+from story_architect.core.writes import edit_entity
+from story_architect.tools.story_load import handler as load_handler
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
@@ -30,16 +30,16 @@ FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 def project(tmp_path, monkeypatch):
     vault = tmp_path / "v"
     shutil.copytree(FIXTURE, vault / "projects" / "save-the-children")
-    import core.config
-    monkeypatch.setattr(core.config, "load_plugin_config",
+    import story_architect.core.config
+    monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
                         lambda: {"root_path": str(vault)})
-    from tools.story_import import handler as import_handler
+    from story_architect.tools.story_import import handler as import_handler
     import_handler({"project": "save-the-children", "confirm": True}, root_path=str(vault))
     return vault / "projects" / "save-the-children"
 
 
 def load(project, **args):
-    from tools.story_load import handler
+    from story_architect.tools.story_load import handler
     vault = str(project.parent.parent)
     return json.loads(handler({"project": "save-the-children", **args}, root_path=vault))
 
@@ -68,7 +68,7 @@ class TestPlotBeatsLiveInTheirOwnView:
                  for act in result["acts"] for seq in act.get("sequences", [])
                  for scene in seq.get("scenes", []) for p in scene.get("plots", [])}
         assert roles, "dramatic_elements returned no plot references at all"
-        from core.constants import PLOT_ROLES
+        from story_architect.core.constants import PLOT_ROLES
         assert roles <= set(PLOT_ROLES)
 
     def test_the_plot_index_sits_under_the_project(self, project):
@@ -128,7 +128,7 @@ class TestPlotBeatsLiveInTheirOwnView:
         asserts the plot side is still readable by name, which is the cost of
         `computed` and the thing worth pinning.
         """
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         import json as _json
         plot_id = load(project)["plots"][0]["id"]
         got = _json.loads(retrieve_handler({
@@ -145,7 +145,7 @@ class TestPlotBeatsLiveInTheirOwnView:
 
     def test_the_scenes_plot_roles_are_the_write_side(self, project):
         """Same rows, reachable from the scene, which is where they are written."""
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         import json as _json
         got = _json.loads(retrieve_handler({
             "project": "save-the-children", "entity_type": "scene",
@@ -186,9 +186,9 @@ class TestBaseViewIsUnchanged:
 
     def test_base_view_stays_small_as_the_project_grows(self, project):
         """The cost that justifies the views: a scene must be near-free."""
-        from tools.story_load import handler
+        from story_architect.tools.story_load import handler
         small = len(json.dumps(load(project)))
-        from core.writes import create_entity
+        from story_architect.core.writes import create_entity
         for i in range(40):
             create_entity(project, "scene", f"extra-{i:02d}",
                           {"title": f"Extra {i}", "sequence_id": "seq-discovery"})
@@ -285,7 +285,7 @@ class TestDramaticElementsView:
         this test compares cannot both be produced from it — the agreement case
         has to be written. That is the fixture's gap, not a defect in the view.
         """
-        from core.writes import edit_entity
+        from story_architect.core.writes import edit_entity
 
         # 1. the scene says plot_role and a plot agrees -> both reported.
         edit_entity(project, "scene", "central-room-day",
@@ -355,14 +355,14 @@ class TestUnfilledView:
         # plot's six role fields stopped being gaps when they became computed,
         # so the fixture sits exactly on the cap and truncation stopped firing
         # for a reason unrelated to truncation.
-        import tools.story_load as sl
+        import story_architect.tools.story_load as sl
         monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)
         r = load(project, view="unfilled")
         assert len(r["unfilled"]) <= 3
         assert r["truncated"] is True
 
     def test_truncation_is_honest_about_what_is_hidden(self, project, monkeypatch):
-        import tools.story_load as sl
+        import story_architect.tools.story_load as sl
         monkeypatch.setattr(sl, "UNFILLED_LIMIT", 3)
         r = load(project, view="unfilled")
         assert r["shown_types"] == len(r["unfilled"])
@@ -413,7 +413,7 @@ class TestBaseMapSceneRow:
     def test_the_base_map_carries_the_scenes_plots_as_bare_slugs(self, project):
         """The plots a scene serves, as slugs. The role it plays in each is the
         `dramatic_elements` view's, which carries the plot index."""
-        from core.writes import edit_entity
+        from story_architect.core.writes import edit_entity
         edit_entity(project, "scene", "central-room-day",
                     {"plot_roles": [
                         {"plot": "the-resistance", "role": "inciting_incident"},
@@ -645,7 +645,7 @@ class TestDramaticElementsEscalationSpine:
         """Case (a) of the issue: a milestone scene with beats and a turning
         point. The fixture records exist but carry no prose, so the facts are
         written here — the point is that the trimmed row keeps them."""
-        from core.writes import create_entity, edit_entity
+        from story_architect.core.writes import create_entity, edit_entity
         edit_entity(project, "scene", "central-room-day",
                     {"scene_objective": "to get the door open without being seen"}, "r")
         # One record per scene, so the existing one is edited rather than
@@ -665,7 +665,7 @@ class TestDramaticElementsEscalationSpine:
     def test_a_scene_promoted_by_no_plot_is_not_on_the_spine(self, project):
         """Case (d): a transition serves no plot, so it is never a milestone
         and never appears here."""
-        from core.writes import create_entity
+        from story_architect.core.writes import create_entity
         create_entity(project, "act", "act-corridor", {"title": "Act"})
         create_entity(project, "sequence", "seq-corridor",
                       {"title": "Seq", "act_id": "act-corridor"})
@@ -699,6 +699,6 @@ class TestDispatch:
             assert v in r["error"]
 
     def test_every_view_is_documented_in_the_schema(self, project):
-        from tools.story_load import SCHEMA
+        from story_architect.tools.story_load import SCHEMA
         assert set(SCHEMA["properties"]["view"]["enum"]) == {
             "dramatic_elements", "relationship", "unfilled", "values", "track"}

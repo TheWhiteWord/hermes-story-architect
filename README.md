@@ -1,57 +1,52 @@
-# Hermes Story Architect
+# Story Architect
 
-> A story-writing environment for Hermes Desktop, architecturally inspired by [Story Architect](https://github.com/story-apps/starc) (STARC).
+Standalone local app for story/screenplay development.
 
-## What this is
+## Install
 
-STARC is a GPLv3 C++/Qt desktop screenwriting app with a rich data model: characters with 20+ structured fields, locations, worlds, synopsis, treatment, screenplay-as-typed-paragraphs, story memory, continuity gates, and an AI assistant protocol.
+pip install -e .
 
-This project takes STARC's **architecture** — the taxonomy, the entity schemas, the action protocol, the continuity model — and re-implements it as a **Hermes-native writing environment**:
+## Run
 
-- Story projects live as a **SQLite database** (`.story/story.db`) under the configured
-  story root; `story_export` writes Markdown for use with an md system such as Obsidian
-- Hermes provides the **intelligence layer** (story loading, editing, continuity checking)
-- The **preview pane** provides interactive navigation (characters, scenes, timeline)
-- All edits require **human review** before being applied
+story-architect --root <projects root>
 
-We are NOT reading `.starc` files. We are taking a good architectural reference and making it native to how you already work.
+## Demo data
 
-## What this is NOT
+story-architect seed-demo --root /tmp/sa-demo
 
-- We are not maintaining STARC's file format or GUI
-- We are not forking the C++ codebase
-- We are not a screenwriting app — we are a **story layer inside Hermes**
+## Tests
 
-## Repo structure
+pytest
 
-```
-hermes-story-architect/
-├── research/                    # STARC architecture reference
-│   └── starc-data-model.md      # Reverse-engineered schema + protocol
-├── plan/
-│   └── plan.md                  # Stage-by-stage build plan
-├── skills/                      # Hermes skills
-│   ├── story-loader/            # Load project into context
-│   └── story-editor/            # Action protocol + apply edits
-├── src/
-│   └── dashboard/               # Preview pane interactive dashboard
-│       └── story-dashboard.html
-├── vault-conventions.md         # Export structure + frontmatter schemas
-└── README.md
-```
+## Using with Hermes
 
-## Stages
+Prerequisites: Hermes Agent v0.22.5+ installed and on PATH; a working model/provider in the default profile (so cloning produces a usable profile).
 
-1. **Schema & Conventions** — Define entity types, fields, project structure
-2. **Story Loader Skill** — Load full project context into Hermes
-3. **Story Editor Skill** — Propose + apply structured edits (Action Protocol)
-4. **Preview Pane Dashboard** — Interactive character/scene/world navigation
+1. Start the app: `story-architect --root <projects root>` (default port 8731, 127.0.0.1 only).
+2. Run `story-architect hermes setup` (idempotent; `--dry-run` to preview, `--profile NAME` to change profile). This creates the `story-architect` profile, writes SOUL.md and the skill, distributes the token, and registers the MCP server `story`.
+3. Start Hermes with the profile:
+4. **Host gateway must be running as a service** (so the app's agent API is reachable even when the Hermes desktop is closed): `hermes gateway install` (user-level) or `sudo hermes gateway install --system`. The app never manages the gateway lifecycle.
+   - CLI: `hermes -p story-architect chat`
+   - Desktop: select the `story-architect` profile (supported).
+4. If the app was not running when Hermes started, start it and run `hermes mcp test` or restart Hermes; tools appear as `mcp_story_*`.
+5. Diagnostics: `story-architect hermes status` (exit code non-zero on any failure).
 
-## Architecture reference
+Security: the app binds to 127.0.0.1 only; `/mcp` requires a bearer token (constant-time check) and rejects unexpected Host headers. The token is stored with 0600 permissions in the app config dir and written to the profile `.env` as `STORY_ARCHITECT_TOKEN` (never printed). The browser UI/API are token-free and read-only.
 
-- **Upstream**: [story-apps/starc](https://github.com/story-apps/starc) — GPLv3
-- **Codex fork**: [jeffkimkimo/starc](https://github.com/jeffkimkimo/starc/tree/agent/codex-story-assistant-alpha) — the Action Protocol V3, story skills, and continuity model we're porting
+## Chat
 
-## Status
+The dashboard has an in-app chat panel (drawer) that talks to the story agent through the app, so Hermes Desktop is not required for day-to-day work. The browser never talks to Hermes directly; the app holds the API key server-side and forwards requests.
 
-Research complete. Plan written (v5). Building Stage 1 (Schema & Conventions).
+Requirements: run `story-architect hermes setup` (idempotent). Setup now also enables the API server for the `story-architect` profile on a dedicated port (default 8642, override via `STORY_ARCHITECT_HERMES_API_PORT`), creates an API key stored 0600 in the app config dir and written to the profile `.env` as `API_SERVER_KEY` (never printed), and applies a conservative toolset: the agent has no terminal/file-system write tools by default and web search/fetch is disabled. The owner can change toolsets in the profile config.
+
+Starting the agent: use the "Start agent" button in the chat panel (or the fallback CLI command `hermes -p story-architect gateway start`), which waits up to 15s for the API to become ready. Autostart is off by default (`STORY_ARCHITECT_AGENT_AUTOSTART=1` to enable). `story-architect hermes status` now also reports API server reachability/auth and that the model id matches the profile. The app never kills a gateway it did not start.
+
+What the agent can do: read/query project data via the `story` MCP tools (load, search, get entity, etc.) and stage/commit changes through the drafts protocol (it asks for approval before committing). What it cannot do by default: run shell commands, write files, or search/fetch the web. Chats are stored per project in `<root>/projects/<slug>/.story/chat.db` (separate from `story.db`); conversations and the last-open conversation per project are restored across reloads and app restarts. Partial replies cancelled mid-stream are kept and marked. A "Project updated / Refresh" banner appears after a committed change.
+
+## Layout
+
+- `src/story_architect/core/` engine (no framework imports)
+- `src/story_architect/app/` HTTP server, config, routes, launcher
+- `src/story_architect/adapters/hermes/` Hermes adapter (setup, status, MCP registration)
+- `src/story_architect/tools/` tool modules
+- `src/story_architect/web/` static UI

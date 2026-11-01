@@ -1,19 +1,9 @@
 import json
-import sys
 import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
-
-# Put the REPO ROOT on sys.path so `core` and `tools` import as top-level packages.
-# This was `Path(__file__).parent` — i.e. `tests/` — under the name `repo_root`.
-# It only appeared to work because 31 test files each carried their own copy of this
-# insert, so nobody noticed the one in conftest was wrong. conftest is the single
-# place it belongs: pytest imports it before collecting anything, so every test file
-# is covered without repeating the line.
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
 
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 
@@ -26,7 +16,7 @@ def _isolate_root(monkeypatch, tmp_path):
     load_plugin_config(). Without this, they'd read ~/.hermes/config.yaml and
     write to the real projects directory.
     """
-    monkeypatch.setattr("core.config.load_plugin_config", lambda: {"root_path": str(tmp_path)})
+    monkeypatch.setattr("story_architect.core.config.load_plugin_config", lambda: {"root_path": str(tmp_path)})
 
 
 def build_fixture_db(dest: Path, root: str) -> None:
@@ -43,21 +33,21 @@ def build_fixture_db(dest: Path, root: str) -> None:
     it, so it is built from it — which removes the whole class of bug rather than
     the one instance that surfaced.
     """
-    from tools.story_import import handler as import_handler
+    from story_architect.tools.story_import import handler as import_handler
 
     shutil.rmtree(dest / ".story" / "story.db", ignore_errors=True)
     # This fixture is session-scoped, so `_isolate_root` (function-scoped) has not
     # run yet and `load_plugin_config` still reaches for the real Hermes home.
     # Pass root_path explicitly AND patch the resolver for the duration.
-    import core.config
+    import story_architect.core.config
 
-    real = core.config.load_plugin_config
-    core.config.load_plugin_config = lambda: {"root_path": root}
+    real = story_architect.core.config.load_plugin_config
+    story_architect.core.config.load_plugin_config = lambda: {"root_path": root}
     try:
         result = json.loads(import_handler(
             {"project": str(dest), "confirm": True, "root_path": root}))
     finally:
-        core.config.load_plugin_config = real
+        story_architect.core.config.load_plugin_config = real
     assert result.get("success"), f"fixture import failed: {result}"
 
 

@@ -13,9 +13,9 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
-from core import drafts
-from core.constants import ENTITY_SCHEMAS
-from core.db import get_db
+from story_architect.core import drafts
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.db import get_db
 
 
 def _counts(project_path):
@@ -157,7 +157,7 @@ def test_drafts_table_exists_on_a_fresh_project(tmp_path):
     actually happen: a project created now has the table, without get_db
     creating anything.
     """
-    from core.writes import create_project
+    from story_architect.core.writes import create_project
 
     create_project("fresh", {"name": "Fresh", "logline": "x"}, tmp_path)
     proj = tmp_path / "projects" / "fresh"
@@ -227,7 +227,7 @@ def test_every_reorderable_type_stages_and_commits(fixture_path):
     disagreement is what made `reorder act` render a full preview and then
     fail on commit with a raw ValueError.
     """
-    from core.writes import REORDERABLE_TYPES
+    from story_architect.core.writes import REORDERABLE_TYPES
     for entity_type in REORDERABLE_TYPES:
         op = {"op": "reorder", "entity_type": entity_type,
               "ordered_ids": ["a", "b"], "summary": "x"}
@@ -479,7 +479,7 @@ def test_a_committed_create_carrying_cast_produces_relation_rows(fixture_path):
 
     # And the rows are readable by the tool that consumes them — the existence
     # assertion above passed even while every reader saw an empty cast.
-    from tools.story_retrieve import handler as retrieve_handler
+    from story_architect.tools.story_retrieve import handler as retrieve_handler
     out = json.loads(retrieve_handler({
         "project": str(fixture_path), "entity_type": "scene",
         "id": ["mira-tells-kael"], "fields": ["characters"],

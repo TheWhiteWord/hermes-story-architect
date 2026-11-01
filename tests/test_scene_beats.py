@@ -13,12 +13,12 @@ import json
 
 import pytest
 
-from tools.story_retrieve import handler as retrieve_handler
-from tools.story_search import handler as search_handler
-from core import writes
-from core.db import get_db, get_unfilled_map
-from core.entity import check_references
-from core.drafts import stage as draft_stage
+from story_architect.tools.story_retrieve import handler as retrieve_handler
+from story_architect.tools.story_search import handler as search_handler
+from story_architect.core import writes
+from story_architect.core.db import get_db, get_unfilled_map
+from story_architect.core.entity import check_references
+from story_architect.core.drafts import stage as draft_stage
 
 
 def test_check_references_id_only_lookup(fixture_path):
@@ -348,7 +348,7 @@ class TestBeatShape:
 
     def test_risk_is_not_a_field_any_more(self, fixture_path):
         """The retired field must not be described, and must not be writable."""
-        from tools.story_describe import handler as describe_handler
+        from story_architect.tools.story_describe import handler as describe_handler
         schema = json.loads(describe_handler({"entity_type": "scene_beats"}))
         beat = schema["entity_schemas"]["scene_beats"]["beats"]["sub_fields"]
         assert "risk" not in beat
@@ -387,7 +387,7 @@ class TestBeatShape:
     def test_effects_stay_on_the_scene(self, fixture_path):
         """`changes` is the state of any entity; `effects` still ties a value
         shift to a plot protagonist. Neither replaces the other."""
-        from tools.story_describe import handler as describe_handler
+        from story_architect.tools.story_describe import handler as describe_handler
         scene = json.loads(describe_handler({"entity_type": "scene"}))
         effects = scene["entity_schemas"]["scene"]["value_turns"]["sub_fields"]["effects"]
         assert "conflict_level" in effects["sub_fields"]["levels"]["sub_fields"]
@@ -479,7 +479,7 @@ class TestBeatObjectShape:
 
     def test_a_declared_map_is_still_validated_per_value(self, fixture_path):
         """`keyed: True` keeps its own reading: the keys are entities."""
-        from core.entity import validate_entity
+        from story_architect.core.entity import validate_entity
         warnings = validate_entity("relationship", {
             "characters": ["obj-alice", "obj-alice"],
             "perspectives": {"obj-alice": {"strength": "high"}},

@@ -3,11 +3,10 @@ import json
 
 import pytest
 
-from core.writes import create_project
-from tools.story_dashboard import handler as dashboard_handler
-from tools.story_export import handler as export_handler
-from tools.story_load import handler as load_handler
-from tools.story_memory import handler as memory_handler
+from story_architect.core.writes import create_project
+from story_architect.tools.story_export import handler as export_handler
+from story_architect.tools.story_load import handler as load_handler
+from story_architect.tools.story_memory import handler as memory_handler
 
 
 def test_memory_loop_is_db_authoritative(tmp_path):
@@ -30,14 +29,6 @@ def test_memory_loop_is_db_authoritative(tmp_path):
     loaded = json.loads(load_handler({"project": str(project)}, root_path=vault))
     assert loaded["memory"]["categories"] == {category: [entry] for category, entry in entries.items()}
     assert loaded["memory"]["usage"].endswith("/3000")
-
-    dashboard = json.loads(dashboard_handler({"project": str(project)}, root_path=vault))
-    assert dashboard["success"] is True
-    html_path = dashboard["dashboard_url"].replace("file://", "").split("?")[0]
-    html = open(html_path, encoding="utf-8").read()
-    assert "Story Memory" in html
-    assert "memory-dialog" in html
-    assert "Decision" in html
 
     assert json.loads(export_handler({"project": str(project)}, root_path=vault))["success"] is True
     memory_file = project / ".story" / "memory.md"

@@ -5,8 +5,8 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from tools.story_import import handler as import_handler
-from tools.story_export import handler as export_handler
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_export import handler as export_handler
 
 
 def note_for(export_path: Path, folder: str, entity_id: str) -> Path:
@@ -38,7 +38,7 @@ def test_import_creates_schema_and_entities(fixture_path):
         data = json.loads(result)
         assert data["success"] is True
 
-        from core.db import get_db
+        from story_architect.core.db import get_db
         conn = get_db(project_path)
 
         entities = conn.execute("SELECT count(*) FROM entities").fetchone()[0]
@@ -116,7 +116,7 @@ def test_round_trip_preserves_data(fixture_path):
         import_handler({"project": str(reimport_proj), "root_path": str(reimport_path)})
 
         # Compare DB state (project id will differ since it's the folder name)
-        from core.db import get_db
+        from story_architect.core.db import get_db
         conn1 = get_db(project_path)
         conn2 = get_db(reimport_proj)
 
@@ -171,7 +171,7 @@ def test_round_trip_kael_note(fixture_path):
 
         # Compare body sections — all original sections must survive round trip
         # (export may add canonical sections that were missing from the fixture)
-        from core.section_parser import list_sections
+        from story_architect.core.section_parser import list_sections
         orig_headings = set(list_sections(orig.content))
         exp_headings = set(list_sections(exported.content))
         assert orig_headings.issubset(exp_headings), (
@@ -187,7 +187,7 @@ def test_fts5_populated_after_import(fixture_path):
 
         import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
-        from core.db import get_db
+        from story_architect.core.db import get_db
         conn = get_db(project_path)
 
         # Search via FTS — join back to sections to get entity_id
@@ -211,7 +211,7 @@ def test_recycle_bin_not_imported(fixture_path):
 
         import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
-        from core.db import get_db
+        from story_architect.core.db import get_db
         conn = get_db(project_path)
 
         soren = conn.execute("SELECT id FROM entities WHERE id=?", ("soren",)).fetchone()
@@ -320,7 +320,7 @@ def test_relationship_round_trip(fixture_path):
         import_handler({"project": str(reimport_proj), "root_path": str(reimport_path)})
 
         # Verify relationship entities in DB
-        from core.db import get_db
+        from story_architect.core.db import get_db
         conn = get_db(reimport_proj)
         rel_count = conn.execute(
             "SELECT count(*) FROM entities WHERE type='relationship'"
@@ -340,7 +340,7 @@ def test_world_variant_of_round_trip(fixture_path):
         import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
         # Verify relation row was created
-        from core.db import get_db
+        from story_architect.core.db import get_db
         conn = get_db(project_path)
         rel = conn.execute(
             "SELECT to_id FROM relations WHERE from_id='the-real-world' AND kind='world_variant'"

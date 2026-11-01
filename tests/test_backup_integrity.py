@@ -30,16 +30,16 @@ def vault(tmp_path, monkeypatch):
     dest = v / "projects" / "stc"
     dest.parent.mkdir(parents=True)
     shutil.copytree(str(FIXTURE), str(dest))
-    import core.config
-    monkeypatch.setattr(core.config, "load_plugin_config",
+    import story_architect.core.config
+    monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
                         lambda: {"root_path": str(v)})
-    from tools.story_import import handler
+    from story_architect.tools.story_import import handler
     handler({"project": "stc", "confirm": True}, root_path=str(v))
     return v
 
 
 def _backup(vault):
-    from tools.story_backup import handler
+    from story_architect.tools.story_backup import handler
     return json.loads(handler({"project": "stc"}, root_path=str(vault)))
 
 
@@ -112,7 +112,7 @@ class TestNoCollisions:
 
     def test_imports_own_backup_does_not_clobber_a_manual_one(self, vault):
         """story_import backs up too — the two paths share one implementation."""
-        from core.db import backup_database
+        from story_architect.core.db import backup_database
         project = vault / "projects" / "stc"
         first = backup_database(project)
         second = backup_database(project)
@@ -128,7 +128,7 @@ class TestContract:
 
     def test_missing_database_is_an_error(self, vault):
         (vault / "projects" / "empty").mkdir()
-        from tools.story_backup import handler
+        from story_architect.tools.story_backup import handler
         r = json.loads(handler({"project": "empty"}, root_path=str(vault)))
         assert "error" in r
 

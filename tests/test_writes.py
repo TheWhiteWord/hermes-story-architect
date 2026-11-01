@@ -14,8 +14,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
-from core import writes
-from core.db import get_db
+from story_architect.core import writes
+from story_architect.core.db import get_db
 
 
 def test_core_never_imports_tools():
@@ -70,7 +70,7 @@ class TestCreateEntity:
         headings = {r[0] for r in _q(
             fixture_path, "SELECT heading FROM sections WHERE entity_id=?",
             ("quiet-room",))}
-        from core.entity import standard_sections
+        from story_architect.core.entity import standard_sections
         assert set(standard_sections("scene")) <= headings
 
     def test_nonstandard_heading_is_rejected(self, fixture_path):
@@ -87,7 +87,7 @@ class TestCreateEntity:
 
     def test_rejection_names_the_valid_sections(self, fixture_path):
         """An error naming nothing actionable gets retried the same wrong way."""
-        from core.entity import standard_sections
+        from story_architect.core.entity import standard_sections
         with pytest.raises(ValueError) as exc:
             writes.create_entity(fixture_path, "scene", "odd2", {"title": "Odd"},
                                  {"Beat Sheet": "x"})

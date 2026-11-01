@@ -7,10 +7,10 @@ import json
 
 import pytest
 
-from core.constants import ENTITY_LABELS, ENTITY_SCHEMAS, REQUIRED_FIELDS
-from core.entity import distinct_ladder_words, standard_sections, validate_entity
-from core.writes import create_entity, create_project, edit_entity
-from tools.story_describe import handler as describe_handler
+from story_architect.core.constants import ENTITY_LABELS, ENTITY_SCHEMAS, REQUIRED_FIELDS
+from story_architect.core.entity import distinct_ladder_words, standard_sections, validate_entity
+from story_architect.core.writes import create_entity, create_project, edit_entity
+from story_architect.tools.story_describe import handler as describe_handler
 
 
 @pytest.fixture
@@ -74,7 +74,7 @@ class TestCreate:
 
     def test_retrieve_returns_every_field_in_schema_order(self, project, tmp_path):
         _value(project, "trust")
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         out = json.loads(retrieve_handler(
             {"project": "p", "entity_type": "value", "id": ["trust"],
              "fields": ["all"]}, root_path=str(project.parent.parent)))
@@ -104,7 +104,7 @@ class TestCreate:
                            "cd": "c", "nn": "d"})
 
     def test_a_refused_create_writes_nothing(self, project):
-        from core.db import get_db
+        from story_architect.core.db import get_db
         with pytest.raises(ValueError):
             _value(project, "trust", c="trust")
         conn = get_db(project)
@@ -137,7 +137,7 @@ class TestEdit:
             edit_entity(project, "value", "trust", {"c": "trust"}, "dup")
 
     def test_a_refused_edit_changes_nothing(self, project):
-        from core.db import get_db
+        from story_architect.core.db import get_db
         _value(project, "trust")
         with pytest.raises(ValueError):
             edit_entity(project, "value", "trust", {"c": "trust"}, "dup")

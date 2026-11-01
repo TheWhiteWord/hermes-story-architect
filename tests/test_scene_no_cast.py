@@ -20,15 +20,15 @@ FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 def project(tmp_path, monkeypatch):
     root = tmp_path / "root"
     shutil.copytree(FIXTURE, root / "projects" / "save-the-children")
-    import core.config
-    monkeypatch.setattr(core.config, "load_plugin_config", lambda: {"root_path": str(root)})
-    from tools.story_import import handler as import_handler
+    import story_architect.core.config
+    monkeypatch.setattr(story_architect.core.config, "load_plugin_config", lambda: {"root_path": str(root)})
+    from story_architect.tools.story_import import handler as import_handler
     import_handler({"project": "save-the-children", "confirm": True}, root_path=str(root))
     return root / "projects" / "save-the-children"
 
 
 def gaps(project, field):
-    from tools.story_load import handler
+    from story_architect.tools.story_load import handler
     data = json.loads(
         handler({"project": "save-the-children", "view": "unfilled",
                  "field": field},
@@ -68,7 +68,7 @@ def test_a_castless_drafted_scene_is_flagged(project, monkeypatch):
     — a filtered answer is never truncated — so the assertion asks the
     question a caller would ask rather than reading the capped list.
     """
-    import tools.story_load as sl
+    import story_architect.tools.story_load as sl
     monkeypatch.setattr(sl, "UNFILLED_LIMIT", 1)
     _scene_with_no_cast(project, "central-room-day")
     assert "central-room-day" in gaps(project, "characters")

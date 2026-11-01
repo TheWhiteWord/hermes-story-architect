@@ -6,9 +6,9 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.story_import import handler as import_handler
-from tools.story_export import handler as export_handler
-from tools.story_backup import handler as backup_handler
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_export import handler as export_handler
+from story_architect.tools.story_backup import handler as backup_handler
 
 
 def test_import_does_not_leak_connections(fixture_path):
@@ -18,7 +18,7 @@ def test_import_does_not_leak_connections(fixture_path):
         shutil.copytree(str(fixture_path), str(project_path))
 
         # Patch get_db to track connections
-        from core import db
+        from story_architect.core import db
         original_get_db = db.get_db
         connections = []
 
@@ -49,7 +49,7 @@ def test_export_does_not_leak_connections(fixture_path):
         # First import
         import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
-        from core import db
+        from story_architect.core import db
         original_get_db = db.get_db
         connections = []
 
@@ -78,7 +78,7 @@ def test_backup_does_not_leak_connections(fixture_path):
         # First import
         import_handler({"project": str(project_path), "root_path": Path(tmp)})
 
-        from core import db
+        from story_architect.core import db
         original_get_db = db.get_db
         connections = []
 

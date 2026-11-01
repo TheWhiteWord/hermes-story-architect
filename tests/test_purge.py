@@ -28,10 +28,10 @@ def vault(tmp_path, monkeypatch):
     dest = v / "projects" / "stc"
     dest.parent.mkdir(parents=True)
     shutil.copytree(str(FIXTURE), str(dest))
-    import core.config
-    monkeypatch.setattr(core.config, "load_plugin_config",
+    import story_architect.core.config
+    monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
                         lambda: {"root_path": str(v)})
-    from tools.story_import import handler
+    from story_architect.tools.story_import import handler
     handler({"project": "stc", "confirm": True}, root_path=str(v))
     return v
 
@@ -41,7 +41,7 @@ TARGET = {"entity_type": "character", "id": "kael"}
 
 def _edit(vault, action, **args):
     """The two admin-only actions that act on one entity: purge and restore."""
-    from tools.story_admin import handler
+    from story_architect.tools.story_admin import handler
     return json.loads(handler({
         "action": action, "target": TARGET, "project": "stc",
         "summary": "test", **args}, root_path=str(vault)))
@@ -58,7 +58,7 @@ def _exists(vault, entity_id):
 
 
 def _delete(vault):
-    from core.writes import delete_entity
+    from story_architect.core.writes import delete_entity
     return delete_entity(vault / "projects" / "stc",
                          "character", "kael", "test", True)
 
@@ -181,9 +181,9 @@ class TestPurgeLeavesNoMarkdownToResurrect:
     """Purged rows must not come back through the Markdown either."""
 
     def test_the_note_is_swept_and_the_entity_stays_gone(self, vault):
-        from tools.story_export import handler as export_handler
-        from tools.story_import import handler as import_handler
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_export import handler as export_handler
+        from story_architect.tools.story_import import handler as import_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         from test_round_trip import note_for, note_rel
 
         # The sweep only touches files a previous export wrote, so the entity
@@ -214,9 +214,9 @@ class TestSoftDeleteSurvivesAnExportImportRoundTrip:
     """A delete must not be undone by an ordinary export → import cycle."""
 
     def test_deleted_entity_is_not_resurrected(self, vault):
-        from tools.story_export import handler as export_handler
-        from tools.story_import import handler as import_handler
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_export import handler as export_handler
+        from story_architect.tools.story_import import handler as import_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         from test_round_trip import note_for, note_rel
         # Export first, so the manifest knows the file exists. The filename is
         # the title, so the path is captured while the note still exists.

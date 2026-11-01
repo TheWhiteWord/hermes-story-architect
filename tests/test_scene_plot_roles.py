@@ -29,8 +29,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
-from core.constants import PLOT_ROLES
-from core.writes import create_entity, create_project, delete_entity, edit_entity
+from story_architect.core.constants import PLOT_ROLES
+from story_architect.core.writes import create_entity, create_project, delete_entity, edit_entity
 
 
 @pytest.fixture
@@ -139,7 +139,7 @@ class TestThePlotSideIsReadOnly:
         """Same rows, other direction — so nothing downstream had to change."""
         write_roles(vault, "s1", [{"plot": "the-resistance", "role": "setup",
                                    "description": "the door"}])
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
         plot = next(p for p in get_dashboard_data(vault)["story_data"]["plots"]
                     if p["id"] == "the-resistance")
         assert plot["setups"] == [{"scene_id": "s1", "description": "the door"}]
@@ -216,14 +216,14 @@ class TestDelete:
         putting them back would mean resurrecting rows nobody can vouch for.
         A test is the only thing that makes a documented exception real.
         """
-        from tools.story_admin import _restore_entity
+        from story_architect.tools.story_admin import _restore_entity
         write_roles(vault, "s1", [{"plot": "the-resistance", "role": "setup",
                                    "description": "d"}])
         delete_entity(vault, "plot", "the-resistance", "cut it", confirm=True)
         _restore_entity({"target": {"entity_type": "plot", "id": "the-resistance"},
                          "summary": "put it back"},
                         vault)
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
         plot = next(p for p in get_dashboard_data(vault)["story_data"]["plots"]
                     if p["id"] == "the-resistance")
         assert plot["setups"] == [], \
@@ -252,11 +252,11 @@ class TestExportRoundTrip:
         root = tmp_path / "root"
         project = root / "projects" / "stc"
         shutil.copytree(REPO / "tests" / "fixtures" / "save-the-children", project)
-        import core.config
-        monkeypatch.setattr(core.config, "load_plugin_config",
+        import story_architect.core.config
+        monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
                             lambda: {"root_path": str(root)})
-        from tools.story_import import handler as import_handler
-        from tools.story_export import handler as export_handler
+        from story_architect.tools.story_import import handler as import_handler
+        from story_architect.tools.story_export import handler as export_handler
         import_handler({"project": "stc", "confirm": True}, root_path=str(root))
         export_handler({"project": "stc", "root_path": str(root)})
         return project
@@ -288,13 +288,13 @@ class TestExportRoundTrip:
         before = self._plot_roles(round_tripped, "central-room-day")
         assert before, "the fixture's scene has no role to begin with"
 
-        import core.config
+        import story_architect.core.config
         root2 = tmp_path / "root2"
         project2 = root2 / "projects" / "stc"
         shutil.copytree(round_tripped, project2)
-        monkeypatch.setattr(core.config, "load_plugin_config",
+        monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
                             lambda: {"root_path": str(root2)})
-        from tools.story_import import handler as import_handler
+        from story_architect.tools.story_import import handler as import_handler
         import_handler({"project": "stc", "confirm": True}, root_path=str(root2))
         assert self._plot_roles(project2, "central-room-day") == before
 
@@ -302,7 +302,7 @@ class TestExportRoundTrip:
                                                         tmp_path, monkeypatch):
         """The round trip has to be invisible from the plot's side as well —
         that is what makes it a round trip rather than a relocation."""
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
         plot = next(p for p in get_dashboard_data(round_tripped)["story_data"]["plots"]
                     if p["id"] == "the-resistance")
         assert plot["climax"], "the plot reads empty after export → import"
@@ -311,13 +311,13 @@ class TestExportRoundTrip:
 
 class TestSchema:
     def test_the_plot_role_fields_are_computed(self):
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         for field in ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions"):
             assert ENTITY_SCHEMAS["plot"][field]["computed"] is True, \
                 f"plot.{field} is still writable"
 
     def test_plot_roles_is_a_scene_field_with_the_right_shape(self):
-        from core.constants import ENTITY_SCHEMAS
+        from story_architect.core.constants import ENTITY_SCHEMAS
         field = ENTITY_SCHEMAS["scene"]["plot_roles"]
         assert field["type"] == "list"
         assert not field.get("computed"), "the write side cannot be computed"
@@ -326,7 +326,7 @@ class TestSchema:
     def test_a_malformed_plot_roles_shape_is_reported(self):
         """The read side shows the shape; this is the write side catching it
         when the display is not consulted. See test_write_shape.py."""
-        from core.entity import validate_entity
+        from story_architect.core.entity import validate_entity
         warnings = validate_entity("scene", {"plot_roles": "the first scene"})
         assert any("plot_roles must be a list" in w for w in warnings), warnings
         assert any("plot, role, description" in w for w in warnings), warnings
@@ -337,7 +337,7 @@ class TestSchema:
         `validate_scene_plot_roles` still checks the same enum at write time —
         that is not duplication: it raises, and the shape validator warns.
         """
-        from core.entity import validate_entity
+        from story_architect.core.entity import validate_entity
         warnings = validate_entity("scene", {
             "plot_roles": [{"plot": "p", "role": "transition", "description": "d"}]})
         assert any("role" in w and "one of" in w for w in warnings), warnings

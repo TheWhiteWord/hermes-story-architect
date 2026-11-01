@@ -37,7 +37,7 @@ def project_with_string_act_count(tmp_path, _built_fixture):
 class TestNumericFieldsCoerceOnRead:
     def test_dashboard_survives_a_string_act_count(self, project_with_string_act_count):
         """This raised TypeError: '>' not supported between 'int' and 'str'."""
-        from core.db import get_dashboard_data
+        from story_architect.core.db import get_dashboard_data
 
         path, _ = project_with_string_act_count
         data = get_dashboard_data(path)          # used to raise
@@ -46,7 +46,7 @@ class TestNumericFieldsCoerceOnRead:
         assert act_count >= 3
 
     def test_summary_survives_a_string_act_count(self, project_with_string_act_count):
-        from core.db import get_project_summary
+        from story_architect.core.db import get_project_summary
 
         path, _ = project_with_string_act_count
         assert isinstance(get_project_summary(path)["project"]["act_count"], int)
@@ -55,7 +55,7 @@ class TestNumericFieldsCoerceOnRead:
 class TestNumericFieldsCoerceOnWrite:
     def test_a_string_written_to_a_number_field_stores_a_number(
             self, project_with_string_act_count):
-        from core.writes import edit_entity
+        from story_architect.core.writes import edit_entity
 
         path, project_id = project_with_string_act_count
         edit_entity(path, "project", project_id, {"act_count": "5"}, "set five")
@@ -74,12 +74,12 @@ class TestCoerceNumber:
         ("abc", "abc"),                       # not a number: returned, not silently defaulted
     ])
     def test_edges(self, value, expected):
-        from core.db import _coerce_number
+        from story_architect.core.db import _coerce_number
 
         assert _coerce_number(value, 3) == expected
 
     def test_a_non_numeric_value_is_visible_not_replaced(self):
         """A wrong value the reader can see beats a plausible one it cannot."""
-        from core.db import _coerce_number
+        from story_architect.core.db import _coerce_number
 
         assert _coerce_number("three acts", 3) == "three acts"

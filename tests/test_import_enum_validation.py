@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from core.entity import validate_entity, value_problems
+from story_architect.core.entity import validate_entity, value_problems
 
 
 def make_project(tmp_path):
@@ -43,16 +43,16 @@ def run_import(proj, root):
     """Import an already-copied project and return the parsed response, so a
     refusal is asserted on the response rather than on an exception raised
     somewhere below."""
-    from tools.story_import import handler
-    import core.config
+    from story_architect.tools.story_import import handler
+    import story_architect.core.config
 
-    real = core.config.load_plugin_config
-    core.config.load_plugin_config = lambda: {"root_path": str(root)}
+    real = story_architect.core.config.load_plugin_config
+    story_architect.core.config.load_plugin_config = lambda: {"root_path": str(root)}
     try:
         return json.loads(handler({"project": str(proj), "confirm": True,
                                    "root_path": str(root)}))
     finally:
-        core.config.load_plugin_config = real
+        story_architect.core.config.load_plugin_config = real
 
 
 def import_project(tmp_path, mutate=None):
@@ -202,7 +202,7 @@ class TestTheValueCheck:
         importer refuses to take back."""
         proj = make_project(tmp_path)
         assert run_import(proj, tmp_path).get("success") is True
-        from tools.story_export import handler as export_handler
+        from story_architect.tools.story_export import handler as export_handler
         export_handler({"project": str(proj)}, root_path=str(tmp_path))
         shutil.rmtree(proj / ".story")
         result = run_import(proj, tmp_path)

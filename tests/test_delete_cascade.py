@@ -22,8 +22,8 @@ import sqlite3
 
 import pytest
 
-from core.writes import delete_entity
-from tools.story_import import handler as import_handler
+from story_architect.core.writes import delete_entity
+from story_architect.tools.story_import import handler as import_handler
 
 
 def _setup(fixture_path, tmp_path, name):
@@ -234,7 +234,7 @@ class TestDefaultsOnReset:
     def test_optional_location_still_lands_in_unfilled_fields(self, fixture_path, tmp_path):
         """location_id is a column so it reads "", but location is optional —
         so unfilled_fields reports it and the UI has its signal."""
-        from tools.story_retrieve import handler as retrieve_handler
+        from story_architect.tools.story_retrieve import handler as retrieve_handler
         p, vault = _setup(fixture_path, tmp_path, "def-2")
         _delete(p, "location", "the-garden")
         r = json.loads(retrieve_handler(

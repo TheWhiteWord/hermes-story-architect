@@ -22,9 +22,9 @@ from pathlib import Path
 import pytest
 
 
-from core.constants import ENTITY_SCHEMAS
-from core.entity import validate_entity
-from core.writes import create_entity, create_project
+from story_architect.core.constants import ENTITY_SCHEMAS
+from story_architect.core.entity import validate_entity
+from story_architect.core.writes import create_entity, create_project
 
 
 @pytest.fixture
@@ -228,7 +228,7 @@ def test_create_writes_the_scene_slug_and_the_description(vault, role):
     """The regression test, on the field a role is written on now. Every role,
     including the two the old unwrap used to corrupt."""
     _with_plot(vault)
-    from core.writes import create_entity as _create
+    from story_architect.core.writes import create_entity as _create
     _create(vault, "scene", "s1", {
         "title": "S1",
         "plot_roles": [{"plot": "the-resistance", "role": role,
@@ -260,7 +260,7 @@ def test_malformed_entry_is_refused_on_create(vault):
 
 
 def test_malformed_entry_is_refused_on_edit(vault):
-    from core.writes import edit_entity
+    from story_architect.core.writes import edit_entity
     _with_plot(vault)
     create_entity(vault, "scene", "s1", {"title": "S1"})
     with pytest.raises(ValueError, match="plot_roles entry needs a plot slug"):
@@ -299,7 +299,7 @@ CREATE_PATH_CASES = [
 
 def _writable_relation_fields():
     """Every relation field a create may write — computed ones are read-only."""
-    from core.entity import relation_fields
+    from story_architect.core.entity import relation_fields
     # `computed` only, and via .get: writes.py accepts a relation field that has no
     # schema entry (valid = schema | sections | rel_fields), so filtering on schema
     # membership here would exempt exactly the fields create still writes.
@@ -334,7 +334,7 @@ def test_create_writes_the_relation_row_and_it_reads_back(
     """
     import json
 
-    from tools.story_retrieve import handler as retrieve_handler
+    from story_architect.tools.story_retrieve import handler as retrieve_handler
 
     _create_with_relation(vault, entity_type, field, value, child)
     rows = [(k, t) for k, t, _ in _notes(vault) if k == kind]

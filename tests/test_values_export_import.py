@@ -12,10 +12,10 @@ import sqlite3
 
 import pytest
 
-from core.writes import create_entity, create_project
-from tools.story_export import handler as export_handler
-from tools.story_import import handler as import_handler
-from tools.story_retrieve import handler as retrieve_handler
+from story_architect.core.writes import create_entity, create_project
+from story_architect.tools.story_export import handler as export_handler
+from story_architect.tools.story_import import handler as import_handler
+from story_architect.tools.story_retrieve import handler as retrieve_handler
 
 
 @pytest.fixture
@@ -161,7 +161,7 @@ class TestRoundTrip:
         shutil.copytree(str(fixture_path), str(p))
         _export(p, vault)
 
-        import tools.story_import as si
+        import story_architect.tools.story_import as si
         order = []
         orig_values, orig_folder = si._import_values, si._import_folder
         si._import_values = lambda conn, pp: (

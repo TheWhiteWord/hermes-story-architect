@@ -26,7 +26,7 @@ def _db(proj):
 
 def _location_scenes(proj):
     """{location_id: number of scenes the dashboard reports for it}."""
-    from core.db import get_dashboard_data
+    from story_architect.core.db import get_dashboard_data
 
     out = {}
 
@@ -54,7 +54,7 @@ def proj(tmp_path, _built_fixture):
 
 class TestLocationSceneRelationIsWritten:
     def test_creating_a_scene_writes_the_relation(self, proj):
-        from core.writes import create_entity
+        from story_architect.core.writes import create_entity
 
         create_entity(proj, "scene", "new-scene",
                       {"title": "New", "location": "the-central-room"})
@@ -65,7 +65,7 @@ class TestLocationSceneRelationIsWritten:
 
     def test_moving_a_scene_replaces_the_relation(self, proj):
         """The stale row is the dangerous half: it keeps a location looking used."""
-        from core.writes import create_entity, edit_entity
+        from story_architect.core.writes import create_entity, edit_entity
 
         create_entity(proj, "location", "cellar", {"name": "Cellar"})
         create_entity(proj, "scene", "moving", {"title": "M", "location": "the-central-room"})
@@ -76,7 +76,7 @@ class TestLocationSceneRelationIsWritten:
         assert rows == [("cellar",)]
 
     def test_clearing_the_location_clears_the_relation(self, proj):
-        from core.writes import create_entity, edit_entity
+        from story_architect.core.writes import create_entity, edit_entity
 
         create_entity(proj, "scene", "clearing", {"title": "C", "location": "the-central-room"})
         edit_entity(proj, "scene", "clearing", {"location": ""}, "clear")

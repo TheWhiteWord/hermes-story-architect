@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 
-from tools import story_admin
+from story_architect.tools import story_admin
 
 
 def _run(args, root):
@@ -170,8 +170,8 @@ class TestDeleteProject:
 
 class TestRestore:
     def test_undoes_a_soft_delete_exactly(self, root):
-        from core.db import get_db
-        from core.writes import delete_entity
+        from story_architect.core.db import get_db
+        from story_architect.core.writes import delete_entity
 
         project = root / "projects" / "save-the-children"
         conn = get_db(project)
@@ -226,7 +226,7 @@ class TestPurge:
     def test_age_floor_keeps_recent_deletes_restorable(self, root):
         """A delete from this session must never be purgeable, however the
         caller words the confirmation."""
-        from core.writes import delete_entity
+        from story_architect.core.writes import delete_entity
         delete_entity(root / "projects" / "save-the-children",
                       "location", "the-garden", "s", confirm=True)
 
@@ -237,8 +237,8 @@ class TestPurge:
         assert "restorable" in result["message"]
 
     def test_purges_once_past_the_floor(self, root):
-        from core.db import get_db
-        from core.writes import delete_entity
+        from story_architect.core.db import get_db
+        from story_architect.core.writes import delete_entity
 
         project = root / "projects" / "save-the-children"
         delete_entity(project, "location", "the-garden", "s", confirm=True)
