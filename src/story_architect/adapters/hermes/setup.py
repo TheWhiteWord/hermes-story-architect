@@ -172,6 +172,8 @@ def setup(argv=None, dry_run=False, force=False, profile_name="story-architect")
             cfg = {}
     port = C.load_config().port
     cfg.setdefault("mcp_servers", {})
+    cfg.setdefault("tool_budget", {})
+    cfg["tool_budget"]["mcp_result_size_chars"] = 100000
     # remove legacy standalone/api_server shim (served via host multiplexer now)
     if isinstance(cfg.get("gateway"), dict):
         cfg["gateway"].pop("standalone", None)
