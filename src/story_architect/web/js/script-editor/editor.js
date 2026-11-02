@@ -157,7 +157,6 @@ window.DASH = window.DASH || {};
     const cue = b.type === 'character' ? cueOf(i) : null;
     const unreg = cue && !cue.id && b.text.trim();
     return `<div class="se-row se-r-${b.type}${unreg ? ' se-unreg' : ''}" data-i="${i}">
-      <span class="se-gutter">${M.GUTTER[b.type] || b.type}</span>
       <textarea class="se-ta se-t-${b.type}" data-i="${i}" rows="1" ${b.type === 'character' ? 'spellcheck="false" autocomplete="off"' : ''} ${S.readonly ? 'readonly' : ''}></textarea>
       ${unreg ? '<span class="se-unreg-mark" title="Not a registered character">!</span>' : ''}
     </div>`;
@@ -167,14 +166,12 @@ window.DASH = window.DASH || {};
     const H = S.H, dis = S.readonly ? 'disabled' : '';
     if (H.mode === 'custom') {
       return `<div class="se-row se-heading" data-heading>
-        <span class="se-gutter">Heading</span>
         <div class="se-hline"><input class="se-hinput" id="se-hinput" spellcheck="false" ${S.readonly ? 'readonly' : ''}>
         <button class="se-pill" data-h="fields" type="button" ${dis} title="Build the heading from INT/EXT, location and time">Use fields</button></div></div>`;
     }
     const name = locationName();
     const registered = !!locById(H.location);
     return `<div class="se-row se-heading" data-heading>
-      <span class="se-gutter">Heading</span>
       <div class="se-hline">
         <button class="se-pill" data-h="ie" type="button" ${dis}>${esc(H.int_ext)}</button>
         <button class="se-pill se-loc${!name ? ' se-warn' : ''}${name && !registered ? ' se-dashed' : ''}" data-h="loc" type="button" ${dis}
