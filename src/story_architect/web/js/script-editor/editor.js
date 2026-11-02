@@ -887,6 +887,7 @@ window.DASH = window.DASH || {};
       window.__STORY_DATA__ = data.story_data;
       window.__SECTIONS__ = data.sections;
       window.__SCREENPLAY_STATS__ = data.screenplay_stats;
+      window.__STRUCTURAL_STATS__ = data.structural_stats;
       if (DASH.network) { try { DASH.network.destroy(); } catch (e) { /* already gone */ } DASH.network = null; }
       DASH.initStory(data.story_data);
     } catch (e) { console.error('[script-editor] reload failed', e); }

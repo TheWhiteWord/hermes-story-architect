@@ -29,6 +29,7 @@ DASH.boot = async function() {
     window.__STORY_DATA__ = data.story_data;
     window.__SECTIONS__ = data.sections;
     window.__SCREENPLAY_STATS__ = data.screenplay_stats;
+    window.__STRUCTURAL_STATS__ = data.structural_stats;
     document.getElementById('loading-screen').style.display = 'none';
     DASH.initStory(data.story_data);
     DASH.watchUpdates(slug);
