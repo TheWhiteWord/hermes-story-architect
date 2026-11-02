@@ -32,8 +32,9 @@ SCHEMA = {
 
         "act": {
             "type": "string",
-            "description": "For view='dramatic_elements', 'values' or 'track': limit to one act id. "
-                           "Defaults to all."
+            "description": "Limit to one act id. Base map: full scene rows for that act, "
+                           "compact rows (id, title, status) for the rest. Also for "
+                           "view='dramatic_elements', 'values' or 'track'. Defaults to all."
         },
         "plot": {
             "type": "string",
@@ -52,7 +53,12 @@ SCHEMA = {
         },
         "sequence": {
             "type": "string",
-            "description": "For view='values' or 'track': limit to one sequence id. Defaults to all."
+            "description": "Limit to one sequence id — the cheapest way to work on a stretch of "
+                           "the story. Base map: full scene rows for that sequence, compact rows "
+                           "for the rest. Also for view='dramatic_elements', 'values' or 'track'. "
+                           "Defaults to all. A large story's responses are kept within a size "
+                           "budget: when a `detail` block lists compacted sequences, call again "
+                           "with sequence=<id> for their full rows."
         },
         "scene": {
             "type": "string",
@@ -116,11 +122,18 @@ def handler(args: dict, **kwargs) -> str:
         if not has_schema(conn):
             return json.dumps({"error": "Database schema not found. Run story_import first."})
 
-        # The base view is the default and stays deliberately slim: it is the
-        # once-per-session map, and its cost per scene is ~16 characters. Any
-        # depth beyond that is opt-in, so nothing here is conditional on `view`.
+        # The base view is the once-per-session map. Each developed scene row
+        # carries what the scene is FOR (characters, location, milestone,
+        # plots, objective, beats pointer) — a few hundred characters apiece —
+        # so a feature-length map outgrows any host cap. It is therefore held
+        # to a response budget: past it, trailing sequences are listed as
+        # compact rows and `detail` says which and how to expand them. `act` /
+        # `sequence` put the full rows where the work is.
         if view is None:
-            summary = get_project_summary(project_path)
+            from story_architect.core.budget import max_response_chars
+            summary = get_project_summary(
+                project_path, act=args.get("act"), sequence=args.get("sequence"),
+                max_chars=max_response_chars())
             if summary:
                 return json.dumps(summary)
         else:
@@ -187,11 +200,15 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     and climax roles are the story-level milestones.
 
     A scene's `scene_objective` and `turning_point` are here too, and
-    `scene_beats` is the pointer to the record they come from. They are not in
-    the base map, which is the once-per-session call and stays slim; this view
-    is the opt-in read of a scene's dramatic spine, and it already nests
-    act → sequence → scene so the two fields have a home. Each is emitted only
-    when filled, so an empty one costs nothing.
+    `scene_beats` is the pointer to the record they come from. The base map
+    carries the objective and the pointer too, but not `turning_point`, the
+    scene's `dramatic_role`, or each plot's role — this view is where those
+    live, nested act → sequence → scene. Each is emitted only when filled, so
+    an empty one costs nothing.
+
+    `act` and `sequence` narrow to that stretch of the story. Unscoped, the
+    view is held to the response budget: trailing sequences collapse to
+    `scene_count` and `detail` lists them (see core.budget).
 
     `plot` narrows the view to one plot: the `project` header's plot index keeps
     only that plot. `milestones_only` then trims the tree to the escalation
@@ -202,8 +219,18 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     scenes it promotes without calling them milestones.
     """
     act_filter = args.get("act")
+    seq_filter = args.get("sequence")
     plot_filter = args.get("plot")
     milestones_only = bool(args.get("milestones_only"))
+
+    if seq_filter:
+        ids = [r[0] for r in conn.execute(
+            "SELECT id FROM entities WHERE type='sequence' AND is_deleted=0 "
+            "ORDER BY order_key, id")]
+        if seq_filter not in ids:
+            return {"view": "dramatic_elements", "sequence": seq_filter,
+                    "error": f"No sequence with id '{seq_filter}'.",
+                    "valid_sequences": ids}
 
     # Each scene's `scene_beats` record, keyed by the scene. Only the id and the
     # two facts this view surfaces are read — not the beats, which would defeat
@@ -249,6 +276,8 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
                 "SELECT id, name, order_key, extra FROM entities "
                 "WHERE type='sequence' AND parent_id=:p ORDER BY order_key, id",
                 {"p": act_id}).fetchall():
+            if seq_filter and seq_id != seq_filter:
+                continue
             seq_extra = json.loads(seq_extra_json or "{}")
             seq = {"id": seq_id, "title": seq_title}
             if seq_extra.get("primary_plot"):
@@ -400,6 +429,7 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     out = {
         "view": "dramatic_elements",
         "act": act_filter or "all",
+        "sequence": seq_filter or "all",
         "plot": plot_filter or "all",
         "project": {
             "structure_type": pro.get("structure_type", ""),
@@ -409,6 +439,31 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
         },
         "acts": acts_out,
     }
+    # A sequence scope is an explicit request: no budget. Otherwise hold the
+    # view to the response budget by collapsing sequences from the story's end.
+    if seq_filter:
+        return out
+    from story_architect.core.budget import (
+        compacted_note, largest_fitting, max_response_chars)
+    seqs = [sq for a in acts_out for sq in a["sequences"]]
+    full_scenes = [sq["scenes"] for sq in seqs]
+
+    def build(k):
+        for i, sq in enumerate(seqs):
+            if i < k:
+                sq["scenes"] = full_scenes[i]
+                sq.pop("scene_count", None)
+            else:
+                sq.pop("scenes", None)
+                sq["scene_count"] = len(full_scenes[i])
+        return out
+
+    k, _ = largest_fitting(build, len(seqs), max_response_chars())
+    if k < len(seqs):
+        out["detail"] = compacted_note(
+            "sequence", [sq["id"] for sq in seqs[k:]],
+            "story_load view='dramatic_elements' with sequence=<id> returns "
+            "that sequence's scenes.")
     return out
 
 

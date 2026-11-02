@@ -428,11 +428,25 @@ def _coerce_number(value, default):
     return default if value is None else value
 
 
-def get_project_summary(project_path: Path) -> dict:
+def get_project_summary(project_path: Path, act: str | None = None,
+                        sequence: str | None = None,
+                        max_chars: int | None = None) -> dict:
     """Return nested project summary for story_load (spec §2).
 
     Shape: {loaded, confirmation, project, acts, characters, plots,
             locations, worlds, memory}
+
+    `act` / `sequence` scope the FULL scene rows to one act or one sequence.
+    Every other scene stays on the map as a compact row (id, title, status), so
+    the map is always complete — scoping chooses where the detail goes, it never
+    removes a scene. An explicit scope is always honoured in full.
+
+    `max_chars` is the response budget for the unscoped case. When the whole map
+    would exceed it, sequences are compacted from the END of the story until it
+    fits, and a top-level `detail` block names them and the call that expands
+    each. Left None, nothing is compacted (the pre-budget behaviour, which the
+    dashboard-free callers and the pinned-shape tests rely on). A response that
+    already fits is returned unchanged, key for key.
     """
     conn = get_db(project_path)
     try:
@@ -586,7 +600,7 @@ def get_project_summary(project_path: Path) -> dict:
                     if k in always_keep or (v and v != defaults.get(k))}
 
         # ── Build scene output ──
-        def _build_scene(sid):
+        def _build_scene(sid, lite=False):
             s = scenes[sid]
             stub = _is_scene_stub(s)
             chars = scene_chars.get(sid, [])
@@ -595,6 +609,10 @@ def get_project_summary(project_path: Path) -> dict:
                 if chars:
                     result["characters"] = chars
                 return result
+            if lite:
+                # Compact row: enough to see the scene exists, where it sits
+                # and how far along it is. The rest is one scoped call away.
+                return {"id": sid, "title": s["title"], "status": s["status"]}
             result = {
                 "id": sid,
                 "title": s["title"],
@@ -632,7 +650,7 @@ def get_project_summary(project_path: Path) -> dict:
                          always_keep={"status"})
 
         # ── Build sequence output ──
-        def _build_sequence(seq_id):
+        def _build_sequence(seq_id, lite=False):
             seq = sequences[seq_id]
             child_scene_ids = sorted(
                 [sid for sid, s in scenes.items() if s["_parent_id"] == seq_id],
@@ -645,11 +663,11 @@ def get_project_summary(project_path: Path) -> dict:
                 "id": seq["id"],
                 "title": seq["title"],
                 "status": seq["status"],
-                "scenes": [_build_scene(sid) for sid in child_scene_ids],
+                "scenes": [_build_scene(sid, lite) for sid in child_scene_ids],
             }
 
         # ── Build act output ──
-        def _build_act(act_id):
+        def _build_act(act_id, full_seqs):
             act = acts[act_id]
             child_seq_ids = sorted(
                 [sid for sid, s in sequences.items() if s["_parent_id"] == act_id],
@@ -659,7 +677,8 @@ def get_project_summary(project_path: Path) -> dict:
                 "id": act["id"],
                 "title": act["title"],
                 "status": act["status"],
-                "sequences": [_build_sequence(sid) for sid in child_seq_ids],
+                "sequences": [_build_sequence(sid, lite=sid not in full_seqs)
+                              for sid in child_seq_ids],
             }
 
         # Build top-level acts (those without parent_id or parent not in acts)
@@ -667,7 +686,31 @@ def get_project_summary(project_path: Path) -> dict:
             [aid for aid, a in acts.items() if not a["_parent_id"] or a["_parent_id"] not in acts],
             key=lambda aid: (acts[aid]["_order_key"], aid)
         )
-        acts_list = [_build_act(aid) for aid in top_act_ids]
+        # ── Scope and budget: which sequences carry full scene rows ──
+        # Story order across the whole map, so "from the end" means the end of
+        # the story rather than the end of a dict.
+        def _seq_children(act_id):
+            return sorted(
+                [sid for sid, sq in sequences.items() if sq["_parent_id"] == act_id],
+                key=lambda sid: (sequences[sid]["_order_key"], sid))
+        ordered_seq_ids = [sid for aid in top_act_ids for sid in _seq_children(aid)]
+
+        if sequence is not None and sequence not in sequences:
+            return {"error": f"No sequence with id '{sequence}'.",
+                    "valid_sequences": ordered_seq_ids}
+        if act is not None and act not in acts:
+            return {"error": f"No act with id '{act}'.",
+                    "valid_acts": top_act_ids}
+        if sequence is not None:
+            scope_ids = [sequence]
+        elif act is not None:
+            scope_ids = _seq_children(act)
+        else:
+            scope_ids = ordered_seq_ids
+        explicit_scope = sequence is not None or act is not None
+
+        def _acts_for(full_seqs):
+            return [_build_act(aid, full_seqs) for aid in top_act_ids]
 
         # ── Computed character relationship summary (CONVENTION_computed_fields) ──
         char_rel_summary = {}
@@ -767,18 +810,43 @@ def get_project_summary(project_path: Path) -> dict:
         # ── Memory ──
         memory_block = get_memory_block(project_path)
 
-        result = {
-            "loaded": True,
-            "confirmation": confirmation,
-            "project": project,
-            "acts": acts_list,
-            "characters": characters_list,
-            "plots": plots_list,
-            "worlds": worlds_list,
-            "memory": memory_block,
-        }
-        if orphaned_locations:
-            result["orphaned_locations"] = orphaned_locations
+        def _assemble(full_seqs):
+            result = {
+                "loaded": True,
+                "confirmation": confirmation,
+                "project": project,
+                "acts": _acts_for(full_seqs),
+                "characters": characters_list,
+                "plots": plots_list,
+                "worlds": worlds_list,
+                "memory": memory_block,
+            }
+            if orphaned_locations:
+                result["orphaned_locations"] = orphaned_locations
+            return result
+
+        # A sequence scope is an explicit request for that detail: no budget.
+        # An act scope, or none, is held to `max_chars` when one is given.
+        if sequence is not None or max_chars is None:
+            result = _assemble(set(scope_ids))
+            compacted = []
+        else:
+            from .budget import largest_fitting
+            k, result = largest_fitting(
+                lambda n: _assemble(set(scope_ids[:n])), len(scope_ids), max_chars)
+            compacted = scope_ids[k:]
+
+        if explicit_scope:
+            result["scope"] = {
+                k_: v for k_, v in (("act", act), ("sequence", sequence)) if v}
+            result["scope"]["note"] = (
+                "Scenes outside this scope are compact rows (id, title, status). "
+                "Call again with another act or sequence for their full rows.")
+        if compacted:
+            from .budget import compacted_note
+            result["detail"] = compacted_note(
+                "sequence", compacted,
+                "story_load with sequence=<id> returns that sequence's full scene rows.")
         return result
     finally:
         conn.close()
