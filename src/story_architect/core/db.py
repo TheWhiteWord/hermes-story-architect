@@ -1382,7 +1382,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                FROM sections s
                JOIN entities e ON s.entity_id = e.id
                LEFT JOIN entities p ON e.parent_id = p.id
-               WHERE e.type='scene' AND s.heading='Content' AND s.body != ''
+               WHERE e.type='scene' AND e.is_deleted=0 AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
         screenplay_text = "\n\n".join(r[0] for r in scene_content_rows)
@@ -1518,7 +1518,7 @@ def get_screenplay_text(project_path: Path) -> str:
                JOIN entities e ON s.entity_id = e.id
                LEFT JOIN entities p ON e.parent_id = p.id
                LEFT JOIN entities pp ON p.parent_id = pp.id
-               WHERE e.type='scene' AND s.heading='Content' AND s.body != ''
+               WHERE e.type='scene' AND e.is_deleted=0 AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(pp.order_key, 0), COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
         return "\n\n".join(r[0] for r in rows)
