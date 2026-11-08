@@ -7,6 +7,17 @@ It deliberately does NOT describe the other tools. Tool schemas are already in
 the model's context at all times — that is how tool calling works — so repeating
 them here spends tokens telling the model something it already knows. Each tool
 carries its own `description` instead, which is where the model actually reads it.
+
+This is the one tool whose answer must never arrive cut. The section names it
+lists are a CLOSED SET that story_draft enforces, so an agent that saw half a
+schema loses whole writes, not one field. The full set of types is large, and a
+host that spills an over-long result leaves the agent a preview it cannot read
+past. So the answer is held to the response budget (core.budget) in WHOLE
+TYPES: each type comes back complete — every field, every section — or not at
+all, and what did not fit is named in `deferred_types`. There is no compact form
+of a schema, so nothing is shortened. When several tool calls land in one turn,
+a host spills the largest first; asking for the types you need keeps this
+answer from being that one.
 """
 import json
 
@@ -158,25 +169,85 @@ SCHEMA = {
         "entity_type": {
             "type": "string",
             "enum": list(ENTITY_SCHEMAS),
-            "description": "Entity type to describe. Omit for all types.",
-        }
+            "description": "Entity type to describe. Omit (and entity_types) for all types — "
+                           "the full set is large, so ask for the types you need.",
+        },
+        "entity_types": {
+            "type": "array",
+            "items": {"type": "string", "enum": list(ENTITY_SCHEMAS)},
+            "description": "Several entity types at once, e.g. ['scene', 'scene_beats']. "
+                           "Each comes back complete. If they would not all fit the size "
+                           "budget the response is marked `truncated` and `deferred_types` "
+                           "lists the ones to ask for next.",
+        },
     },
 }
 
 
-def handler(args: dict, **kwargs) -> str:
-    """Return field metadata for the requested entity type(s)."""
-    entity_type = args.get("entity_type")
+def _requested_types(args: dict) -> tuple[list[str], list[str]]:
+    """(types in the order asked, unknown names). No request means all types.
 
-    if entity_type and entity_type not in ENTITY_SCHEMAS:
+    `entity_type` and `entity_types` combine rather than conflict — a model that
+    sends both gets the union, in the order given, each type once. A bare string
+    where a list belongs is read as a one-item list.
+    """
+    asked: list = []
+    single = args.get("entity_type")
+    if single:
+        asked.append(single)
+    many = args.get("entity_types")
+    if isinstance(many, str):
+        many = [many]
+    if isinstance(many, (list, tuple)):
+        asked.extend(many)
+    seen, types, unknown = set(), [], []
+    for name in asked:
+        if not isinstance(name, str):
+            unknown.append(name)
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        (types if name in ENTITY_SCHEMAS else unknown).append(name)
+    if not asked:
+        types = list(ENTITY_SCHEMAS)
+    return types, unknown
+
+
+def handler(args: dict, **kwargs) -> str:
+    """Return field metadata for the requested entity type(s), whole types only."""
+    from story_architect.core.budget import json_size, max_response_chars
+
+    types, unknown = _requested_types(args)
+    if unknown:
+        label = "entity_type" if len(unknown) == 1 else "entity_types"
         return json.dumps({
             "success": False,
-            "error": f"Unknown entity_type: {entity_type}. "
+            "error": f"Unknown {label}: {', '.join(map(str, unknown))}. "
                      f"Available: {', '.join(ENTITY_SCHEMAS)}",
         })
 
-    types = [entity_type] if entity_type else list(ENTITY_SCHEMAS)
-    return json.dumps({
-        "success": True,
-        "entity_schemas": _entity_schemas(types),
-    })
+    schemas = _entity_schemas(types)
+    kept, deferred = list(types), []
+
+    def assemble() -> dict:
+        response = {"success": True,
+                    "entity_schemas": {t: schemas[t] for t in kept}}
+        if deferred:
+            response["truncated"] = True
+            response["deferred_types"] = list(deferred)
+            response["hint"] = (
+                f"{len(kept)} of {len(types)} entity types are returned, each complete "
+                f"(every field and section). The size budget stopped the rest. Call "
+                f"again with entity_types=deferred_types to read them.")
+        return response
+
+    # Measured on the real output, not estimated. The first type is always
+    # returned whole, however large: an agent must be able to read at least one
+    # complete schema, and the budget floor is well above any single type.
+    budget = max_response_chars()
+    response = assemble()
+    while json_size(response) > budget and len(kept) > 1:
+        deferred.insert(0, kept.pop())
+        response = assemble()
+    return json.dumps(response)

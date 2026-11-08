@@ -19,6 +19,16 @@ def _isolate_root(monkeypatch, tmp_path):
     monkeypatch.setattr("story_architect.core.config.load_plugin_config", lambda: {"root_path": str(tmp_path)})
 
 
+@pytest.fixture(autouse=True)
+def _isolate_budget(monkeypatch, tmp_path):
+    """The response budget is a user setting (env var or config.toml), so a
+    developer's own value must not change what a test expects. Without this, a
+    config.toml sized for a small model would make every completeness test that
+    asks for all entity types start failing on that one machine."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
+
+
 def build_fixture_db(dest: Path, root: str) -> None:
     """Import the fixture's markdown into `dest`, which must already be a copy.
 

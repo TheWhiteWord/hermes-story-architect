@@ -33,14 +33,6 @@ def _no_user_config(tmp_path, monkeypatch):
     monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
 
 
-@pytest.fixture(autouse=True)
-def _no_user_config(tmp_path, monkeypatch):
-    """A developer's own ~/.config/story-architect/config.toml must not change
-    what these tests expect from the default budget."""
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
-    monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
-
-
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 N_SEQ, PER_SEQ = 6, 8          # 48 scenes: enough to overflow a small budget
 N_REL_COPIES = 10              # 3 real relationships x 10 = 33 total
@@ -435,3 +427,164 @@ class TestRelationshipViewBudget:
     def test_unknown_character_says_so(self, big):
         r = self.rels(big, character="nobody")
         assert r["relationships"] == [] and "nobody" in r["note"]
+
+
+# ── story_search ────────────────────────────────────────────────────────────
+
+class TestSearchLimit:
+    """`maximum: 50` in the schema is advice; nothing enforces it upstream, and
+    SQLite reads LIMIT -1 as "no limit"."""
+
+    @staticmethod
+    def search(project, **args):
+        from story_architect.tools.story_search import handler
+        return json.loads(handler({"project": "save-the-children", "query": "scene",
+                                   **args}, root_path=str(project.parent.parent)))
+
+    def test_an_oversized_limit_is_capped_and_says_so(self, big):
+        r = self.search(big, limit=500)
+        assert r["total"] == 50 and r["total_matches"] > 50
+        assert "brought into range" in r["note"]
+
+    @pytest.mark.parametrize("limit", [-1, 0, -999])
+    def test_non_positive_limits_never_mean_unlimited(self, big, limit):
+        r = self.search(big, limit=limit)
+        assert r["total"] == 1
+
+    @pytest.mark.parametrize("limit", ["abc", None, [3], {}])
+    def test_a_bad_type_falls_back_to_the_default(self, big, limit):
+        assert self.search(big, limit=limit)["total"] == 10
+
+    def test_a_numeric_string_is_accepted(self, big):
+        assert self.search(big, limit="5")["total"] == 5
+
+    def test_in_range_limit_is_untouched_and_unannounced(self, big):
+        r = self.search(big, limit=7)
+        assert r["total"] == 7 and "brought into range" not in r.get("note", "")
+
+    def test_worst_case_stays_small(self, big):
+        from story_architect.tools.story_search import handler
+        raw = handler({"project": "save-the-children", "query": "scene", "limit": 9999},
+                      root_path=str(big.parent.parent))
+        assert len(raw) < 20_000
+
+
+# ── story_describe ──────────────────────────────────────────────────────────
+
+class TestDescribeBudget:
+    """story_describe is the one answer that must never arrive cut: its section
+    names are a CLOSED SET that story_draft enforces, so half a schema loses
+    whole writes. Schemas have no compact form, so the unit is the whole type."""
+
+    @staticmethod
+    def describe(monkeypatch, budget=None, **args):
+        from story_architect.tools.story_describe import handler
+        if budget:
+            monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", str(budget))
+        return json.loads(handler(args))
+
+    @staticmethod
+    def truth():
+        from story_architect.tools.story_describe import _entity_schemas
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        return _entity_schemas(list(ENTITY_SCHEMAS))
+
+    def test_fitting_response_is_unchanged(self, monkeypatch):
+        r = self.describe(monkeypatch)
+        assert r["success"] is True
+        assert r["entity_schemas"] == self.truth()
+        assert not {"truncated", "deferred_types", "hint"} & r.keys()
+
+    def test_over_budget_returns_complete_types_and_names_the_rest(self, monkeypatch):
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        truth = self.truth()
+        r = self.describe(monkeypatch, budget=9000)
+        assert r["truncated"] is True and r["deferred_types"]
+        got = list(r["entity_schemas"])
+        assert got + r["deferred_types"] == list(ENTITY_SCHEMAS), \
+            "contiguous, in declared order"
+        for name, schema in r["entity_schemas"].items():
+            assert schema == truth[name], f"{name} must be whole, field for field"
+        assert len(json.dumps(r)) <= 9000
+        assert "deferred_types" in r["hint"]
+
+    @pytest.mark.parametrize("budget", [2000, 6000, 9000, 17000, 25000])
+    def test_paging_reads_every_type_once_and_whole(self, monkeypatch, budget):
+        truth = self.truth()
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", str(budget))
+        from story_architect.tools.story_describe import handler
+        pending, seen, calls = None, [], 0
+        while True:
+            r = json.loads(handler({"entity_types": pending} if pending else {}))
+            calls += 1
+            assert calls <= len(truth), "paging must make progress"
+            for name, schema in r["entity_schemas"].items():
+                assert schema == truth[name]
+            seen += list(r["entity_schemas"])
+            pending = r.get("deferred_types")
+            if not pending:
+                break
+        assert seen == list(truth)
+
+    def test_the_closed_section_set_survives_every_budget(self, monkeypatch):
+        """The reason this tool is essential. Whatever comes back, a type's
+        standard_sections must be there — never a type without its section list."""
+        for budget in (2000, 7000, 12000, 40000):
+            r = self.describe(monkeypatch, budget=budget)
+            for name, fields in r["entity_schemas"].items():
+                assert fields["sections"]["standard_sections"], (name, budget)
+
+    def test_the_first_type_is_never_cut_even_if_it_alone_exceeds_the_budget(
+            self, monkeypatch):
+        r = self.describe(monkeypatch, budget=2000, entity_type="scene")
+        assert list(r["entity_schemas"]) == ["scene"]
+        assert r["entity_schemas"]["scene"] == self.truth()["scene"]
+        assert "truncated" not in r
+
+    def test_several_types_in_one_call_keep_their_order(self, monkeypatch):
+        r = self.describe(monkeypatch, entity_types=["scene_beats", "scene", "plot"])
+        assert list(r["entity_schemas"]) == ["scene_beats", "scene", "plot"]
+        assert "truncated" not in r
+
+    def test_asking_for_several_types_still_defers_the_tail(self, monkeypatch):
+        r = self.describe(monkeypatch, budget=7000,
+                          entity_types=["scene", "plot", "project", "character"])
+        assert r["truncated"] is True
+        assert list(r["entity_schemas"]) + r["deferred_types"] == \
+            ["scene", "plot", "project", "character"]
+
+    def test_entity_type_and_entity_types_combine_without_duplicates(self, monkeypatch):
+        r = self.describe(monkeypatch, entity_type="plot",
+                          entity_types=["plot", "scene"])
+        assert list(r["entity_schemas"]) == ["plot", "scene"]
+
+    def test_a_bare_string_for_entity_types_is_read_as_one_item(self, monkeypatch):
+        r = self.describe(monkeypatch, entity_types="character")
+        assert list(r["entity_schemas"]) == ["character"]
+
+    @pytest.mark.parametrize("bad, shown", [
+        ({"entity_type": "nope"}, "nope"),
+        ({"entity_types": ["scene", "nope", "alsonope"]}, "nope, alsonope"),
+        ({"entity_types": [{"x": 1}]}, "x"),
+    ])
+    def test_unknown_types_fail_cleanly_and_name_the_valid_ones(
+            self, monkeypatch, bad, shown):
+        r = self.describe(monkeypatch, **bad)
+        assert r["success"] is False and shown in r["error"]
+        assert "scene" in r["error"] and "Available" in r["error"]
+
+    def test_the_schema_offers_entity_types_and_cannot_drift_from_the_data(self):
+        from story_architect.tools.story_describe import SCHEMA
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        prop = SCHEMA["properties"]["entity_types"]
+        assert prop["type"] == "array"
+        assert prop["items"]["enum"] == list(ENTITY_SCHEMAS)
+
+    def test_no_type_is_larger_than_a_small_budget_floor(self):
+        """A single type has to fit the smallest budget anyone should set,
+        because a type is the unit that is never split. If a schema grows past
+        this, the floor (or the schema) needs a decision — not a silent cut."""
+        from story_architect.tools.story_describe import _entity_schemas
+        from story_architect.core.constants import ENTITY_SCHEMAS
+        biggest = max(len(json.dumps(_entity_schemas([t]))) for t in ENTITY_SCHEMAS)
+        assert biggest < 8_000, f"largest single type is {biggest} chars"
