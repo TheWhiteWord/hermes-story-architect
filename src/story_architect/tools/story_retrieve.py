@@ -5,7 +5,9 @@ The counterpart to story_load ("what exists and where" vs "what does this say").
 * A typo'd or mistyped id reports the project, not the import tool.
 * Relation-backed fields (plot beats, scene characters) are reachable, so a
   plot's crisis scene can be read as empty.
-* Any number of entities per call.
+* Any number of entities per call, held to a response budget: whole entities
+  up to the budget, then `truncated` + `deferred_ids` + a hint. An entity is
+  never cut in half — it is returned complete or not at all (see core.budget).
 """
 import json
 from pathlib import Path
@@ -40,7 +42,10 @@ SCHEMA = {
             "items": {"type": "string"},
             "description": "Entity id(s), exactly as returned by story_load. Several at once is "
                            "cheaper than one call per id. For entity_type='project' use the "
-                           "project name from story_load.",
+                           "project name from story_load. Responses are kept within a size "
+                           "budget: entities come back whole, in the order given, and if "
+                           "they would not all fit the response is marked `truncated` and "
+                           "`deferred_ids` lists the ones to ask for next.",
         },
         "sections": {
             "type": "array",
@@ -233,6 +238,14 @@ def _sections(conn, entity_id: str, wanted) -> dict:
     return {name: bodies.get(name) for name in wanted}
 
 
+def _section_sizes(conn, entity_id: str) -> dict:
+    """Heading -> characters, for an entity too big to return whole, so the
+    agent can ask for its sections one at a time instead of guessing."""
+    return {h: len(b or "") for h, b in conn.execute(
+        "SELECT heading, body FROM sections WHERE entity_id=? ORDER BY rowid",
+        (entity_id,))}
+
+
 def handler(args: dict, **kwargs) -> str:
     """Return the requested fields and sections for one or more entities."""
     from story_architect.core.config import resolve_root
@@ -279,8 +292,17 @@ def handler(args: dict, **kwargs) -> str:
         # different claim, and the wrong one.
         wanted = set(schema) if want_fields == ["all"] else set(want_fields or [])
 
-        entities, not_found = [], []
-        for entity_id in ids:
+        from story_architect.core.budget import json_size, max_response_chars
+        budget = max_response_chars()
+        # What the envelope costs beside the entities: the type, the keys, and
+        # room for `truncated`, `deferred_ids` and the hint.
+        used = json_size({"entity_type": entity_type, "entities": []}) + 400
+        entities, not_found, deferred = [], [], []
+        oversize = None
+        for position, entity_id in enumerate(ids):
+            if deferred:
+                deferred.append(entity_id)   # once one is deferred, the tail is
+                continue
             row, error = _resolve(conn, entity_type, entity_id)
             if error:
                 not_found.append({"id": entity_id, "error": error})
@@ -301,12 +323,51 @@ def handler(args: dict, **kwargs) -> str:
             # one more section among them.
             if wanted:
                 entry["unfilled_fields"] = _unfilled(conn, data, entity_type)
+            # Whole entities only. The FIRST is always returned, however big:
+            # refusing it would leave the agent with nothing to act on. Every
+            # later one must fit alongside what is already there, plus the ids
+            # that would be deferred if it does not.
+            cost = json_size(entry) + 2
+            if entities:
+                tail = sum(len(i) + 4 for i in ids[position:])
+                if used + cost + tail > budget:
+                    deferred.append(entity_id)
+                    continue
+            elif used + cost > budget:
+                oversize = {"id": data["id"],
+                            "section_sizes": _section_sizes(conn, data["id"])}
             entities.append(entry)
+            used += cost
     finally:
         conn.close()
 
-    response = {"entity_type": entity_type, "entities": entities}
-    if not_found:
-        response["not_found"] = not_found
-        response["hint"] = "Call story_load to list valid ids for this project."
+    def assemble() -> dict:
+        response = {"entity_type": entity_type, "entities": entities}
+        hints = []
+        if not_found:
+            response["not_found"] = not_found
+            hints.append("Call story_load to list valid ids for this project.")
+        if deferred:
+            response["truncated"] = True
+            response["deferred_ids"] = deferred
+            hints.append(
+                f"{len(entities)} of {len(ids)} requested entities are returned, "
+                f"each complete; the size budget stopped the rest. Call again with "
+                f"deferred_ids (same sections/fields) to read them.")
+        if oversize:
+            response["over_budget"] = oversize
+            hints.append(
+                f"'{oversize['id']}' alone is larger than the size budget. To read it "
+                f"in parts, request one section at a time — section_sizes lists them.")
+        if hints:
+            response["hint"] = " ".join(hints)
+        return response
+
+    # The estimate in the loop above is a shortcut; this is the guarantee, taken
+    # on the real output. Hand back the last entity until it fits (never the
+    # first), so the response is within budget unless one entity alone is not.
+    response = assemble()
+    while json_size(response) > budget and len(entities) > 1:
+        deferred.insert(0, entities.pop()["id"])
+        response = assemble()
     return json.dumps(response)

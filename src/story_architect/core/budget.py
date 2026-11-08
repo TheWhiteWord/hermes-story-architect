@@ -1,32 +1,39 @@
 """Response budget: keep a tool's answer small enough that the host never has
 to cut it for us.
 
-Why this exists. Hermes caps every MCP result (`tool_budget.mcp_result_size_chars`,
-50k chars by default and scaled DOWN for small context windows: ~19k at a 32k
-window, ~39k at 65k). Past the cap the host swaps the result for a ~1.5k-char
-preview plus a file path, and this plugin's agents have no file tools to read
-that path with. The agent then proceeds on a preview of a map that was meant to
-be whole. A story tool's answer has to be complete or say, in its own words,
-what it left out and how to ask for it.
+Why this exists. A host agent caps every tool result. Past its cap it swaps the
+result for a short preview plus a file path, and this plugin's agents have no
+file tools to read that path with. The agent then proceeds on a preview of a
+map that was meant to be whole. A story tool's answer has to be complete or
+say, in its own words, what it left out and how to ask for it.
 
 So the rule here is: *the tool* decides what to compact, at a structural
 boundary (a whole sequence, a whole entity), and says so. The host's cut never
 fires. Nothing is silently dropped — a compacted unit stays visible as a
 compact row, and the response carries the exact call that expands it.
 
-The budget is in characters of the JSON text, which is what the host counts.
-Set it a little under the host's threshold:
+The budget is in characters of the JSON text, which is what a host counts. It
+must sit a little UNDER the host's cap, and that cap is not a fixed number: it
+usually scales with the model's context window, which this plugin cannot see.
+So the budget is a setting you state once, resolved in this order:
 
-    STORY_ARCHITECT_MAX_RESPONSE_CHARS   (default 35000)
+    1. env var   STORY_ARCHITECT_MAX_RESPONSE_CHARS
+    2. config    max_response_chars   in the [story_architect] table of
+                 ~/.config/story-architect/config.toml (the file that already
+                 holds port and root)
+    3. default   35000   (safe from ~65k-token windows up)
 
-For a 32k-token model use ~15000; for 65k use ~30000; for 128k+ the default
-is already safely under the host's 50k.
+A value that is not a whole number >= 2000 is ignored and the next source is
+tried. A host adapter (see adapters/) can provide a helper that works the
+number out for its host's model.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import tomllib
+from pathlib import Path
 from typing import Callable
 
 DEFAULT_MAX_RESPONSE_CHARS = 35_000
@@ -35,16 +42,41 @@ _ENV = "STORY_ARCHITECT_MAX_RESPONSE_CHARS"
 _MIN_SANE = 2_000
 
 
-def max_response_chars() -> int:
-    """The configured budget, falling back to the default on a bad value."""
-    raw = os.environ.get(_ENV, "").strip()
-    if not raw:
-        return DEFAULT_MAX_RESPONSE_CHARS
+def _valid(value) -> int | None:
+    """`value` as a usable budget, or None. Bools and floats are not budgets."""
+    if isinstance(value, bool):
+        return None
     try:
-        value = int(raw)
-    except ValueError:
-        return DEFAULT_MAX_RESPONSE_CHARS
-    return value if value >= _MIN_SANE else DEFAULT_MAX_RESPONSE_CHARS
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return number if number >= _MIN_SANE else None
+
+
+def _config_file() -> Path:
+    # Same location as app/config.py (core may not import from app).
+    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "story-architect" / "config.toml"
+
+
+def _from_config_file() -> int | None:
+    try:
+        with _config_file().open("rb") as f:
+            table = tomllib.load(f).get("story_architect", {})
+        return _valid(table.get("max_response_chars"))
+    except Exception:   # a missing or malformed file just means "not set"
+        return None
+
+
+def max_response_chars() -> int:
+    """The response budget: env var, then config.toml, then the default."""
+    from_env = _valid(os.environ.get(_ENV, ""))
+    if from_env is not None:
+        return from_env
+    from_file = _from_config_file()
+    if from_file is not None:
+        return from_file
+    return DEFAULT_MAX_RESPONSE_CHARS
 
 
 def json_size(obj) -> int:

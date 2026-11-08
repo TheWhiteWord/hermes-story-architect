@@ -1,12 +1,24 @@
 # ISSUE TICKETS
 
-## ISSUE 1 - TOOL OUTPUT TRUNCATION (MEDIUM PRIORITY)
+## ISSUE 1 - TOOL OUTPUT TRUNCATION (MEDIUM PRIORITY) [parially solved - commit `3c9c6974f0e9594af0ef9a1ebe1a8e81bfd87b8e`]
 
 Need to check if tool outputs are being truncted , or if they are ony truncated in the report. The tool output is being truncated in the report, but not sure if they are truncated in the tool output to the llm itself.
 
-## ISSUE 2 - EDITOR UI  (LOW PRIORITY)
+**Fix:**
+Patch file;
+- Under budget, nothing changes. Small projects get the same output as before, key for key (tested).
+- Over budget, trailing sequences compact.
+    - They become id/title/status rows (or scene_count in dramatic_elements).
+    - Nothing is removed.
+    - A detail block names exactly which sequences were compacted and gives the call that expands them (tested).
+- sequence= is now on the base map and dramatic_elements. An explicit sequence is always answered in full, regardless of budget. act= works on the base map too.
+- Budget: STORY_ARCHITECT_MAX_RESPONSE_CHARS, default 35000. Set it somewhat under Hermes’s threshold: about 15000 for a 32k-token model, 30000 for 65k, and the default is fine from 128k up.
 
-Elements voices shopwn at the side of the script page they are not lined and some are appearing in the page itself. Also the left spacing pf the scipt to the left edge cna be reducee so taht when other views are opened they cna push the script view further in.
+## ISSUE 2 - EDITOR UI  (LOW PRIORITY) - [SOLVED in commit `e5811d805f5b8e2bcdc7e0e410461c5c04248e30`]
+
+Elements voices shown at the side of the script page they are not alllined with one another and some are appearing over the scipt page itself. Also the minimum spacing of the script page in the edit to the left edge can be reduced (probably half) so taht when other views are opened they can push the script view further in (to the left).
+
+**Fix:**: Gutter marks removed
 
 ## ISSUE 3 - SCRIPT VIEW (HIGH PRIORITY) - [SOLVED in commit `0f0ae7bb0aa108d16eb8043971b01f47c96ecd55`]
 

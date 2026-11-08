@@ -30,6 +30,13 @@ SCHEMA = {
                            "'track' = one entity across the story, in story order."
         },
 
+        "character": {
+            "type": "string",
+            "description": "For view='relationship': only the relationships that involve "
+                           "this character id, in full. Unscoped, a large cast's graph is "
+                           "kept within a size budget: when `detail` lists compacted "
+                           "relationships, call again with character=<id>."
+        },
         "act": {
             "type": "string",
             "description": "Limit to one act id. Base map: full scene rows for that act, "
@@ -157,7 +164,7 @@ def _extended_view(conn, project_path, view: str, args: dict):
     if view == "dramatic_elements":
         return _view_dramatic_elements(conn, args)
     if view == "relationship":
-        return _view_relationship(conn)
+        return _view_relationship(conn, args)
     if view == "unfilled":
         return _view_unfilled(project_path, args)
     if view == "values":
@@ -467,14 +474,25 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
     return out
 
 
-def _view_relationship(conn) -> dict:
-    """Every relationship with its per-character perspectives."""
+def _view_relationship(conn, args: dict) -> dict:
+    """Relationships with their per-character perspectives.
+
+    Each row carries the scenes it appears in and a perspective per character,
+    so the whole graph grows with the cast AND with how often each pair meets.
+    `character` narrows to the relationships that involve one character, always
+    in full. Unscoped, the view is held to the response budget: relationships
+    past it are listed compactly (id, name, characters — the skeleton of who is
+    tied to whom) and `detail` says how to read them in full.
+    """
+    character = args.get("character")
     out = []
     for rel_id, name, status, extra_json in conn.execute(
             "SELECT id, name, status, extra FROM entities "
             "WHERE type='relationship' AND is_deleted=0 "
             "ORDER BY id").fetchall():
         extra = json.loads(extra_json or "{}")
+        if character and character not in extra.get("characters", []):
+            continue
         perspectives = extra.get("perspectives", {})
         out.append({
             "id": rel_id,
@@ -492,7 +510,31 @@ def _view_relationship(conn) -> dict:
                 for char_id, p in sorted(perspectives.items())
             ],
         })
-    return {"view": "relationship", "relationships": out}
+    if character:
+        result = {"view": "relationship", "character": character,
+                  "relationships": out}
+        if not out:
+            result["note"] = (f"No relationship involves '{character}'. Ids are "
+                              f"exactly as returned by story_load.")
+        return result
+
+    from story_architect.core.budget import (
+        compacted_note, largest_fitting, max_response_chars)
+    full_rows = list(out)
+
+    def build(k):
+        rows = [r if i < k else {"id": r["id"], "name": r["name"],
+                                 "characters": r["characters"]}
+                for i, r in enumerate(full_rows)]
+        return {"view": "relationship", "relationships": rows}
+
+    k, result = largest_fitting(build, len(full_rows), max_response_chars())
+    if k < len(full_rows):
+        result["detail"] = compacted_note(
+            "relationship", [r["id"] for r in full_rows[k:]],
+            "story_load view='relationship' with character=<id> returns that "
+            "character's relationships in full.")
+    return result
 
 
 # The unfilled view is a suggestion list, not an inventory: a project with 90

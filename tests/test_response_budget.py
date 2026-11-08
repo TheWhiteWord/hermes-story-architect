@@ -25,8 +25,25 @@ from story_architect.core import budget
 from story_architect.core.db import get_project_summary
 from story_architect.tools.story_load import handler as load_handler
 
+@pytest.fixture(autouse=True)
+def _no_user_config(tmp_path, monkeypatch):
+    """A developer's own ~/.config/story-architect/config.toml must not change
+    what these tests expect from the default budget."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_user_config(tmp_path, monkeypatch):
+    """A developer's own ~/.config/story-architect/config.toml must not change
+    what these tests expect from the default budget."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
+
+
 FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
 N_SEQ, PER_SEQ = 6, 8          # 48 scenes: enough to overflow a small budget
+N_REL_COPIES = 10              # 3 real relationships x 10 = 33 total
 SMALL = "6000"                 # chars; forces compaction without a huge project
 
 
@@ -42,6 +59,14 @@ def _grow(project_dir: Path):
     seq_tpl = (project_dir / "sequences" / "The Discovery.md").read_text()
     scene_tpl = (project_dir / "scenes" / "Central Room - Day.md").read_text()
     beats_tpl = (project_dir / "scene_beats" / "Central Room - Day.md").read_text()
+    # A larger cast: ten copies of each of the fixture's three relationships,
+    # so which characters they involve is real, not invented.
+    for tpl_file in sorted((project_dir / "relationships").glob("*.md")):
+        tpl = tpl_file.read_text()
+        for r in range(N_REL_COPIES):
+            (project_dir / "relationships" / f"{tpl_file.stem} {r}.md").write_text(
+                _sub(_sub(tpl, id=f"{tpl_file.stem.lower().replace(' ', '-')}-{r}"),
+                     name=f"{tpl_file.stem} {r}"))
     n = 0
     for s in range(N_SEQ):
         (project_dir / "sequences" / f"Gen Seq {s}.md").write_text(
@@ -256,3 +281,157 @@ class TestDramaticElementsScopeAndBudget:
     def test_unknown_sequence_names_the_valid_ones(self, big):
         bad = load(big, view="dramatic_elements", sequence="nope")
         assert "error" in bad and "gen-seq-0" in bad["valid_sequences"]
+
+
+# ── story_retrieve ──────────────────────────────────────────────────────────
+
+def retrieve(project, ids, entity_type="scene", **extra):
+    from story_architect.tools.story_retrieve import handler
+    args = {"project": "save-the-children", "entity_type": entity_type, "id": ids,
+            "sections": ["all"], "fields": ["all"], **extra}
+    return json.loads(handler(args, root_path=str(project.parent.parent)))
+
+
+def gen_ids():
+    return [f"gen-scene-{i}" for i in range(N_SEQ * PER_SEQ)]
+
+
+def unbudgeted(project, monkeypatch, ids):
+    """Ground truth: every entity, read with a budget too big to bite. The
+    default budget would truncate the truth itself."""
+    monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "100000000")
+    r = retrieve(project, ids)
+    assert "truncated" not in r
+    return {e["id"]: e for e in r["entities"]}
+
+
+class TestRetrieveBudget:
+    def test_fitting_response_is_unchanged(self, small, monkeypatch):
+        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
+        r = retrieve(small, ["central-room-day", "central-room-night"])
+        assert len(r["entities"]) == 2
+        assert not {"truncated", "deferred_ids", "hint", "over_budget"} & r.keys()
+
+    def test_over_budget_returns_whole_entities_then_defers_the_tail(
+            self, big, monkeypatch):
+        ids = gen_ids()
+        truth = unbudgeted(big, monkeypatch, ids)
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
+        r = retrieve(big, ids)
+
+        assert r["truncated"] is True
+        got = [e["id"] for e in r["entities"]]
+        assert got and r["deferred_ids"]
+        assert got + r["deferred_ids"] == ids, "contiguous, in request order"
+        for e in r["entities"]:
+            assert e == truth[e["id"]], "an entity is whole or absent, never cut"
+        assert len(json.dumps(r)) <= int(SMALL)
+        assert "deferred_ids" in r["hint"]
+
+    def test_following_deferred_ids_reads_everything_exactly_once(
+            self, big, monkeypatch):
+        ids = gen_ids()
+        truth = unbudgeted(big, monkeypatch, ids)
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
+        pending, seen, calls = ids, [], 0
+        while pending:
+            r = retrieve(big, pending)
+            calls += 1
+            assert calls < 100, "paging must make progress"
+            seen += [e["id"] for e in r["entities"]]
+            pending = r.get("deferred_ids", [])
+        assert seen == ids and calls > 1
+        assert set(seen) == set(truth) and len(seen) == len(set(seen))
+
+    def test_first_entity_is_returned_even_if_it_alone_is_too_big(
+            self, big, monkeypatch):
+        import sqlite3
+        db = big / ".story" / "story.db"
+        conn = sqlite3.connect(db)
+        conn.execute("UPDATE sections SET body=? WHERE entity_id='gen-scene-0' "
+                     "AND rowid=(SELECT min(rowid) FROM sections "
+                     "WHERE entity_id='gen-scene-0')", ("x" * 20000,))
+        conn.commit(); conn.close()
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "8000")
+
+        r = retrieve(big, ["gen-scene-0", "gen-scene-1"])
+        assert [e["id"] for e in r["entities"]] == ["gen-scene-0"]
+        assert r["deferred_ids"] == ["gen-scene-1"]
+        assert r["over_budget"]["id"] == "gen-scene-0"
+        assert max(r["over_budget"]["section_sizes"].values()) >= 20000
+        assert "one section at a time" in r["hint"]
+
+        alone = retrieve(big, ["gen-scene-0"])
+        assert [e["id"] for e in alone["entities"]] == ["gen-scene-0"]
+        assert "deferred_ids" not in alone and "over_budget" in alone
+
+    def test_not_found_and_deferral_both_reported(self, big, monkeypatch):
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
+        r = retrieve(big, ["no-such-scene"] + gen_ids())
+        assert [n["id"] for n in r["not_found"]] == ["no-such-scene"]
+        assert r["truncated"] is True
+        assert "story_load" in r["hint"] and "deferred_ids" in r["hint"]
+
+    def test_a_scoped_request_is_never_truncated(self, big, monkeypatch):
+        """Asking for one section is the way to stay under budget."""
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
+        r = retrieve(big, gen_ids()[:3], sections=["Content"], fields=None)
+        assert len(r["entities"]) == 3 and "truncated" not in r
+
+
+# ── relationship view ───────────────────────────────────────────────────────
+
+class TestRelationshipViewBudget:
+    @staticmethod
+    def rels(project, **args):
+        return load(project, view="relationship", **args)
+
+    def test_fitting_view_is_unchanged(self, small, monkeypatch):
+        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
+        r = self.rels(small)
+        assert "detail" not in r and r["relationships"]
+        assert all("perspectives" in x for x in r["relationships"])
+
+    def test_over_budget_compacts_but_lists_every_relationship(
+            self, big, monkeypatch):
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "100000000")
+        full = self.rels(big)["relationships"]
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "6000")
+        r = self.rels(big)
+
+        assert [x["id"] for x in r["relationships"]] == [x["id"] for x in full]
+        compacted = r["detail"]["compacted"]
+        assert compacted, "33 relationships should overflow a 6000 budget"
+        by_id = {x["id"]: x for x in full}
+        for x in r["relationships"]:
+            if x["id"] in compacted:
+                assert set(x) == {"id", "name", "characters"}
+                assert x["characters"] == by_id[x["id"]]["characters"]
+            else:
+                assert x == by_id[x["id"]]
+        assert len(json.dumps(r)) < len(json.dumps({"relationships": full}))
+
+    def test_character_filter_returns_that_characters_relationships_in_full(
+            self, big, monkeypatch):
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "100000000")
+        full = self.rels(big)["relationships"]
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "2000")  # ignored
+        r = self.rels(big, character="kael")
+        expected = [x for x in full if "kael" in x["characters"]]
+        assert expected and r["relationships"] == expected
+        assert r["character"] == "kael" and "detail" not in r
+        assert len(expected) < len(full), "the filter must actually narrow"
+
+    def test_the_expand_hint_actually_expands(self, big, monkeypatch):
+        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "6000")
+        r = self.rels(big)
+        left_out = [x for x in r["relationships"] if x["id"] in r["detail"]["compacted"]]
+        char = left_out[0]["characters"][0]
+        again = self.rels(big, character=char)["relationships"]
+        assert all("perspectives" in x for x in again)
+        assert {x["id"] for x in left_out if char in x["characters"]} <= \
+            {x["id"] for x in again}
+
+    def test_unknown_character_says_so(self, big):
+        r = self.rels(big, character="nobody")
+        assert r["relationships"] == [] and "nobody" in r["note"]
