@@ -624,11 +624,6 @@ def get_project_summary(project_path: Path, act: str | None = None,
                 # every agent has to learn and bridge.
                 "characters": chars,
                 "location": scene_loc.get(sid),
-                "milestone": milestone_label(scene_plot_roles.get(sid, []), plot_scopes),
-                # The plots this scene serves, as bare slugs. The role it plays
-                # in each is the `dramatic_elements` view's, which carries the
-                # plot index; the base map stays the once-per-session call.
-                "plots": [e["plot"] for e in scene_plot_roles.get(sid, [])],
                 # The scene's immediate desire, for the same reason it is in
                 # `dramatic_elements`: the map says what each scene is FOR, and
                 # this is that in one line. The scene's own field first — it is
@@ -637,16 +632,8 @@ def get_project_summary(project_path: Path, act: str | None = None,
                 "scene_objective": (
                     s["_extra"].get("scene_objective", "")
                     or scene_beats.get(sid, {}).get("scene_objective", "")),
-                # The scene's computed field, read from its scene_beats. It is
-                # the record's ID, not the record: the id cannot be derived from
-                # the scene id, so this is the pointer a reader follows with a
-                # second call. The key is absent entirely when the scene has no
-                # record, so an empty string is never reported as one. The rest
-                # of the record — the beats above all — stays out of the base
-                # map, which is the once-per-session call.
-                **({"scene_beats": scene_beats[sid]["id"]} if sid in scene_beats else {}),
             }
-            return _omit(result, {"one_sentence": "", "characters": [], "location": None, "milestone": [], "plots": [], "scene_objective": "", "scene_beats": ""},
+            return _omit(result, {"one_sentence": "", "characters": [], "location": None, "scene_objective": ""},
                          always_keep={"status"})
 
         # ── Build sequence output ──

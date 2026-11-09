@@ -130,8 +130,8 @@ def handler(args: dict, **kwargs) -> str:
             return json.dumps({"error": "Database schema not found. Run story_import first."})
 
         # The base view is the once-per-session map. Each developed scene row
-        # carries what the scene is FOR (characters, location, milestone,
-        # plots, objective, beats pointer) — a few hundred characters apiece —
+        # carries what the scene is FOR (characters, location, objective) — a few
+        # hundred characters apiece —
         # so a feature-length map outgrows any host cap. It is therefore held
         # to a response budget: past it, trailing sequences are listed as
         # compact rows and `detail` says which and how to expand them. `act` /

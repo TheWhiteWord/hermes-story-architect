@@ -405,7 +405,7 @@ class TestBaseMapSceneRow:
     def test_the_base_map_carries_only_the_pointer(self, project):
         self._scene_with_beats(project)
         row = self._row(project, "slim")
-        assert row["scene_beats"] == "slim-beats"
+        assert "scene_beats" not in row
         # The record's own fields must not surface under a made-up name either.
         assert "turning_point" not in row
         assert "beats" not in row
@@ -420,7 +420,7 @@ class TestBaseMapSceneRow:
                         {"plot": "the-scientists-last-stand", "role": "setup"},
                     ]}, "r")
         row = self._row(project, "central-room-day")
-        assert row["plots"] == ["the-resistance", "the-scientists-last-stand"]
+        assert "plots" not in row
         # `dramatic_role` is a single word about the scene; the plots are the
         # thing the map reports, and a scene can serve several.
         assert "dramatic_role" not in row
@@ -469,7 +469,7 @@ class TestBaseMapSceneRow:
         })
         scenes = self._all_scenes(project)
         assert "scene_beats" not in scenes["bare"]
-        assert scenes["slim"]["scene_beats"] == "slim-beats"
+        assert "scene_beats" not in scenes["slim"]
         assert len(json.dumps(scenes["slim"])) - len(json.dumps(scenes["bare"])) < 50
 
     def test_a_scene_without_a_record_carries_no_pointer(self, project):

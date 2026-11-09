@@ -1,0 +1,227 @@
+{
+  "view": "dramatic_elements",
+  "act": "all",
+  "sequence": "all",
+  "plot": "all",
+  "project": {
+    "structure_type": "Classical",
+    "story_climax_scene_id": [
+      "the-door-closes"
+    ],
+    "inciting_incident_scene_id": [
+      "central-room-day"
+    ],
+    "plots": [
+      {
+        "id": "the-resistance",
+        "name": "The Resistance",
+        "plot_scope": "main",
+        "plot_type": "",
+        "milestones": {
+          "inciting_incident": [
+            "central-room-day"
+          ],
+          "setup": [
+            "central-room-day",
+            "garden-dream"
+          ],
+          "crisis": [
+            "central-room-night"
+          ],
+          "complication": [
+            "garden-day"
+          ],
+          "resolution": [
+            "the-core-day"
+          ],
+          "climax": [
+            "the-door-closes"
+          ]
+        }
+      },
+      {
+        "id": "the-scientists-last-stand",
+        "name": "The Scientists' Last Stand",
+        "plot_scope": "sub",
+        "plot_type": "Contradictory",
+        "milestones": {
+          "setup": [
+            "central-room-day"
+          ],
+          "crisis": [
+            "central-room-night"
+          ],
+          "climax": [
+            "the-core-day"
+          ],
+          "resolution": [
+            "the-core-day"
+          ]
+        }
+      }
+    ]
+  },
+  "acts": [
+    {
+      "id": "act-1",
+      "title": "Act One",
+      "sequences": [
+        {
+          "id": "seq-discovery",
+          "title": "The Discovery",
+          "primary_plot": "the-resistance",
+          "scenes": [
+            {
+              "id": "central-room-day",
+              "title": "Central Room - Day",
+              "status": "drafted",
+              "dramatic_role": "plot_role",
+              "milestone": [
+                "inciting_incident",
+                "setup"
+              ],
+              "plots": [
+                {
+                  "plot": "the-resistance",
+                  "role": "inciting_incident"
+                },
+                {
+                  "plot": "the-resistance",
+                  "role": "setup"
+                },
+                {
+                  "plot": "the-scientists-last-stand",
+                  "role": "setup"
+                }
+              ],
+              "scene_objective": "to open the door and prove the wrongness is real, not a malfunction",
+              "turning_point": "the handle turns and the lock was never engaged",
+              "scene_beats": "central-room-day-beats"
+            },
+            {
+              "id": "central-room-night",
+              "title": "Central Room - Night",
+              "status": "drafted",
+              "dramatic_role": "plot_role",
+              "milestone": [
+                "crisis"
+              ],
+              "plots": [
+                {
+                  "plot": "the-resistance",
+                  "role": "crisis"
+                },
+                {
+                  "plot": "the-scientists-last-stand",
+                  "role": "crisis"
+                }
+              ],
+              "scene_objective": "to refuse the Administrator's offer and keep the doubt instead of the comfort",
+              "turning_point": "Kael answers the offer with 'Then I choose discomfort'",
+              "scene_beats": "central-room-night-beats"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-2",
+      "title": "Act II",
+      "sequences": [
+        {
+          "id": "seq-confrontation",
+          "title": "The Confrontation",
+          "primary_plot": "the-resistance",
+          "scenes": [
+            {
+              "id": "garden-day",
+              "title": "Garden - Day",
+              "status": "drafted",
+              "dramatic_role": "plot_role",
+              "milestone": [
+                "complication"
+              ],
+              "plots": [
+                {
+                  "plot": "the-resistance",
+                  "role": "complication"
+                }
+              ],
+              "scene_objective": "to understand what has changed in the Garden since the door was opened",
+              "turning_point": "the grass bends toward Kael's hand instead of away from it",
+              "scene_beats": "garden-day-beats"
+            },
+            {
+              "id": "garden-dream",
+              "title": "Garden Dream",
+              "status": "drafted",
+              "dramatic_role": "plot_role",
+              "milestone": [
+                "setup"
+              ],
+              "plots": [
+                {
+                  "plot": "the-resistance",
+                  "role": "setup"
+                }
+              ],
+              "scene_objective": "to find out what is behind the seams of the Garden while asleep",
+              "turning_point": "the spirals follow Kael's breathing and the ground moves under their own judgement",
+              "scene_beats": "garden-dream-beats"
+            }
+          ]
+        },
+        {
+          "id": "seq-resolution",
+          "title": "The Resolution",
+          "scenes": [
+            {
+              "id": "the-door-closes",
+              "title": "The Door Closes",
+              "status": "written",
+              "dramatic_role": "plot_role",
+              "milestone": [
+                "climax"
+              ],
+              "plots": [
+                {
+                  "plot": "the-resistance",
+                  "role": "climax"
+                }
+              ],
+              "scene_objective": "to leave the Institute and close the door from the outside",
+              "turning_point": "the door shuts behind them and cannot be reopened from out here",
+              "scene_beats": "the-door-closes-beats"
+            },
+            {
+              "id": "the-core-day",
+              "title": "The Core - Day",
+              "status": "written",
+              "dramatic_role": "plot_role",
+              "milestone": [
+                "resolution"
+              ],
+              "plots": [
+                {
+                  "plot": "the-resistance",
+                  "role": "resolution"
+                },
+                {
+                  "plot": "the-scientists-last-stand",
+                  "role": "climax"
+                },
+                {
+                  "plot": "the-scientists-last-stand",
+                  "role": "resolution"
+                }
+              ],
+              "scene_objective": "to get the children through the door and into the real world",
+              "turning_point": "the sky is real, shared and impossibly large",
+              "scene_beats": "the-core-day-beats"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
