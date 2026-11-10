@@ -17,7 +17,7 @@ document.addEventListener('click', function(e){
 });
 DASH.boot = async function() {
   try {
-    const m = (location.hash || '').match(/^#\/p\/(.+)$/);
+    const m = (location.hash || '').match(/^#\/p\/([^/?]+)/);
     if (!m) {
       await DASH.showPicker();
       return;
@@ -29,9 +29,11 @@ DASH.boot = async function() {
     window.__STORY_DATA__ = data.story_data;
     window.__SECTIONS__ = data.sections;
     window.__SCREENPLAY_STATS__ = data.screenplay_stats;
+    window.__STRUCTURAL_STATS__ = data.structural_stats;
     document.getElementById('loading-screen').style.display = 'none';
     DASH.initStory(data.story_data);
     DASH.watchUpdates(slug);
+    if (DASH.routeEditor) DASH.routeEditor();   // a reload on #/p/<slug>/scene/<id>/edit reopens the editor
   } catch (e) {
     DASH.showError();
   }

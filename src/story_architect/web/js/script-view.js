@@ -82,15 +82,22 @@ DASH.buildScriptView = function() {
 
   doc.appendChild(body);
 
-  // ── Wire scene heading clicks ──
-  doc.querySelectorAll('.fountain-scene_heading').forEach((el, i) => {
-    const sceneId = stats.sceneIds && stats.sceneIds[i];
-    if (sceneId) {
-      el.style.cursor = 'pointer';
-      el.addEventListener('click', () => {
-        DASH.showScenePanel(sceneId);
-      });
-    }
+  // ── Wire scene clicks ──
+  // A scene is its heading and everything up to the next heading, so any click
+  // in that run opens the script editor on that scene, near what was clicked.
+  // (The scene's own panel is one click away from the editor: "Open scene".)
+  let sceneIdx = -1;
+  Array.from(body.children).forEach(el => {
+    if (el.classList.contains('fountain-scene_heading')) sceneIdx++;
+    const sceneId = sceneIdx >= 0 && stats.sceneIds && stats.sceneIds[sceneIdx];
+    if (!sceneId || el.tagName === 'HR') return;
+    el.classList.add('se-clickable');
+    el.title = 'Open in the script editor';
+    el.addEventListener('click', (e) => {
+      // A dialogue group wraps its cue and lines; focus the line that was clicked, not the group.
+      const hit = (e.target.closest && e.target.closest('p, h2, h3, h4')) || el;
+      DASH.openScriptEditor(sceneId, { focusText: hit.textContent });
+    });
   });
 
   // Subtitle
@@ -103,4 +110,4 @@ DASH.buildScriptView = function() {
   DASH._scriptBuilt = true;
 };
 
-DASH.boot();
+

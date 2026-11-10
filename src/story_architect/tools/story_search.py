@@ -2,6 +2,26 @@
 import json
 from pathlib import Path
 
+DEFAULT_LIMIT = 10
+MAX_LIMIT = 50      # snippets are capped at 200 chars, so 50 hits is ~14 KB
+
+
+def _clamp_limit(raw) -> tuple[int, bool]:
+    """The limit to use, and whether the caller's value had to be cut down.
+
+    The schema's `maximum` is advice, not enforcement: nothing between the model
+    and this handler validates it, and SQLite reads `LIMIT -1` as "no limit", so
+    an unclamped value can return every match in the project. A bad type falls
+    back to the default; an out-of-range number is brought into range.
+    """
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_LIMIT, False
+    clamped = max(1, min(value, MAX_LIMIT))
+    return clamped, clamped != value
+
+
 SCHEMA = {
     "description": "Find where something is mentioned, across all section prose in a project. "
                    "Returns short snippets, not full text, and reports the true total match count "
@@ -53,7 +73,8 @@ def handler(args: dict, **kwargs) -> str:
 
     # No blanket except: a failed search must not be reported as a missing DB,
     # which would send the agent to story_import and wipe runtime work.
-    found = search_sections(project_path, args["query"], limit=args.get("limit", 10))
+    limit, was_clamped = _clamp_limit(args.get("limit", DEFAULT_LIMIT))
+    found = search_sections(project_path, args["query"], limit=limit)
 
     results, total = found["results"], found["total_matches"]
     response = {
@@ -62,9 +83,14 @@ def handler(args: dict, **kwargs) -> str:
         "total": len(results),
         "total_matches": total,
     }
+    notes = []
+    if was_clamped:
+        notes.append(f"limit was brought into range (1-{MAX_LIMIT}).")
     if total > len(results):
-        response["note"] = (
+        notes.append(
             f"Showing {len(results)} of {total} matches. Narrow the query, or raise "
-            f"limit (max 50). Use story_retrieve to read a section in full."
+            f"limit (max {MAX_LIMIT}). Use story_retrieve to read a section in full."
         )
+    if notes:
+        response["note"] = " ".join(notes)
     return json.dumps(response)

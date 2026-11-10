@@ -43,6 +43,10 @@ Starting the agent: use the "Start agent" button in the chat panel (or the fallb
 
 What the agent can do: read/query project data via the `story` MCP tools (load, search, get entity, etc.) and stage/commit changes through the drafts protocol (it asks for approval before committing). What it cannot do by default: run shell commands, write files, or search/fetch the web. Chats are stored per project in `<root>/projects/<slug>/.story/chat.db` (separate from `story.db`); conversations and the last-open conversation per project are restored across reloads and app restarts. Partial replies cancelled mid-stream are kept and marked. A "Project updated / Refresh" banner appears after a committed change.
 
+## Writes from the browser (the one exception)
+
+The browser UI is read-only **except** the scene script editor: `PUT /api/projects/{slug}/scenes/{scene}/script`. A person editing a script is the approval, so this path writes directly through `core.writes` (via `core/manual_edits.py`) instead of staging a draft. It sits behind the same middleware as every other non-GET request (localhost Host, own/absent Origin, `X-Story-Architect: 1`); there is no second auth model. A save carries a content hash and is refused with 409 if the scene changed since it was loaded. Agent writes still go through drafts and `/mcp`.
+
 ## Layout
 
 - `src/story_architect/core/` engine (no framework imports)

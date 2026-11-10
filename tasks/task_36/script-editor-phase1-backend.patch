@@ -1,0 +1,1421 @@
+diff --git a/README.md b/README.md
+index b9eede5..f9c92ef 100644
+--- a/README.md
++++ b/README.md
+@@ -43,6 +43,10 @@ Starting the agent: use the "Start agent" button in the chat panel (or the fallb
+ 
+ What the agent can do: read/query project data via the `story` MCP tools (load, search, get entity, etc.) and stage/commit changes through the drafts protocol (it asks for approval before committing). What it cannot do by default: run shell commands, write files, or search/fetch the web. Chats are stored per project in `<root>/projects/<slug>/.story/chat.db` (separate from `story.db`); conversations and the last-open conversation per project are restored across reloads and app restarts. Partial replies cancelled mid-stream are kept and marked. A "Project updated / Refresh" banner appears after a committed change.
+ 
++## Writes from the browser (the one exception)
++
++The browser UI is read-only **except** the scene script editor: `PUT /api/projects/{slug}/scenes/{scene}/script`. A person editing a script is the approval, so this path writes directly through `core.writes` (via `core/manual_edits.py`) instead of staging a draft. It sits behind the same middleware as every other non-GET request (localhost Host, own/absent Origin, `X-Story-Architect: 1`); there is no second auth model. A save carries a content hash and is refused with 409 if the scene changed since it was loaded. Agent writes still go through drafts and `/mcp`.
++
+ ## Layout
+ 
+ - `src/story_architect/core/` engine (no framework imports)
+diff --git a/src/story_architect/app/routes/scripts.py b/src/story_architect/app/routes/scripts.py
+new file mode 100644
+index 0000000..3011cb5
+--- /dev/null
++++ b/src/story_architect/app/routes/scripts.py
+@@ -0,0 +1,66 @@
++"""Scene script editor API — the one place the browser writes (see README).
++
++Thin: parse the request, call `core.manual_edits`, map its errors to HTTP.
++Non-GET requests already pass through the Host / Origin / `X-Story-Architect`
++checks in `server.py`; this adds no second auth model.
++"""
++from pathlib import Path
++
++from fastapi import APIRouter
++from fastapi.responses import JSONResponse
++
++
++def _err(status: int, code: str, message: str, **extra):
++    return JSONResponse(status_code=status,
++                        content={"error": {"code": code, "message": message, **extra}})
++
++
++def make_router(config, app):
++    router = APIRouter()
++
++    def _project(slug):
++        from story_architect.tools.story_resolve import resolve_project
++        return resolve_project(slug, Path(config.root))
++
++    @router.get("/api/projects/{slug}/scenes/{scene_id}/script")
++    def get_script(slug: str, scene_id: str):
++        from story_architect.core import manual_edits as me
++        try:
++            project = _project(slug)
++            return me.load_scene_script(project, scene_id)
++        except me.ScriptNotFound as e:
++            return _err(404, "not_found", str(e))
++        except ValueError as e:  # unknown project
++            return _err(404, "not_found", str(e))
++
++    @router.put("/api/projects/{slug}/scenes/{scene_id}/script")
++    def put_script(slug: str, scene_id: str, body: dict):
++        from story_architect.core import manual_edits as me
++        try:
++            project = _project(slug)
++        except ValueError as e:
++            return _err(404, "not_found", str(e))
++        try:
++            return me.save_scene_script(project, scene_id, body)
++        except me.ScriptConflict as e:
++            return _err(409, "conflict", str(e), current_hash=e.current_hash)
++        except me.ScriptNotFound as e:
++            return _err(404, "not_found", str(e))
++        except me.ScriptLocked as e:
++            return _err(423, "locked", str(e))
++        except me.ScriptError as e:
++            return _err(422, "invalid", str(e))
++        except ValueError as e:  # refused by core.writes
++            return _err(422, "invalid", str(e))
++
++    @router.post("/api/projects/{slug}/script/parse")
++    def parse_text(slug: str, body: dict):
++        """Pasted Fountain -> blocks. Pure; used when text is pasted into the editor."""
++        from story_architect.core import scene_script as ss
++        text = (body or {}).get("text")
++        if not isinstance(text, str):
++            return _err(422, "invalid", "`text` must be a string.")
++        heading_line, rest = ss.split_heading(text)
++        return {"heading": heading_line, "blocks": ss.parse_blocks(rest)}
++
++    return router
+diff --git a/src/story_architect/app/server.py b/src/story_architect/app/server.py
+index 34fb10b..b1affea 100644
+--- a/src/story_architect/app/server.py
++++ b/src/story_architect/app/server.py
+@@ -16,6 +16,7 @@ from story_architect.app.routes import agent as agent_routes
+ from story_architect.app.routes import chat as chat_routes
+ from story_architect.app.routes import drafts as drafts_routes
+ from story_architect.app.routes import projects as projects_routes
++from story_architect.app.routes import scripts as scripts_routes
+ 
+ 
+ def create_app(config: Config) -> FastAPI:
+@@ -75,6 +76,7 @@ def create_app(config: Config) -> FastAPI:
+     app.include_router(chat_routes.make_router(config, app))
+     app.include_router(drafts_routes.make_router(config, app))
+     app.include_router(projects_routes.make_router(config, app))
++    app.include_router(scripts_routes.make_router(config, app))
+ 
+     @app.get("/healthz")
+     def healthz():
+diff --git a/src/story_architect/core/manual_edits.py b/src/story_architect/core/manual_edits.py
+new file mode 100644
+index 0000000..4f1bc3c
+--- /dev/null
++++ b/src/story_architect/core/manual_edits.py
+@@ -0,0 +1,294 @@
++"""Writes authored by a person in the UI, as opposed to staged by the agent.
++
++Two doors into the same room. The agent proposes through `core.drafts` and a
++person approves; a person editing in the UI IS the approval, so their edits go
++straight through `core.writes` with no draft in between. There is deliberately
++no second write path underneath: every function here validates what the UI can
++get wrong and then calls the same `writes.edit_entity` / `create_entity` the
++agent's commits dispatch to, so one place defines what an edit means.
++
++This module is where future manual authoring lands too (creating a character
++or location by hand): add a function here, validate, call `core.writes`. Keep
++HTTP out of it — `app/routes/scripts.py` is the thin layer over this.
++
++Concurrency: nothing in the schema is versioned, so each load hands back a
++`hash` of what the editor is looking at and a save must present it. If Hermes
++committed in between, the save is refused (`ScriptConflict`) and the person
++decides, rather than one side's work silently overwriting the other's.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++from pathlib import Path
++
++from . import scene_script as ss
++from .constants import SCENE_TIMES_OF_DAY, PLOT_ROLES
++from .db import get_db
++from .entity import ENTITY_COLUMN_MAP, unfilled_fields
++from .fountain_lexer import SCENE_HEADING_RE
++
++
++class ScriptError(ValueError):
++    """A save the UI sent that cannot be applied. The message is user-facing."""
++
++
++class ScriptNotFound(ScriptError):
++    pass
++
++
++class ScriptLocked(ScriptError):
++    pass
++
++
++class ScriptConflict(ScriptError):
++    def __init__(self, current_hash: str):
++        super().__init__("The scene changed since you opened it.")
++        self.current_hash = current_hash
++
++
++# ─── Reading ─────────────────────────────────────────────────────────────────
++
++def _scene_state(conn, scene_id: str) -> dict:
++    row = conn.execute(
++        "SELECT id, name, one_sentence, order_key, status, parent_id, location_id, extra "
++        "FROM entities WHERE type='scene' AND id=? AND is_deleted=0", (scene_id,)
++    ).fetchone()
++    if not row:
++        raise ScriptNotFound(f"Scene not found: {scene_id}")
++    extra = json.loads(row[7]) if row[7] else {}
++    body = conn.execute(
++        "SELECT body FROM sections WHERE entity_id=? AND heading='Content'",
++        (scene_id,)).fetchone()
++    chars = [r[0] for r in conn.execute(
++        "SELECT from_id FROM relations WHERE to_id=? AND kind='character_scene' "
++        "ORDER BY \"order\", from_id", (scene_id,))]
++    n_roles = conn.execute(
++        "SELECT COUNT(*) FROM relations WHERE to_id=? AND kind IN (%s)"
++        % ",".join("?" * len(PLOT_ROLES)),
++        (scene_id, *[f"plot_{r}" for r in PLOT_ROLES])).fetchone()[0]
++    return {
++        "row": {"name": row[1], "one_sentence": row[2], "order_key": row[3],
++                "status": row[4], "parent_id": row[5], "location_id": row[6]},
++        "id": row[0], "title": row[1], "status": row[4],
++        "order": row[3] or 0, "sequence_id": row[5],
++        "location": row[6] or "", "extra": extra,
++        "raw_content": body[0] if body else "",
++        "characters": chars, "plot_role_count": n_roles,
++    }
++
++
++def _registry(conn) -> tuple[list[dict], dict]:
++    chars = []
++    for cid, name, extra in conn.execute(
++            "SELECT id, name, extra FROM entities WHERE type='character' AND is_deleted=0 "
++            "ORDER BY name"):
++        ex = json.loads(extra) if extra else {}
++        chars.append({"id": cid, "name": name or cid,
++                      "story_role": ex.get("story_role", "")})
++    names = {r[0]: r[1] for r in conn.execute(
++        "SELECT id, name FROM entities WHERE type='world' AND is_deleted=0")}
++    locs = [{"id": i, "name": n or i,
++             "world": ({"id": w, "name": names.get(w, w)} if w else None)}
++            for i, n, w in conn.execute(
++                "SELECT id, name, parent_id FROM entities "
++                "WHERE type='location' AND is_deleted=0 ORDER BY name")]
++    return chars, {l["id"]: l for l in locs}
++
++
++def content_hash(state: dict) -> str:
++    """The change token: what the editor sees, and what a save overwrites."""
++    blob = json.dumps({
++        "content": state["raw_content"],
++        "heading": state["extra"].get("heading", ""),
++        "location": state["location"],
++        "time_of_day": state["extra"].get("time_of_day", ""),
++        "characters": sorted(state["characters"]),
++    }, sort_keys=True, ensure_ascii=False)
++    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
++
++
++def _adhoc_elsewhere(conn, characters: list[dict], skip: str) -> list[dict]:
++    """Unregistered speakers used in OTHER scenes, so a minor character already
++    written once is offered again instead of being retyped (and mistyped)."""
++    counts: dict[str, int] = {}
++    for sid, body in conn.execute(
++            "SELECT e.id, s.body FROM sections s JOIN entities e ON e.id=s.entity_id "
++            "WHERE e.type='scene' AND e.is_deleted=0 AND s.heading='Content' AND e.id<>?",
++            (skip,)):
++        _, rest = ss.split_heading(body)
++        for c in ss.script_cast(ss.parse_blocks(rest), characters):
++            if not c["registered"]:
++                counts[c["cue"]] = counts.get(c["cue"], 0) + 1
++    return [{"cue": k, "name": k.title(), "scenes": n}
++            for k, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
++
++
++def load_scene_script(project_path: Path, scene_id: str) -> dict:
++    """Everything the editor needs to open one scene."""
++    conn = get_db(project_path)
++    try:
++        st = _scene_state(conn, scene_id)
++        characters, locations = _registry(conn)
++        adhoc = _adhoc_elsewhere(conn, characters, scene_id)
++    finally:
++        conn.close()
++
++    extra = st["extra"]
++    heading_line, body = ss.split_heading(st["raw_content"])
++    blocks = ss.parse_blocks(body)
++    lossless = (ss.is_lossless(st["raw_content"], heading_line, blocks)
++                if st["raw_content"].strip() and not ss.is_placeholder(st["raw_content"])
++                else True)
++
++    # The heading line in Content is what the script shows, so it wins. With no
++    # script yet, the scene's own fields are all there is.
++    heading = ss.parse_heading(heading_line if heading_line is not None
++                               else extra.get("heading", ""))
++    loc = locations.get(st["location"])
++    heading["location"] = st["location"] if loc else ""
++    if loc is None:
++        heading["suggested_location"] = ss.suggest_location(
++            heading["location_text"], list(locations.values()))
++    heading["time_of_day"] = extra.get("time_of_day", "") or heading.get("time_text", "")
++
++    cast = ss.script_cast(blocks, characters)
++    in_script = {c["id"] for c in cast if c["id"]}
++    by_id = {c["id"]: c for c in characters}
++    registered_cast = [
++        {"id": cid, "name": by_id[cid]["name"], "story_role": by_id[cid]["story_role"],
++         "in_script": cid in in_script,
++         "cues": next((c["cues"] for c in cast if c["id"] == cid), 0)}
++        for cid in dict.fromkeys(list(st["characters"]) + sorted(in_script))
++        if cid in by_id]
++
++    scene = {
++        "id": st["id"], "title": st["title"], "status": st["status"],
++        "order": st["order"], "sequence_id": st["sequence_id"],
++        "location": st["location"], "time_of_day": extra.get("time_of_day", ""),
++        "heading": extra.get("heading", ""), "dramatic_role": extra.get("dramatic_role", ""),
++        "no_cast": bool(extra.get("no_cast")),
++        "scene_objective": extra.get("scene_objective", ""),
++    }
++    unfilled = unfilled_fields("scene", {
++        **extra,
++        "characters": st["characters"] or [],
++        "plot_roles": [1] * st["plot_role_count"],
++    }, st["row"])
++
++    return {
++        "scene": scene,
++        "locked": st["status"] == "locked" or not lossless,
++        "locked_reason": ("status" if st["status"] == "locked"
++                          else "not_roundtrippable" if not lossless else None),
++        "hash": content_hash(st),
++        "heading": heading,
++        "blocks": blocks,
++        "content": st["raw_content"] if not ss.is_placeholder(st["raw_content"]) else "",
++        "location": loc,
++        "cast": registered_cast,
++        "adhoc": [c for c in cast if not c["registered"]],
++        "adhoc_elsewhere": adhoc,
++        "registry": {"characters": characters, "locations": list(locations.values())},
++        "findings": ss.findings(
++            scene=scene, heading=heading, heading_line=heading_line, blocks=blocks,
++            cast=cast, location=loc, has_plot_roles=st["plot_role_count"] > 0,
++            unfilled=unfilled, lossless=lossless),
++        "stats": ss.script_stats(st["raw_content"], cast),
++    }
++
++
++# ─── Writing ─────────────────────────────────────────────────────────────────
++
++def _validate_blocks(blocks) -> list[dict]:
++    if not isinstance(blocks, list):
++        raise ScriptError("`blocks` must be a list.")
++    clean = []
++    for i, b in enumerate(blocks):
++        if not isinstance(b, dict) or b.get("type") not in ss.BLOCK_TYPES \
++                or not isinstance(b.get("text", ""), str):
++            raise ScriptError(f"blocks[{i}] must be {{type, text}} with a known type.")
++        clean.append({"type": b["type"], "text": b.get("text", "")})
++    return clean
++
++
++def save_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
++    """Save a person's edit of one scene's script. One transaction.
++
++    payload = {
++      base_hash: str,                        # from the load this edit is based on
++      blocks: [{type, text}],
++      heading: {mode: "structured"|"custom",
++                int_ext, location (slug|""), location_text, time_of_day,   # structured
++                text},                                                      # custom
++      extra_cast: [character slugs]          # cast added by hand, not via a cue
++    }
++
++    Writes Content, heading, location, time_of_day and characters together, so
++    the heading line in the script and the scene's fields cannot disagree.
++    Does not change `status`.
++    """
++    from .writes import edit_entity
++
++    if not isinstance(payload, dict):
++        raise ScriptError("Request body must be an object.")
++    blocks = _validate_blocks(payload.get("blocks"))
++    hd = payload.get("heading") or {}
++    if not isinstance(hd, dict):
++        raise ScriptError("`heading` must be an object.")
++
++    conn = get_db(project_path)
++    try:
++        st = _scene_state(conn, scene_id)
++        characters, locations = _registry(conn)
++    finally:
++        conn.close()
++
++    if payload.get("base_hash") != content_hash(st):
++        raise ScriptConflict(content_hash(st))
++    if st["status"] == "locked":
++        raise ScriptLocked("This scene is locked. Unlock it before editing.")
++
++    # Location: a slug must name a real location. An unregistered place is
++    # allowed to stand in the heading as text, but is never written as a link.
++    slug = hd.get("location") or ""
++    if slug and slug not in locations:
++        raise ScriptError(f"Location not found: {slug}")
++    tod = hd.get("time_of_day") or ""
++    if tod and tod not in SCENE_TIMES_OF_DAY:
++        raise ScriptError(f"time_of_day must be one of {', '.join(SCENE_TIMES_OF_DAY)}.")
++
++    if hd.get("mode") == "custom":
++        heading = (hd.get("text") or "").strip()
++        if not SCENE_HEADING_RE.match(heading):
++            raise ScriptError("A custom heading must be a scene heading "
++                              "(INT./EXT. … or a forced '.HEADING').")
++    else:
++        name = locations[slug]["name"] if slug else (hd.get("location_text") or "").strip()
++        try:
++            heading = ss.compose_heading(hd.get("int_ext") or "INT.", name, tod)
++        except ValueError as e:
++            raise ScriptError(str(e))
++
++    # Cast: who the script names (registered), plus whoever was added by hand.
++    by_id = {c["id"]: c for c in characters}
++    extra_cast = payload.get("extra_cast") or []
++    bad = [c for c in extra_cast if c not in by_id]
++    if bad:
++        raise ScriptError(f"Character not found: {', '.join(bad)}")
++    cast_ids = [c["id"] for c in ss.script_cast(blocks, characters) if c["id"]]
++    cast = list(dict.fromkeys(cast_ids + list(extra_cast)))
++
++    content = ss.compose_content(heading, blocks)
++    previous = st["raw_content"]
++    result = edit_entity(
++        project_path, "scene", scene_id,
++        {"Content": content, "heading": heading, "location": slug,
++         "time_of_day": tod, "characters": cast},
++        "Script edited by hand in the script editor")
++    if result.get("success") is False or result.get("error"):
++        raise ScriptError(result.get("error") or result.get("message") or "Save failed.")
++
++    fresh = load_scene_script(project_path, scene_id)
++    fresh["previous_content"] = previous  # lets the client offer an in-session undo
++    return fresh
+diff --git a/src/story_architect/core/scene_script.py b/src/story_architect/core/scene_script.py
+new file mode 100644
+index 0000000..dc039f8
+--- /dev/null
++++ b/src/story_architect/core/scene_script.py
+@@ -0,0 +1,492 @@
++"""A scene's script as an editable list of blocks — pure functions, no DB.
++
++The scene's `Content` section (Fountain text) stays the single source of truth,
++so the agent and a human edit the same artifact. This module is the bridge the
++script editor needs: Fountain text <-> typed blocks, plus the facts the editor
++shows beside the page (cast, heading parts, findings, stats).
++
++Why not just reuse `fountain_lexer.parse`? The lexer is a *reader* built for
++rendering: it throws away blank-line structure and the original text of lines
++it does not model. An editor has to write the text back, so this module works
++paragraph by paragraph (the unit Fountain is actually defined in) and keeps
++anything it does not model as a `raw` block, verbatim. It still leans on the
++lexer's own regexes so the two can never disagree about what a heading, a cue
++or a transition is. `tests/test_scene_script.py` pins that parity against the
++lexer on real scene content.
++
++Block types: action, character, parenthetical, dialogue, transition, note, raw.
++The scene heading is NOT a block: it is generated from INT/EXT + location +
++time of day (see `compose_heading`) and written as the first line of Content.
++
++What this module deliberately does not do: touch the database, decide who may
++write, or validate that a location exists. Those are `core/manual_edits.py`.
++"""
++from __future__ import annotations
++
++import re
++
++from .constants import SCENE_TIMES_OF_DAY
++from .fountain_lexer import (
++    CHARACTER_RE,
++    PARENTHETICAL_RE,
++    SCENE_HEADING_RE,
++    TRANSITION_RE,
++    trim_character_extension,
++    trim_character_force_symbol,
++)
++
++BLOCK_TYPES = ("action", "character", "parenthetical", "dialogue",
++               "transition", "note", "raw")
++
++# Canonical INT/EXT prefixes the heading controls offer.
++INT_EXT_CHOICES = ("INT.", "EXT.", "INT./EXT.", "EST.")
++
++_PLACEHOLDER_RE = re.compile(r"^\s*\[placeholder", re.IGNORECASE)
++_NOTE_RE = re.compile(r"^\[\[(.*)\]\]$", re.DOTALL)
++_SCENE_NUMBER_RE = re.compile(r"#[-.0-9a-z]+#\s*$", re.IGNORECASE)
++_HEADING_PARTS_RE = re.compile(
++    r"^\s*(?P<ie>INT\./EXT\.|INT/EXT\.?|I/E\.?|INT\.?|EXT\.?|EST\.?)\s+(?P<rest>\S.*?)\s*$",
++    re.IGNORECASE)
++_TIME_SEP_RE = re.compile(r"\s+[-–—]\s+")
++# A line that is exactly two spaces is Fountain's in-dialogue line break, not a
++# paragraph separator.
++_LINE_BREAK = "  "
++
++
++# ─── Content in/out ──────────────────────────────────────────────────────────
++
++def is_placeholder(content: str) -> bool:
++    """A template's `[placeholder — scene/Content]` marker is not content."""
++    return bool(_PLACEHOLDER_RE.match(content or ""))
++
++
++def _split_paragraphs(lines: list[str]) -> list[list[str]]:
++    paras, cur = [], []
++    for ln in lines:
++        if ln.strip() == "" and ln != _LINE_BREAK:
++            if cur:
++                paras.append(cur)
++                cur = []
++        else:
++            cur.append(ln.rstrip() if ln != _LINE_BREAK else ln)
++    if cur:
++        paras.append(cur)
++    return paras
++
++
++def split_heading(content: str) -> tuple[str | None, str]:
++    """(heading line or None, the rest of the content).
++
++    The heading is the first non-blank line when it is a scene heading — the
++    one rule `scene_content_lint` enforces. Without one, everything is body and
++    `findings` reports it.
++    """
++    if is_placeholder(content):
++        return None, ""
++    lines = (content or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
++    for i, ln in enumerate(lines):
++        if ln.strip():
++            if SCENE_HEADING_RE.match(ln):
++                return ln.strip(), "\n".join(lines[i + 1:])
++            return None, "\n".join(lines[i:])
++    return None, ""
++
++
++def parse_blocks(body: str) -> list[dict]:
++    """Fountain body text (no heading) -> blocks. Never raises, never drops text."""
++    lines = (body or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
++    blocks: list[dict] = []
++    for para in _split_paragraphs(lines):
++        blocks.extend(_parse_paragraph(para))
++    return blocks
++
++
++def _raw(para):
++    return [{"type": "raw", "text": "\n".join(para)}]
++
++
++def _parse_paragraph(para: list[str]) -> list[dict]:
++    first = para[0].strip()
++
++    if first.startswith("!"):                       # forced action
++        text = "\n".join([para[0].lstrip()[1:]] + para[1:])
++        return [{"type": "action", "text": text}]
++
++    if first.startswith("@"):                       # forced character
++        if len(para) >= 2 and not first.endswith("^"):
++            return _dialogue_group(para)
++        return _raw(para)
++
++    # Everything the editor does not model stays verbatim.
++    if (SCENE_HEADING_RE.match(first)               # a heading mid-script
++            or first[:1] in ("#", "=", "~", ">")    # section/synopsis/page break/lyric/centered
++            or first.endswith("^")):                # dual dialogue
++        return _raw(para)
++
++    if len(para) == 1 and TRANSITION_RE.match(first):
++        return [{"type": "transition", "text": first}]
++
++    joined = "\n".join(para)
++    m = _NOTE_RE.match(joined.strip())
++    if m and "]]" not in m.group(1):
++        return [{"type": "note", "text": m.group(1).strip()}]
++
++    # A cue needs something after it: the lexer only treats an all-caps line as
++    # a character when dialogue follows, and a lone all-caps line is action.
++    if len(para) >= 2 and CHARACTER_RE.match(first):
++        return _dialogue_group(para)
++
++    return [{"type": "action", "text": joined}]
++
++
++def _dialogue_group(para: list[str]) -> list[dict]:
++    cue = para[0].strip()
++    if cue.startswith("@"):
++        cue = cue[1:].strip()
++    out = [{"type": "character", "text": cue}]
++    speech: list[str] = []
++
++    def flush():
++        if speech:
++            out.append({"type": "dialogue",
++                        "text": "\n".join("" if s == _LINE_BREAK else s
++                                          for s in speech)})
++            speech.clear()
++
++    for ln in para[1:]:
++        if PARENTHETICAL_RE.match(ln.strip()):
++            flush()
++            out.append({"type": "parenthetical", "text": ln.strip()})
++        else:
++            speech.append(ln.strip() if ln != _LINE_BREAK else ln)
++    flush()
++    return out
++
++
++def serialize_blocks(blocks: list[dict]) -> str:
++    """Blocks -> Fountain body text (no heading, no trailing newline).
++
++    A force marker is added only where the plain text would be read as
++    something else, so the stored Fountain stays clean for the agent: `!` for
++    an action line that would parse as a heading/cue/etc., `@` for a cue that
++    is not all-caps. Empty blocks are dropped.
++    """
++    paras: list[list[str]] = []
++    in_speech = False  # inside a character's group: parentheticals/dialogue attach
++    for b in blocks:
++        t = b.get("type")
++        text = (b.get("text") or "")
++        if t == "raw":
++            paras.append(text.split("\n"))
++            in_speech = False
++            continue
++        if not text.strip():
++            continue
++        if t == "character":
++            cue = text.strip()
++            paras.append([cue if CHARACTER_RE.match(cue) else "@" + cue])
++            in_speech = True
++        elif t == "parenthetical":
++            p = text.strip()
++            if not (p.startswith("(") and p.endswith(")")):
++                p = "(" + p.strip("()") + ")"
++            (paras[-1].append(p) if in_speech else paras.append([p]))
++        elif t == "dialogue":
++            lines = [ln.strip() if ln.strip() else _LINE_BREAK
++                     for ln in text.strip("\n").split("\n")]
++            (paras[-1].extend(lines) if in_speech else paras.append(lines))
++        elif t == "transition":
++            paras.append([text.strip()])
++            in_speech = False
++        elif t == "note":
++            paras.append(["[[" + text.strip() + "]]"])
++            in_speech = False
++        else:  # action (and any unknown type: never lose the text)
++            lines = text.strip("\n").split("\n")
++            if _would_misparse(lines):
++                lines[0] = "!" + lines[0].lstrip()
++            paras.append(lines)
++            in_speech = False
++    return "\n\n".join("\n".join(p) for p in paras)
++
++
++def _would_misparse(lines: list[str]) -> bool:
++    got = _parse_paragraph([ln.rstrip() for ln in lines if ln.strip()] or [""])
++    return not (len(got) == 1 and got[0]["type"] == "action")
++
++
++def compose_content(heading: str | None, blocks: list[dict]) -> str:
++    body = serialize_blocks(blocks)
++    parts = [p for p in (heading, body) if p]
++    return "\n\n".join(parts) + ("\n" if parts else "")
++
++
++def _words(text: str) -> list[str]:
++    return re.findall(r"\w+", text or "", re.UNICODE)
++
++
++def is_lossless(content: str, heading: str | None, blocks: list[dict]) -> bool:
++    """True when opening this content in the editor and saving it back keeps
++    every word. A False here means the editor must open read-only rather than
++    silently rewrite a script it does not fully understand."""
++    again = compose_content(heading, blocks)
++    if _words(again) != _words(content):
++        return False
++    h2, body2 = split_heading(again)
++    return parse_blocks(body2) == blocks
++
++
++# ─── Heading ─────────────────────────────────────────────────────────────────
++
++def _canon_int_ext(raw: str) -> str:
++    r = raw.upper().replace(" ", "")
++    if r.startswith(("INT./EXT", "INT/EXT", "I/E")):
++        return "INT./EXT."
++    if r.startswith("INT"):
++        return "INT."
++    if r.startswith("EXT"):
++        return "EXT."
++    return "EST."
++
++
++def parse_heading(heading: str | None) -> dict:
++    """Split a heading line into the three controls the editor shows.
++
++    `mode` is "structured" when the heading round-trips through
++    `compose_heading`, and "custom" when it does not (a forced `.SNIPER POV`
++    heading, a scene number, a time of day outside the six the schema allows).
++    A custom heading is kept verbatim and its controls are disabled.
++    """
++    text = (heading or "").strip()
++    empty = {"mode": "structured", "int_ext": "INT.", "location_text": "",
++             "time_text": "", "time_of_day": "", "text": text}
++    if not text:
++        return empty
++    custom = {**empty, "mode": "custom"}
++    if text.startswith(".") or _SCENE_NUMBER_RE.search(text):
++        return custom
++    m = _HEADING_PARTS_RE.match(text)
++    if not m:
++        return custom
++    rest = m.group("rest")
++    parts = _TIME_SEP_RE.split(rest)
++    time_text = ""
++    if len(parts) >= 2 and parts[-1].strip().upper() in SCENE_TIMES_OF_DAY:
++        time_text = parts[-1].strip().upper()
++        rest = " - ".join(parts[:-1])
++    return {"mode": "structured", "int_ext": _canon_int_ext(m.group("ie")),
++            "location_text": rest.strip(), "time_text": time_text,
++            "time_of_day": time_text, "text": text}
++
++
++def compose_heading(int_ext: str, location_name: str, time_of_day: str = "") -> str:
++    """`INT. KITCHEN - NIGHT`. The location name is upper-cased, as in a script."""
++    if int_ext not in INT_EXT_CHOICES:
++        raise ValueError(f"int_ext must be one of {', '.join(INT_EXT_CHOICES)}")
++    if time_of_day and time_of_day not in SCENE_TIMES_OF_DAY:
++        raise ValueError(f"time_of_day must be one of {', '.join(SCENE_TIMES_OF_DAY)}")
++    name = " ".join((location_name or "").split()).upper()
++    if not name:
++        raise ValueError("a heading needs a location")
++    return f"{int_ext} {name}" + (f" - {time_of_day}" if time_of_day else "")
++
++
++def suggest_location(location_text: str, locations: list[dict]) -> str | None:
++    """A registered location whose name or slug equals the heading's text.
++
++    Exact (case/whitespace/leading "the" aside) on purpose: the heading says
++    KITCHEN, and silently linking it to "Kitchen Annex" because the words
++    overlap is a wrong link the author never sees. The editor offers the
++    suggestion; it does not apply it.
++    """
++    def norm(s):
++        s = " ".join((s or "").lower().replace("-", " ").split())
++        return s[4:] if s.startswith("the ") else s
++    want = norm(location_text)
++    if not want:
++        return None
++    hits = [l["id"] for l in locations
++            if want in (norm(l.get("name")), norm(l.get("id")))]
++    return hits[0] if len(hits) == 1 else None
++
++
++# ─── Cast ────────────────────────────────────────────────────────────────────
++
++def cue_key(cue: str) -> str:
++    """A cue as a stable key: no `@`, `(V.O.)`, `^`; one space; upper-case."""
++    c = trim_character_extension(trim_character_force_symbol(cue or ""))
++    return " ".join(c.replace("^", "").split()).upper()
++
++
++def _tokens(s: str) -> set[str]:
++    return {t for t in re.split(r"[^\w']+", s.upper()) if t}
++
++
++def resolve_cue(key: str, characters: list[dict]) -> dict:
++    """Resolve one cue key to a registered character.
++
++    -> {"id": slug|None, "candidates": [slugs]}. Strictly: the full name, the
++    slug, or a set of whole words of exactly one character's name (OAK ->
++    Detective Oak). No substring and no fuzzy matching: DET would match
++    "Detective Oak" and so would MA match "Mara", and a link made on a prefix
++    is a wrong link the author never sees. Ambiguity resolves to nothing.
++    """
++    for c in characters:
++        if key in (c["name"].upper(), c["id"].replace("-", " ").upper(), c["id"].upper()):
++            return {"id": c["id"], "candidates": []}
++    want = _tokens(key)
++    if not want or len(key) < 2:
++        return {"id": None, "candidates": []}
++    hits = [c["id"] for c in characters if want <= _tokens(c["name"])]
++    if len(hits) == 1:
++        return {"id": hits[0], "candidates": []}
++    return {"id": None, "candidates": hits}
++
++
++def script_cast(blocks: list[dict], characters: list[dict]) -> list[dict]:
++    """Who speaks in this script, in order of first appearance.
++
++    Registered speakers carry their slug and role; the rest are ad-hoc, known
++    only from the script — nothing is stored for them, which is the point.
++    """
++    order: list[str] = []
++    counts: dict[str, int] = {}
++    first_block: dict[str, int] = {}
++    for i, b in enumerate(blocks):
++        if b.get("type") == "character" and b.get("text", "").strip():
++            k = cue_key(b["text"])
++            if not k:
++                continue
++            if k not in counts:
++                order.append(k)
++                first_block[k] = i
++            counts[k] = counts.get(k, 0) + 1
++    by_id = {c["id"]: c for c in characters}
++    cast, seen_ids = [], set()
++    for k in order:
++        r = resolve_cue(k, characters)
++        cid = r["id"]
++        if cid and cid in seen_ids:           # OAK and DETECTIVE OAK: one person
++            for e in cast:
++                if e["id"] == cid:
++                    e["cues"] += counts[k]
++            continue
++        if cid:
++            seen_ids.add(cid)
++        cast.append({
++            "cue": k, "id": cid, "registered": bool(cid),
++            "name": by_id[cid]["name"] if cid else k.title(),
++            "story_role": by_id[cid].get("story_role", "") if cid else "",
++            "cues": counts[k], "first_block": first_block[k],
++            "candidates": r["candidates"],
++        })
++    return cast
++
++
++# ─── Stats ───────────────────────────────────────────────────────────────────
++
++def script_stats(content: str, cast: list[dict]) -> dict:
++    """`lines` are text lines (non-blank), per the existing dashboard figure;
++    `speaking_parts` are distinct speakers."""
++    lines = [ln for ln in (content or "").splitlines() if ln.strip()]
++    return {"lines": len(lines), "words": len(_words(content)),
++            "speaking_parts": len(cast)}
++
++
++# ─── Findings ────────────────────────────────────────────────────────────────
++
++CRITICAL, OTHER = "critical", "other"
++
++# Optional fields the editor reports as gaps in the "Others" group. The ones
++# below are CRITICAL for a scene and are reported there, so they are skipped in
++# the generic unfilled list rather than reported twice.
++_REPORTED_AS_CRITICAL = {"heading", "location", "time_of_day", "plot_roles",
++                         "characters"}
++
++
++def _finding(level, code, message, **anchor):
++    return {"level": level, "code": code, "message": message, **anchor}
++
++
++def findings(*, scene: dict, heading: dict, heading_line: str | None,
++             blocks: list[dict], cast: list[dict], location: dict | None,
++             has_plot_roles: bool, unfilled: list[str],
++             lossless: bool = True) -> list[dict]:
++    """Everything worth telling the author about this scene's script.
++
++    Critical = what breaks the script or the scene's place in the story:
++    entities the script uses that do not exist, and the optional fields a
++    scene cannot function without. Required fields are not reported (the write
++    path already refuses a record without them). Other = remaining optional
++    gaps, from the shared `unfilled_fields`.
++
++    Each finding may carry an anchor — {"block": i} or {"field": name} — so the
++    editor can jump to the thing.
++    """
++    out: list[dict] = []
++
++    if not lossless:
++        out.append(_finding(CRITICAL, "not_editable",
++                            "This script uses Fountain the editor cannot round-trip "
++                            "without losing text, so it opens read-only. Edit it with Hermes."))
++    if not heading_line:
++        out.append(_finding(CRITICAL, "heading_missing",
++                            "The script has no scene heading. A scene without one is "
++                            "absent from the script view.", field="heading"))
++    if not scene.get("order"):
++        out.append(_finding(CRITICAL, "order_unset",
++                            "Scene order is 0 — it has not been placed in its sequence yet.",
++                            field="order"))
++    if not scene.get("time_of_day"):
++        out.append(_finding(CRITICAL, "time_of_day_missing",
++                            "Time of day is not set.", field="time_of_day"))
++
++    if location is None:
++        text = heading.get("location_text")
++        out.append(_finding(
++            CRITICAL, "location_unregistered",
++            (f"Location '{text}' is not a registered location." if text
++             else "No location is set."), field="location"))
++    elif not location.get("world"):
++        out.append(_finding(CRITICAL, "location_no_world",
++                            f"Location '{location['name']}' belongs to no world.",
++                            field="location"))
++
++    for c in cast:
++        if not c["registered"]:
++            hint = (f" Could be: {', '.join(c['candidates'])}." if c["candidates"] else "")
++            out.append(_finding(CRITICAL, "character_unregistered",
++                                f"Character '{c['name']}' is not a registered character.{hint}",
++                                block=c["first_block"]))
++
++    in_speech = False
++    for i, b in enumerate(blocks):
++        t = b.get("type")
++        if t == "character":
++            in_speech = bool((b.get("text") or "").strip())
++        elif t in ("parenthetical", "dialogue"):
++            if not in_speech and (b.get("text") or "").strip():
++                out.append(_finding(CRITICAL, "orphan_dialogue",
++                                    f"This {t} has no character before it, so it will "
++                                    f"read as action.", block=i))
++        else:
++            in_speech = False
++        if t == "transition" and not TRANSITION_RE.match((b.get("text") or "").strip()):
++            out.append(_finding(CRITICAL, "transition_unrecognised",
++                                "This will not read as a transition. Use 'CUT TO:' or "
++                                "'FADE OUT.' style.", block=i))
++
++    if not has_plot_roles and scene.get("dramatic_role") not in ("transition", "non-event"):
++        out.append(_finding(CRITICAL, "plot_roles_missing",
++                            "The scene serves no plot, and is not marked transition or "
++                            "non-event.", field="plot_roles"))
++
++    for f in unfilled:
++        if f in _REPORTED_AS_CRITICAL and f != "characters":
++            continue
++        if f == "characters" and (scene.get("no_cast") or cast):
++            continue
++        out.append(_finding(OTHER, "unfilled",
++                            f"Missing: field '{f}' not found in scene "
++                            f"'{scene.get('title') or scene.get('id')}'.", field=f))
++    return out
+diff --git a/tests/test_manual_edits.py b/tests/test_manual_edits.py
+new file mode 100644
+index 0000000..a79e5e4
+--- /dev/null
++++ b/tests/test_manual_edits.py
+@@ -0,0 +1,189 @@
++"""A person's edit of a scene script: load, save, conflict, and what is written.
++
++The save goes through `core.writes.edit_entity`, so these tests read the result
++back through the same load the editor uses — the heading in the script and the
++scene's fields must agree after every save.
++"""
++import pytest
++
++from story_architect.core import manual_edits as me
++from story_architect.core.db import get_db
++from story_architect.core.writes import create_entity, edit_entity
++
++
++@pytest.fixture
++def project(tmp_path):
++    p = tmp_path
++    create_entity(p, "act", "act-1", {"title": "Act I"})
++    create_entity(p, "sequence", "seq-1", {"title": "One", "act_id": "act-1"})
++    create_entity(p, "world", "london-1950", {"name": "London 1950", "one_sentence": "T"})
++    create_entity(p, "location", "kitchen", {"name": "Kitchen", "one_sentence": "T", "world": "london-1950"})
++    create_entity(p, "location", "attic", {"name": "Attic", "one_sentence": "T"})
++    for slug, name, role in [("mara-chen", "Mara Chen", "Protagonist"),
++                             ("detective-oak", "Detective Oak", "Antagonist")]:
++        create_entity(p, "character", slug, {"name": name, "story_role": role, "one_sentence": "T"})
++    create_entity(p, "scene", "the-kitchen",
++                  {"title": "The Kitchen", "sequence_id": "seq-1", "act_id": "act-1", "order": 2,
++                   "location": "kitchen", "time_of_day": "NIGHT", "heading": "INT. KITCHEN - NIGHT",
++                   "characters": ["mara-chen"]},
++                  sections={"Content": "INT. KITCHEN - NIGHT\n\nMara stands at the counter.\n\n"
++                                       "MARA\n(quietly)\nYou knew.\n\nLEO\nSorry.\n"})
++    return p
++
++
++def _payload(scene, **over):
++    p = {"base_hash": scene["hash"],
++         "blocks": scene["blocks"],
++         "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen",
++                     "location_text": "", "time_of_day": "NIGHT"},
++         "extra_cast": []}
++    p.update(over)
++    return p
++
++
++class TestLoad:
++    def test_shape(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        assert s["heading"]["int_ext"] == "INT." and s["heading"]["location"] == "kitchen"
++        assert s["location"] == {"id": "kitchen", "name": "Kitchen",
++                                 "world": {"id": "london-1950", "name": "London 1950"}}
++        assert [c["id"] for c in s["cast"]] == ["mara-chen"]
++        assert [c["cue"] for c in s["adhoc"]] == ["LEO"]       # speaks, not registered
++        assert s["stats"]["speaking_parts"] == 2
++        assert not s["locked"]
++
++    def test_unregistered_speaker_is_a_critical_finding_with_a_block_anchor(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        f = [x for x in s["findings"] if x["code"] == "character_unregistered"]
++        assert len(f) == 1 and "Leo" in f[0]["message"] and isinstance(f[0]["block"], int)
++
++    def test_unknown_scene(self, project):
++        with pytest.raises(me.ScriptNotFound):
++            me.load_scene_script(project, "nope")
++
++    def test_adhoc_names_from_other_scenes_are_offered(self, project):
++        create_entity(project, "scene", "the-attic",
++                      {"title": "Attic", "sequence_id": "seq-1", "act_id": "act-1"},
++                      sections={"Content": "INT. ATTIC - DAY\n\nLEO\nHello.\n\nNORA\nHi.\n"})
++        s = me.load_scene_script(project, "the-kitchen")
++        assert {a["cue"]: a["scenes"] for a in s["adhoc_elsewhere"]} == {"LEO": 1, "NORA": 1}
++
++    def test_empty_scene_opens_with_no_blocks(self, project):
++        create_entity(project, "scene", "blank", {"title": "Blank", "sequence_id": "seq-1", "act_id": "act-1"})
++        # create appends an undecided order; 0 is what a scene sits at when it was
++        # un-placed on purpose, which is the state the warning exists for.
++        edit_entity(project, "scene", "blank", {"order": 0}, "unplace")
++        s = me.load_scene_script(project, "blank")
++        assert s["blocks"] == [] and s["content"] == "" and not s["locked"]
++        codes = {f["code"] for f in s["findings"]}
++        assert {"heading_missing", "order_unset"} <= codes
++
++    def test_location_suggested_from_heading_but_not_linked(self, project):
++        create_entity(project, "scene", "s3", {"title": "S3", "sequence_id": "seq-1", "act_id": "act-1"},
++                      sections={"Content": "INT. KITCHEN - DAY\n\nHello.\n"})
++        s = me.load_scene_script(project, "s3")
++        assert s["scene"]["location"] == "" and s["heading"]["suggested_location"] == "kitchen"
++
++    def test_locked_scene_loads_locked(self, project):
++        edit_entity(project, "scene", "the-kitchen", {"status": "locked"}, "lock")
++        assert me.load_scene_script(project, "the-kitchen")["locked_reason"] == "status"
++
++
++class TestSave:
++    def test_edit_a_line_keeps_everything_in_sync(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        blocks = [dict(b) for b in s["blocks"]]
++        blocks[0]["text"] = "Mara stands at the counter, a ledger open."
++        out = me.save_scene_script(project, "the-kitchen", _payload(s, blocks=blocks))
++        assert "a ledger open" in out["content"]
++        assert out["content"].startswith("INT. KITCHEN - NIGHT\n")
++        assert out["previous_content"] == s["content"]
++        assert out["scene"]["status"] == s["scene"]["status"]      # status is not touched
++
++    def test_changing_location_and_time_rewrites_heading_everywhere(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        out = me.save_scene_script(project, "the-kitchen", _payload(
++            s, heading={"mode": "structured", "int_ext": "EXT.", "location": "attic",
++                        "location_text": "", "time_of_day": "DAWN"}))
++        assert out["content"].startswith("EXT. ATTIC - DAWN\n")
++        assert out["scene"]["heading"] == "EXT. ATTIC - DAWN"
++        assert out["scene"]["location"] == "attic" and out["scene"]["time_of_day"] == "DAWN"
++        assert "location_no_world" in {f["code"] for f in out["findings"]}   # attic has no world
++
++    def test_unregistered_location_lives_in_the_heading_only(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        out = me.save_scene_script(project, "the-kitchen", _payload(
++            s, heading={"mode": "structured", "int_ext": "INT.", "location": "",
++                        "location_text": "the cellar", "time_of_day": ""}))
++        assert out["content"].startswith("INT. THE CELLAR\n")
++        assert out["scene"]["location"] == ""
++        codes = {f["code"] for f in out["findings"]}
++        assert {"location_unregistered", "time_of_day_missing"} <= codes
++
++    def test_cast_is_script_speakers_plus_hand_added(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        blocks = s["blocks"] + [{"type": "character", "text": "DETECTIVE OAK"},
++                                {"type": "dialogue", "text": "Evening."}]
++        out = me.save_scene_script(project, "the-kitchen", _payload(s, blocks=blocks))
++        assert {c["id"] for c in out["cast"]} == {"mara-chen", "detective-oak"}
++        # and an unregistered speaker never becomes a stored character
++        conn = get_db(project)
++        try:
++            assert conn.execute("SELECT COUNT(*) FROM entities WHERE type='character'").fetchone()[0] == 2
++        finally:
++            conn.close()
++
++    def test_hand_added_cast_without_a_cue(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        out = me.save_scene_script(project, "the-kitchen", _payload(s, extra_cast=["detective-oak"]))
++        oak = next(c for c in out["cast"] if c["id"] == "detective-oak")
++        assert oak["in_script"] is False
++
++    def test_custom_heading_is_kept_verbatim(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        out = me.save_scene_script(project, "the-kitchen", _payload(
++            s, heading={"mode": "custom", "text": ".SNIPER SCOPE POV", "location": "kitchen",
++                        "time_of_day": "NIGHT"}))
++        assert out["content"].startswith(".SNIPER SCOPE POV\n")
++        assert out["heading"]["mode"] == "custom"
++
++    def test_stale_save_is_refused_and_nothing_is_written(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        edit_entity(project, "scene", "the-kitchen",
++                    {"Content": "INT. KITCHEN - NIGHT\n\nHermes was here.\n"}, "agent edit")
++        blocks = [{"type": "action", "text": "Mine."}]
++        with pytest.raises(me.ScriptConflict) as e:
++            me.save_scene_script(project, "the-kitchen", _payload(s, blocks=blocks))
++        assert e.value.current_hash != s["hash"]
++        assert "Hermes was here." in me.load_scene_script(project, "the-kitchen")["content"]
++
++    def test_locked_scene_is_refused(self, project):
++        s = me.load_scene_script(project, "the-kitchen")
++        edit_entity(project, "scene", "the-kitchen", {"status": "locked"}, "lock")
++        s2 = me.load_scene_script(project, "the-kitchen")
++        with pytest.raises(me.ScriptLocked):
++            me.save_scene_script(project, "the-kitchen", _payload(s2))
++
++    @pytest.mark.parametrize("over,msg", [
++        ({"heading": {"mode": "structured", "int_ext": "INT.", "location": "ghost"}}, "Location not found"),
++        ({"heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen", "time_of_day": "EVENING"}}, "time_of_day"),
++        ({"heading": {"mode": "structured", "int_ext": "OUT.", "location": "kitchen"}}, "int_ext"),
++        ({"heading": {"mode": "structured", "int_ext": "INT.", "location": "", "location_text": ""}}, "location"),
++        ({"heading": {"mode": "custom", "text": "just words"}}, "scene heading"),
++        ({"extra_cast": ["ghost"]}, "Character not found"),
++        ({"blocks": [{"type": "bogus", "text": "x"}]}, r"blocks\[0\]"),
++        ({"blocks": "nope"}, "list"),
++    ])
++    def test_invalid_payloads_are_refused_before_writing(self, project, over, msg):
++        s = me.load_scene_script(project, "the-kitchen")
++        with pytest.raises(me.ScriptError, match=msg):
++            me.save_scene_script(project, "the-kitchen", _payload(s, **over))
++        assert me.load_scene_script(project, "the-kitchen")["hash"] == s["hash"]
++
++    def test_the_agent_sees_the_edit(self, project):
++        """The point of one source of truth: the same Content the agent reads."""
++        s = me.load_scene_script(project, "the-kitchen")
++        me.save_scene_script(project, "the-kitchen", _payload(
++            s, blocks=[{"type": "action", "text": "A new line."}]))
++        from story_architect.core.db import get_screenplay_text
++        assert "A new line." in get_screenplay_text(project)
+diff --git a/tests/test_scene_script.py b/tests/test_scene_script.py
+new file mode 100644
+index 0000000..819fb30
+--- /dev/null
++++ b/tests/test_scene_script.py
+@@ -0,0 +1,213 @@
++"""Pure block model: parse/serialize, heading, cast resolution, findings.
++
++The parity tests pin the property the module's docstring claims: it agrees
++with the lexer about what a heading, a cue and a transition are, on real
++scene content, not only on hand-picked strings.
++"""
++import pytest
++
++from story_architect.core import scene_script as ss
++from story_architect.core.fountain_lexer import parse as lex
++
++CHARS = [
++    {"id": "mara-chen", "name": "Mara Chen", "story_role": "Protagonist"},
++    {"id": "detective-oak", "name": "Detective Oak", "story_role": "Antagonist"},
++    {"id": "oak-sr", "name": "Oak Senior", "story_role": "Minor"},
++]
++
++SCRIPT = (
++    "INT. KITCHEN - NIGHT\n\n"
++    "Mara stands at the counter.\n\n"
++    "RAIN HAMMERS.\n\n"
++    "MARA (V.O.)\n(quietly)\nYou knew.\nThe whole time.\n\n"
++    "DETECTIVE OAK\nNo.\n\n"
++    "CUT TO:\n\n[[a note]]\n\n!INT. NOT A HEADING\n\n> centered <\n"
++)
++
++
++def _roundtrip(content):
++    h, body = ss.split_heading(content)
++    return h, ss.parse_blocks(body)
++
++
++class TestRoundTrip:
++    def test_types(self):
++        h, blocks = _roundtrip(SCRIPT)
++        assert h == "INT. KITCHEN - NIGHT"
++        assert [b["type"] for b in blocks] == [
++            "action", "action", "character", "parenthetical", "dialogue",
++            "character", "dialogue", "transition", "note", "action", "raw"]
++
++    def test_serialization_is_stable(self):
++        h, blocks = _roundtrip(SCRIPT)
++        again = ss.compose_content(h, blocks)
++        h2, blocks2 = _roundtrip(again)
++        assert blocks2 == blocks
++        assert ss.compose_content(h2, blocks2) == again
++        assert ss.is_lossless(SCRIPT, h, blocks)
++
++    def test_all_caps_action_before_dialogue_gets_a_force_marker(self):
++        """An action line must not turn into a cue just because it is all-caps."""
++        out = ss.serialize_blocks([{"type": "action", "text": "RAIN HAMMERS.\nIt will not stop."}])
++        assert out.startswith("!RAIN HAMMERS.")
++        assert ss.parse_blocks(out) == [{"type": "action", "text": "RAIN HAMMERS.\nIt will not stop."}]
++
++    def test_plain_action_is_left_clean(self):
++        assert ss.serialize_blocks([{"type": "action", "text": "Rain hammers."}]) == "Rain hammers."
++
++    def test_mixed_case_cue_gets_at_sign_and_survives(self):
++        out = ss.serialize_blocks([{"type": "character", "text": "McCoy"},
++                                   {"type": "dialogue", "text": "Hi."}])
++        assert out.startswith("@McCoy")
++        assert ss.parse_blocks(out)[0] == {"type": "character", "text": "McCoy"}
++
++    def test_blank_line_inside_dialogue_is_kept(self):
++        blocks = [{"type": "character", "text": "MARA"},
++                  {"type": "dialogue", "text": "One.\n\nTwo."}]
++        again = ss.parse_blocks(ss.serialize_blocks(blocks))
++        assert again == blocks
++
++    def test_orphan_dialogue_is_reported_not_hidden(self):
++        f = ss.findings(scene={"order": 1, "time_of_day": "DAY"}, heading={}, heading_line="INT. A - DAY",
++                        blocks=[{"type": "dialogue", "text": "Hello?"}], cast=[], location=None,
++                        has_plot_roles=True, unfilled=[])
++        assert any(x["code"] == "orphan_dialogue" and x["block"] == 0 for x in f)
++
++    def test_empty_blocks_are_dropped(self):
++        assert ss.serialize_blocks([{"type": "action", "text": "  "}]) == ""
++
++    def test_dual_dialogue_stays_raw_and_lossless(self):
++        c = "INT. A - DAY\n\nMARA\nHi.\n\nOAK ^\nHo.\n"
++        h, blocks = _roundtrip(c)
++        assert any(b["type"] == "raw" for b in blocks)
++        assert ss.is_lossless(c, h, blocks)
++
++
++class TestParityWithLexer:
++    """On the fixture's real scenes, the blocks and the lexer agree."""
++
++    def test_fixture_scenes(self, fixture_db):
++        import sqlite3
++        conn = sqlite3.connect(str(fixture_db / ".story" / "story.db"))
++        bodies = [r[0] for r in conn.execute(
++            "SELECT body FROM sections WHERE heading='Content' AND body<>'' ")]
++        conn.close()
++        bodies = [b for b in bodies if not ss.is_placeholder(b)]
++        assert bodies, "fixture has no scene content to compare"
++        checked = 0
++        for body in bodies:
++            h, blocks = _roundtrip(body)
++            tokens = [t for t in lex(body)["tokens"]
++                      if t["type"] in ("character", "transition")]
++            lex_cues = [ss.cue_key(t["text"]) for t in tokens if t["type"] == "character"]
++            mine = [ss.cue_key(b["text"]) for b in blocks if b["type"] == "character"]
++            assert mine == lex_cues, body[:80]
++            assert [t["text"] for t in tokens if t["type"] == "transition"] == \
++                   [b["text"] for b in blocks if b["type"] == "transition"]
++            assert ss.is_lossless(body, h, blocks), body[:80]
++            checked += 1
++        assert checked
++
++
++class TestHeading:
++    @pytest.mark.parametrize("text,ie,loc,tod", [
++        ("INT. KITCHEN - NIGHT", "INT.", "KITCHEN", "NIGHT"),
++        ("EXT. LONDON STREET - DAY", "EXT.", "LONDON STREET", "DAY"),
++        ("INT./EXT. CAR - DUSK", "INT./EXT.", "CAR", "DUSK"),
++        ("I/E. CAR - DAWN", "INT./EXT.", "CAR", "DAWN"),
++        ("INT. KITCHEN", "INT.", "KITCHEN", ""),
++        ("EXT. A - B - DUSK", "EXT.", "A - B", "DUSK"),
++        ("INT. KITCHEN - PANTRY", "INT.", "KITCHEN - PANTRY", ""),
++    ])
++    def test_parse(self, text, ie, loc, tod):
++        p = ss.parse_heading(text)
++        assert (p["mode"], p["int_ext"], p["location_text"], p["time_of_day"]) == ("structured", ie, loc, tod)
++
++    @pytest.mark.parametrize("text", [".SNIPER SCOPE POV", "INT. KITCHEN - EVENING #12#", "INT. HALL - MOMENTS LATER"])
++    def test_custom_headings_are_kept_verbatim(self, text):
++        p = ss.parse_heading(text)
++        # "MOMENTS LATER" is not an enum time, so it stays part of the location text
++        if text.startswith("INT. HALL"):
++            assert p["mode"] == "structured" and p["time_of_day"] == ""
++        else:
++            assert p["mode"] == "custom" and p["text"] == text
++
++    def test_compose(self):
++        assert ss.compose_heading("INT.", "The kitchen", "NIGHT") == "INT. THE KITCHEN - NIGHT"
++        assert ss.compose_heading("EXT.", "Pier") == "EXT. PIER"
++        with pytest.raises(ValueError):
++            ss.compose_heading("INT.", "", "DAY")
++        with pytest.raises(ValueError):
++            ss.compose_heading("INT.", "A", "EVENING")
++
++    def test_compose_then_parse_is_identity(self):
++        h = ss.compose_heading("INT./EXT.", "Car", "DUSK")
++        p = ss.parse_heading(h)
++        assert ss.compose_heading(p["int_ext"], p["location_text"], p["time_of_day"]) == h
++
++    def test_suggest_is_exact_only(self):
++        locs = [{"id": "kitchen", "name": "The Kitchen"}, {"id": "kitchen-annex", "name": "Kitchen Annex"}]
++        assert ss.suggest_location("KITCHEN", locs) == "kitchen"
++        assert ss.suggest_location("KITCH", locs) is None
++
++
++class TestCast:
++    def test_exact_and_whole_word(self):
++        assert ss.resolve_cue("MARA CHEN", CHARS)["id"] == "mara-chen"
++        assert ss.resolve_cue("MARA", CHARS)["id"] == "mara-chen"
++        assert ss.resolve_cue("DETECTIVE", CHARS)["id"] == "detective-oak"
++
++    def test_no_prefix_or_fuzzy_match(self):
++        """The mock's own example: DET must not silently become Detective Oak."""
++        assert ss.resolve_cue("DET", CHARS)["id"] is None
++        assert ss.resolve_cue("MA", CHARS)["id"] is None
++
++    def test_ambiguity_resolves_to_nothing_and_names_candidates(self):
++        r = ss.resolve_cue("OAK", CHARS)
++        assert r["id"] is None and set(r["candidates"]) == {"detective-oak", "oak-sr"}
++
++    def test_cue_key_strips_extensions_and_markers(self):
++        assert ss.cue_key("@McCoy (V.O.)") == "MCCOY"
++        assert ss.cue_key("MARA (CONT'D)") == "MARA"
++
++    def test_two_cues_one_person_count_once(self):
++        blocks = [{"type": "character", "text": "MARA"}, {"type": "dialogue", "text": "a"},
++                  {"type": "character", "text": "MARA CHEN"}, {"type": "dialogue", "text": "b"},
++                  {"type": "character", "text": "LEO"}, {"type": "dialogue", "text": "c"}]
++        cast = ss.script_cast(blocks, CHARS)
++        assert [c["id"] for c in cast] == ["mara-chen", None]
++        assert cast[0]["cues"] == 2 and cast[1]["name"] == "Leo" and not cast[1]["registered"]
++        assert ss.script_stats("x", cast)["speaking_parts"] == 2
++
++
++class TestFindings:
++    def _f(self, **kw):
++        base = dict(scene={"order": 3, "time_of_day": "NIGHT", "dramatic_role": "", "id": "s", "title": "S"},
++                    heading={"location_text": "KITCHEN"}, heading_line="INT. KITCHEN - NIGHT",
++                    blocks=[], cast=[], location={"id": "k", "name": "Kitchen", "world": {"id": "w", "name": "W"}},
++                    has_plot_roles=True, unfilled=[])
++        base.update(kw)
++        return {x["code"] for x in ss.findings(**base)}
++
++    def test_clean_scene_has_no_critical(self):
++        assert self._f() == set()
++
++    def test_every_critical_rule(self):
++        codes = self._f(scene={"order": 0, "time_of_day": "", "dramatic_role": "", "id": "s"},
++                        heading_line=None, location=None, has_plot_roles=False)
++        assert {"order_unset", "time_of_day_missing", "heading_missing",
++                "location_unregistered", "plot_roles_missing"} <= codes
++
++    def test_transition_scene_needs_no_plot_roles(self):
++        assert "plot_roles_missing" not in self._f(
++            scene={"order": 1, "time_of_day": "DAY", "dramatic_role": "transition", "id": "s"},
++            has_plot_roles=False)
++
++    def test_location_without_world(self):
++        assert "location_no_world" in self._f(location={"id": "k", "name": "Kitchen", "world": None})
++
++    def test_unfilled_critical_fields_are_not_reported_twice(self):
++        f = ss.findings(scene={"order": 1, "time_of_day": "", "id": "s"}, heading={}, heading_line="INT. A",
++                        blocks=[], cast=[], location={"id": "k", "name": "K", "world": {"id": "w"}},
++                        has_plot_roles=True, unfilled=["time_of_day", "scene_objective"])
++        assert [x["field"] for x in f if x["level"] == "other"] == ["scene_objective"]
+diff --git a/tests/test_script_routes.py b/tests/test_script_routes.py
+new file mode 100644
+index 0000000..a0f3210
+--- /dev/null
++++ b/tests/test_script_routes.py
+@@ -0,0 +1,96 @@
++"""HTTP surface of the script editor, including the middleware it must sit behind."""
++import pytest
++from fastapi.testclient import TestClient
++
++from story_architect.app.config import Config
++from story_architect.app.server import create_app
++from story_architect.core.writes import create_entity, edit_entity
++
++H = {"X-Story-Architect": "1"}
++
++
++@pytest.fixture
++def client(tmp_path, monkeypatch):
++    monkeypatch.setattr("story_architect.app.token.load_api_key", lambda: "k")
++    root = tmp_path / "root"
++    proj = root / "projects" / "demo"
++    (proj / ".story").mkdir(parents=True)
++    create_entity(proj, "act", "act-1", {"title": "A"})
++    create_entity(proj, "sequence", "seq-1", {"title": "S", "act_id": "act-1"})
++    create_entity(proj, "world", "w", {"name": "W", "one_sentence": "T"})
++    create_entity(proj, "location", "kitchen", {"name": "Kitchen", "one_sentence": "T", "world": "w"})
++    create_entity(proj, "scene", "s1", {"title": "S1", "sequence_id": "seq-1", "act_id": "act-1", "order": 1,
++                                        "location": "kitchen", "time_of_day": "NIGHT"},
++                  sections={"Content": "INT. KITCHEN - NIGHT\n\nRain.\n"})
++    tc = TestClient(create_app(Config(root=root, port=8731)), base_url="http://127.0.0.1:8731")
++    return tc, proj
++
++
++def _body(s, **over):
++    b = {"base_hash": s["hash"], "blocks": s["blocks"],
++         "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen", "time_of_day": "NIGHT"},
++         "extra_cast": []}
++    b.update(over)
++    return b
++
++
++def test_get_then_put_round_trip(client):
++    tc, _ = client
++    s = tc.get("/api/projects/demo/scenes/s1/script").json()
++    assert s["heading"]["location"] == "kitchen" and s["blocks"][0]["text"] == "Rain."
++    r = tc.put("/api/projects/demo/scenes/s1/script", headers=H,
++               json=_body(s, blocks=[{"type": "action", "text": "Heavy rain."}]))
++    assert r.status_code == 200 and "Heavy rain." in r.json()["content"]
++
++
++def test_write_needs_the_custom_header(client):
++    """The one browser write path is behind the same middleware as the rest."""
++    tc, _ = client
++    s = tc.get("/api/projects/demo/scenes/s1/script").json()
++    assert tc.put("/api/projects/demo/scenes/s1/script", json=_body(s)).status_code == 403
++
++
++def test_foreign_origin_is_refused(client):
++    tc, _ = client
++    s = tc.get("/api/projects/demo/scenes/s1/script").json()
++    r = tc.put("/api/projects/demo/scenes/s1/script", json=_body(s),
++               headers={**H, "Origin": "http://evil.example"})
++    assert r.status_code == 403
++
++
++def test_conflict_is_409_with_the_current_hash(client):
++    tc, proj = client
++    s = tc.get("/api/projects/demo/scenes/s1/script").json()
++    edit_entity(proj, "scene", "s1", {"Content": "INT. KITCHEN - NIGHT\n\nAgent.\n"}, "agent")
++    r = tc.put("/api/projects/demo/scenes/s1/script", headers=H, json=_body(s))
++    assert r.status_code == 409
++    err = r.json()["error"]
++    assert err["code"] == "conflict" and err["current_hash"] != s["hash"]
++
++
++@pytest.mark.parametrize("path,status", [
++    ("/api/projects/demo/scenes/nope/script", 404),
++    ("/api/projects/ghost/scenes/s1/script", 404),
++])
++def test_missing_things_are_404(client, path, status):
++    tc, _ = client
++    assert tc.get(path).status_code == status
++
++
++def test_locked_is_423_and_invalid_is_422(client):
++    tc, proj = client
++    s = tc.get("/api/projects/demo/scenes/s1/script").json()
++    bad = tc.put("/api/projects/demo/scenes/s1/script", headers=H,
++                 json=_body(s, heading={"mode": "structured", "int_ext": "INT.", "location": "ghost"}))
++    assert bad.status_code == 422
++    edit_entity(proj, "scene", "s1", {"status": "locked"}, "lock")
++    s = tc.get("/api/projects/demo/scenes/s1/script").json()
++    assert tc.put("/api/projects/demo/scenes/s1/script", headers=H, json=_body(s)).status_code == 423
++
++
++def test_parse_pasted_text(client):
++    tc, _ = client
++    r = tc.post("/api/projects/demo/script/parse", headers=H,
++                json={"text": "MARA\nHi.\n\nShe leaves."}).json()
++    assert [b["type"] for b in r["blocks"]] == ["character", "dialogue", "action"]
++    assert tc.post("/api/projects/demo/script/parse", headers=H, json={"text": 5}).status_code == 422

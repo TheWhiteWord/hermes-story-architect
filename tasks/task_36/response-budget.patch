@@ -1,0 +1,1391 @@
+diff --git a/src/story_architect/adapters/hermes/budget.py b/src/story_architect/adapters/hermes/budget.py
+new file mode 100644
+index 0000000..9ec59d7
+--- /dev/null
++++ b/src/story_architect/adapters/hermes/budget.py
+@@ -0,0 +1,76 @@
++"""Work out story_architect's response budget for a Hermes model.
++
++Hermes spills an MCP result to disk (leaving the agent a ~1.5k-char preview and
++a path it cannot read) when the result is longer than
++
++    min( tool_budget.mcp_result_size_chars,           # config.yaml, default 50000
++         clamp(15% of the context window in chars,    # window_tokens * 4 * 0.15
++               8000, 100000) )
++
++The second term is the one that bites: it shrinks with the model. A 32k-token
++model spills at 19,200 chars, a 65k one at 39,000, a 128k one at the full 50,000.
++The plugin cannot see the model, so this derives the number once, with a margin,
++for you to put in ~/.config/story-architect/config.toml.
++
++This mirrors Hermes's tools/budget_config.py. If a Hermes upgrade changes those
++constants, update them here (tests pin the current values).
++
++    python -m story_architect.adapters.hermes.budget 65000
++    python -m story_architect.adapters.hermes.budget 32000 --mcp-cap 40000
++"""
++
++from __future__ import annotations
++
++import argparse
++
++CHARS_PER_TOKEN = 4              # Hermes's own estimate (agent/model_metadata.py)
++PER_RESULT_WINDOW_FRACTION = 0.15
++MIN_RESULT_CHARS = 8_000
++MAX_RESULT_CHARS = 100_000
++DEFAULT_MCP_CAP = 50_000         # tool_budget.mcp_result_size_chars default
++SAFETY = 0.90                    # stay under the cap: the host counts its own way
++ROUND_TO = 500
++
++
++def hermes_spill_threshold(context_tokens: int, mcp_cap: int | None = None) -> int:
++    """The result length above which Hermes spills an MCP result to disk."""
++    window_chars = context_tokens * CHARS_PER_TOKEN
++    scaled = max(MIN_RESULT_CHARS,
++                 min(int(window_chars * PER_RESULT_WINDOW_FRACTION), MAX_RESULT_CHARS))
++    return min(mcp_cap or DEFAULT_MCP_CAP, scaled)
++
++
++def suggest_budget(context_tokens: int, mcp_cap: int | None = None) -> int:
++    """A response budget safely under Hermes's threshold for this model."""
++    threshold = hermes_spill_threshold(context_tokens, mcp_cap)
++    return int(threshold * SAFETY) // ROUND_TO * ROUND_TO
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(
++        prog="python -m story_architect.adapters.hermes.budget",
++        description="Suggest max_response_chars for a Hermes model.")
++    ap.add_argument("context_tokens", type=int,
++                    help="the model's context window in tokens (e.g. 65000)")
++    ap.add_argument("--mcp-cap", type=int, default=None,
++                    help="tool_budget.mcp_result_size_chars from the profile's "
++                         "config.yaml, if you set one (default 50000)")
++    args = ap.parse_args(argv)
++    if args.context_tokens <= 0:
++        ap.error("context_tokens must be positive")
++    threshold = hermes_spill_threshold(args.context_tokens, args.mcp_cap)
++    budget = suggest_budget(args.context_tokens, args.mcp_cap)
++    print(f"Hermes spills MCP results longer than {threshold:,} chars "
++          f"on a {args.context_tokens:,}-token model.")
++    print(f"Suggested budget: {budget:,} chars. In "
++          f"~/.config/story-architect/config.toml:\n")
++    print(f"[story_architect]\nmax_response_chars = {budget}")
++    if budget < 15_000:
++        print("\nNote: below ~15,000 the base map's fixed part (characters, plots, "
++              "worlds, one compact row per scene) can exceed the budget on a large "
++              "project; use act=/sequence= scoping to stay under it.")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/src/story_architect/core/budget.py b/src/story_architect/core/budget.py
+new file mode 100644
+index 0000000..45092c8
+--- /dev/null
++++ b/src/story_architect/core/budget.py
+@@ -0,0 +1,122 @@
++"""Response budget: keep a tool's answer small enough that the host never has
++to cut it for us.
++
++Why this exists. A host agent caps every tool result. Past its cap it swaps the
++result for a short preview plus a file path, and this plugin's agents have no
++file tools to read that path with. The agent then proceeds on a preview of a
++map that was meant to be whole. A story tool's answer has to be complete or
++say, in its own words, what it left out and how to ask for it.
++
++So the rule here is: *the tool* decides what to compact, at a structural
++boundary (a whole sequence, a whole entity), and says so. The host's cut never
++fires. Nothing is silently dropped — a compacted unit stays visible as a
++compact row, and the response carries the exact call that expands it.
++
++The budget is in characters of the JSON text, which is what a host counts. It
++must sit a little UNDER the host's cap, and that cap is not a fixed number: it
++usually scales with the model's context window, which this plugin cannot see.
++So the budget is a setting you state once, resolved in this order:
++
++    1. env var   STORY_ARCHITECT_MAX_RESPONSE_CHARS
++    2. config    max_response_chars   in the [story_architect] table of
++                 ~/.config/story-architect/config.toml (the file that already
++                 holds port and root)
++    3. default   35000   (safe from ~65k-token windows up)
++
++A value that is not a whole number >= 2000 is ignored and the next source is
++tried. A host adapter (see adapters/) can provide a helper that works the
++number out for its host's model.
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import tomllib
++from pathlib import Path
++from typing import Callable
++
++DEFAULT_MAX_RESPONSE_CHARS = 35_000
++_ENV = "STORY_ARCHITECT_MAX_RESPONSE_CHARS"
++# Below this the budget cannot hold even a bare map; treat it as a typo.
++_MIN_SANE = 2_000
++
++
++def _valid(value) -> int | None:
++    """`value` as a usable budget, or None. Bools and floats are not budgets."""
++    if isinstance(value, bool):
++        return None
++    try:
++        number = int(str(value).strip())
++    except (TypeError, ValueError):
++        return None
++    return number if number >= _MIN_SANE else None
++
++
++def _config_file() -> Path:
++    # Same location as app/config.py (core may not import from app).
++    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
++    return base / "story-architect" / "config.toml"
++
++
++def _from_config_file() -> int | None:
++    try:
++        with _config_file().open("rb") as f:
++            table = tomllib.load(f).get("story_architect", {})
++        return _valid(table.get("max_response_chars"))
++    except Exception:   # a missing or malformed file just means "not set"
++        return None
++
++
++def max_response_chars() -> int:
++    """The response budget: env var, then config.toml, then the default."""
++    from_env = _valid(os.environ.get(_ENV, ""))
++    if from_env is not None:
++        return from_env
++    from_file = _from_config_file()
++    if from_file is not None:
++        return from_file
++    return DEFAULT_MAX_RESPONSE_CHARS
++
++
++def json_size(obj) -> int:
++    """Length of `obj` as the tool will emit it (json.dumps defaults)."""
++    return len(json.dumps(obj))
++
++
++def largest_fitting(build: Callable[[int], object], n_units: int,
++                    budget: int) -> tuple[int, object]:
++    """Largest k in [0, n_units] for which `build(k)` fits `budget`.
++
++    `build(k)` returns the response with the FIRST k units at full detail and
++    the rest compacted. Size must not shrink as k grows (full rows are a
++    superset of compact rows), which makes a binary search exact: the answer is
++    measured on the real output, not estimated.
++
++    Returns (k, response). When even k=0 is over budget, k=0 is returned
++    anyway — the compact form is the floor, and the caller's hint tells the
++    agent how to scope down.
++    """
++    full = build(n_units)
++    if json_size(full) <= budget:
++        return n_units, full
++    lo, hi = 0, n_units - 1   # n_units is known not to fit
++    best = 0
++    while lo <= hi:
++        mid = (lo + hi) // 2
++        if json_size(build(mid)) <= budget:
++            best, lo = mid, mid + 1
++        else:
++            hi = mid - 1
++    return best, build(best)
++
++
++def compacted_note(unit_name: str, ids: list[str], expand_hint: str) -> dict:
++    """The `detail` block that tells the agent what was compacted and how to
++    get it back. Present only when something was compacted."""
++    return {
++        "compacted": ids,
++        "reason": (f"The full response would exceed the size budget, so these "
++                   f"{unit_name}s are listed compactly. Nothing was removed."),
++        "expand": expand_hint,
++    }
+diff --git a/src/story_architect/core/db.py b/src/story_architect/core/db.py
+index 1d076d9..8c66ce1 100644
+--- a/src/story_architect/core/db.py
++++ b/src/story_architect/core/db.py
+@@ -428,11 +428,25 @@ def _coerce_number(value, default):
+     return default if value is None else value
+ 
+ 
+-def get_project_summary(project_path: Path) -> dict:
++def get_project_summary(project_path: Path, act: str | None = None,
++                        sequence: str | None = None,
++                        max_chars: int | None = None) -> dict:
+     """Return nested project summary for story_load (spec §2).
+ 
+     Shape: {loaded, confirmation, project, acts, characters, plots,
+             locations, worlds, memory}
++
++    `act` / `sequence` scope the FULL scene rows to one act or one sequence.
++    Every other scene stays on the map as a compact row (id, title, status), so
++    the map is always complete — scoping chooses where the detail goes, it never
++    removes a scene. An explicit scope is always honoured in full.
++
++    `max_chars` is the response budget for the unscoped case. When the whole map
++    would exceed it, sequences are compacted from the END of the story until it
++    fits, and a top-level `detail` block names them and the call that expands
++    each. Left None, nothing is compacted (the pre-budget behaviour, which the
++    dashboard-free callers and the pinned-shape tests rely on). A response that
++    already fits is returned unchanged, key for key.
+     """
+     conn = get_db(project_path)
+     try:
+@@ -586,7 +600,7 @@ def get_project_summary(project_path: Path) -> dict:
+                     if k in always_keep or (v and v != defaults.get(k))}
+ 
+         # ── Build scene output ──
+-        def _build_scene(sid):
++        def _build_scene(sid, lite=False):
+             s = scenes[sid]
+             stub = _is_scene_stub(s)
+             chars = scene_chars.get(sid, [])
+@@ -595,6 +609,10 @@ def get_project_summary(project_path: Path) -> dict:
+                 if chars:
+                     result["characters"] = chars
+                 return result
++            if lite:
++                # Compact row: enough to see the scene exists, where it sits
++                # and how far along it is. The rest is one scoped call away.
++                return {"id": sid, "title": s["title"], "status": s["status"]}
+             result = {
+                 "id": sid,
+                 "title": s["title"],
+@@ -632,7 +650,7 @@ def get_project_summary(project_path: Path) -> dict:
+                          always_keep={"status"})
+ 
+         # ── Build sequence output ──
+-        def _build_sequence(seq_id):
++        def _build_sequence(seq_id, lite=False):
+             seq = sequences[seq_id]
+             child_scene_ids = sorted(
+                 [sid for sid, s in scenes.items() if s["_parent_id"] == seq_id],
+@@ -645,11 +663,11 @@ def get_project_summary(project_path: Path) -> dict:
+                 "id": seq["id"],
+                 "title": seq["title"],
+                 "status": seq["status"],
+-                "scenes": [_build_scene(sid) for sid in child_scene_ids],
++                "scenes": [_build_scene(sid, lite) for sid in child_scene_ids],
+             }
+ 
+         # ── Build act output ──
+-        def _build_act(act_id):
++        def _build_act(act_id, full_seqs):
+             act = acts[act_id]
+             child_seq_ids = sorted(
+                 [sid for sid, s in sequences.items() if s["_parent_id"] == act_id],
+@@ -659,7 +677,8 @@ def get_project_summary(project_path: Path) -> dict:
+                 "id": act["id"],
+                 "title": act["title"],
+                 "status": act["status"],
+-                "sequences": [_build_sequence(sid) for sid in child_seq_ids],
++                "sequences": [_build_sequence(sid, lite=sid not in full_seqs)
++                              for sid in child_seq_ids],
+             }
+ 
+         # Build top-level acts (those without parent_id or parent not in acts)
+@@ -667,7 +686,31 @@ def get_project_summary(project_path: Path) -> dict:
+             [aid for aid, a in acts.items() if not a["_parent_id"] or a["_parent_id"] not in acts],
+             key=lambda aid: (acts[aid]["_order_key"], aid)
+         )
+-        acts_list = [_build_act(aid) for aid in top_act_ids]
++        # ── Scope and budget: which sequences carry full scene rows ──
++        # Story order across the whole map, so "from the end" means the end of
++        # the story rather than the end of a dict.
++        def _seq_children(act_id):
++            return sorted(
++                [sid for sid, sq in sequences.items() if sq["_parent_id"] == act_id],
++                key=lambda sid: (sequences[sid]["_order_key"], sid))
++        ordered_seq_ids = [sid for aid in top_act_ids for sid in _seq_children(aid)]
++
++        if sequence is not None and sequence not in sequences:
++            return {"error": f"No sequence with id '{sequence}'.",
++                    "valid_sequences": ordered_seq_ids}
++        if act is not None and act not in acts:
++            return {"error": f"No act with id '{act}'.",
++                    "valid_acts": top_act_ids}
++        if sequence is not None:
++            scope_ids = [sequence]
++        elif act is not None:
++            scope_ids = _seq_children(act)
++        else:
++            scope_ids = ordered_seq_ids
++        explicit_scope = sequence is not None or act is not None
++
++        def _acts_for(full_seqs):
++            return [_build_act(aid, full_seqs) for aid in top_act_ids]
+ 
+         # ── Computed character relationship summary (CONVENTION_computed_fields) ──
+         char_rel_summary = {}
+@@ -767,18 +810,43 @@ def get_project_summary(project_path: Path) -> dict:
+         # ── Memory ──
+         memory_block = get_memory_block(project_path)
+ 
+-        result = {
+-            "loaded": True,
+-            "confirmation": confirmation,
+-            "project": project,
+-            "acts": acts_list,
+-            "characters": characters_list,
+-            "plots": plots_list,
+-            "worlds": worlds_list,
+-            "memory": memory_block,
+-        }
+-        if orphaned_locations:
+-            result["orphaned_locations"] = orphaned_locations
++        def _assemble(full_seqs):
++            result = {
++                "loaded": True,
++                "confirmation": confirmation,
++                "project": project,
++                "acts": _acts_for(full_seqs),
++                "characters": characters_list,
++                "plots": plots_list,
++                "worlds": worlds_list,
++                "memory": memory_block,
++            }
++            if orphaned_locations:
++                result["orphaned_locations"] = orphaned_locations
++            return result
++
++        # A sequence scope is an explicit request for that detail: no budget.
++        # An act scope, or none, is held to `max_chars` when one is given.
++        if sequence is not None or max_chars is None:
++            result = _assemble(set(scope_ids))
++            compacted = []
++        else:
++            from .budget import largest_fitting
++            k, result = largest_fitting(
++                lambda n: _assemble(set(scope_ids[:n])), len(scope_ids), max_chars)
++            compacted = scope_ids[k:]
++
++        if explicit_scope:
++            result["scope"] = {
++                k_: v for k_, v in (("act", act), ("sequence", sequence)) if v}
++            result["scope"]["note"] = (
++                "Scenes outside this scope are compact rows (id, title, status). "
++                "Call again with another act or sequence for their full rows.")
++        if compacted:
++            from .budget import compacted_note
++            result["detail"] = compacted_note(
++                "sequence", compacted,
++                "story_load with sequence=<id> returns that sequence's full scene rows.")
+         return result
+     finally:
+         conn.close()
+diff --git a/src/story_architect/tools/story_load.py b/src/story_architect/tools/story_load.py
+index 6cb7b90..96c83ec 100644
+--- a/src/story_architect/tools/story_load.py
++++ b/src/story_architect/tools/story_load.py
+@@ -30,10 +30,18 @@ SCHEMA = {
+                            "'track' = one entity across the story, in story order."
+         },
+ 
++        "character": {
++            "type": "string",
++            "description": "For view='relationship': only the relationships that involve "
++                           "this character id, in full. Unscoped, a large cast's graph is "
++                           "kept within a size budget: when `detail` lists compacted "
++                           "relationships, call again with character=<id>."
++        },
+         "act": {
+             "type": "string",
+-            "description": "For view='dramatic_elements', 'values' or 'track': limit to one act id. "
+-                           "Defaults to all."
++            "description": "Limit to one act id. Base map: full scene rows for that act, "
++                           "compact rows (id, title, status) for the rest. Also for "
++                           "view='dramatic_elements', 'values' or 'track'. Defaults to all."
+         },
+         "plot": {
+             "type": "string",
+@@ -52,7 +60,12 @@ SCHEMA = {
+         },
+         "sequence": {
+             "type": "string",
+-            "description": "For view='values' or 'track': limit to one sequence id. Defaults to all."
++            "description": "Limit to one sequence id — the cheapest way to work on a stretch of "
++                           "the story. Base map: full scene rows for that sequence, compact rows "
++                           "for the rest. Also for view='dramatic_elements', 'values' or 'track'. "
++                           "Defaults to all. A large story's responses are kept within a size "
++                           "budget: when a `detail` block lists compacted sequences, call again "
++                           "with sequence=<id> for their full rows."
+         },
+         "scene": {
+             "type": "string",
+@@ -116,11 +129,18 @@ def handler(args: dict, **kwargs) -> str:
+         if not has_schema(conn):
+             return json.dumps({"error": "Database schema not found. Run story_import first."})
+ 
+-        # The base view is the default and stays deliberately slim: it is the
+-        # once-per-session map, and its cost per scene is ~16 characters. Any
+-        # depth beyond that is opt-in, so nothing here is conditional on `view`.
++        # The base view is the once-per-session map. Each developed scene row
++        # carries what the scene is FOR (characters, location, milestone,
++        # plots, objective, beats pointer) — a few hundred characters apiece —
++        # so a feature-length map outgrows any host cap. It is therefore held
++        # to a response budget: past it, trailing sequences are listed as
++        # compact rows and `detail` says which and how to expand them. `act` /
++        # `sequence` put the full rows where the work is.
+         if view is None:
+-            summary = get_project_summary(project_path)
++            from story_architect.core.budget import max_response_chars
++            summary = get_project_summary(
++                project_path, act=args.get("act"), sequence=args.get("sequence"),
++                max_chars=max_response_chars())
+             if summary:
+                 return json.dumps(summary)
+         else:
+@@ -144,7 +164,7 @@ def _extended_view(conn, project_path, view: str, args: dict):
+     if view == "dramatic_elements":
+         return _view_dramatic_elements(conn, args)
+     if view == "relationship":
+-        return _view_relationship(conn)
++        return _view_relationship(conn, args)
+     if view == "unfilled":
+         return _view_unfilled(project_path, args)
+     if view == "values":
+@@ -187,11 +207,15 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
+     and climax roles are the story-level milestones.
+ 
+     A scene's `scene_objective` and `turning_point` are here too, and
+-    `scene_beats` is the pointer to the record they come from. They are not in
+-    the base map, which is the once-per-session call and stays slim; this view
+-    is the opt-in read of a scene's dramatic spine, and it already nests
+-    act → sequence → scene so the two fields have a home. Each is emitted only
+-    when filled, so an empty one costs nothing.
++    `scene_beats` is the pointer to the record they come from. The base map
++    carries the objective and the pointer too, but not `turning_point`, the
++    scene's `dramatic_role`, or each plot's role — this view is where those
++    live, nested act → sequence → scene. Each is emitted only when filled, so
++    an empty one costs nothing.
++
++    `act` and `sequence` narrow to that stretch of the story. Unscoped, the
++    view is held to the response budget: trailing sequences collapse to
++    `scene_count` and `detail` lists them (see core.budget).
+ 
+     `plot` narrows the view to one plot: the `project` header's plot index keeps
+     only that plot. `milestones_only` then trims the tree to the escalation
+@@ -202,9 +226,19 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
+     scenes it promotes without calling them milestones.
+     """
+     act_filter = args.get("act")
++    seq_filter = args.get("sequence")
+     plot_filter = args.get("plot")
+     milestones_only = bool(args.get("milestones_only"))
+ 
++    if seq_filter:
++        ids = [r[0] for r in conn.execute(
++            "SELECT id FROM entities WHERE type='sequence' AND is_deleted=0 "
++            "ORDER BY order_key, id")]
++        if seq_filter not in ids:
++            return {"view": "dramatic_elements", "sequence": seq_filter,
++                    "error": f"No sequence with id '{seq_filter}'.",
++                    "valid_sequences": ids}
++
+     # Each scene's `scene_beats` record, keyed by the scene. Only the id and the
+     # two facts this view surfaces are read — not the beats, which would defeat
+     # the point of keeping them out of the base map.
+@@ -249,6 +283,8 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
+                 "SELECT id, name, order_key, extra FROM entities "
+                 "WHERE type='sequence' AND parent_id=:p ORDER BY order_key, id",
+                 {"p": act_id}).fetchall():
++            if seq_filter and seq_id != seq_filter:
++                continue
+             seq_extra = json.loads(seq_extra_json or "{}")
+             seq = {"id": seq_id, "title": seq_title}
+             if seq_extra.get("primary_plot"):
+@@ -400,6 +436,7 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
+     out = {
+         "view": "dramatic_elements",
+         "act": act_filter or "all",
++        "sequence": seq_filter or "all",
+         "plot": plot_filter or "all",
+         "project": {
+             "structure_type": pro.get("structure_type", ""),
+@@ -409,17 +446,53 @@ def _view_dramatic_elements(conn, args: dict) -> dict:
+         },
+         "acts": acts_out,
+     }
++    # A sequence scope is an explicit request: no budget. Otherwise hold the
++    # view to the response budget by collapsing sequences from the story's end.
++    if seq_filter:
++        return out
++    from story_architect.core.budget import (
++        compacted_note, largest_fitting, max_response_chars)
++    seqs = [sq for a in acts_out for sq in a["sequences"]]
++    full_scenes = [sq["scenes"] for sq in seqs]
++
++    def build(k):
++        for i, sq in enumerate(seqs):
++            if i < k:
++                sq["scenes"] = full_scenes[i]
++                sq.pop("scene_count", None)
++            else:
++                sq.pop("scenes", None)
++                sq["scene_count"] = len(full_scenes[i])
++        return out
++
++    k, _ = largest_fitting(build, len(seqs), max_response_chars())
++    if k < len(seqs):
++        out["detail"] = compacted_note(
++            "sequence", [sq["id"] for sq in seqs[k:]],
++            "story_load view='dramatic_elements' with sequence=<id> returns "
++            "that sequence's scenes.")
+     return out
+ 
+ 
+-def _view_relationship(conn) -> dict:
+-    """Every relationship with its per-character perspectives."""
++def _view_relationship(conn, args: dict) -> dict:
++    """Relationships with their per-character perspectives.
++
++    Each row carries the scenes it appears in and a perspective per character,
++    so the whole graph grows with the cast AND with how often each pair meets.
++    `character` narrows to the relationships that involve one character, always
++    in full. Unscoped, the view is held to the response budget: relationships
++    past it are listed compactly (id, name, characters — the skeleton of who is
++    tied to whom) and `detail` says how to read them in full.
++    """
++    character = args.get("character")
+     out = []
+     for rel_id, name, status, extra_json in conn.execute(
+             "SELECT id, name, status, extra FROM entities "
+             "WHERE type='relationship' AND is_deleted=0 "
+             "ORDER BY id").fetchall():
+         extra = json.loads(extra_json or "{}")
++        if character and character not in extra.get("characters", []):
++            continue
+         perspectives = extra.get("perspectives", {})
+         out.append({
+             "id": rel_id,
+@@ -437,7 +510,31 @@ def _view_relationship(conn) -> dict:
+                 for char_id, p in sorted(perspectives.items())
+             ],
+         })
+-    return {"view": "relationship", "relationships": out}
++    if character:
++        result = {"view": "relationship", "character": character,
++                  "relationships": out}
++        if not out:
++            result["note"] = (f"No relationship involves '{character}'. Ids are "
++                              f"exactly as returned by story_load.")
++        return result
++
++    from story_architect.core.budget import (
++        compacted_note, largest_fitting, max_response_chars)
++    full_rows = list(out)
++
++    def build(k):
++        rows = [r if i < k else {"id": r["id"], "name": r["name"],
++                                 "characters": r["characters"]}
++                for i, r in enumerate(full_rows)]
++        return {"view": "relationship", "relationships": rows}
++
++    k, result = largest_fitting(build, len(full_rows), max_response_chars())
++    if k < len(full_rows):
++        result["detail"] = compacted_note(
++            "relationship", [r["id"] for r in full_rows[k:]],
++            "story_load view='relationship' with character=<id> returns that "
++            "character's relationships in full.")
++    return result
+ 
+ 
+ # The unfilled view is a suggestion list, not an inventory: a project with 90
+diff --git a/src/story_architect/tools/story_retrieve.py b/src/story_architect/tools/story_retrieve.py
+index 4ff685c..dab39b1 100644
+--- a/src/story_architect/tools/story_retrieve.py
++++ b/src/story_architect/tools/story_retrieve.py
+@@ -5,7 +5,9 @@ The counterpart to story_load ("what exists and where" vs "what does this say").
+ * A typo'd or mistyped id reports the project, not the import tool.
+ * Relation-backed fields (plot beats, scene characters) are reachable, so a
+   plot's crisis scene can be read as empty.
+-* Any number of entities per call.
++* Any number of entities per call, held to a response budget: whole entities
++  up to the budget, then `truncated` + `deferred_ids` + a hint. An entity is
++  never cut in half — it is returned complete or not at all (see core.budget).
+ """
+ import json
+ from pathlib import Path
+@@ -40,7 +42,10 @@ SCHEMA = {
+             "items": {"type": "string"},
+             "description": "Entity id(s), exactly as returned by story_load. Several at once is "
+                            "cheaper than one call per id. For entity_type='project' use the "
+-                           "project name from story_load.",
++                           "project name from story_load. Responses are kept within a size "
++                           "budget: entities come back whole, in the order given, and if "
++                           "they would not all fit the response is marked `truncated` and "
++                           "`deferred_ids` lists the ones to ask for next.",
+         },
+         "sections": {
+             "type": "array",
+@@ -233,6 +238,14 @@ def _sections(conn, entity_id: str, wanted) -> dict:
+     return {name: bodies.get(name) for name in wanted}
+ 
+ 
++def _section_sizes(conn, entity_id: str) -> dict:
++    """Heading -> characters, for an entity too big to return whole, so the
++    agent can ask for its sections one at a time instead of guessing."""
++    return {h: len(b or "") for h, b in conn.execute(
++        "SELECT heading, body FROM sections WHERE entity_id=? ORDER BY rowid",
++        (entity_id,))}
++
++
+ def handler(args: dict, **kwargs) -> str:
+     """Return the requested fields and sections for one or more entities."""
+     from story_architect.core.config import resolve_root
+@@ -279,8 +292,17 @@ def handler(args: dict, **kwargs) -> str:
+         # different claim, and the wrong one.
+         wanted = set(schema) if want_fields == ["all"] else set(want_fields or [])
+ 
+-        entities, not_found = [], []
+-        for entity_id in ids:
++        from story_architect.core.budget import json_size, max_response_chars
++        budget = max_response_chars()
++        # What the envelope costs beside the entities: the type, the keys, and
++        # room for `truncated`, `deferred_ids` and the hint.
++        used = json_size({"entity_type": entity_type, "entities": []}) + 400
++        entities, not_found, deferred = [], [], []
++        oversize = None
++        for position, entity_id in enumerate(ids):
++            if deferred:
++                deferred.append(entity_id)   # once one is deferred, the tail is
++                continue
+             row, error = _resolve(conn, entity_type, entity_id)
+             if error:
+                 not_found.append({"id": entity_id, "error": error})
+@@ -301,12 +323,51 @@ def handler(args: dict, **kwargs) -> str:
+             # one more section among them.
+             if wanted:
+                 entry["unfilled_fields"] = _unfilled(conn, data, entity_type)
++            # Whole entities only. The FIRST is always returned, however big:
++            # refusing it would leave the agent with nothing to act on. Every
++            # later one must fit alongside what is already there, plus the ids
++            # that would be deferred if it does not.
++            cost = json_size(entry) + 2
++            if entities:
++                tail = sum(len(i) + 4 for i in ids[position:])
++                if used + cost + tail > budget:
++                    deferred.append(entity_id)
++                    continue
++            elif used + cost > budget:
++                oversize = {"id": data["id"],
++                            "section_sizes": _section_sizes(conn, data["id"])}
+             entities.append(entry)
++            used += cost
+     finally:
+         conn.close()
+ 
+-    response = {"entity_type": entity_type, "entities": entities}
+-    if not_found:
+-        response["not_found"] = not_found
+-        response["hint"] = "Call story_load to list valid ids for this project."
++    def assemble() -> dict:
++        response = {"entity_type": entity_type, "entities": entities}
++        hints = []
++        if not_found:
++            response["not_found"] = not_found
++            hints.append("Call story_load to list valid ids for this project.")
++        if deferred:
++            response["truncated"] = True
++            response["deferred_ids"] = deferred
++            hints.append(
++                f"{len(entities)} of {len(ids)} requested entities are returned, "
++                f"each complete; the size budget stopped the rest. Call again with "
++                f"deferred_ids (same sections/fields) to read them.")
++        if oversize:
++            response["over_budget"] = oversize
++            hints.append(
++                f"'{oversize['id']}' alone is larger than the size budget. To read it "
++                f"in parts, request one section at a time — section_sizes lists them.")
++        if hints:
++            response["hint"] = " ".join(hints)
++        return response
++
++    # The estimate in the loop above is a shortcut; this is the guarantee, taken
++    # on the real output. Hand back the last entity until it fits (never the
++    # first), so the response is within budget unless one entity alone is not.
++    response = assemble()
++    while json_size(response) > budget and len(entities) > 1:
++        deferred.insert(0, entities.pop()["id"])
++        response = assemble()
+     return json.dumps(response)
+diff --git a/src/story_architect/tools/story_search.py b/src/story_architect/tools/story_search.py
+index 544f698..35f5db5 100644
+--- a/src/story_architect/tools/story_search.py
++++ b/src/story_architect/tools/story_search.py
+@@ -2,6 +2,26 @@
+ import json
+ from pathlib import Path
+ 
++DEFAULT_LIMIT = 10
++MAX_LIMIT = 50      # snippets are capped at 200 chars, so 50 hits is ~14 KB
++
++
++def _clamp_limit(raw) -> tuple[int, bool]:
++    """The limit to use, and whether the caller's value had to be cut down.
++
++    The schema's `maximum` is advice, not enforcement: nothing between the model
++    and this handler validates it, and SQLite reads `LIMIT -1` as "no limit", so
++    an unclamped value can return every match in the project. A bad type falls
++    back to the default; an out-of-range number is brought into range.
++    """
++    try:
++        value = int(raw)
++    except (TypeError, ValueError):
++        return DEFAULT_LIMIT, False
++    clamped = max(1, min(value, MAX_LIMIT))
++    return clamped, clamped != value
++
++
+ SCHEMA = {
+     "description": "Find where something is mentioned, across all section prose in a project. "
+                    "Returns short snippets, not full text, and reports the true total match count "
+@@ -53,7 +73,8 @@ def handler(args: dict, **kwargs) -> str:
+ 
+     # No blanket except: a failed search must not be reported as a missing DB,
+     # which would send the agent to story_import and wipe runtime work.
+-    found = search_sections(project_path, args["query"], limit=args.get("limit", 10))
++    limit, was_clamped = _clamp_limit(args.get("limit", DEFAULT_LIMIT))
++    found = search_sections(project_path, args["query"], limit=limit)
+ 
+     results, total = found["results"], found["total_matches"]
+     response = {
+@@ -62,9 +83,14 @@ def handler(args: dict, **kwargs) -> str:
+         "total": len(results),
+         "total_matches": total,
+     }
++    notes = []
++    if was_clamped:
++        notes.append(f"limit was brought into range (1-{MAX_LIMIT}).")
+     if total > len(results):
+-        response["note"] = (
++        notes.append(
+             f"Showing {len(results)} of {total} matches. Narrow the query, or raise "
+-            f"limit (max 50). Use story_retrieve to read a section in full."
++            f"limit (max {MAX_LIMIT}). Use story_retrieve to read a section in full."
+         )
++    if notes:
++        response["note"] = " ".join(notes)
+     return json.dumps(response)
+diff --git a/tests/test_budget_config.py b/tests/test_budget_config.py
+new file mode 100644
+index 0000000..e1f0ea7
+--- /dev/null
++++ b/tests/test_budget_config.py
+@@ -0,0 +1,133 @@
++"""Where the response budget comes from, and the Hermes percentage helper.
++
++The budget has to sit under the host's per-result cap, and that cap scales with
++the model's context window, which the plugin cannot see. So it is a setting
++(env var, then config.toml, then a default), and the Hermes adapter can work the
++number out from a model's context size.
++"""
++
++import importlib
++import sys
++
++import pytest
++
++from story_architect.core import budget
++from story_architect.adapters.hermes import budget as hb
++
++ENV = "STORY_ARCHITECT_MAX_RESPONSE_CHARS"
++
++
++@pytest.fixture(autouse=True)
++def home(tmp_path, monkeypatch):
++    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
++    monkeypatch.delenv(ENV, raising=False)
++    (tmp_path / "story-architect").mkdir()
++    return tmp_path / "story-architect"
++
++
++def write_toml(home, body):
++    (home / "config.toml").write_text(body)
++
++
++class TestResolution:
++    def test_default_when_nothing_is_set(self):
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++    def test_config_file_is_used(self, home):
++        write_toml(home, "[story_architect]\nmax_response_chars = 17000\n")
++        assert budget.max_response_chars() == 17000
++
++    def test_env_beats_config_file(self, home, monkeypatch):
++        write_toml(home, "[story_architect]\nmax_response_chars = 17000\n")
++        monkeypatch.setenv(ENV, "25000")
++        assert budget.max_response_chars() == 25000
++
++    def test_a_bad_env_value_falls_through_to_the_file(self, home, monkeypatch):
++        write_toml(home, "[story_architect]\nmax_response_chars = 17000\n")
++        monkeypatch.setenv(ENV, "banana")
++        assert budget.max_response_chars() == 17000
++
++    @pytest.mark.parametrize("bad", ["max_response_chars = 10",
++                                     "max_response_chars = true",
++                                     "max_response_chars = 15000.5",
++                                     'max_response_chars = "lots"',
++                                     "max_response_chars = -3"])
++    def test_a_bad_file_value_means_not_set(self, home, bad):
++        write_toml(home, f"[story_architect]\n{bad}\n")
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++    def test_a_malformed_file_means_not_set(self, home):
++        write_toml(home, "this is [not toml")
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++    def test_other_tables_and_keys_are_ignored(self, home):
++        write_toml(home, "[other]\nmax_response_chars = 9000\n[story_architect]\nport = 1\n")
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++
++class TestCoreDoesNotReadHostConfig:
++    """The budget was once derived by parsing the host's config.yaml. That value
++    is only one of the host's inputs (the model window is the other, and the
++    one that matters), so it gave a wrong number — and a bare `except` hid a
++    missing import so it silently did nothing. The core must not do this."""
++
++    def test_a_host_config_yaml_has_no_effect(self, tmp_path, monkeypatch):
++        host = tmp_path / "host"
++        host.mkdir()
++        (host / "config.yaml").write_text(
++            "tool_budget:\n  mcp_result_size_chars: 100000\n")
++        monkeypatch.setenv("HERMES_HOME", str(host))
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++    def test_core_budget_names_no_host(self):
++        src = importlib.util.find_spec("story_architect.core.budget").origin
++        assert "hermes" not in open(src).read().lower()
++
++
++class TestHermesPercentage:
++    # What Hermes enforces, computed from tools/budget_config.py:
++    #   min(mcp cap (50000), clamp(0.15 * window_tokens * 4, 8000, 100000))
++    @pytest.mark.parametrize("ctx, threshold, suggested", [
++        (8_000,     8_000,  7_000),    # floor: a tiny model still gets 8k
++        (32_000,   19_200, 17_000),
++        (65_000,   39_000, 35_000),
++        (128_000,  50_000, 45_000),
++        (200_000,  50_000, 45_000),
++        (1_000_000, 50_000, 45_000),
++    ])
++    def test_known_windows(self, ctx, threshold, suggested):
++        assert hb.hermes_spill_threshold(ctx) == threshold
++        assert hb.suggest_budget(ctx) == suggested
++
++    def test_a_smaller_configured_cap_wins(self):
++        assert hb.hermes_spill_threshold(200_000, mcp_cap=30_000) == 30_000
++        assert hb.suggest_budget(200_000, mcp_cap=30_000) == 27_000
++
++    def test_a_larger_configured_cap_cannot_beat_the_window(self):
++        """The very mistake of reading the config key alone: raising it to
++        100000 does not lift a 65k-token model past its 15% window share."""
++        assert hb.hermes_spill_threshold(65_000, mcp_cap=100_000) == 39_000
++
++    def test_the_suggestion_is_always_under_the_threshold_and_sane(self):
++        for ctx in range(4_000, 400_000, 3_000):
++            for cap in (None, 20_000, 50_000, 100_000):
++                t = hb.hermes_spill_threshold(ctx, cap)
++                s = hb.suggest_budget(ctx, cap)
++                assert s < t
++                assert s >= budget._MIN_SANE or t < 2_500
++
++    def test_cli_prints_the_toml_line(self, capsys):
++        assert hb.main(["65000"]) == 0
++        out = capsys.readouterr().out
++        assert "39,000" in out and "[story_architect]" in out
++        assert "max_response_chars = 35000" in out
++
++    def test_the_cli_output_round_trips_through_the_resolver(self, capsys, home):
++        hb.main(["32000"])
++        toml = capsys.readouterr().out.split("\n\n", 1)[1]
++        write_toml(home, toml)
++        assert budget.max_response_chars() == hb.suggest_budget(32_000)
++
++    def test_cli_rejects_a_non_positive_window(self):
++        with pytest.raises(SystemExit):
++            hb.main(["0"])
+diff --git a/tests/test_response_budget.py b/tests/test_response_budget.py
+new file mode 100644
+index 0000000..d6ea8f1
+--- /dev/null
++++ b/tests/test_response_budget.py
+@@ -0,0 +1,469 @@
++"""Response budget and act/sequence scoping for story_load.
++
++A feature-length story outgrows any host cap: the base map costs a few hundred
++characters per developed scene, so ~100 scenes is already ~50k chars. Hermes
++swaps an over-cap MCP result for a ~1.5k preview plus a file path, and these
++agents have no file tools to read it. So the TOOL keeps to a budget and says,
++in its own words, what it compacted and how to expand it.
++
++The contract these tests pin:
++  * a response that fits is unchanged — small projects see no difference;
++  * over budget, trailing sequences compact; nothing is removed; `detail` names
++    them and the expand call works;
++  * `sequence=` is an explicit request and is always answered in full;
++  * `act=` / `sequence=` put full rows where the work is, compact rows elsewhere.
++"""
++
++import json
++import re
++import shutil
++from pathlib import Path
++
++import pytest
++
++from story_architect.core import budget
++from story_architect.core.db import get_project_summary
++from story_architect.tools.story_load import handler as load_handler
++
++@pytest.fixture(autouse=True)
++def _no_user_config(tmp_path, monkeypatch):
++    """A developer's own ~/.config/story-architect/config.toml must not change
++    what these tests expect from the default budget."""
++    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
++    monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
++
++
++FIXTURE = Path(__file__).parent / "fixtures" / "save-the-children"
++N_SEQ, PER_SEQ = 6, 8          # 48 scenes: enough to overflow a small budget
++N_REL_COPIES = 10              # 3 real relationships x 10 = 33 total
++SMALL = "6000"                 # chars; forces compaction without a huge project
++
++
++def _sub(text, **kv):
++    for k, v in kv.items():
++        text = re.sub(rf"^{k}: .*$", f"{k}: {v}", text, flags=re.M, count=1)
++    return text
++
++
++def _grow(project_dir: Path):
++    """Add N_SEQ sequences of PER_SEQ developed scenes, cloned from the
++    fixture's own files so every field and relation is shaped like real data."""
++    seq_tpl = (project_dir / "sequences" / "The Discovery.md").read_text()
++    scene_tpl = (project_dir / "scenes" / "Central Room - Day.md").read_text()
++    beats_tpl = (project_dir / "scene_beats" / "Central Room - Day.md").read_text()
++    # A larger cast: ten copies of each of the fixture's three relationships,
++    # so which characters they involve is real, not invented.
++    for tpl_file in sorted((project_dir / "relationships").glob("*.md")):
++        tpl = tpl_file.read_text()
++        for r in range(N_REL_COPIES):
++            (project_dir / "relationships" / f"{tpl_file.stem} {r}.md").write_text(
++                _sub(_sub(tpl, id=f"{tpl_file.stem.lower().replace(' ', '-')}-{r}"),
++                     name=f"{tpl_file.stem} {r}"))
++    n = 0
++    for s in range(N_SEQ):
++        (project_dir / "sequences" / f"Gen Seq {s}.md").write_text(
++            _sub(seq_tpl, id=f"gen-seq-{s}", order=100 + s, title=f"Gen Seq {s}"))
++        for _ in range(PER_SEQ):
++            (project_dir / "scenes" / f"Gen Scene {n}.md").write_text(
++                _sub(scene_tpl, id=f"gen-scene-{n}", order=1000 + n,
++                     title=f"Gen Scene {n}", heading=f"INT. ROOM {n} - DAY",
++                     sequence_id=f"gen-seq-{s}"))
++            (project_dir / "scene_beats" / f"Gen Scene {n}.md").write_text(
++                _sub(beats_tpl, id=f"gen-scene-{n}-beats", scene=f"gen-scene-{n}"))
++            n += 1
++
++
++def _import(vault: Path, monkeypatch):
++    import story_architect.core.config
++    monkeypatch.setattr(story_architect.core.config, "load_plugin_config",
++                        lambda: {"root_path": str(vault)})
++    from story_architect.tools.story_import import handler as import_handler
++    result = json.loads(import_handler(
++        {"project": "save-the-children", "confirm": True}, root_path=str(vault)))
++    assert "error" not in result, result
++
++
++@pytest.fixture
++def small(tmp_path, monkeypatch):
++    vault = tmp_path / "v"
++    shutil.copytree(FIXTURE, vault / "projects" / "save-the-children")
++    _import(vault, monkeypatch)
++    return vault / "projects" / "save-the-children"
++
++
++@pytest.fixture
++def big(tmp_path, monkeypatch):
++    vault = tmp_path / "v"
++    proj = vault / "projects" / "save-the-children"
++    shutil.copytree(FIXTURE, proj)
++    _grow(proj)
++    _import(vault, monkeypatch)
++    return proj
++
++
++def load(project, **args):
++    vault = str(project.parent.parent)
++    return json.loads(load_handler({"project": "save-the-children", **args},
++                                   root_path=vault))
++
++
++def scenes_of(result):
++    return {s["id"]: s for a in result["acts"] for q in a["sequences"]
++            for s in q["scenes"]}
++
++
++def seq_ids(result):
++    return [q["id"] for a in result["acts"] for q in a["sequences"]]
++
++
++COMPACT_KEYS = {"id", "title", "status"}
++
++
++# ── the helper ──────────────────────────────────────────────────────────────
++
++class TestBudgetHelper:
++    def test_default_when_unset(self, monkeypatch):
++        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++    @pytest.mark.parametrize("bad", ["", "abc", "-5", "10", "1e5"])
++    def test_bad_values_fall_back(self, monkeypatch, bad):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", bad)
++        assert budget.max_response_chars() == budget.DEFAULT_MAX_RESPONSE_CHARS
++
++    def test_env_value_is_used(self, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "12345")
++        assert budget.max_response_chars() == 12345
++
++    def test_largest_fitting_is_exact(self):
++        # unit i costs 100 chars full, 10 compact; 10 units, budget for 4 full
++        def build(k):
++            return {"u": ["x" * 100 if i < k else "x" * 10 for i in range(10)]}
++        base = budget.json_size(build(0))
++        per_full = budget.json_size(build(1)) - base
++        k, out = budget.largest_fitting(build, 10, base + 4 * per_full)
++        assert k == 4 and budget.json_size(out) <= base + 4 * per_full
++        assert budget.largest_fitting(build, 10, 10**9)[0] == 10
++
++    def test_floor_is_zero_not_an_error(self):
++        k, out = budget.largest_fitting(lambda k: {"u": "x" * (50 + k)}, 3, 5)
++        assert k == 0 and out is not None
++
++
++# ── base map ────────────────────────────────────────────────────────────────
++
++class TestBaseMapBudget:
++    def test_fitting_response_is_unchanged(self, small, monkeypatch):
++        """A small project must not see the budget at all."""
++        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
++        assert load(small) == get_project_summary(small)
++        assert "detail" not in load(small) and "scope" not in load(small)
++
++    def test_over_budget_compacts_from_the_end_and_removes_nothing(
++            self, big, monkeypatch):
++        full = get_project_summary(big)                       # unbudgeted truth
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
++        result = load(big)
++
++        assert scenes_of(result).keys() == scenes_of(full).keys()   # complete
++        compacted = result["detail"]["compacted"]
++        assert compacted, "this project should overflow a 6000-char budget"
++        order = seq_ids(result)
++        assert compacted == order[len(order) - len(compacted):], \
++            "compaction must be a suffix of the story, not a scatter"
++        for q in (q for a in result["acts"] for q in a["sequences"]
++                  if q["id"] in compacted):
++            for s in q["scenes"]:
++                assert set(s) <= COMPACT_KEYS | {"characters"}
++        assert len(json.dumps(result)) < len(json.dumps(full))
++
++    def test_leading_sequences_keep_full_rows(self, big, monkeypatch):
++        full = scenes_of(get_project_summary(big))
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "20000")
++        result = load(big)
++        compacted = set(result.get("detail", {}).get("compacted", []))
++        kept = [q for a in result["acts"] for q in a["sequences"]
++                if q["id"] not in compacted]
++        assert kept, "a 20000 budget should hold at least one full sequence"
++        for q in kept:
++            for s in q["scenes"]:
++                assert s == full[s["id"]]
++
++    def test_the_expand_hint_actually_expands(self, big, monkeypatch):
++        full = scenes_of(get_project_summary(big))
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
++        target = load(big)["detail"]["compacted"][-1]
++        expanded = load(big, sequence=target)
++        rows = [s for a in expanded["acts"] for q in a["sequences"]
++                if q["id"] == target for s in q["scenes"]]
++        assert rows and all(s == full[s["id"]] for s in rows)
++
++    def test_sequence_scope_ignores_the_budget(self, big, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "2000")
++        result = load(big, sequence="gen-seq-2")
++        assert "detail" not in result
++        assert result["scope"]["sequence"] == "gen-seq-2"
++        full = scenes_of(get_project_summary(big))
++        for q in (q for a in result["acts"] for q in a["sequences"]):
++            for s in q["scenes"]:
++                if q["id"] == "gen-seq-2":
++                    assert s == full[s["id"]]
++                else:
++                    assert set(s) <= COMPACT_KEYS | {"characters"}
++
++    def test_scoped_map_is_still_complete(self, big):
++        full = get_project_summary(big)
++        assert scenes_of(load(big, sequence="gen-seq-4")).keys() == \
++            scenes_of(full).keys()
++
++    def test_act_scope(self, big):
++        act_id = load(big)["acts"][0]["id"]
++        result = load(big, act=act_id)
++        assert result["scope"]["act"] == act_id
++
++    def test_unknown_ids_name_the_valid_ones(self, big):
++        bad = load(big, sequence="nope")
++        assert "error" in bad and "gen-seq-0" in bad["valid_sequences"]
++        bad = load(big, act="nope")
++        assert "error" in bad and bad["valid_acts"]
++
++
++# ── dramatic_elements ───────────────────────────────────────────────────────
++
++class TestDramaticElementsScopeAndBudget:
++    @staticmethod
++    def _seqs(result):
++        return [q for a in result["acts"] for q in a["sequences"]]
++
++    def test_fitting_view_has_no_detail_and_keeps_scenes(self, small, monkeypatch):
++        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
++        result = load(small, view="dramatic_elements")
++        assert "detail" not in result
++        assert all("scenes" in q for q in self._seqs(result))
++
++    def test_sequence_scope_returns_only_that_sequence(self, big):
++        result = load(big, view="dramatic_elements", sequence="gen-seq-3")
++        seqs = self._seqs(result)
++        assert [q["id"] for q in seqs] == ["gen-seq-3"]
++        assert len(seqs[0]["scenes"]) == PER_SEQ
++        assert result["sequence"] == "gen-seq-3"
++
++    def test_sequence_scope_ignores_the_budget(self, big, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "2000")
++        result = load(big, view="dramatic_elements", sequence="gen-seq-3")
++        assert "detail" not in result
++        assert len(self._seqs(result)[0]["scenes"]) == PER_SEQ
++
++    def test_over_budget_collapses_to_counts_with_a_hint(self, big, monkeypatch):
++        full = load(big, view="dramatic_elements")
++        n_full = {q["id"]: len(q["scenes"]) for q in self._seqs(full)}
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "9000")
++        result = load(big, view="dramatic_elements")
++        compacted = result["detail"]["compacted"]
++        assert compacted
++        for q in self._seqs(result):
++            if q["id"] in compacted:
++                assert "scenes" not in q and q["scene_count"] == n_full[q["id"]]
++            else:
++                assert len(q["scenes"]) == n_full[q["id"]]
++        # nothing vanished: every sequence is still listed
++        assert [q["id"] for q in self._seqs(result)] == \
++            [q["id"] for q in self._seqs(full)]
++
++    def test_unknown_sequence_names_the_valid_ones(self, big):
++        bad = load(big, view="dramatic_elements", sequence="nope")
++        assert "error" in bad and "gen-seq-0" in bad["valid_sequences"]
++
++
++# ── story_retrieve ──────────────────────────────────────────────────────────
++
++def retrieve(project, ids, entity_type="scene", **extra):
++    from story_architect.tools.story_retrieve import handler
++    args = {"project": "save-the-children", "entity_type": entity_type, "id": ids,
++            "sections": ["all"], "fields": ["all"], **extra}
++    return json.loads(handler(args, root_path=str(project.parent.parent)))
++
++
++def gen_ids():
++    return [f"gen-scene-{i}" for i in range(N_SEQ * PER_SEQ)]
++
++
++def unbudgeted(project, monkeypatch, ids):
++    """Ground truth: every entity, read with a budget too big to bite. The
++    default budget would truncate the truth itself."""
++    monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "100000000")
++    r = retrieve(project, ids)
++    assert "truncated" not in r
++    return {e["id"]: e for e in r["entities"]}
++
++
++class TestRetrieveBudget:
++    def test_fitting_response_is_unchanged(self, small, monkeypatch):
++        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
++        r = retrieve(small, ["central-room-day", "central-room-night"])
++        assert len(r["entities"]) == 2
++        assert not {"truncated", "deferred_ids", "hint", "over_budget"} & r.keys()
++
++    def test_over_budget_returns_whole_entities_then_defers_the_tail(
++            self, big, monkeypatch):
++        ids = gen_ids()
++        truth = unbudgeted(big, monkeypatch, ids)
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
++        r = retrieve(big, ids)
++
++        assert r["truncated"] is True
++        got = [e["id"] for e in r["entities"]]
++        assert got and r["deferred_ids"]
++        assert got + r["deferred_ids"] == ids, "contiguous, in request order"
++        for e in r["entities"]:
++            assert e == truth[e["id"]], "an entity is whole or absent, never cut"
++        assert len(json.dumps(r)) <= int(SMALL)
++        assert "deferred_ids" in r["hint"]
++
++    def test_following_deferred_ids_reads_everything_exactly_once(
++            self, big, monkeypatch):
++        ids = gen_ids()
++        truth = unbudgeted(big, monkeypatch, ids)
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
++        pending, seen, calls = ids, [], 0
++        while pending:
++            r = retrieve(big, pending)
++            calls += 1
++            assert calls < 100, "paging must make progress"
++            seen += [e["id"] for e in r["entities"]]
++            pending = r.get("deferred_ids", [])
++        assert seen == ids and calls > 1
++        assert set(seen) == set(truth) and len(seen) == len(set(seen))
++
++    def test_first_entity_is_returned_even_if_it_alone_is_too_big(
++            self, big, monkeypatch):
++        import sqlite3
++        db = big / ".story" / "story.db"
++        conn = sqlite3.connect(db)
++        conn.execute("UPDATE sections SET body=? WHERE entity_id='gen-scene-0' "
++                     "AND rowid=(SELECT min(rowid) FROM sections "
++                     "WHERE entity_id='gen-scene-0')", ("x" * 20000,))
++        conn.commit(); conn.close()
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "8000")
++
++        r = retrieve(big, ["gen-scene-0", "gen-scene-1"])
++        assert [e["id"] for e in r["entities"]] == ["gen-scene-0"]
++        assert r["deferred_ids"] == ["gen-scene-1"]
++        assert r["over_budget"]["id"] == "gen-scene-0"
++        assert max(r["over_budget"]["section_sizes"].values()) >= 20000
++        assert "one section at a time" in r["hint"]
++
++        alone = retrieve(big, ["gen-scene-0"])
++        assert [e["id"] for e in alone["entities"]] == ["gen-scene-0"]
++        assert "deferred_ids" not in alone and "over_budget" in alone
++
++    def test_not_found_and_deferral_both_reported(self, big, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
++        r = retrieve(big, ["no-such-scene"] + gen_ids())
++        assert [n["id"] for n in r["not_found"]] == ["no-such-scene"]
++        assert r["truncated"] is True
++        assert "story_load" in r["hint"] and "deferred_ids" in r["hint"]
++
++    def test_a_scoped_request_is_never_truncated(self, big, monkeypatch):
++        """Asking for one section is the way to stay under budget."""
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", SMALL)
++        r = retrieve(big, gen_ids()[:3], sections=["Content"], fields=None)
++        assert len(r["entities"]) == 3 and "truncated" not in r
++
++
++# ── relationship view ───────────────────────────────────────────────────────
++
++class TestRelationshipViewBudget:
++    @staticmethod
++    def rels(project, **args):
++        return load(project, view="relationship", **args)
++
++    def test_fitting_view_is_unchanged(self, small, monkeypatch):
++        monkeypatch.delenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", raising=False)
++        r = self.rels(small)
++        assert "detail" not in r and r["relationships"]
++        assert all("perspectives" in x for x in r["relationships"])
++
++    def test_over_budget_compacts_but_lists_every_relationship(
++            self, big, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "100000000")
++        full = self.rels(big)["relationships"]
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "6000")
++        r = self.rels(big)
++
++        assert [x["id"] for x in r["relationships"]] == [x["id"] for x in full]
++        compacted = r["detail"]["compacted"]
++        assert compacted, "33 relationships should overflow a 6000 budget"
++        by_id = {x["id"]: x for x in full}
++        for x in r["relationships"]:
++            if x["id"] in compacted:
++                assert set(x) == {"id", "name", "characters"}
++                assert x["characters"] == by_id[x["id"]]["characters"]
++            else:
++                assert x == by_id[x["id"]]
++        assert len(json.dumps(r)) < len(json.dumps({"relationships": full}))
++
++    def test_character_filter_returns_that_characters_relationships_in_full(
++            self, big, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "100000000")
++        full = self.rels(big)["relationships"]
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "2000")  # ignored
++        r = self.rels(big, character="kael")
++        expected = [x for x in full if "kael" in x["characters"]]
++        assert expected and r["relationships"] == expected
++        assert r["character"] == "kael" and "detail" not in r
++        assert len(expected) < len(full), "the filter must actually narrow"
++
++    def test_the_expand_hint_actually_expands(self, big, monkeypatch):
++        monkeypatch.setenv("STORY_ARCHITECT_MAX_RESPONSE_CHARS", "6000")
++        r = self.rels(big)
++        left_out = [x for x in r["relationships"] if x["id"] in r["detail"]["compacted"]]
++        char = left_out[0]["characters"][0]
++        again = self.rels(big, character=char)["relationships"]
++        assert all("perspectives" in x for x in again)
++        assert {x["id"] for x in left_out if char in x["characters"]} <= \
++            {x["id"] for x in again}
++
++    def test_unknown_character_says_so(self, big):
++        r = self.rels(big, character="nobody")
++        assert r["relationships"] == [] and "nobody" in r["note"]
++
++
++# ── story_search ────────────────────────────────────────────────────────────
++
++class TestSearchLimit:
++    """`maximum: 50` in the schema is advice; nothing enforces it upstream, and
++    SQLite reads LIMIT -1 as "no limit"."""
++
++    @staticmethod
++    def search(project, **args):
++        from story_architect.tools.story_search import handler
++        return json.loads(handler({"project": "save-the-children", "query": "scene",
++                                   **args}, root_path=str(project.parent.parent)))
++
++    def test_an_oversized_limit_is_capped_and_says_so(self, big):
++        r = self.search(big, limit=500)
++        assert r["total"] == 50 and r["total_matches"] > 50
++        assert "brought into range" in r["note"]
++
++    @pytest.mark.parametrize("limit", [-1, 0, -999])
++    def test_non_positive_limits_never_mean_unlimited(self, big, limit):
++        r = self.search(big, limit=limit)
++        assert r["total"] == 1
++
++    @pytest.mark.parametrize("limit", ["abc", None, [3], {}])
++    def test_a_bad_type_falls_back_to_the_default(self, big, limit):
++        assert self.search(big, limit=limit)["total"] == 10
++
++    def test_a_numeric_string_is_accepted(self, big):
++        assert self.search(big, limit="5")["total"] == 5
++
++    def test_in_range_limit_is_untouched_and_unannounced(self, big):
++        r = self.search(big, limit=7)
++        assert r["total"] == 7 and "brought into range" not in r.get("note", "")
++
++    def test_worst_case_stays_small(self, big):
++        from story_architect.tools.story_search import handler
++        raw = handler({"project": "save-the-children", "query": "scene", "limit": 9999},
++                      root_path=str(big.parent.parent))
++        assert len(raw) < 20_000
