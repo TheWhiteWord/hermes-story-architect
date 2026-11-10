@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="css/scene-beats.css">
 <link rel="stylesheet" href="css/character-journey.css">
 <link rel="stylesheet" href="css/script-editor.css">
+<link rel="stylesheet" href="css/entity-form.css">
 <link rel="stylesheet" href="css/chat.css">
 </head>
 
@@ -188,6 +189,7 @@
         <div class="view-title">Character web</div>
         <div class="view-subtitle" id="graph-subtitle">—</div>
         <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'character'})" title="Add a character">+ New</button>
           <button class="btn" onclick="DASH.resetGraphLayout()" title="Reset layout">Reset</button>
         </div>
       </div>
@@ -224,6 +226,9 @@
       <div class="view-header">
         <div class="view-title">Locations</div>
         <div class="view-subtitle" id="locations-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'location'})" title="Add a location">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="location-list"></div>
@@ -259,6 +264,9 @@
       <div class="view-header">
         <div class="view-title">Worlds</div>
         <div class="view-subtitle" id="worlds-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'world'})" title="Add a world">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="world-list"></div>
@@ -270,6 +278,9 @@
       <div class="view-header">
         <div class="view-title">Values</div>
         <div class="view-subtitle" id="values-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openValuesMenu(this)" title="Add or edit a value">Edit values ▾</button>
+        </div>
       </div>
       <div class="view-body" id="values-body"></div>
     </div>
@@ -504,6 +515,7 @@
         <div class="panel-entity-type" id="panel-type">—</div>
         <div class="panel-name" id="panel-name">—</div>
       </div>
+      <button class="panel-edit" id="panel-edit" title="Edit by hand">Edit</button>
       <button class="panel-close" onclick="DASH.closePanel()">✕</button>
     </div>
     <div class="panel-body" id="panel-body"></div>
@@ -540,6 +552,7 @@
 <script src="js/script-editor/model.js"></script>
 <script src="js/script-editor/editor.js"></script>
 <script src="js/script-view.js"></script>
+<script src="js/forms/entity-form.js"></script>
 <script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>DASH.boot();</script>
 </body>
 </html>
