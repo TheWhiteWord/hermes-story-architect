@@ -27,15 +27,19 @@ import hashlib
 import json
 from pathlib import Path
 
-from .constants import (ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_SCOPES, PLOT_TYPES,
-                        VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
+from .constants import (ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES, PLOT_TYPES,
+                        STRUCTURE_TYPES, VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
 from .db import get_db
 from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELDS,
                      coerce_number, standard_sections)
 
 # What the form can edit today. The spec builder is generic; this is the gate,
 # so a type goes live when its form has been exercised, not when its schema exists.
-FORM_TYPES = ("character", "location", "world", "value")
+FORM_TYPES = ("character", "location", "world", "value", "plot", "relationship", "project")
+
+# The project is a single record that exists from the start: it can be edited,
+# never created or deleted from here.
+SINGLETONS = ("project",)
 
 NAME_KEY = {"scene": "title", "sequence": "title", "act": "title"}
 
@@ -82,6 +86,14 @@ LABELS = {
     "values": "What the world holds sacred", "power": "Who holds power",
     "p": "Positive", "c": "Contrary", "cd": "Contradictory",
     "nn": "Negation of the negation", "note": "Note",
+    "plot_scope": "Scope", "plot_type": "Kind of subplot", "value_arc": "Value arc",
+    "characters": "Characters", "perspectives": "Perspectives", "scenes": "Scenes featured",
+    "history": "History", "status": "Status", "logline": "Logline",
+    "structure_type": "Structure", "act_count": "Number of acts",
+    "screenplay_title": "Screenplay title", "controlling_idea": "Controlling idea",
+    "draft_date": "Draft date", "setups": "Setups", "inciting_incident": "Inciting incident",
+    "complications": "Complications", "crisis": "Crisis", "climax": "Climax",
+    "resolutions": "Resolutions", "value_focus": "Values that shift",
 }
 
 # Closed vocabularies that live in `constants` / `entity`, not in the schema.
@@ -91,7 +103,15 @@ ENUMS = {
     ("plot", "value_arc"): VALUE_ARCS,
     ("plot", "plot_scope"): PLOT_SCOPES,
     ("plot", "plot_type"): PLOT_TYPES,
+    ("relationship", "status"): ["active", "resolved", "complex"],
+    ("project", "status"): ["active", "abandoned", "archived"],
+    ("project", "structure_type"): STRUCTURE_TYPES,
 }
+
+# The kinds a perspective can have. The schema only lists them in prose, and the
+# write path doesn't enforce them, so the form offers them and keeps anything
+# already stored.
+REL_TYPES = ["ally", "enemy", "family", "romantic", "professional", "mentor", "rival", "neutral", "custom"]
 
 # Relational fields the schema does not declare as `ref` (it must not: a `ref`
 # makes the write path check it, which changes what the agent is held to).
@@ -100,9 +120,25 @@ UI_REFS = {
     ("location", "world"): "world",
     ("location", "variant_of"): "location",
     ("world", "variant_of"): "world",
+    ("relationship", "characters"): "character",
+    ("relationship", "scenes"): "scene",
 }
 
-MULTILINE = {"note", "history", "purpose"}
+# Fields that only matter when another field has a given value. Hidden, they are
+# reset to their default, so a stale value can't linger behind the form.
+SHOW_IF = {("plot", "plot_type"): {"plot_scope": "sub"}}
+
+# Where the schema's own order reads badly in a form.
+FIELD_ORDER = {"relationship": ["name", "characters", "perspectives", "status", "history", "scenes"]}
+
+# A name the form can suggest from other fields until the person types their own.
+AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
+
+# Visual grouping inside one form.
+GROUPS = {("project", k): "Title page" for k in
+          ("screenplay_title", "credit", "author", "contact", "draft_date", "draft")}
+
+MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea"}
 
 # Help written for the person at the form. The schema's own descriptions are
 # written for the agent ("Slug of the base location…") and would read as jargon.
@@ -122,12 +158,36 @@ HELP = {
     ("location", "variant_of"): "Pick the original if this is another version of it. Leave empty otherwise.",
     ("world", "variant_of"): "Pick the original if this is another version of it. Leave empty otherwise.",
     ("value", "name"): "The positive pole, e.g. “trust”. Scenes refer to the value by this name.",
+    ("plot", "one_sentence"): "One line that sums up this plot.",
+    ("plot", "characters"): "The protagonists of this plot only — not everyone who appears in it.",
+    ("plot", "value_arc"): "The kind of change this plot puts its protagonist through.",
+    ("plot", "plot_scope"): "A main plot carries the story; a subplot supports it.",
+    ("plot", "plot_type"): "How this subplot relates to the main plot.",
+    ("relationship", "name"): "Usually the two names, e.g. “Kael & Mira”.",
+    ("relationship", "history"): "How this relationship came to be and how it has changed.",
+    ("relationship", "scenes"): "Scenes where this relationship is featured.",
+    ("project", "logline"): "One sentence that sums up the story.",
+    ("project", "genre"): "e.g. Sci-fi thriller.",
+    ("project", "setting"): "e.g. Near-future city-state.",
+    ("project", "spine"): "The protagonist’s desire — what drives the whole story.",
+    ("project", "controlling_idea"): "The argument the story makes.",
+    ("project", "act_count"): "Grows by itself if you add more acts than this.",
+    ("project", "credit"): "e.g. Written by.",
+    ("project", "draft"): "e.g. First Draft.",
+    ("project", "draft_date"): "Printed bottom-left on the title page.",
+    ("project", "contact"): "Printed bottom-right on the title page.",
+    ("project", "screenplay_title"): "Printed centred on the title page.",
     **{k: v for k, v in VALUE_LADDER.items()},
 }
 
+_ON_SCENES = "Set on a scene’s plot roles."
 HINTS = {
     ("character", "relationships"):
         "Managed as relationship entities — edit them from the Relationships view.",
+    **{("plot", k): _ON_SCENES for k in
+       ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions")},
+    ("plot", "value_focus"): "Counted from the value turns written on scenes.",
+    ("project", "value_focus"): "Counted from the value turns written on scenes.",
 }
 
 # A field whose value cannot change once the entity exists.
@@ -150,13 +210,33 @@ def _ref_for(entity_type: str, key: str, meta: dict):
     return meta.get("ref") or UI_REFS.get((entity_type, key))
 
 
+# What a perspective holds, one card per character.
+PERSPECTIVE_FIELDS = [
+    {"key": "label", "label": "Label", "kind": "text", "help": "What they call it, e.g. “Closest friend”."},
+    {"key": "feeling", "label": "Feeling", "kind": "text", "help": "Their emotional stance."},
+    {"key": "type", "label": "Kind", "kind": "select", "options": REL_TYPES, "allow_blank": True},
+    {"key": "strength", "label": "Strength", "kind": "number", "min": -1, "max": 1, "step": 0.1,
+     "help": "−1 is hostile, 0 neutral, 1 devoted."},
+    {"key": "secret", "label": "Hidden from the other character", "kind": "toggle"},
+]
+
+
+def _json_default(meta: dict):
+    return json.loads(json.dumps(meta.get("default", "")))
+
+
 def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
     spec = {
         "key": key,
         "label": LABELS.get(key) or meta.get("label") or _humanize(key),
         "help": HELP.get((entity_type, key)) or HELP.get(key, ""),
         "required": False,
+        "default": _json_default(meta),
     }
+    if (entity_type, key) in GROUPS:
+        spec["group"] = GROUPS[(entity_type, key)]
+    if (entity_type, key) in SHOW_IF:
+        spec["show_if"] = SHOW_IF[(entity_type, key)]
     if meta.get("computed"):
         spec.update(kind="computed", hint=HINTS.get((entity_type, key), ""))
         return spec
@@ -164,11 +244,17 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
     ref = _ref_for(entity_type, key, meta)
     kind_t = meta.get("type")
     if enum:
-        spec.update(kind="select", options=list(enum))
+        spec.update(kind="select", options=list(enum),
+                    allow_blank=meta.get("default", "") in ("", None))
+    elif entity_type == "relationship" and key == "characters":
+        spec.update(kind="reflist", ref=ref, count=2, row_labels=["First character", "Second character"])
     elif ref and kind_t == "list":
-        spec.update(kind="reflist", ref=ref)
+        spec.update(kind="reflist", ref=ref, add_label=f"Add {ENTITY_LABELS.get(ref, ref).lower()}")
     elif ref:
         spec.update(kind="ref", ref=ref)
+    elif kind_t == "object" and meta.get("keyed") and entity_type == "relationship":
+        spec.update(kind="perspectives", keyed_by="characters", ref="character",
+                    fields=PERSPECTIVE_FIELDS)
     elif kind_t == "string":
         spec["kind"] = "textarea" if key in MULTILINE else "text"
     elif kind_t == "list" and meta.get("sub_fields"):
@@ -177,6 +263,8 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
         spec["kind"] = "list"
     elif kind_t == "number":
         spec["kind"] = "number"
+        if key == "act_count":
+            spec.update(integer=True, min=1)
     elif kind_t == "boolean":
         spec["kind"] = "toggle"
     else:
@@ -193,6 +281,10 @@ def form_spec(entity_type: str) -> dict:
     nk = name_key(entity_type)
     fields = [_field_spec(entity_type, k, m) for k, m in ENTITY_SCHEMAS[entity_type].items()
               if k not in ("id", "type")]
+    order = FIELD_ORDER.get(entity_type)
+    if order:
+        fields.sort(key=lambda f: order.index(f["key"]) if f["key"] in order else len(order))
+    fields.sort(key=lambda f: 1 if f.get("group") else 0)       # stable: groups sit together, last
     for f in fields:
         if f["key"] == nk:
             f["required"] = True
@@ -204,6 +296,8 @@ def form_spec(entity_type: str) -> dict:
         "name_key": nk,
         "fields": fields,
         "sections": standard_sections(entity_type),
+        "singleton": entity_type in SINGLETONS,
+        **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
     }
 
 
@@ -223,7 +317,17 @@ def _slug_of(name: str) -> str:
     return slug(name)
 
 
+def _resolve(conn, entity_type: str, entity_id: str) -> str:
+    """A singleton has one record whatever id the caller names."""
+    if entity_type in SINGLETONS:
+        r = conn.execute("SELECT id FROM entities WHERE type=?", (entity_type,)).fetchone()
+        if r:
+            return r[0]
+    return entity_id
+
+
 def _row(conn, entity_type: str, entity_id: str):
+    entity_id = _resolve(conn, entity_type, entity_id)
     row = conn.execute(
         "SELECT id, name, one_sentence, order_key, status, parent_id, location_id, extra "
         "FROM entities WHERE type=? AND id=? AND is_deleted=0", (entity_type, entity_id)
@@ -237,7 +341,22 @@ def _is_placeholder(text) -> bool:
     return str(text or "").lstrip().lower().startswith("[placeholder")
 
 
-def _computed(conn, entity_type: str, entity_id: str) -> dict:
+ROLE_FIELD = {"setup": "setups", "inciting_incident": "inciting_incident", "complication": "complications",
+              "crisis": "crisis", "climax": "climax", "resolution": "resolutions"}
+
+
+def _focus_rows(focus: dict) -> list:
+    rows = []
+    for label, key in (("Major", "major"), ("Minor", "minor")):
+        items = (focus or {}).get(key) or []
+        if items:
+            rows.append({"display": f"{label}: " + " · ".join(
+                f"{i['value']} ×{i['scenes'] if isinstance(i['scenes'], int) else len(i['scenes'])}"
+                for i in items)})
+    return rows
+
+
+def _computed(conn, entity_type: str, entity_id: str, project_path: Path | None = None) -> dict:
     """Derived fields, as display rows. Shown, never written."""
     out = {}
     if entity_type == "character":
@@ -256,6 +375,53 @@ def _computed(conn, entity_type: str, entity_id: str) -> dict:
             rows.append({"display": names.get(other, other) + (f" — {' · '.join(bits)}" if bits else ""),
                          "ref": f"relationship:{rid}"})
         out["relationships"] = rows
+    elif entity_type == "plot":
+        by_field = {f: [] for f in ROLE_FIELD.values()}
+        for sname, sid, kind, note in conn.execute(
+                "SELECT e.name, e.id, r.kind, r.note FROM relations r JOIN entities e ON e.id=r.to_id "
+                "WHERE r.from_id=? AND r.kind LIKE 'plot\\_%' ESCAPE '\\' AND e.is_deleted=0 "
+                "ORDER BY r.\"order\"", (entity_id,)):
+            field = ROLE_FIELD.get(kind[len("plot_"):])
+            if field:
+                by_field[field].append({"display": (sname or sid) + (f" — {note}" if note else ""),
+                                        "ref": f"scene:{sid}"})
+        out.update(by_field)
+    if entity_type in ("plot", "project") and project_path is not None:
+        try:
+            from . import value_focus
+            focus = (value_focus.for_plot(project_path, entity_id) if entity_type == "plot"
+                     else value_focus.for_project(project_path))
+            out["value_focus"] = _focus_rows(focus)
+        except Exception:                      # a derived display must never block the form
+            out["value_focus"] = []
+    return out
+
+
+def _persp_form(raw) -> dict:
+    """Perspectives as the form holds them: every field present, `""` when unset."""
+    out = {}
+    for cid, p in (raw or {}).items():
+        p = p if isinstance(p, dict) else {}
+        st = p.get("strength")
+        out[cid] = {
+            "label": str(p.get("label") or ""), "feeling": str(p.get("feeling") or ""),
+            "type": str(p.get("type") or ""),
+            "strength": st if isinstance(st, (int, float)) and not isinstance(st, bool) else "",
+            "secret": bool(p.get("secret")),
+        }
+    return out
+
+
+def _persp_storage(form: dict) -> dict:
+    """…and as it is stored: only what was filled in, but every character keeps a key."""
+    out = {}
+    for cid, p in form.items():
+        d = {k: p[k] for k in ("label", "feeling", "type") if p.get(k)}
+        if p.get("strength") not in ("", None):
+            d["strength"] = p["strength"]
+        if p.get("secret"):
+            d["secret"] = True
+        out[cid] = d
     return out
 
 
@@ -275,6 +441,7 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
     conn = get_db(project_path)
     try:
         row = _row(conn, entity_type, entity_id)
+        entity_id = row[0]
         extra = json.loads(row[7]) if row[7] else {}
         schema = ENTITY_SCHEMAS[entity_type]
         colmap = ENTITY_COLUMN_MAP.get(entity_type, {})
@@ -298,6 +465,8 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
                 v = extra.get(key)
             if v is None:
                 v = json.loads(json.dumps(meta.get("default", "")))
+            if key == "perspectives" and entity_type == "relationship":
+                v = _persp_form(v)
             values[key] = v
         sections = {h: "" for h in standard_sections(entity_type)}
         for heading, body in conn.execute(
@@ -306,7 +475,7 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
                 sections[heading] = "" if _is_placeholder(body) else (body or "")
         return {
             "type": entity_type, "id": entity_id, "values": values, "sections": sections,
-            "computed": _computed(conn, entity_type, entity_id),
+            "computed": _computed(conn, entity_type, entity_id, project_path),
             "version": _version(values, sections),
         }
     finally:
@@ -320,6 +489,7 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
     if not isinstance(raw, dict):
         raise EntityInvalid({"_form": "The form sent something unexpected. Reload and try again."})
     schema = ENTITY_SCHEMAS[entity_type]
+    spec = {f["key"]: f for f in form_spec(entity_type)["fields"]}
     values, errors = {}, {}
     for key, v in raw.items():
         meta = schema.get(key)
@@ -330,7 +500,9 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
             continue                                   # derived: never written
         t = meta.get("type")
         label = LABELS.get(key) or _humanize(key)
-        if t == "string":
+        if entity_type == "relationship" and key == "perspectives":
+            values[key] = _clean_perspectives(v, errors)
+        elif t == "string":
             values[key] = "" if v is None else str(v).strip()
         elif t == "list":
             if not isinstance(v, list):
@@ -340,19 +512,54 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
             else:
                 values[key] = [str(i).strip() for i in v if isinstance(i, (str, int, float)) and str(i).strip()]
         elif t == "number":
+            f = spec.get(key, {})
             if v in ("", None):
                 values[key] = meta.get("default", 0)
             else:
                 n = coerce_number(v)
-                if isinstance(n, (int, float)) and not isinstance(n, bool):
-                    values[key] = n
-                else:
+                if not isinstance(n, (int, float)) or isinstance(n, bool):
                     errors[key] = f"{label} should be a number."
+                elif f.get("integer") and n != int(n):
+                    errors[key] = f"{label} should be a whole number."
+                elif "min" in f and n < f["min"]:
+                    errors[key] = f"{label} should be at least {f['min']}."
+                else:
+                    values[key] = int(n) if f.get("integer") else n
         elif t == "boolean":
             values[key] = bool(v)
         else:
             values[key] = v
+    # A field that only applies under a condition is reset when the condition fails.
+    for key, f in spec.items():
+        cond = f.get("show_if")
+        if cond and key in values and any(values.get(dep) != want for dep, want in cond.items()):
+            values[key] = f["default"]
+    if "perspectives" in values and "characters" in values:
+        keep = [c for c in values["characters"] if c]
+        values["perspectives"] = {c: values["perspectives"].get(c) or _persp_form({c: {}})[c] for c in keep}
     return values, errors
+
+
+def _clean_perspectives(raw, errors: dict) -> dict:
+    if not isinstance(raw, dict):
+        errors["perspectives"] = "Perspectives should be a set of cards, one per character."
+        return {}
+    out = {}
+    for cid, p in raw.items():
+        p = p if isinstance(p, dict) else {}
+        st = p.get("strength")
+        if st in ("", None):
+            st = ""
+        else:
+            n = coerce_number(st)
+            if not isinstance(n, (int, float)) or isinstance(n, bool) or not -1.0 <= float(n) <= 1.0:
+                errors[f"perspectives.{cid}.strength"] = "Strength is a number from −1 (hostile) to 1 (devoted)."
+                st = ""
+            else:
+                st = n
+        out[cid] = {"label": str(p.get("label") or "").strip(), "feeling": str(p.get("feeling") or "").strip(),
+                    "type": str(p.get("type") or "").strip(), "strength": st, "secret": bool(p.get("secret"))}
+    return out
 
 
 def _exists(conn, entity_type: str, entity_id: str) -> bool:
@@ -369,7 +576,7 @@ def _unique_id(conn, slug: str) -> str:
 
 
 def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
-              errors: dict) -> tuple[dict, str | None]:
+              errors: dict, baseline: dict | None = None) -> tuple[dict, str | None]:
     """Everything the form can get wrong, keyed by field. Returns (warnings, id)."""
     spec = form_spec(entity_type)
     nk = spec["name_key"]
@@ -407,7 +614,7 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
         errors[nk] = LOCKED_ON_EDIT[("value", "name")]
 
     # A second one with the same name is allowed, but worth a nudge.
-    if name and not is_value:
+    if name and not is_value and entity_type not in SINGLETONS:
         dup = conn.execute(
             "SELECT id FROM entities WHERE type=? AND is_deleted=0 AND lower(name)=lower(?) AND id<>?",
             (entity_type, name, entity_id or "")).fetchone()
@@ -420,6 +627,8 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
         v = values.get(key)
         if key in errors or v in (None, "", []):
             continue
+        if baseline is not None and baseline.get(key) == v:
+            continue                       # untouched: don't hold the person to a stored legacy value
         if kind == "select" and v not in f["options"]:
             errors[key] = f"Pick one of: {', '.join(f['options'])}."
         elif kind == "ref":
@@ -431,6 +640,8 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
             missing = [i for i in v if not _exists(conn, f["ref"], i)]
             if missing:
                 errors[key] = f"Not found: {', '.join(missing)}."
+
+    _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings)
 
     if is_value:
         words = {r: values.get(r, "") for r in VALUE_LADDER}
@@ -455,6 +666,29 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
     return warnings, new_id
 
 
+def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings) -> None:
+    if entity_type == "relationship" and "characters" not in errors:
+        chars = values.get("characters") or []
+        if len(chars) != 2 or len(set(chars)) != 2:
+            errors["characters"] = "Pick two different characters."
+        else:
+            for rid, rname, rex in conn.execute(
+                    "SELECT id, name, extra FROM entities WHERE type='relationship' AND is_deleted=0 AND id<>?",
+                    (entity_id or "",)):
+                if set((json.loads(rex) if rex else {}).get("characters") or []) == set(chars):
+                    nm = _names(conn, chars)
+                    warnings["characters"] = (f"{nm.get(chars[0], chars[0])} and {nm.get(chars[1], chars[1])} "
+                                              f"already have a relationship (“{rname}”). Saving adds another.")
+                    break
+    elif entity_type == "plot":
+        if values.get("plot_scope") == "sub" and not values.get("plot_type"):
+            warnings["plot_type"] = "A subplot normally has a kind — pick how it relates to the main plot."
+    elif entity_type == "project" and isinstance(values.get("act_count"), (int, float)):
+        have = conn.execute("SELECT COUNT(*) FROM entities WHERE type='act' AND is_deleted=0").fetchone()[0]
+        if "act_count" not in errors and values["act_count"] < have:
+            warnings["act_count"] = f"You already have {have} acts, so the count will stay at {have}."
+
+
 def _clean_sections(entity_type: str, raw, errors: dict) -> dict:
     if raw in (None, {}):
         return {}
@@ -475,12 +709,15 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
                  entity_id: str | None = None) -> dict:
     """What a save WOULD say. Writes nothing; the form calls it while typing."""
     _require_type(entity_type)
+    _refuse_singleton(entity_type, entity_id is None)
     values, errors = _clean(entity_type, (payload or {}).get("values") or {})
     _clean_sections(entity_type, (payload or {}).get("sections"), errors)
     conn = get_db(project_path)
     try:
+        baseline = None
         if entity_id is not None:
-            _row(conn, entity_type, entity_id)
+            row = _row(conn, entity_type, entity_id)
+            entity_id = row[0]
         warnings, new_id = _validate(conn, entity_type, entity_id, values, errors)
     finally:
         conn.close()
@@ -492,6 +729,19 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
 SUMMARY = "Edited by hand in the entity form"
 
 
+def _refuse_singleton(entity_type: str, creating: bool = False, deleting: bool = False) -> None:
+    if entity_type in SINGLETONS and (creating or deleting):
+        raise EntityInvalid({"_form": f"The {entity_type} can be edited here, "
+                                      f"but not created or deleted."})
+
+
+def _to_storage(entity_type: str, data: dict) -> dict:
+    out = dict(data)
+    if entity_type == "relationship" and "perspectives" in out:
+        out["perspectives"] = _persp_storage(out["perspectives"])
+    return out
+
+
 def _write_error(e: ValueError) -> EntityInvalid:
     return EntityInvalid({"_form": str(e)})
 
@@ -500,6 +750,7 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
     from .writes import create_entity
 
     _require_type(entity_type)
+    _refuse_singleton(entity_type, creating=True)
     values, errors = _clean(entity_type, (payload or {}).get("values") or {})
     sections = _clean_sections(entity_type, (payload or {}).get("sections"), errors)
     conn = get_db(project_path)
@@ -510,7 +761,10 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
     if errors or not new_id:
         raise EntityInvalid(errors or {"_form": "Could not make an id from that name."}, warnings)
 
-    fm = {k: v for k, v in values.items() if v not in ("", [], None)}
+    if entity_type == "relationship":               # one card per character, even if never opened
+        values["perspectives"] = {c: (values.get("perspectives") or {}).get(c) or _persp_form({c: {}})[c]
+                                  for c in values.get("characters") or []}
+    fm = {k: v for k, v in _to_storage(entity_type, values).items() if v not in ("", [], None)}
     try:
         create_entity(project_path, entity_type, new_id, fm,
                       {h: b for h, b in sections.items() if b})
@@ -524,6 +778,7 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
 
     _require_type(entity_type)
     current = load_entity(project_path, entity_type, entity_id)
+    entity_id = current["id"]
     if (payload or {}).get("base_version") != current["version"]:
         raise EntityConflict(current["version"])
 
@@ -531,7 +786,7 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
     sections = _clean_sections(entity_type, (payload or {}).get("sections"), errors)
     conn = get_db(project_path)
     try:
-        warnings, _ = _validate(conn, entity_type, entity_id, values, errors)
+        warnings, _ = _validate(conn, entity_type, entity_id, values, errors, baseline=current["values"])
     finally:
         conn.close()
     if errors:
@@ -544,7 +799,7 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
     if not changed:
         return {**current, "unchanged": True, "warnings": warnings}
     try:
-        edit_entity(project_path, entity_type, entity_id, changed, SUMMARY)
+        edit_entity(project_path, entity_type, entity_id, _to_storage(entity_type, changed), SUMMARY)
     except ValueError as e:
         raise _write_error(e)
     return {**load_entity(project_path, entity_type, entity_id), "unchanged": False,
@@ -594,6 +849,7 @@ def _beat_refs(extra: dict) -> set:
 def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict:
     """What a delete takes with it and what stops it. Changes nothing."""
     _require_type(entity_type)
+    _refuse_singleton(entity_type, deleting=True)
     conn = get_db(project_path)
     try:
         row = _row(conn, entity_type, entity_id)
@@ -633,6 +889,13 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
                 plots.append(pname or pid)
         if plots:
             effects.append(f"No longer a protagonist of {_plural(len(plots), 'plot')}: {_list(plots)}.")
+        if entity_type == "plot":
+            roles = [r[0] for r in conn.execute(
+                f"SELECT DISTINCT e.name FROM relations r JOIN entities e ON e.id=r.to_id "
+                f"WHERE r.from_id IN ({marks}) AND r.kind LIKE 'plot\\_%' ESCAPE '\\' "
+                f"AND e.type='scene' AND e.is_deleted=0", gone_l)]
+            if roles:
+                effects.append(f"Loses its plot role in {_plural(len(roles), 'scene')}: {_list(roles)}.")
         located = [r[0] for r in conn.execute(
             f"SELECT name FROM entities WHERE type='scene' AND is_deleted=0 "
             f"AND location_id IN ({marks})", gone_l)]
@@ -669,6 +932,8 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
             for t in (json.loads(sex) if sex else {}).get("value_turns") or []:
                 if not isinstance(t, dict):
                     continue
+                if str(t.get("plot") or "") in gone:
+                    turn_scenes.setdefault(sid, set()).add(names.get(str(t["plot"]), str(t["plot"])))
                 if value_name and str(t.get("value") or "").strip().lower() == value_name:
                     turn_scenes.setdefault(sid, set()).add(row[1] or entity_id)
                 for eff in t.get("effects") or []:
@@ -691,6 +956,8 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
 def delete_form_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
     from .writes import delete_entity
 
+    _require_type(entity_type)
+    _refuse_singleton(entity_type, deleting=True)
     prev = delete_preview(project_path, entity_type, entity_id)
     if prev["blockers"]:
         raise EntityBlocked("This can't be deleted yet.", prev["blockers"])

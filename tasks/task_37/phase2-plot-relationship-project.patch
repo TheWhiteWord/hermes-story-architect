@@ -1,0 +1,1410 @@
+diff --git a/src/story_architect/core/manual_entities.py b/src/story_architect/core/manual_entities.py
+index c1fc162..54979c7 100644
+--- a/src/story_architect/core/manual_entities.py
++++ b/src/story_architect/core/manual_entities.py
+@@ -27,15 +27,19 @@ import hashlib
+ import json
+ from pathlib import Path
+ 
+-from .constants import (ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_SCOPES, PLOT_TYPES,
+-                        VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
++from .constants import (ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES, PLOT_TYPES,
++                        STRUCTURE_TYPES, VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
+ from .db import get_db
+ from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELDS,
+                      coerce_number, standard_sections)
+ 
+ # What the form can edit today. The spec builder is generic; this is the gate,
+ # so a type goes live when its form has been exercised, not when its schema exists.
+-FORM_TYPES = ("character", "location", "world", "value")
++FORM_TYPES = ("character", "location", "world", "value", "plot", "relationship", "project")
++
++# The project is a single record that exists from the start: it can be edited,
++# never created or deleted from here.
++SINGLETONS = ("project",)
+ 
+ NAME_KEY = {"scene": "title", "sequence": "title", "act": "title"}
+ 
+@@ -82,6 +86,14 @@ LABELS = {
+     "values": "What the world holds sacred", "power": "Who holds power",
+     "p": "Positive", "c": "Contrary", "cd": "Contradictory",
+     "nn": "Negation of the negation", "note": "Note",
++    "plot_scope": "Scope", "plot_type": "Kind of subplot", "value_arc": "Value arc",
++    "characters": "Characters", "perspectives": "Perspectives", "scenes": "Scenes featured",
++    "history": "History", "status": "Status", "logline": "Logline",
++    "structure_type": "Structure", "act_count": "Number of acts",
++    "screenplay_title": "Screenplay title", "controlling_idea": "Controlling idea",
++    "draft_date": "Draft date", "setups": "Setups", "inciting_incident": "Inciting incident",
++    "complications": "Complications", "crisis": "Crisis", "climax": "Climax",
++    "resolutions": "Resolutions", "value_focus": "Values that shift",
+ }
+ 
+ # Closed vocabularies that live in `constants` / `entity`, not in the schema.
+@@ -91,8 +103,16 @@ ENUMS = {
+     ("plot", "value_arc"): VALUE_ARCS,
+     ("plot", "plot_scope"): PLOT_SCOPES,
+     ("plot", "plot_type"): PLOT_TYPES,
++    ("relationship", "status"): ["active", "resolved", "complex"],
++    ("project", "status"): ["active", "abandoned", "archived"],
++    ("project", "structure_type"): STRUCTURE_TYPES,
+ }
+ 
++# The kinds a perspective can have. The schema only lists them in prose, and the
++# write path doesn't enforce them, so the form offers them and keeps anything
++# already stored.
++REL_TYPES = ["ally", "enemy", "family", "romantic", "professional", "mentor", "rival", "neutral", "custom"]
++
+ # Relational fields the schema does not declare as `ref` (it must not: a `ref`
+ # makes the write path check it, which changes what the agent is held to).
+ # Declared here, for the form only. Value = the type the slug must belong to.
+@@ -100,9 +120,25 @@ UI_REFS = {
+     ("location", "world"): "world",
+     ("location", "variant_of"): "location",
+     ("world", "variant_of"): "world",
++    ("relationship", "characters"): "character",
++    ("relationship", "scenes"): "scene",
+ }
+ 
+-MULTILINE = {"note", "history", "purpose"}
++# Fields that only matter when another field has a given value. Hidden, they are
++# reset to their default, so a stale value can't linger behind the form.
++SHOW_IF = {("plot", "plot_type"): {"plot_scope": "sub"}}
++
++# Where the schema's own order reads badly in a form.
++FIELD_ORDER = {"relationship": ["name", "characters", "perspectives", "status", "history", "scenes"]}
++
++# A name the form can suggest from other fields until the person types their own.
++AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
++
++# Visual grouping inside one form.
++GROUPS = {("project", k): "Title page" for k in
++          ("screenplay_title", "credit", "author", "contact", "draft_date", "draft")}
++
++MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea"}
+ 
+ # Help written for the person at the form. The schema's own descriptions are
+ # written for the agent ("Slug of the base location…") and would read as jargon.
+@@ -122,12 +158,36 @@ HELP = {
+     ("location", "variant_of"): "Pick the original if this is another version of it. Leave empty otherwise.",
+     ("world", "variant_of"): "Pick the original if this is another version of it. Leave empty otherwise.",
+     ("value", "name"): "The positive pole, e.g. “trust”. Scenes refer to the value by this name.",
++    ("plot", "one_sentence"): "One line that sums up this plot.",
++    ("plot", "characters"): "The protagonists of this plot only — not everyone who appears in it.",
++    ("plot", "value_arc"): "The kind of change this plot puts its protagonist through.",
++    ("plot", "plot_scope"): "A main plot carries the story; a subplot supports it.",
++    ("plot", "plot_type"): "How this subplot relates to the main plot.",
++    ("relationship", "name"): "Usually the two names, e.g. “Kael & Mira”.",
++    ("relationship", "history"): "How this relationship came to be and how it has changed.",
++    ("relationship", "scenes"): "Scenes where this relationship is featured.",
++    ("project", "logline"): "One sentence that sums up the story.",
++    ("project", "genre"): "e.g. Sci-fi thriller.",
++    ("project", "setting"): "e.g. Near-future city-state.",
++    ("project", "spine"): "The protagonist’s desire — what drives the whole story.",
++    ("project", "controlling_idea"): "The argument the story makes.",
++    ("project", "act_count"): "Grows by itself if you add more acts than this.",
++    ("project", "credit"): "e.g. Written by.",
++    ("project", "draft"): "e.g. First Draft.",
++    ("project", "draft_date"): "Printed bottom-left on the title page.",
++    ("project", "contact"): "Printed bottom-right on the title page.",
++    ("project", "screenplay_title"): "Printed centred on the title page.",
+     **{k: v for k, v in VALUE_LADDER.items()},
+ }
+ 
++_ON_SCENES = "Set on a scene’s plot roles."
+ HINTS = {
+     ("character", "relationships"):
+         "Managed as relationship entities — edit them from the Relationships view.",
++    **{("plot", k): _ON_SCENES for k in
++       ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions")},
++    ("plot", "value_focus"): "Counted from the value turns written on scenes.",
++    ("project", "value_focus"): "Counted from the value turns written on scenes.",
+ }
+ 
+ # A field whose value cannot change once the entity exists.
+@@ -150,13 +210,33 @@ def _ref_for(entity_type: str, key: str, meta: dict):
+     return meta.get("ref") or UI_REFS.get((entity_type, key))
+ 
+ 
++# What a perspective holds, one card per character.
++PERSPECTIVE_FIELDS = [
++    {"key": "label", "label": "Label", "kind": "text", "help": "What they call it, e.g. “Closest friend”."},
++    {"key": "feeling", "label": "Feeling", "kind": "text", "help": "Their emotional stance."},
++    {"key": "type", "label": "Kind", "kind": "select", "options": REL_TYPES, "allow_blank": True},
++    {"key": "strength", "label": "Strength", "kind": "number", "min": -1, "max": 1, "step": 0.1,
++     "help": "−1 is hostile, 0 neutral, 1 devoted."},
++    {"key": "secret", "label": "Hidden from the other character", "kind": "toggle"},
++]
++
++
++def _json_default(meta: dict):
++    return json.loads(json.dumps(meta.get("default", "")))
++
++
+ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
+     spec = {
+         "key": key,
+         "label": LABELS.get(key) or meta.get("label") or _humanize(key),
+         "help": HELP.get((entity_type, key)) or HELP.get(key, ""),
+         "required": False,
++        "default": _json_default(meta),
+     }
++    if (entity_type, key) in GROUPS:
++        spec["group"] = GROUPS[(entity_type, key)]
++    if (entity_type, key) in SHOW_IF:
++        spec["show_if"] = SHOW_IF[(entity_type, key)]
+     if meta.get("computed"):
+         spec.update(kind="computed", hint=HINTS.get((entity_type, key), ""))
+         return spec
+@@ -164,11 +244,17 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
+     ref = _ref_for(entity_type, key, meta)
+     kind_t = meta.get("type")
+     if enum:
+-        spec.update(kind="select", options=list(enum))
++        spec.update(kind="select", options=list(enum),
++                    allow_blank=meta.get("default", "") in ("", None))
++    elif entity_type == "relationship" and key == "characters":
++        spec.update(kind="reflist", ref=ref, count=2, row_labels=["First character", "Second character"])
+     elif ref and kind_t == "list":
+-        spec.update(kind="reflist", ref=ref)
++        spec.update(kind="reflist", ref=ref, add_label=f"Add {ENTITY_LABELS.get(ref, ref).lower()}")
+     elif ref:
+         spec.update(kind="ref", ref=ref)
++    elif kind_t == "object" and meta.get("keyed") and entity_type == "relationship":
++        spec.update(kind="perspectives", keyed_by="characters", ref="character",
++                    fields=PERSPECTIVE_FIELDS)
+     elif kind_t == "string":
+         spec["kind"] = "textarea" if key in MULTILINE else "text"
+     elif kind_t == "list" and meta.get("sub_fields"):
+@@ -177,6 +263,8 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
+         spec["kind"] = "list"
+     elif kind_t == "number":
+         spec["kind"] = "number"
++        if key == "act_count":
++            spec.update(integer=True, min=1)
+     elif kind_t == "boolean":
+         spec["kind"] = "toggle"
+     else:
+@@ -193,6 +281,10 @@ def form_spec(entity_type: str) -> dict:
+     nk = name_key(entity_type)
+     fields = [_field_spec(entity_type, k, m) for k, m in ENTITY_SCHEMAS[entity_type].items()
+               if k not in ("id", "type")]
++    order = FIELD_ORDER.get(entity_type)
++    if order:
++        fields.sort(key=lambda f: order.index(f["key"]) if f["key"] in order else len(order))
++    fields.sort(key=lambda f: 1 if f.get("group") else 0)       # stable: groups sit together, last
+     for f in fields:
+         if f["key"] == nk:
+             f["required"] = True
+@@ -204,6 +296,8 @@ def form_spec(entity_type: str) -> dict:
+         "name_key": nk,
+         "fields": fields,
+         "sections": standard_sections(entity_type),
++        "singleton": entity_type in SINGLETONS,
++        **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
+     }
+ 
+ 
+@@ -223,7 +317,17 @@ def _slug_of(name: str) -> str:
+     return slug(name)
+ 
+ 
++def _resolve(conn, entity_type: str, entity_id: str) -> str:
++    """A singleton has one record whatever id the caller names."""
++    if entity_type in SINGLETONS:
++        r = conn.execute("SELECT id FROM entities WHERE type=?", (entity_type,)).fetchone()
++        if r:
++            return r[0]
++    return entity_id
++
++
+ def _row(conn, entity_type: str, entity_id: str):
++    entity_id = _resolve(conn, entity_type, entity_id)
+     row = conn.execute(
+         "SELECT id, name, one_sentence, order_key, status, parent_id, location_id, extra "
+         "FROM entities WHERE type=? AND id=? AND is_deleted=0", (entity_type, entity_id)
+@@ -237,7 +341,22 @@ def _is_placeholder(text) -> bool:
+     return str(text or "").lstrip().lower().startswith("[placeholder")
+ 
+ 
+-def _computed(conn, entity_type: str, entity_id: str) -> dict:
++ROLE_FIELD = {"setup": "setups", "inciting_incident": "inciting_incident", "complication": "complications",
++              "crisis": "crisis", "climax": "climax", "resolution": "resolutions"}
++
++
++def _focus_rows(focus: dict) -> list:
++    rows = []
++    for label, key in (("Major", "major"), ("Minor", "minor")):
++        items = (focus or {}).get(key) or []
++        if items:
++            rows.append({"display": f"{label}: " + " · ".join(
++                f"{i['value']} ×{i['scenes'] if isinstance(i['scenes'], int) else len(i['scenes'])}"
++                for i in items)})
++    return rows
++
++
++def _computed(conn, entity_type: str, entity_id: str, project_path: Path | None = None) -> dict:
+     """Derived fields, as display rows. Shown, never written."""
+     out = {}
+     if entity_type == "character":
+@@ -256,6 +375,53 @@ def _computed(conn, entity_type: str, entity_id: str) -> dict:
+             rows.append({"display": names.get(other, other) + (f" — {' · '.join(bits)}" if bits else ""),
+                          "ref": f"relationship:{rid}"})
+         out["relationships"] = rows
++    elif entity_type == "plot":
++        by_field = {f: [] for f in ROLE_FIELD.values()}
++        for sname, sid, kind, note in conn.execute(
++                "SELECT e.name, e.id, r.kind, r.note FROM relations r JOIN entities e ON e.id=r.to_id "
++                "WHERE r.from_id=? AND r.kind LIKE 'plot\\_%' ESCAPE '\\' AND e.is_deleted=0 "
++                "ORDER BY r.\"order\"", (entity_id,)):
++            field = ROLE_FIELD.get(kind[len("plot_"):])
++            if field:
++                by_field[field].append({"display": (sname or sid) + (f" — {note}" if note else ""),
++                                        "ref": f"scene:{sid}"})
++        out.update(by_field)
++    if entity_type in ("plot", "project") and project_path is not None:
++        try:
++            from . import value_focus
++            focus = (value_focus.for_plot(project_path, entity_id) if entity_type == "plot"
++                     else value_focus.for_project(project_path))
++            out["value_focus"] = _focus_rows(focus)
++        except Exception:                      # a derived display must never block the form
++            out["value_focus"] = []
++    return out
++
++
++def _persp_form(raw) -> dict:
++    """Perspectives as the form holds them: every field present, `""` when unset."""
++    out = {}
++    for cid, p in (raw or {}).items():
++        p = p if isinstance(p, dict) else {}
++        st = p.get("strength")
++        out[cid] = {
++            "label": str(p.get("label") or ""), "feeling": str(p.get("feeling") or ""),
++            "type": str(p.get("type") or ""),
++            "strength": st if isinstance(st, (int, float)) and not isinstance(st, bool) else "",
++            "secret": bool(p.get("secret")),
++        }
++    return out
++
++
++def _persp_storage(form: dict) -> dict:
++    """…and as it is stored: only what was filled in, but every character keeps a key."""
++    out = {}
++    for cid, p in form.items():
++        d = {k: p[k] for k in ("label", "feeling", "type") if p.get(k)}
++        if p.get("strength") not in ("", None):
++            d["strength"] = p["strength"]
++        if p.get("secret"):
++            d["secret"] = True
++        out[cid] = d
+     return out
+ 
+ 
+@@ -275,6 +441,7 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+     conn = get_db(project_path)
+     try:
+         row = _row(conn, entity_type, entity_id)
++        entity_id = row[0]
+         extra = json.loads(row[7]) if row[7] else {}
+         schema = ENTITY_SCHEMAS[entity_type]
+         colmap = ENTITY_COLUMN_MAP.get(entity_type, {})
+@@ -298,6 +465,8 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+                 v = extra.get(key)
+             if v is None:
+                 v = json.loads(json.dumps(meta.get("default", "")))
++            if key == "perspectives" and entity_type == "relationship":
++                v = _persp_form(v)
+             values[key] = v
+         sections = {h: "" for h in standard_sections(entity_type)}
+         for heading, body in conn.execute(
+@@ -306,7 +475,7 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+                 sections[heading] = "" if _is_placeholder(body) else (body or "")
+         return {
+             "type": entity_type, "id": entity_id, "values": values, "sections": sections,
+-            "computed": _computed(conn, entity_type, entity_id),
++            "computed": _computed(conn, entity_type, entity_id, project_path),
+             "version": _version(values, sections),
+         }
+     finally:
+@@ -320,6 +489,7 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+     if not isinstance(raw, dict):
+         raise EntityInvalid({"_form": "The form sent something unexpected. Reload and try again."})
+     schema = ENTITY_SCHEMAS[entity_type]
++    spec = {f["key"]: f for f in form_spec(entity_type)["fields"]}
+     values, errors = {}, {}
+     for key, v in raw.items():
+         meta = schema.get(key)
+@@ -330,7 +500,9 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+             continue                                   # derived: never written
+         t = meta.get("type")
+         label = LABELS.get(key) or _humanize(key)
+-        if t == "string":
++        if entity_type == "relationship" and key == "perspectives":
++            values[key] = _clean_perspectives(v, errors)
++        elif t == "string":
+             values[key] = "" if v is None else str(v).strip()
+         elif t == "list":
+             if not isinstance(v, list):
+@@ -340,21 +512,56 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+             else:
+                 values[key] = [str(i).strip() for i in v if isinstance(i, (str, int, float)) and str(i).strip()]
+         elif t == "number":
++            f = spec.get(key, {})
+             if v in ("", None):
+                 values[key] = meta.get("default", 0)
+             else:
+                 n = coerce_number(v)
+-                if isinstance(n, (int, float)) and not isinstance(n, bool):
+-                    values[key] = n
+-                else:
++                if not isinstance(n, (int, float)) or isinstance(n, bool):
+                     errors[key] = f"{label} should be a number."
++                elif f.get("integer") and n != int(n):
++                    errors[key] = f"{label} should be a whole number."
++                elif "min" in f and n < f["min"]:
++                    errors[key] = f"{label} should be at least {f['min']}."
++                else:
++                    values[key] = int(n) if f.get("integer") else n
+         elif t == "boolean":
+             values[key] = bool(v)
+         else:
+             values[key] = v
++    # A field that only applies under a condition is reset when the condition fails.
++    for key, f in spec.items():
++        cond = f.get("show_if")
++        if cond and key in values and any(values.get(dep) != want for dep, want in cond.items()):
++            values[key] = f["default"]
++    if "perspectives" in values and "characters" in values:
++        keep = [c for c in values["characters"] if c]
++        values["perspectives"] = {c: values["perspectives"].get(c) or _persp_form({c: {}})[c] for c in keep}
+     return values, errors
+ 
+ 
++def _clean_perspectives(raw, errors: dict) -> dict:
++    if not isinstance(raw, dict):
++        errors["perspectives"] = "Perspectives should be a set of cards, one per character."
++        return {}
++    out = {}
++    for cid, p in raw.items():
++        p = p if isinstance(p, dict) else {}
++        st = p.get("strength")
++        if st in ("", None):
++            st = ""
++        else:
++            n = coerce_number(st)
++            if not isinstance(n, (int, float)) or isinstance(n, bool) or not -1.0 <= float(n) <= 1.0:
++                errors[f"perspectives.{cid}.strength"] = "Strength is a number from −1 (hostile) to 1 (devoted)."
++                st = ""
++            else:
++                st = n
++        out[cid] = {"label": str(p.get("label") or "").strip(), "feeling": str(p.get("feeling") or "").strip(),
++                    "type": str(p.get("type") or "").strip(), "strength": st, "secret": bool(p.get("secret"))}
++    return out
++
++
+ def _exists(conn, entity_type: str, entity_id: str) -> bool:
+     return conn.execute("SELECT 1 FROM entities WHERE id=? AND type=? AND is_deleted=0",
+                         (entity_id, entity_type)).fetchone() is not None
+@@ -369,7 +576,7 @@ def _unique_id(conn, slug: str) -> str:
+ 
+ 
+ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+-              errors: dict) -> tuple[dict, str | None]:
++              errors: dict, baseline: dict | None = None) -> tuple[dict, str | None]:
+     """Everything the form can get wrong, keyed by field. Returns (warnings, id)."""
+     spec = form_spec(entity_type)
+     nk = spec["name_key"]
+@@ -407,7 +614,7 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+         errors[nk] = LOCKED_ON_EDIT[("value", "name")]
+ 
+     # A second one with the same name is allowed, but worth a nudge.
+-    if name and not is_value:
++    if name and not is_value and entity_type not in SINGLETONS:
+         dup = conn.execute(
+             "SELECT id FROM entities WHERE type=? AND is_deleted=0 AND lower(name)=lower(?) AND id<>?",
+             (entity_type, name, entity_id or "")).fetchone()
+@@ -420,6 +627,8 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+         v = values.get(key)
+         if key in errors or v in (None, "", []):
+             continue
++        if baseline is not None and baseline.get(key) == v:
++            continue                       # untouched: don't hold the person to a stored legacy value
+         if kind == "select" and v not in f["options"]:
+             errors[key] = f"Pick one of: {', '.join(f['options'])}."
+         elif kind == "ref":
+@@ -432,6 +641,8 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+             if missing:
+                 errors[key] = f"Not found: {', '.join(missing)}."
+ 
++    _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings)
++
+     if is_value:
+         words = {r: values.get(r, "") for r in VALUE_LADDER}
+         seen: dict[str, str] = {}
+@@ -455,6 +666,29 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+     return warnings, new_id
+ 
+ 
++def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings) -> None:
++    if entity_type == "relationship" and "characters" not in errors:
++        chars = values.get("characters") or []
++        if len(chars) != 2 or len(set(chars)) != 2:
++            errors["characters"] = "Pick two different characters."
++        else:
++            for rid, rname, rex in conn.execute(
++                    "SELECT id, name, extra FROM entities WHERE type='relationship' AND is_deleted=0 AND id<>?",
++                    (entity_id or "",)):
++                if set((json.loads(rex) if rex else {}).get("characters") or []) == set(chars):
++                    nm = _names(conn, chars)
++                    warnings["characters"] = (f"{nm.get(chars[0], chars[0])} and {nm.get(chars[1], chars[1])} "
++                                              f"already have a relationship (“{rname}”). Saving adds another.")
++                    break
++    elif entity_type == "plot":
++        if values.get("plot_scope") == "sub" and not values.get("plot_type"):
++            warnings["plot_type"] = "A subplot normally has a kind — pick how it relates to the main plot."
++    elif entity_type == "project" and isinstance(values.get("act_count"), (int, float)):
++        have = conn.execute("SELECT COUNT(*) FROM entities WHERE type='act' AND is_deleted=0").fetchone()[0]
++        if "act_count" not in errors and values["act_count"] < have:
++            warnings["act_count"] = f"You already have {have} acts, so the count will stay at {have}."
++
++
+ def _clean_sections(entity_type: str, raw, errors: dict) -> dict:
+     if raw in (None, {}):
+         return {}
+@@ -475,12 +709,15 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
+                  entity_id: str | None = None) -> dict:
+     """What a save WOULD say. Writes nothing; the form calls it while typing."""
+     _require_type(entity_type)
++    _refuse_singleton(entity_type, entity_id is None)
+     values, errors = _clean(entity_type, (payload or {}).get("values") or {})
+     _clean_sections(entity_type, (payload or {}).get("sections"), errors)
+     conn = get_db(project_path)
+     try:
++        baseline = None
+         if entity_id is not None:
+-            _row(conn, entity_type, entity_id)
++            row = _row(conn, entity_type, entity_id)
++            entity_id = row[0]
+         warnings, new_id = _validate(conn, entity_type, entity_id, values, errors)
+     finally:
+         conn.close()
+@@ -492,6 +729,19 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
+ SUMMARY = "Edited by hand in the entity form"
+ 
+ 
++def _refuse_singleton(entity_type: str, creating: bool = False, deleting: bool = False) -> None:
++    if entity_type in SINGLETONS and (creating or deleting):
++        raise EntityInvalid({"_form": f"The {entity_type} can be edited here, "
++                                      f"but not created or deleted."})
++
++
++def _to_storage(entity_type: str, data: dict) -> dict:
++    out = dict(data)
++    if entity_type == "relationship" and "perspectives" in out:
++        out["perspectives"] = _persp_storage(out["perspectives"])
++    return out
++
++
+ def _write_error(e: ValueError) -> EntityInvalid:
+     return EntityInvalid({"_form": str(e)})
+ 
+@@ -500,6 +750,7 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
+     from .writes import create_entity
+ 
+     _require_type(entity_type)
++    _refuse_singleton(entity_type, creating=True)
+     values, errors = _clean(entity_type, (payload or {}).get("values") or {})
+     sections = _clean_sections(entity_type, (payload or {}).get("sections"), errors)
+     conn = get_db(project_path)
+@@ -510,7 +761,10 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
+     if errors or not new_id:
+         raise EntityInvalid(errors or {"_form": "Could not make an id from that name."}, warnings)
+ 
+-    fm = {k: v for k, v in values.items() if v not in ("", [], None)}
++    if entity_type == "relationship":               # one card per character, even if never opened
++        values["perspectives"] = {c: (values.get("perspectives") or {}).get(c) or _persp_form({c: {}})[c]
++                                  for c in values.get("characters") or []}
++    fm = {k: v for k, v in _to_storage(entity_type, values).items() if v not in ("", [], None)}
+     try:
+         create_entity(project_path, entity_type, new_id, fm,
+                       {h: b for h, b in sections.items() if b})
+@@ -524,6 +778,7 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
+ 
+     _require_type(entity_type)
+     current = load_entity(project_path, entity_type, entity_id)
++    entity_id = current["id"]
+     if (payload or {}).get("base_version") != current["version"]:
+         raise EntityConflict(current["version"])
+ 
+@@ -531,7 +786,7 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
+     sections = _clean_sections(entity_type, (payload or {}).get("sections"), errors)
+     conn = get_db(project_path)
+     try:
+-        warnings, _ = _validate(conn, entity_type, entity_id, values, errors)
++        warnings, _ = _validate(conn, entity_type, entity_id, values, errors, baseline=current["values"])
+     finally:
+         conn.close()
+     if errors:
+@@ -544,7 +799,7 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
+     if not changed:
+         return {**current, "unchanged": True, "warnings": warnings}
+     try:
+-        edit_entity(project_path, entity_type, entity_id, changed, SUMMARY)
++        edit_entity(project_path, entity_type, entity_id, _to_storage(entity_type, changed), SUMMARY)
+     except ValueError as e:
+         raise _write_error(e)
+     return {**load_entity(project_path, entity_type, entity_id), "unchanged": False,
+@@ -594,6 +849,7 @@ def _beat_refs(extra: dict) -> set:
+ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict:
+     """What a delete takes with it and what stops it. Changes nothing."""
+     _require_type(entity_type)
++    _refuse_singleton(entity_type, deleting=True)
+     conn = get_db(project_path)
+     try:
+         row = _row(conn, entity_type, entity_id)
+@@ -633,6 +889,13 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
+                 plots.append(pname or pid)
+         if plots:
+             effects.append(f"No longer a protagonist of {_plural(len(plots), 'plot')}: {_list(plots)}.")
++        if entity_type == "plot":
++            roles = [r[0] for r in conn.execute(
++                f"SELECT DISTINCT e.name FROM relations r JOIN entities e ON e.id=r.to_id "
++                f"WHERE r.from_id IN ({marks}) AND r.kind LIKE 'plot\\_%' ESCAPE '\\' "
++                f"AND e.type='scene' AND e.is_deleted=0", gone_l)]
++            if roles:
++                effects.append(f"Loses its plot role in {_plural(len(roles), 'scene')}: {_list(roles)}.")
+         located = [r[0] for r in conn.execute(
+             f"SELECT name FROM entities WHERE type='scene' AND is_deleted=0 "
+             f"AND location_id IN ({marks})", gone_l)]
+@@ -669,6 +932,8 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
+             for t in (json.loads(sex) if sex else {}).get("value_turns") or []:
+                 if not isinstance(t, dict):
+                     continue
++                if str(t.get("plot") or "") in gone:
++                    turn_scenes.setdefault(sid, set()).add(names.get(str(t["plot"]), str(t["plot"])))
+                 if value_name and str(t.get("value") or "").strip().lower() == value_name:
+                     turn_scenes.setdefault(sid, set()).add(row[1] or entity_id)
+                 for eff in t.get("effects") or []:
+@@ -691,6 +956,8 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
+ def delete_form_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+     from .writes import delete_entity
+ 
++    _require_type(entity_type)
++    _refuse_singleton(entity_type, deleting=True)
+     prev = delete_preview(project_path, entity_type, entity_id)
+     if prev["blockers"]:
+         raise EntityBlocked("This can't be deleted yet.", prev["blockers"])
+diff --git a/src/story_architect/web/css/entity-form.css b/src/story_architect/web/css/entity-form.css
+index ce161ba..da685a2 100644
+--- a/src/story_architect/web/css/entity-form.css
++++ b/src/story_architect/web/css/entity-form.css
+@@ -137,3 +137,17 @@ textarea.ef-input { resize: none; min-height: 34px; overflow: hidden; }
+ .ef-menu button:hover { background: var(--card); }
+ .ef-menu small { color: var(--muted-foreground); font-size: var(--font-size-xs); }
+ .ef-menu .new { color: var(--accent); border-top: 1px solid var(--border); border-radius: 0 0 4px 4px; margin-top: 4px; padding-top: 7px; }
++
++/* ─── phase 2: groups, cards, pickers ─────────────────────────────────── */
++.ef-group { margin: 6px 0 -4px; padding-top: 12px; border-top: 1px solid var(--border); font-size: var(--font-size-xs);
++  letter-spacing: .08em; text-transform: uppercase; font-weight: 500; color: var(--muted-foreground); }
++.ef-check { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-sm); cursor: pointer; }
++.ef-check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
++.ef-sub-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 12px;
++  background: color-mix(in srgb, var(--foreground) 2.5%, transparent); }
++.ef-sub-card + .ef-sub-card { margin-top: 10px; }
++.ef-sub-card-h { font-size: var(--font-size-sm); font-weight: 500; margin-bottom: 8px; color: var(--accent); }
++.ef-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
++.ef-grid .ef-wide { grid-column: 1 / -1; }
++.ef-rowlabel { margin: -3px 0 2px 2px; }
++@media (max-width: 560px) { .ef-grid { grid-template-columns: 1fr; } }
+diff --git a/src/story_architect/web/index.html b/src/story_architect/web/index.html
+index 82b01fd..2a433f9 100644
+--- a/src/story_architect/web/index.html
++++ b/src/story_architect/web/index.html
+@@ -179,6 +179,9 @@
+       <div class="view-header">
+         <div class="view-title" id="story-project-name">Story</div>
+         <div class="view-subtitle" id="story-subtitle">—</div>
++        <div class="view-header-actions">
++          <button class="btn" onclick="DASH.openProjectForm()" title="Edit title, genre, structure and title page">Edit project</button>
++        </div>
+       </div>
+       <div class="view-body" id="story-body"></div>
+     </div>
+@@ -240,6 +243,9 @@
+       <div class="view-header">
+         <div class="view-title">Plots</div>
+         <div class="view-subtitle" id="plots-subtitle">—</div>
++        <div class="view-header-actions">
++          <button class="btn" onclick="DASH.openEntityForm({type:'plot'})" title="Add a plot">+ New</button>
++        </div>
+       </div>
+       <div class="view-body">
+         <div class="entity-grid" id="plot-list"></div>
+@@ -253,6 +259,9 @@
+       <div class="view-header">
+         <div class="view-title">Relationships</div>
+         <div class="view-subtitle" id="relationships-subtitle">—</div>
++        <div class="view-header-actions">
++          <button class="btn" onclick="DASH.openEntityForm({type:'relationship'})" title="Add a relationship">+ New</button>
++        </div>
+       </div>
+       <div class="view-body">
+         <div class="entity-grid" id="relationship-list"></div>
+diff --git a/src/story_architect/web/js/forms/entity-form.js b/src/story_architect/web/js/forms/entity-form.js
+index edd359b..b7db198 100644
+--- a/src/story_architect/web/js/forms/entity-form.js
++++ b/src/story_architect/web/js/forms/entity-form.js
+@@ -3,7 +3,8 @@
+ // One renderer for every type. The server describes each type as a form spec
+ // (`/form-spec`, built from ENTITY_SCHEMAS), so a field added to the schema
+ // appears here with no change to this file. Nothing here knows what a
+-// "character" is; it knows kinds: text, textarea, select, ref, list, computed.
++// "character" is; it knows kinds: text, textarea, select, ref, reflist, list,
++// perspectives (a card per chosen entity), computed.
+ //
+ //   DASH.openEntityForm({ type, id?, values? })   id => edit, no id => create
+ //
+@@ -20,8 +21,9 @@ window.DASH = window.DASH || {};
+   const clone = (v) => JSON.parse(JSON.stringify(v));
+   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+   const slugFromHash = () => { const m = (location.hash || '').match(/^#\/p\/([^/?]+)/); return m ? decodeURIComponent(m[1]) : null; };
+-  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values' };
+-  const PANEL_TYPES = ['character', 'location', 'world'];
++  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values', scene: 'scenes' };
++  const PANEL_TYPES = ['character', 'location', 'world', 'plot', 'relationship'];
++  const blankPersp = () => ({ label: '', feeling: '', type: '', strength: '', secret: false });
+ 
+   let specs = null, rootEl = null, toastTimer = 0, menuEl = null;
+   const S = { open: false };
+@@ -49,15 +51,25 @@ window.DASH = window.DASH || {};
+   }
+ 
+   // ─── Values: normalise, diff, dirty ──────────────────────────────────────
+-  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'unsupported' && f.kind !== 'reflist');
++  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'unsupported');
+   const nameKey = () => S.spec.name_key;
++  // A field with `show_if` only exists while its condition holds; hidden, it counts as its default.
++  const visible = (f) => !f.show_if || Object.keys(f.show_if).every((k) => S.values[k] === f.show_if[k]);
++  const dependedOn = (key) => S.spec.fields.some((g) => g.show_if && key in g.show_if);
+ 
+   function norm(values) {
+     const out = {};
+     editable().forEach((f) => {
+       let v = values[f.key];
+-      if (f.kind === 'list') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
+-      else if (typeof v === 'string') v = v.trim();
++      if (f.show_if && !Object.keys(f.show_if).every((k) => values[k] === f.show_if[k])) v = clone(f.default);
++      else if (f.kind === 'list' || f.kind === 'reflist') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
++      else if (f.kind === 'perspectives') {
++        const o = {};
++        Object.keys(v || {}).forEach((id) => { const p = v[id] || {}; o[id] = {
++          label: String(p.label || '').trim(), feeling: String(p.feeling || '').trim(), type: String(p.type || '').trim(),
++          strength: p.strength === '' || p.strength == null ? '' : Number(p.strength), secret: !!p.secret }; });
++        v = o;
++      } else if (typeof v === 'string') v = v.trim();
+       out[f.key] = v;
+     });
+     return out;
+@@ -72,7 +84,7 @@ window.DASH = window.DASH || {};
+     const values = {};
+     spec.fields.forEach((f) => {
+       if (f.kind === 'computed' || f.kind === 'unsupported') return;
+-      values[f.key] = f.kind === 'list' || f.kind === 'reflist' ? [] : f.kind === 'toggle' ? false : '';
++      values[f.key] = clone(f.default);
+     });
+     Object.assign(values, prefill || {});
+     const sections = {}; spec.sections.forEach((n) => { sections[n] = ''; });
+@@ -101,7 +113,7 @@ window.DASH = window.DASH || {};
+       open: true, mode: opts.id ? 'edit' : 'create', type: opts.type, id: opts.id || null, spec,
+       orig, base: clone(orig), values: clone(orig.values), sections: clone(orig.sections),
+       tab: 'fields', step: 'form', discard: false, busy: false, conflict: false, preview: null,
+-      errors: {}, warnings: {}, newId: null, touched: new Set(), submitted: false, seq: 0, timer: 0,
++      errors: {}, warnings: {}, newId: null, touched: new Set(), nameTyped: false, submitted: false, seq: 0, timer: 0,
+       trigger: document.activeElement,
+     });
+     render(); focusFirst();
+@@ -124,7 +136,7 @@ window.DASH = window.DASH || {};
+   function render() {
+     const kind = S.spec.label;
+     rootEl.classList.add('open');
+-    rootEl.innerHTML = `<div class="ef-card" role="dialog" aria-modal="true" aria-label="${h(kind)}">
++    rootEl.innerHTML = `<div class="ef-card" role="dialog" aria-modal="true" aria-label="${h(kind)}" tabindex="-1">
+       <div class="ef-head">
+         <div class="ef-titles">
+           <div class="ef-kicker">${h(kind)} · ${S.mode === 'edit' ? 'Editing' : 'New'}</div>
+@@ -138,6 +150,7 @@ window.DASH = window.DASH || {};
+       <div class="ef-foot" id="ef-foot"></div>
+     </div>`;
+     renderBody(); syncFooter(); paintHeader();
++    if (!rootEl.contains(document.activeElement)) rootEl.querySelector('.ef-card').focus();   // keep focus inside
+   }
+ 
+   function tabsHtml() {
+@@ -157,36 +170,49 @@ window.DASH = window.DASH || {};
+   }
+ 
+   function fieldsHtml() {
+-    const normal = S.spec.fields.filter((f) => f.kind !== 'computed').map(fieldHtml).join('');
+-    const derived = S.mode === 'edit' ? S.spec.fields.filter((f) => f.kind === 'computed').map(derivedHtml).join('') : '';
+-    return normal + (derived ? `<div class="ef-derived">${derived}</div>` : '');
++    let last = null, html = '';
++    S.spec.fields.filter((f) => f.kind !== 'computed' && visible(f)).forEach((f) => {
++      if ((f.group || null) !== last) { last = f.group || null; if (last) html += `<h3 class="ef-group">${h(last)}</h3>`; }
++      html += fieldHtml(f);
++    });
++    const derived = S.mode === 'edit' ? derivedBlock() : '';
++    return html + (derived ? `<div class="ef-derived">${derived}</div>` : '');
+   }
+ 
+   function fieldHtml(f) {
+     const locked = S.mode === 'edit' && f.locked_on_edit;
+     const note = locked ? f.locked_on_edit : f.help;
++    const err = `<div class="ef-msg" data-msg="${h(f.key)}"></div>`;
++    if (f.kind === 'perspectives') return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>${perspectivesHtml(f)}${err}</div>`;
+     return `<div class="ef-field">
+       <label class="ef-label" for="ef-f-${h(f.key)}">${h(f.label)}${f.required ? '<abbr class="ef-req" title="Required">*</abbr>' : ''}</label>
+       ${widget(f, locked)}
+-      ${note ? `<div class="ef-help">${h(note)}</div>` : ''}
+-      <div class="ef-msg" data-msg="${h(f.key)}"></div></div>`;
++      ${note ? `<div class="ef-help">${h(note)}</div>` : ''}${err}</div>`;
+   }
+ 
+   function widget(f, locked) {
+     const v = S.values[f.key], id = `id="ef-f-${h(f.key)}" data-key="${h(f.key)}"`;
+     switch (f.kind) {
+       case 'text': return `<input class="ef-input" ${id} value="${h(v)}" autocomplete="off"${locked ? ' disabled' : ''}>`;
+-      case 'number': return `<input class="ef-input" type="number" ${id} value="${h(v)}">`;
++      case 'number': return `<input class="ef-input" type="number" ${id} value="${h(v)}"${numAttrs(f)}>`;
+       case 'textarea': return `<textarea class="ef-input" ${id} rows="2">${h(v)}</textarea>`;
+-      case 'toggle': return `<input type="checkbox" ${id}${v ? ' checked' : ''}>`;
+-      case 'select':
+-        return `<select class="ef-input" ${id}><option value="">—</option>${f.options.map((o) => `<option${o === v ? ' selected' : ''}>${h(o)}</option>`).join('')}</select>`;
++      case 'toggle': return `<label class="ef-check"><input type="checkbox" ${id}${v ? ' checked' : ''}> <span>${h(f.label)}</span></label>`;
++      case 'select': return selectHtml(f, id, v);
+       case 'ref': return refSelect(f, id, v);
++      case 'reflist': return refListWidget(f, v || []);
+       case 'list': return listWidget(f, v || []);
+       default: return `<div class="ef-note">Not editable here yet — ask the agent.</div>`;
+     }
+   }
+ 
++  const numAttrs = (f) => ['min', 'max', 'step'].filter((k) => f[k] != null).map((k) => ` ${k}="${f[k]}"`).join('') + (f.integer ? ' step="1"' : '');
++
++  function selectHtml(f, attrs, v) {
++    const stray = v && !f.options.includes(v) ? `<option selected>${h(v)}</option>` : '';     // keep a stored value we don't list
++    return `<select class="ef-input" ${attrs}>${f.allow_blank ? '<option value="">—</option>' : ''}${stray}
++      ${f.options.map((o) => `<option${o === v ? ' selected' : ''}>${h(o)}</option>`).join('')}</select>`;
++  }
++
+   // A picker over entities that exist, so a link can't point at nothing.
+   function refSelect(f, id, v) {
+     const all = ((D.story || {})[LISTS[f.ref]] || []).filter((e) => e.id !== S.id);
+@@ -197,6 +223,49 @@ window.DASH = window.DASH || {};
+       ${all.map((e) => `<option value="${h(e.id)}"${e.id === v ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('')}</select>`;
+   }
+ 
++  const entityName = (type, id) => refName(type, id);
++  function entityOptions(type, chosen, current) {
++    const all = ((D.story || {})[LISTS[type]] || []).filter((e) => e.id === current || !chosen.includes(e.id));
++    all.sort((a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title)));
++    const known = all.some((e) => e.id === current);
++    return `<option value="">— choose —</option>${current && !known ? `<option value="${h(current)}" selected>${h(current)} (missing)</option>` : ''}`
++      + all.map((e) => `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('');
++  }
++
++  // Several entities of one kind. `count` fixes the number of slots (a relationship's two characters);
++  // otherwise rows grow and shrink. A character already picked in one slot is not offered in another.
++  function refListWidget(f, items) {
++    const rows = f.count ? Array.from({ length: f.count }, (_, i) => items[i] || '') : items;
++    const chosen = rows.filter(Boolean);
++    return `<div class="ef-list">${rows.map((cur, i) => `<div class="ef-row">
++        <select class="ef-input" id="ef-f-${h(f.key)}-${i}" data-ref="${h(f.key)}" data-i="${i}" aria-label="${h((f.row_labels || [])[i] || f.label)}">${entityOptions(f.ref, chosen, cur)}</select>
++        ${f.count ? '' : `<button class="ef-rm" data-act="ref-del" data-key="${h(f.key)}" data-i="${i}" aria-label="Remove" title="Remove">×</button>`}</div>
++        ${f.count && (f.row_labels || [])[i] ? `<div class="ef-note ef-rowlabel">${h(f.row_labels[i])}</div>` : ''}`).join('')}
++      ${f.count ? '' : `<button class="ef-add" data-act="ref-add" data-key="${h(f.key)}">+ ${h(f.add_label || 'Add')}</button>`}</div>`;
++  }
++
++  // One card per chosen entity — they appear only once that entity is picked.
++  function perspectivesHtml(f) {
++    const ids = (S.values[f.keyed_by] || []).filter(Boolean), cards = S.values[f.key] || {};
++    if (!ids.length) return '<div class="ef-note">Pick the characters first — each gets a card here.</div>';
++    return ids.map((cid) => {
++      const other = ids.length === 2 ? ids.find((x) => x !== cid) : null;
++      const title = other ? `How ${entityName(f.ref, cid)} sees ${entityName(f.ref, other)}` : entityName(f.ref, cid);
++      const p = cards[cid] || blankPersp();
++      const sub = f.fields.map((sf) => {
++        const path = `${f.key}.${cid}.${sf.key}`, at = `data-pc="${h(cid)}" data-pf="${h(sf.key)}" data-path="${h(path)}" id="ef-p-${h(cid)}-${h(sf.key)}"`;
++        let w;
++        if (sf.kind === 'select') w = selectHtml(sf, at, p[sf.key]);
++        else if (sf.kind === 'number') w = `<input class="ef-input" type="number" ${at} value="${h(p[sf.key])}"${numAttrs(sf)}>`;
++        else if (sf.kind === 'toggle') w = `<label class="ef-check"><input type="checkbox" ${at}${p[sf.key] ? ' checked' : ''}> <span>${h(sf.label)}</span></label>`;
++        else w = `<input class="ef-input" ${at} value="${h(p[sf.key])}" autocomplete="off">`;
++        return `<div class="ef-field${sf.kind === 'toggle' ? ' ef-wide' : ''}">${sf.kind === 'toggle' ? '' : `<label class="ef-label" for="ef-p-${h(cid)}-${h(sf.key)}">${h(sf.label)}</label>`}${w}
++          ${sf.help ? `<div class="ef-help">${h(sf.help)}</div>` : ''}<div class="ef-msg" data-msg="${h(path)}"></div></div>`;
++      }).join('');
++      return `<div class="ef-sub-card"><div class="ef-sub-card-h">${h(title)}</div><div class="ef-grid">${sub}</div></div>`;
++    }).join('');
++  }
++
+   function listWidget(f, items) {
+     return `<div class="ef-list">${items.map((it, i) => `<div class="ef-row">
+         <input class="ef-input" data-list="${h(f.key)}" data-i="${i}" value="${h(it)}" autocomplete="off">
+@@ -204,11 +273,24 @@ window.DASH = window.DASH || {};
+       <button class="ef-add" data-act="list-add" data-key="${h(f.key)}">+ Add</button></div>`;
+   }
+ 
+-  function derivedHtml(f) {
+-    const rows = (S.orig.computed || {})[f.key] || [];
+-    return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
+-      <div class="ef-ro${rows.length ? '' : ' none'}">${rows.length ? rows.map((r) => `<div>${h(r.display)}</div>`).join('') : 'None yet'}</div>
++  // Derived fields: shown when they have something to show. Several empty ones collapse into
++  // a single line, so a new plot doesn't open with seven "None yet".
++  function derivedBlock() {
++    const fs = S.spec.fields.filter((f) => f.kind === 'computed');
++    const rowsOf = (f) => (S.orig.computed || {})[f.key] || [];
++    const full = fs.filter((f) => rowsOf(f).length), empty = fs.filter((f) => !rowsOf(f).length);
++    const one = (f) => `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
++      <div class="ef-ro${rowsOf(f).length ? '' : ' none'}">${rowsOf(f).length ? rowsOf(f).map((r) => `<div>${h(r.display)}</div>`).join('') : 'None yet'}</div>
+       ${f.hint ? `<div class="ef-note">${h(f.hint)}</div>` : ''}</div>`;
++    let html = full.map(one).join('');
++    if (empty.length === 1 && !full.length) html = one(empty[0]);
++    else if (empty.length) {
++      const hints = [...new Set(empty.map((f) => f.hint).filter(Boolean))];
++      html += `<div class="ef-field"><div class="ef-label">Not used yet</div>
++        <div class="ef-ro none">${empty.map((f) => h(f.label)).join(' · ')}</div>
++        ${hints.length === 1 ? `<div class="ef-note">${h(hints[0])}</div>` : ''}</div>`;
++    }
++    return html;
+   }
+ 
+   function sectionsHtml() {
+@@ -235,10 +317,13 @@ window.DASH = window.DASH || {};
+     const a = norm(S.orig.values), b = norm(S.values), rows = [];
+     changedFields().forEach((f) => {
+       let was, now;
+-      if (f.kind === 'list') {
+-        const x = a[f.key] || [], y = b[f.key] || [];
+-        was = x.length ? x.map((i) => y.includes(i) ? h(i) : `<span class="del">${h(i)}</span>`).join('<br>') : '—';
+-        now = y.length ? y.map((i) => x.includes(i) ? h(i) : `<span class="add">${h(i)}</span>`).join('<br>') : '—';
++      if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
++      else if (f.kind === 'list' || f.kind === 'reflist') {
++        const nm = f.kind === 'reflist' ? (i) => refName(f.ref, i) : (i) => i;
++        const x = (a[f.key] || []).map((i) => [i, nm(i)]), y = (b[f.key] || []).map((i) => [i, nm(i)]);
++        const xs = x.map((i) => i[0]), ys = y.map((i) => i[0]);
++        was = x.length ? x.map(([id, n]) => ys.includes(id) ? h(n) : `<span class="del">${h(n)}</span>`).join('<br>') : '—';
++        now = y.length ? y.map(([id, n]) => xs.includes(id) ? h(n) : `<span class="add">${h(n)}</span>`).join('<br>') : '—';
+       } else { was = h(fmtScalar(f, a[f.key])); now = h(fmtScalar(f, b[f.key])); }
+       rows.push(diff(f.label, was, now));
+     });
+@@ -248,6 +333,22 @@ window.DASH = window.DASH || {};
+          <button class="btn" data-act="rebase">Apply my edits on top of the latest</button></div>` : '';
+     return `${banner}<div class="ef-sub">Check what will change in “${h(S.values[nameKey()] || S.id)}”.</div>${rows.join('') || '<div class="ef-sub">Nothing changed.</div>'}`;
+   }
++  // Only the card fields that changed, one line each, "Kael · Label: Friend".
++  function persDiff(f, before, after) {
++    const was = [], now = [];
++    Object.keys(Object.assign({}, before, after)).forEach((cid) => {
++      const x = before[cid], y = after[cid], who = entityName(f.ref, cid);
++      f.fields.forEach((sf) => {
++        const xv = x ? x[sf.key] : '', yv = y ? y[sf.key] : '';
++        if (eq(xv, yv)) return;
++        const show = (v) => sf.kind === 'toggle' ? (v ? 'yes' : 'no') : (v === '' || v == null ? '—' : String(v));
++        const lab = sf.kind === 'toggle' ? 'Hidden' : sf.label;
++        was.push(x ? `${h(who)} · ${h(lab)}: ${h(show(xv))}` : '—');
++        now.push(y ? `<span class="add">${h(who)} · ${h(lab)}: ${h(show(yv))}</span>` : `<span class="del">${h(who)} removed</span>`);
++      });
++    });
++    return [was.join('<br>') || '—', now.join('<br>') || '—'];
++  }
+   const diff = (label, was, now) => `<div class="ef-diff"><div class="ef-diff-h">${h(label)}</div>
+     <div class="ef-diff-b"><div class="was">${was}</div><div class="now">${now}</div></div></div>`;
+ 
+@@ -281,7 +382,7 @@ window.DASH = window.DASH || {};
+         <button class="btn btn-danger" data-act="confirm-delete"${!p || !p.can_delete || S.busy ? ' disabled' : ''}>${S.busy ? 'Deleting…' : 'Delete'}</button>`;
+     }
+     const edit = S.mode === 'edit';
+-    return `${edit ? '<button class="btn btn-danger btn-ghost" data-act="ask-delete">Delete…</button>' : ''}<div class="grow"></div>
++    return `${edit && !S.spec.singleton ? '<button class="btn btn-danger btn-ghost" data-act="ask-delete">Delete…</button>' : ''}<div class="grow"></div>
+       <button class="btn" data-act="close">Cancel</button>
+       <button class="btn btn-primary" data-act="save"${S.busy || (edit && !isDirty()) ? ' disabled' : ''}>${edit ? 'Review changes' : 'Create'}</button>`;
+   }
+@@ -295,15 +396,14 @@ window.DASH = window.DASH || {};
+     i.textContent = S.mode === 'edit' ? 'id: ' + S.id : (S.newId && v ? 'id: ' + S.newId : '');
+   }
+ 
+-  // Messages show for a field once it's been touched, or after a save attempt.
++  // Errors show for a field once it's been touched, or after a save attempt; warnings always do.
+   function paintMessages() {
+     const show = (k) => S.submitted || S.touched.has(k);
+     document.querySelectorAll('#ef-body [data-msg]').forEach((el) => {
+-      const k = el.dataset.msg, err = show(k) && S.errors[k], warn = show(k) && !err && S.warnings[k];
++      const k = el.dataset.msg, err = show(k) && S.errors[k], warn = !err && S.warnings[k];   // a warning is worth seeing at once
+       el.textContent = err || warn || '';
+       el.className = 'ef-msg' + (err ? ' err' : warn ? ' warn' : '');
+-      const input = el.parentElement.querySelector('.ef-input');
+-      if (input) input.classList.toggle('ef-invalid', !!err);
++      el.parentElement.querySelectorAll('.ef-input').forEach((i) => i.classList.toggle('ef-invalid', !!err));
+     });
+     const b = document.getElementById('ef-banner');
+     if (b) { const m = S.errors._form; b.textContent = m || ''; b.className = 'ef-banner' + (m ? ' on' : ''); }
+@@ -315,7 +415,8 @@ window.DASH = window.DASH || {};
+     const key = Object.keys(S.errors).find((k) => k !== '_form');
+     if (key && S.tab !== 'fields') { S.tab = 'fields'; render(); }
+     else if (S.step !== 'form') { S.step = 'form'; render(); }
+-    const el = key && document.querySelector(`[data-key="${CSS.escape(key)}"]`);
++    const k = key && CSS.escape(key);
++    const el = key && document.querySelector(`[data-key="${k}"],[data-path="${k}"],[data-ref="${k}"]`);
+     if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); }
+   }
+ 
+@@ -412,11 +513,16 @@ window.DASH = window.DASH || {};
+     } finally { S.busy = false; syncFooter(); }
+   }
+ 
++  function reopenPanel(type, id) {
++    if (type === 'plot' && D.showPlotPanel) D.showPlotPanel(id);
++    else if (PANEL_TYPES.includes(type) && D.panelTabs) D.panelTabs.openEntity(type + ':' + id);
++  }
++
+   async function finish(res, verb) {
+     const type = S.type, name = res.values[nameKey()] || res.id;
+     close();
+     if (D.reloadData) await D.reloadData(); else location.reload();
+-    if (PANEL_TYPES.includes(type) && D.panelTabs) D.panelTabs.openEntity(type + ':' + res.id);
++    reopenPanel(type, res.id);
+     toast(`${verb} “${name}”`);
+   }
+ 
+@@ -437,6 +543,13 @@ window.DASH = window.DASH || {};
+         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
+         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
+       }
++      case 'ref-add': {
++        const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
++        renderBody(); const rows = document.querySelectorAll(`[data-ref="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
++      }
++      case 'ref-del': {
++        S.values[el.dataset.key].splice(+el.dataset.i, 1); syncPersp(); renderBody(); afterEdit(); break;
++      }
+       case 'list-del': {
+         S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
+       }
+@@ -445,22 +558,51 @@ window.DASH = window.DASH || {};
+ 
+   function afterEdit() { scheduleCheck(); syncFooter(); paintHeader(); }
+ 
++  const field = (key) => S.spec.fields.find((f) => f.key === key);
++  const persField = () => S.spec.fields.find((f) => f.kind === 'perspectives');
++
++  // Keep exactly one card per chosen entity: new picks get a blank card, dropped ones lose theirs.
++  function syncPersp() {
++    const f = persField(); if (!f) return;
++    const ids = (S.values[f.keyed_by] || []).filter(Boolean), cur = S.values[f.key] || {}, next = {};
++    ids.forEach((id) => { next[id] = cur[id] || blankPersp(); });
++    S.values[f.key] = next;
++  }
++
++  // A relationship is usually named for its two people; fill it in until the person writes their own.
++  function autoName() {
++    const a = S.spec.auto_name; if (!a || S.mode !== 'create' || S.nameTyped) return;   // typed, not merely visited
++    const f = field(a.from), ids = (S.values[a.from] || []).filter(Boolean);
++    S.values[nameKey()] = ids.length && ids.length === (f.count || ids.length) ? ids.map((id) => entityName(f.ref, id)).join(a.join) : '';
++  }
++
+   function onInput(e) {
+-    const el = e.target;
+-    if (el.dataset.key != null) {
+-      S.values[el.dataset.key] = el.type === 'checkbox' ? el.checked : el.value;
+-      S.touched.add(el.dataset.key);
+-    } else if (el.dataset.list != null) {
+-      S.values[el.dataset.list][+el.dataset.i] = el.value; S.touched.add(el.dataset.list);
+-    } else if (el.dataset.section != null) {
+-      S.sections[el.dataset.section] = el.value;
++    const el = e.target, d = el.dataset;
++    let rerender = false;
++    if (d.key != null) {
++      S.values[d.key] = el.type === 'checkbox' ? el.checked : el.value;
++      S.touched.add(d.key); rerender = dependedOn(d.key);
++      if (d.key === nameKey()) S.nameTyped = true;
++    } else if (d.ref != null) {
++      const arr = S.values[d.ref] = S.values[d.ref] || [];
++      while (arr.length <= +d.i) arr.push('');
++      arr[+d.i] = el.value; S.touched.add(d.ref);
++      syncPersp(); autoName(); rerender = true;              // the other slot's choices and the cards depend on this
++    } else if (d.pc != null) {
++      const f = persField(), cards = S.values[f.key] = S.values[f.key] || {};
++      (cards[d.pc] = cards[d.pc] || blankPersp())[d.pf] = el.type === 'checkbox' ? el.checked : el.value;
++      S.touched.add(d.path);
++    } else if (d.list != null) {
++      S.values[d.list][+d.i] = el.value; S.touched.add(d.list);
++    } else if (d.section != null) {
++      S.sections[d.section] = el.value;
+     } else return;
+     if (el.tagName === 'TEXTAREA') autosize(el);
++    if (rerender) { const id = el.id; renderBody(); const n = id && document.getElementById(id); if (n) n.focus(); }
+     afterEdit();
+   }
+ 
+   function onKey(e) {
+-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); requestClose(); return; }
+     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); const b = rootEl.querySelector('.ef-foot .btn-primary:not([disabled])'); if (b) b.click(); return; }
+     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.list != null) {
+       e.preventDefault();
+@@ -496,11 +638,15 @@ window.DASH = window.DASH || {};
+       };
+     };
+     wrap('showCharacterPanel', 'character'); wrap('showLocationPanel', 'location'); wrap('showWorldPanel', 'world');
++    wrap('showPlotPanel', 'plot'); wrap('showRelationshipPanel', 'relationship');
+     const open = D.openPanel, close_ = D.closePanel;
+     D.openPanel = function () { const r = open.apply(this, arguments); D._formTarget = D._pendingFormTarget || null; syncEditButton(); return r; };
+     D.closePanel = function () { D._formTarget = null; syncEditButton(); return close_.apply(this, arguments); };
+   }
+ 
++  // The project is one record that always exists; the server finds it whatever id we name.
++  D.openProjectForm = function () { D.openEntityForm({ type: 'project', id: slugFromHash() }); };
++
+   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+ 
+   // Values have no list or panel of their own, so the Values view gets a menu.
+@@ -534,10 +680,14 @@ window.DASH = window.DASH || {};
+     });
+     rootEl.addEventListener('input', onInput);
+     rootEl.addEventListener('focusout', (e) => {
+-      const k = e.target.dataset && (e.target.dataset.key || e.target.dataset.list);
++      const k = e.target.dataset && (e.target.dataset.key || e.target.dataset.list || e.target.dataset.path || e.target.dataset.ref);
+       if (k && S.open) { S.touched.add(k); paintMessages(); }
+     });
+     rootEl.addEventListener('keydown', onKey);
++    // Escape must work wherever focus is — a re-render can drop it onto the page behind.
++    document.addEventListener('keydown', (e) => {
++      if (S.open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); requestClose(); }
++    }, true);
+     wrapPanels();
+     const edit = document.getElementById('panel-edit');
+     if (edit) edit.addEventListener('click', () => { if (D._formTarget) D.openEntityForm(D._formTarget); });
+diff --git a/tests/test_manual_entities_phase2.py b/tests/test_manual_entities_phase2.py
+new file mode 100644
+index 0000000..efe6f24
+--- /dev/null
++++ b/tests/test_manual_entities_phase2.py
+@@ -0,0 +1,320 @@
++"""Entity form, phase 2: plots, relationships and the project record."""
++import json
++
++import pytest
++
++from story_architect.core import manual_entities as me
++from story_architect.core.db import get_db
++from story_architect.core.writes import create_entity, edit_entity
++
++
++@pytest.fixture
++def project(tmp_path):
++    from story_architect.core.writes import create_project
++    root = tmp_path
++    (root / "projects").mkdir()
++    create_project("demo", {"name": "Demo", "logline": "A test"}, root)
++    p = root / "projects" / "demo"
++    for slug, name in [("kael", "Kael"), ("mira", "Mira"), ("oak", "Oak")]:
++        create_entity(p, "character", slug, {"name": name, "one_sentence": "x"})
++    return p
++
++
++def _scene_with_role(p, plot="main", role="setup", note="The door opens"):
++    create_entity(p, "act", "a1", {"title": "A"})
++    create_entity(p, "sequence", "s1", {"title": "S", "act_id": "a1"})
++    create_entity(p, "scene", "sc1", {"title": "Dinner", "sequence_id": "s1", "act_id": "a1",
++                                      "plot_roles": [{"plot": plot, "role": role, "description": note}]})
++
++
++def _extra(p, eid):
++    conn = get_db(p)
++    try:
++        return json.loads(conn.execute("SELECT extra FROM entities WHERE id=?", (eid,)).fetchone()[0])
++    finally:
++        conn.close()
++
++
++# ─── plot ────────────────────────────────────────────────────────────────────
++
++class TestPlot:
++    def test_spec(self):
++        by = {f["key"]: f for f in me.form_spec("plot")["fields"]}
++        assert by["characters"]["kind"] == "reflist" and by["characters"]["ref"] == "character"
++        assert by["plot_type"]["show_if"] == {"plot_scope": "sub"}
++        assert by["status"]["kind"] == "select" and not by["status"]["allow_blank"]
++        assert by["value_arc"]["allow_blank"]
++        assert by["climax"]["kind"] == "computed" and "plot roles" in by["climax"]["hint"]
++
++    def test_create_and_read_back(self, project):
++        out = me.create_form_entity(project, "plot", {"values": {
++            "name": "Escape", "one_sentence": "Get out.", "characters": ["kael"],
++            "plot_scope": "main", "value_arc": "Education"}})
++        assert out["id"] == "escape" and out["values"]["characters"] == ["kael"]
++        assert out["values"]["status"] == "active"
++
++    def test_type_only_applies_to_subplots(self, project):
++        sub = me.create_form_entity(project, "plot", {"values": {
++            "name": "Rival", "plot_scope": "sub", "plot_type": "Resonant"}})
++        assert sub["values"]["plot_type"] == "Resonant"
++        main = me.create_form_entity(project, "plot", {"values": {
++            "name": "Spine", "plot_scope": "main", "plot_type": "Resonant"}})
++        assert main["values"]["plot_type"] == ""            # hidden -> reset, not left behind
++
++    def test_switching_to_main_clears_the_type(self, project):
++        sub = me.create_form_entity(project, "plot", {"values": {
++            "name": "Rival", "plot_scope": "sub", "plot_type": "Setup"}})
++        out = me.edit_form_entity(project, "plot", "rival", {
++            "base_version": sub["version"], "values": {**sub["values"], "plot_scope": "main"}})
++        assert out["values"]["plot_type"] == "" and _extra(project, "rival")["plot_type"] == ""
++
++    def test_subplot_without_a_kind_is_a_warning_not_an_error(self, project):
++        chk = me.check_entity(project, "plot", {"values": {"name": "Rival", "plot_scope": "sub"}})
++        assert chk["ok"] and "plot_type" in chk["warnings"]
++
++    def test_unknown_protagonist_is_named(self, project):
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(project, "plot", {"values": {"name": "X", "characters": ["nobody"]}})
++        assert "nobody" in e.value.errors["characters"]
++
++    def test_derived_roles_show_scene_and_note(self, project):
++        create_entity(project, "plot", "main", {"name": "Main", "plot_scope": "main"})
++        _scene_with_role(project)
++        c = me.load_entity(project, "plot", "main")["computed"]
++        assert c["setups"][0]["display"] == "Dinner — The door opens"
++        assert c["crisis"] == []
++
++    def test_a_stored_legacy_value_does_not_block_an_unrelated_edit(self, project):
++        out = me.create_form_entity(project, "plot", {"values": {"name": "Old"}})
++        conn = get_db(project)
++        try:
++            ex = json.loads(conn.execute("SELECT extra FROM entities WHERE id='old'").fetchone()[0])
++            ex["value_arc"] = "Legacy"
++            conn.execute("UPDATE entities SET extra=? WHERE id='old'", (json.dumps(ex),))
++        finally:
++            conn.close()
++        cur = me.load_entity(project, "plot", "old")
++        got = me.edit_form_entity(project, "plot", "old", {
++            "base_version": cur["version"], "values": {**cur["values"], "one_sentence": "now with a summary"}})
++        assert got["values"]["one_sentence"] == "now with a summary"
++        # …but choosing a bad one is still refused
++        with pytest.raises(me.EntityInvalid):
++            me.edit_form_entity(project, "plot", "old", {
++                "base_version": got["version"], "values": {**got["values"], "value_arc": "Nonsense"}})
++
++    def test_delete_reports_scene_roles(self, project):
++        create_entity(project, "plot", "main", {"name": "Main"})
++        _scene_with_role(project)
++        prev = me.delete_preview(project, "plot", "main")
++        assert prev["can_delete"] and any("Dinner" in e and "plot role" in e for e in prev["effects"])
++        me.delete_form_entity(project, "plot", "main")
++        assert me.load_entity  # still importable; the plot is gone:
++        with pytest.raises(me.EntityNotFound):
++            me.load_entity(project, "plot", "main")
++
++    def test_plot_named_in_value_turns_blocks_the_delete(self, project):
++        create_entity(project, "value", "trust", {"name": "trust", "p": "trust", "c": "distrust",
++                                                  "cd": "betrayal", "nn": "blind faith"})
++        create_entity(project, "plot", "main", {"name": "Main", "characters": ["kael"]})
++        create_entity(project, "act", "a1", {"title": "A"})
++        create_entity(project, "sequence", "s1", {"title": "S", "act_id": "a1"})
++        create_entity(project, "scene", "sc1", {
++            "title": "Dinner", "sequence_id": "s1", "act_id": "a1",
++            "value_turns": [{"plot": "main", "value": "trust", "from": "trust", "to": "betrayal",
++                             "effects": [{"character": "kael",
++                                          "levels": [{"conflict_level": "inner", "effect": "x"}]}]}]})
++        prev = me.delete_preview(project, "plot", "main")
++        assert not prev["can_delete"] and "Main" in prev["blockers"][0] and "Dinner" in prev["blockers"][0]
++
++
++# ─── relationship ────────────────────────────────────────────────────────────
++
++REL = {"name": "Kael & Mira", "characters": ["kael", "mira"],
++       "perspectives": {"kael": {"label": "Friend", "type": "family", "strength": 0.9},
++                        "mira": {"label": "Watcher"}}}
++
++
++class TestRelationship:
++    def test_spec(self):
++        by = {f["key"]: f for f in me.form_spec("relationship")["fields"]}
++        assert by["characters"]["kind"] == "reflist" and by["characters"]["count"] == 2
++        assert by["perspectives"]["kind"] == "perspectives" and by["perspectives"]["keyed_by"] == "characters"
++        assert {f["key"] for f in by["perspectives"]["fields"]} == {"label", "feeling", "type", "strength", "secret"}
++        assert [f["key"] for f in me.form_spec("relationship")["fields"]][:4] == \
++            ["name", "characters", "perspectives", "status"]
++
++    def test_create_stores_only_what_was_filled_but_a_key_per_character(self, project):
++        out = me.create_form_entity(project, "relationship", {"values": REL})
++        assert out["id"] == "kael-mira"
++        stored = _extra(project, "kael-mira")["perspectives"]
++        assert stored["kael"] == {"label": "Friend", "type": "family", "strength": 0.9}
++        assert stored["mira"] == {"label": "Watcher"}
++        # a character with nothing filled in still has a key
++        out = me.create_form_entity(project, "relationship", {"values": {
++            "name": "Oak & Kael", "characters": ["oak", "kael"]}})
++        assert set(_extra(project, out["id"])["perspectives"]) == {"oak", "kael"}
++
++    def test_two_different_characters_are_required(self, project):
++        for bad in ([], ["kael"], ["kael", "kael"], ["kael", "mira", "oak"]):
++            with pytest.raises(me.EntityInvalid) as e:
++                me.create_form_entity(project, "relationship", {"values": {"name": "X", "characters": bad}})
++            assert e.value.errors["characters"] == "Pick two different characters."
++
++    def test_unknown_character(self, project):
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(project, "relationship", {"values": {"name": "X", "characters": ["kael", "zed"]}})
++        assert "zed" in e.value.errors["characters"]
++
++    def test_same_pair_twice_is_a_warning(self, project):
++        me.create_form_entity(project, "relationship", {"values": REL})
++        chk = me.check_entity(project, "relationship", {"values": {**REL, "name": "Again", "characters": ["mira", "kael"]}})
++        assert chk["ok"] and "already have a relationship" in chk["warnings"]["characters"]
++
++    def test_strength_range_is_keyed_to_the_card_field(self, project):
++        bad = {**REL, "perspectives": {"kael": {"strength": 3}, "mira": {}}}
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(project, "relationship", {"values": bad})
++        assert "perspectives.kael.strength" in e.value.errors
++
++    def test_untouched_form_is_a_no_op(self, project):
++        out = me.create_form_entity(project, "relationship", {"values": REL})
++        again = me.edit_form_entity(project, "relationship", "kael-mira",
++                                    {"base_version": out["version"], "values": out["values"]})
++        assert again["unchanged"]
++
++    def test_edit_one_perspective_leaves_the_other(self, project):
++        out = me.create_form_entity(project, "relationship", {"values": REL})
++        v = out["values"]
++        v["perspectives"]["mira"].update(strength=-0.3, secret=True)
++        got = me.edit_form_entity(project, "relationship", "kael-mira", {"base_version": out["version"], "values": v})
++        assert _extra(project, "kael-mira")["perspectives"]["mira"] == {"label": "Watcher", "strength": -0.3, "secret": True}
++        assert _extra(project, "kael-mira")["perspectives"]["kael"]["label"] == "Friend"
++        assert got["values"]["perspectives"]["mira"]["secret"] is True
++
++    def test_swapping_a_character_rekeys_the_perspectives(self, project):
++        out = me.create_form_entity(project, "relationship", {"values": REL})
++        v = {**out["values"], "characters": ["kael", "oak"]}
++        got = me.edit_form_entity(project, "relationship", "kael-mira", {"base_version": out["version"], "values": v})
++        assert set(got["values"]["perspectives"]) == {"kael", "oak"}
++        assert got["values"]["perspectives"]["kael"]["label"] == "Friend"      # kept
++        assert got["values"]["perspectives"]["oak"]["label"] == ""             # new card, blank
++
++    def test_status_and_history(self, project):
++        out = me.create_form_entity(project, "relationship", {"values": {**REL, "status": "complex", "history": "Long."}})
++        assert out["values"]["status"] == "complex" and out["values"]["history"] == "Long."
++        with pytest.raises(me.EntityInvalid):
++            me.edit_form_entity(project, "relationship", "kael-mira", {
++                "base_version": out["version"], "values": {**out["values"], "status": "frenemies"}})
++
++    def test_delete(self, project):
++        me.create_form_entity(project, "relationship", {"values": REL})
++        assert me.delete_preview(project, "relationship", "kael-mira")["can_delete"]
++        me.delete_form_entity(project, "relationship", "kael-mira")
++        with pytest.raises(me.EntityNotFound):
++            me.load_entity(project, "relationship", "kael-mira")
++
++
++# ─── project ─────────────────────────────────────────────────────────────────
++
++class TestProject:
++    def test_title_page_fields_are_grouped_and_last(self):
++        fields = me.form_spec("project")["fields"]
++        grouped = [f["key"] for f in fields if f.get("group") == "Title page"]
++        assert set(grouped) == {"screenplay_title", "credit", "author", "contact", "draft_date", "draft"}
++        keys = [f["key"] for f in fields]
++        assert keys[-len(grouped):] == grouped or set(keys[-len(grouped):]) == set(grouped)
++
++    def test_loads_whatever_id_is_given(self, project):
++        a = me.load_entity(project, "project", "demo")
++        b = me.load_entity(project, "project", "anything")
++        assert a["id"] == b["id"] == "demo" and a["values"]["name"] == "Demo"
++
++    def test_edit(self, project):
++        cur = me.load_entity(project, "project", "demo")
++        out = me.edit_form_entity(project, "project", "demo", {
++            "base_version": cur["version"],
++            "values": {**cur["values"], "genre": "Sci-fi", "author": "Me", "act_count": 4,
++                       "structure_type": "Classical", "status": "active"},
++            "sections": {"Premise": "What if…"}})
++        v = out["values"]
++        assert (v["genre"], v["author"], v["act_count"]) == ("Sci-fi", "Me", 4)
++        assert out["sections"]["Premise"] == "What if…"
++
++    @pytest.mark.parametrize("bad,msg", [(0, "at least 1"), ("many", "number"), (2.5, "whole number")])
++    def test_act_count_is_validated(self, project, bad, msg):
++        cur = me.load_entity(project, "project", "demo")
++        with pytest.raises(me.EntityInvalid) as e:
++            me.edit_form_entity(project, "project", "demo", {
++                "base_version": cur["version"], "values": {**cur["values"], "act_count": bad}})
++        assert msg in e.value.errors["act_count"]
++
++    def test_lowering_below_existing_acts_warns(self, project):
++        for i in (1, 2, 3):
++            create_entity(project, "act", f"a{i}", {"title": f"Act {i}"})
++        chk = me.check_entity(project, "project", {"values": {"name": "Demo", "act_count": 2}}, "demo")
++        assert chk["ok"] and "3 acts" in chk["warnings"]["act_count"]
++
++    def test_bad_structure_is_refused(self, project):
++        cur = me.load_entity(project, "project", "demo")
++        with pytest.raises(me.EntityInvalid) as e:
++            me.edit_form_entity(project, "project", "demo", {
++                "base_version": cur["version"], "values": {**cur["values"], "structure_type": "Epic"}})
++        assert "Classical" in e.value.errors["structure_type"]
++
++    def test_cannot_be_created_or_deleted_here(self, project):
++        with pytest.raises(me.EntityInvalid):
++            me.create_form_entity(project, "project", {"values": {"name": "Second"}})
++        with pytest.raises(me.EntityInvalid):
++            me.delete_preview(project, "project", "demo")
++        with pytest.raises(me.EntityInvalid):
++            me.delete_form_entity(project, "project", "demo")
++        assert me.load_entity(project, "project", "demo")["values"]["name"] == "Demo"
++
++    def test_value_focus_is_shown_not_written(self, project):
++        cur = me.load_entity(project, "project", "demo")
++        assert "value_focus" in cur["computed"]
++        out = me.edit_form_entity(project, "project", "demo", {
++            "base_version": cur["version"], "values": {**cur["values"], "value_focus": [{"x": 1}], "genre": "g"}})
++        assert out["values"]["genre"] == "g"
++
++
++# ─── over HTTP ───────────────────────────────────────────────────────────────
++
++class TestHttp:
++    @pytest.fixture
++    def client(self, tmp_path, monkeypatch):
++        from fastapi.testclient import TestClient
++        from story_architect.app.config import Config
++        from story_architect.app.server import create_app
++        from story_architect.core.writes import create_project
++        monkeypatch.setattr("story_architect.app.token.load_api_key", lambda: "k")
++        root = tmp_path / "root"
++        (root / "projects").mkdir(parents=True)
++        create_project("demo", {"name": "Demo"}, root)
++        proj = root / "projects" / "demo"
++        for s, n in (("kael", "Kael"), ("mira", "Mira")):
++            create_entity(proj, "character", s, {"name": n, "one_sentence": "x"})
++        c = TestClient(create_app(Config(root=root, port=8731)), base_url="http://127.0.0.1:8731")
++        c.headers.update({"X-Story-Architect": "1"})
++        return c
++
++    def test_spec_exposes_the_new_types(self, client):
++        t = client.get("/api/projects/demo/form-spec").json()["types"]
++        assert {"plot", "relationship", "project"} <= set(t)
++        assert t["project"]["singleton"] and t["relationship"]["auto_name"]["join"] == " & "
++
++    def test_relationship_round_trip(self, client):
++        r = client.post("/api/projects/demo/entities/relationship", json={"values": REL})
++        assert r.status_code == 200 and r.json()["id"] == "kael-mira"
++        r = client.post("/api/projects/demo/entities/relationship",
++                        json={"values": {"name": "X", "characters": ["kael", "kael"]}})
++        assert r.status_code == 422 and r.json()["error"]["errors"]["characters"] == "Pick two different characters."
++        assert client.delete("/api/projects/demo/entities/relationship/kael-mira").status_code == 200
++
++    def test_project_edit_and_refusals(self, client):
++        d = client.get("/api/projects/demo/entities/project/demo/form").json()
++        r = client.put("/api/projects/demo/entities/project/demo",
++                       json={"base_version": d["version"], "values": {**d["values"], "genre": "Noir"}})
++        assert r.status_code == 200 and r.json()["values"]["genre"] == "Noir"
++        assert client.delete("/api/projects/demo/entities/project/demo").status_code == 422
++        assert client.post("/api/projects/demo/entities/project", json={"values": {"name": "B"}}).status_code == 422

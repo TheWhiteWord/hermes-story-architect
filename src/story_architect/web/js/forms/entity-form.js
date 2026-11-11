@@ -3,7 +3,8 @@
 // One renderer for every type. The server describes each type as a form spec
 // (`/form-spec`, built from ENTITY_SCHEMAS), so a field added to the schema
 // appears here with no change to this file. Nothing here knows what a
-// "character" is; it knows kinds: text, textarea, select, ref, list, computed.
+// "character" is; it knows kinds: text, textarea, select, ref, reflist, list,
+// perspectives (a card per chosen entity), computed.
 //
 //   DASH.openEntityForm({ type, id?, values? })   id => edit, no id => create
 //
@@ -20,8 +21,9 @@ window.DASH = window.DASH || {};
   const clone = (v) => JSON.parse(JSON.stringify(v));
   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const slugFromHash = () => { const m = (location.hash || '').match(/^#\/p\/([^/?]+)/); return m ? decodeURIComponent(m[1]) : null; };
-  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values' };
-  const PANEL_TYPES = ['character', 'location', 'world'];
+  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values', scene: 'scenes' };
+  const PANEL_TYPES = ['character', 'location', 'world', 'plot', 'relationship'];
+  const blankPersp = () => ({ label: '', feeling: '', type: '', strength: '', secret: false });
 
   let specs = null, rootEl = null, toastTimer = 0, menuEl = null;
   const S = { open: false };
@@ -49,15 +51,25 @@ window.DASH = window.DASH || {};
   }
 
   // ─── Values: normalise, diff, dirty ──────────────────────────────────────
-  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'unsupported' && f.kind !== 'reflist');
+  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'unsupported');
   const nameKey = () => S.spec.name_key;
+  // A field with `show_if` only exists while its condition holds; hidden, it counts as its default.
+  const visible = (f) => !f.show_if || Object.keys(f.show_if).every((k) => S.values[k] === f.show_if[k]);
+  const dependedOn = (key) => S.spec.fields.some((g) => g.show_if && key in g.show_if);
 
   function norm(values) {
     const out = {};
     editable().forEach((f) => {
       let v = values[f.key];
-      if (f.kind === 'list') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
-      else if (typeof v === 'string') v = v.trim();
+      if (f.show_if && !Object.keys(f.show_if).every((k) => values[k] === f.show_if[k])) v = clone(f.default);
+      else if (f.kind === 'list' || f.kind === 'reflist') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
+      else if (f.kind === 'perspectives') {
+        const o = {};
+        Object.keys(v || {}).forEach((id) => { const p = v[id] || {}; o[id] = {
+          label: String(p.label || '').trim(), feeling: String(p.feeling || '').trim(), type: String(p.type || '').trim(),
+          strength: p.strength === '' || p.strength == null ? '' : Number(p.strength), secret: !!p.secret }; });
+        v = o;
+      } else if (typeof v === 'string') v = v.trim();
       out[f.key] = v;
     });
     return out;
@@ -72,7 +84,7 @@ window.DASH = window.DASH || {};
     const values = {};
     spec.fields.forEach((f) => {
       if (f.kind === 'computed' || f.kind === 'unsupported') return;
-      values[f.key] = f.kind === 'list' || f.kind === 'reflist' ? [] : f.kind === 'toggle' ? false : '';
+      values[f.key] = clone(f.default);
     });
     Object.assign(values, prefill || {});
     const sections = {}; spec.sections.forEach((n) => { sections[n] = ''; });
@@ -101,7 +113,7 @@ window.DASH = window.DASH || {};
       open: true, mode: opts.id ? 'edit' : 'create', type: opts.type, id: opts.id || null, spec,
       orig, base: clone(orig), values: clone(orig.values), sections: clone(orig.sections),
       tab: 'fields', step: 'form', discard: false, busy: false, conflict: false, preview: null,
-      errors: {}, warnings: {}, newId: null, touched: new Set(), submitted: false, seq: 0, timer: 0,
+      errors: {}, warnings: {}, newId: null, touched: new Set(), nameTyped: false, submitted: false, seq: 0, timer: 0,
       trigger: document.activeElement,
     });
     render(); focusFirst();
@@ -124,7 +136,7 @@ window.DASH = window.DASH || {};
   function render() {
     const kind = S.spec.label;
     rootEl.classList.add('open');
-    rootEl.innerHTML = `<div class="ef-card" role="dialog" aria-modal="true" aria-label="${h(kind)}">
+    rootEl.innerHTML = `<div class="ef-card" role="dialog" aria-modal="true" aria-label="${h(kind)}" tabindex="-1">
       <div class="ef-head">
         <div class="ef-titles">
           <div class="ef-kicker">${h(kind)} · ${S.mode === 'edit' ? 'Editing' : 'New'}</div>
@@ -138,6 +150,7 @@ window.DASH = window.DASH || {};
       <div class="ef-foot" id="ef-foot"></div>
     </div>`;
     renderBody(); syncFooter(); paintHeader();
+    if (!rootEl.contains(document.activeElement)) rootEl.querySelector('.ef-card').focus();   // keep focus inside
   }
 
   function tabsHtml() {
@@ -157,34 +170,47 @@ window.DASH = window.DASH || {};
   }
 
   function fieldsHtml() {
-    const normal = S.spec.fields.filter((f) => f.kind !== 'computed').map(fieldHtml).join('');
-    const derived = S.mode === 'edit' ? S.spec.fields.filter((f) => f.kind === 'computed').map(derivedHtml).join('') : '';
-    return normal + (derived ? `<div class="ef-derived">${derived}</div>` : '');
+    let last = null, html = '';
+    S.spec.fields.filter((f) => f.kind !== 'computed' && visible(f)).forEach((f) => {
+      if ((f.group || null) !== last) { last = f.group || null; if (last) html += `<h3 class="ef-group">${h(last)}</h3>`; }
+      html += fieldHtml(f);
+    });
+    const derived = S.mode === 'edit' ? derivedBlock() : '';
+    return html + (derived ? `<div class="ef-derived">${derived}</div>` : '');
   }
 
   function fieldHtml(f) {
     const locked = S.mode === 'edit' && f.locked_on_edit;
     const note = locked ? f.locked_on_edit : f.help;
+    const err = `<div class="ef-msg" data-msg="${h(f.key)}"></div>`;
+    if (f.kind === 'perspectives') return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>${perspectivesHtml(f)}${err}</div>`;
     return `<div class="ef-field">
       <label class="ef-label" for="ef-f-${h(f.key)}">${h(f.label)}${f.required ? '<abbr class="ef-req" title="Required">*</abbr>' : ''}</label>
       ${widget(f, locked)}
-      ${note ? `<div class="ef-help">${h(note)}</div>` : ''}
-      <div class="ef-msg" data-msg="${h(f.key)}"></div></div>`;
+      ${note ? `<div class="ef-help">${h(note)}</div>` : ''}${err}</div>`;
   }
 
   function widget(f, locked) {
     const v = S.values[f.key], id = `id="ef-f-${h(f.key)}" data-key="${h(f.key)}"`;
     switch (f.kind) {
       case 'text': return `<input class="ef-input" ${id} value="${h(v)}" autocomplete="off"${locked ? ' disabled' : ''}>`;
-      case 'number': return `<input class="ef-input" type="number" ${id} value="${h(v)}">`;
+      case 'number': return `<input class="ef-input" type="number" ${id} value="${h(v)}"${numAttrs(f)}>`;
       case 'textarea': return `<textarea class="ef-input" ${id} rows="2">${h(v)}</textarea>`;
-      case 'toggle': return `<input type="checkbox" ${id}${v ? ' checked' : ''}>`;
-      case 'select':
-        return `<select class="ef-input" ${id}><option value="">—</option>${f.options.map((o) => `<option${o === v ? ' selected' : ''}>${h(o)}</option>`).join('')}</select>`;
+      case 'toggle': return `<label class="ef-check"><input type="checkbox" ${id}${v ? ' checked' : ''}> <span>${h(f.label)}</span></label>`;
+      case 'select': return selectHtml(f, id, v);
       case 'ref': return refSelect(f, id, v);
+      case 'reflist': return refListWidget(f, v || []);
       case 'list': return listWidget(f, v || []);
       default: return `<div class="ef-note">Not editable here yet — ask the agent.</div>`;
     }
+  }
+
+  const numAttrs = (f) => ['min', 'max', 'step'].filter((k) => f[k] != null).map((k) => ` ${k}="${f[k]}"`).join('') + (f.integer ? ' step="1"' : '');
+
+  function selectHtml(f, attrs, v) {
+    const stray = v && !f.options.includes(v) ? `<option selected>${h(v)}</option>` : '';     // keep a stored value we don't list
+    return `<select class="ef-input" ${attrs}>${f.allow_blank ? '<option value="">—</option>' : ''}${stray}
+      ${f.options.map((o) => `<option${o === v ? ' selected' : ''}>${h(o)}</option>`).join('')}</select>`;
   }
 
   // A picker over entities that exist, so a link can't point at nothing.
@@ -197,6 +223,49 @@ window.DASH = window.DASH || {};
       ${all.map((e) => `<option value="${h(e.id)}"${e.id === v ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('')}</select>`;
   }
 
+  const entityName = (type, id) => refName(type, id);
+  function entityOptions(type, chosen, current) {
+    const all = ((D.story || {})[LISTS[type]] || []).filter((e) => e.id === current || !chosen.includes(e.id));
+    all.sort((a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title)));
+    const known = all.some((e) => e.id === current);
+    return `<option value="">— choose —</option>${current && !known ? `<option value="${h(current)}" selected>${h(current)} (missing)</option>` : ''}`
+      + all.map((e) => `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('');
+  }
+
+  // Several entities of one kind. `count` fixes the number of slots (a relationship's two characters);
+  // otherwise rows grow and shrink. A character already picked in one slot is not offered in another.
+  function refListWidget(f, items) {
+    const rows = f.count ? Array.from({ length: f.count }, (_, i) => items[i] || '') : items;
+    const chosen = rows.filter(Boolean);
+    return `<div class="ef-list">${rows.map((cur, i) => `<div class="ef-row">
+        <select class="ef-input" id="ef-f-${h(f.key)}-${i}" data-ref="${h(f.key)}" data-i="${i}" aria-label="${h((f.row_labels || [])[i] || f.label)}">${entityOptions(f.ref, chosen, cur)}</select>
+        ${f.count ? '' : `<button class="ef-rm" data-act="ref-del" data-key="${h(f.key)}" data-i="${i}" aria-label="Remove" title="Remove">×</button>`}</div>
+        ${f.count && (f.row_labels || [])[i] ? `<div class="ef-note ef-rowlabel">${h(f.row_labels[i])}</div>` : ''}`).join('')}
+      ${f.count ? '' : `<button class="ef-add" data-act="ref-add" data-key="${h(f.key)}">+ ${h(f.add_label || 'Add')}</button>`}</div>`;
+  }
+
+  // One card per chosen entity — they appear only once that entity is picked.
+  function perspectivesHtml(f) {
+    const ids = (S.values[f.keyed_by] || []).filter(Boolean), cards = S.values[f.key] || {};
+    if (!ids.length) return '<div class="ef-note">Pick the characters first — each gets a card here.</div>';
+    return ids.map((cid) => {
+      const other = ids.length === 2 ? ids.find((x) => x !== cid) : null;
+      const title = other ? `How ${entityName(f.ref, cid)} sees ${entityName(f.ref, other)}` : entityName(f.ref, cid);
+      const p = cards[cid] || blankPersp();
+      const sub = f.fields.map((sf) => {
+        const path = `${f.key}.${cid}.${sf.key}`, at = `data-pc="${h(cid)}" data-pf="${h(sf.key)}" data-path="${h(path)}" id="ef-p-${h(cid)}-${h(sf.key)}"`;
+        let w;
+        if (sf.kind === 'select') w = selectHtml(sf, at, p[sf.key]);
+        else if (sf.kind === 'number') w = `<input class="ef-input" type="number" ${at} value="${h(p[sf.key])}"${numAttrs(sf)}>`;
+        else if (sf.kind === 'toggle') w = `<label class="ef-check"><input type="checkbox" ${at}${p[sf.key] ? ' checked' : ''}> <span>${h(sf.label)}</span></label>`;
+        else w = `<input class="ef-input" ${at} value="${h(p[sf.key])}" autocomplete="off">`;
+        return `<div class="ef-field${sf.kind === 'toggle' ? ' ef-wide' : ''}">${sf.kind === 'toggle' ? '' : `<label class="ef-label" for="ef-p-${h(cid)}-${h(sf.key)}">${h(sf.label)}</label>`}${w}
+          ${sf.help ? `<div class="ef-help">${h(sf.help)}</div>` : ''}<div class="ef-msg" data-msg="${h(path)}"></div></div>`;
+      }).join('');
+      return `<div class="ef-sub-card"><div class="ef-sub-card-h">${h(title)}</div><div class="ef-grid">${sub}</div></div>`;
+    }).join('');
+  }
+
   function listWidget(f, items) {
     return `<div class="ef-list">${items.map((it, i) => `<div class="ef-row">
         <input class="ef-input" data-list="${h(f.key)}" data-i="${i}" value="${h(it)}" autocomplete="off">
@@ -204,11 +273,24 @@ window.DASH = window.DASH || {};
       <button class="ef-add" data-act="list-add" data-key="${h(f.key)}">+ Add</button></div>`;
   }
 
-  function derivedHtml(f) {
-    const rows = (S.orig.computed || {})[f.key] || [];
-    return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
-      <div class="ef-ro${rows.length ? '' : ' none'}">${rows.length ? rows.map((r) => `<div>${h(r.display)}</div>`).join('') : 'None yet'}</div>
+  // Derived fields: shown when they have something to show. Several empty ones collapse into
+  // a single line, so a new plot doesn't open with seven "None yet".
+  function derivedBlock() {
+    const fs = S.spec.fields.filter((f) => f.kind === 'computed');
+    const rowsOf = (f) => (S.orig.computed || {})[f.key] || [];
+    const full = fs.filter((f) => rowsOf(f).length), empty = fs.filter((f) => !rowsOf(f).length);
+    const one = (f) => `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
+      <div class="ef-ro${rowsOf(f).length ? '' : ' none'}">${rowsOf(f).length ? rowsOf(f).map((r) => `<div>${h(r.display)}</div>`).join('') : 'None yet'}</div>
       ${f.hint ? `<div class="ef-note">${h(f.hint)}</div>` : ''}</div>`;
+    let html = full.map(one).join('');
+    if (empty.length === 1 && !full.length) html = one(empty[0]);
+    else if (empty.length) {
+      const hints = [...new Set(empty.map((f) => f.hint).filter(Boolean))];
+      html += `<div class="ef-field"><div class="ef-label">Not used yet</div>
+        <div class="ef-ro none">${empty.map((f) => h(f.label)).join(' · ')}</div>
+        ${hints.length === 1 ? `<div class="ef-note">${h(hints[0])}</div>` : ''}</div>`;
+    }
+    return html;
   }
 
   function sectionsHtml() {
@@ -235,10 +317,13 @@ window.DASH = window.DASH || {};
     const a = norm(S.orig.values), b = norm(S.values), rows = [];
     changedFields().forEach((f) => {
       let was, now;
-      if (f.kind === 'list') {
-        const x = a[f.key] || [], y = b[f.key] || [];
-        was = x.length ? x.map((i) => y.includes(i) ? h(i) : `<span class="del">${h(i)}</span>`).join('<br>') : '—';
-        now = y.length ? y.map((i) => x.includes(i) ? h(i) : `<span class="add">${h(i)}</span>`).join('<br>') : '—';
+      if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
+      else if (f.kind === 'list' || f.kind === 'reflist') {
+        const nm = f.kind === 'reflist' ? (i) => refName(f.ref, i) : (i) => i;
+        const x = (a[f.key] || []).map((i) => [i, nm(i)]), y = (b[f.key] || []).map((i) => [i, nm(i)]);
+        const xs = x.map((i) => i[0]), ys = y.map((i) => i[0]);
+        was = x.length ? x.map(([id, n]) => ys.includes(id) ? h(n) : `<span class="del">${h(n)}</span>`).join('<br>') : '—';
+        now = y.length ? y.map(([id, n]) => xs.includes(id) ? h(n) : `<span class="add">${h(n)}</span>`).join('<br>') : '—';
       } else { was = h(fmtScalar(f, a[f.key])); now = h(fmtScalar(f, b[f.key])); }
       rows.push(diff(f.label, was, now));
     });
@@ -247,6 +332,22 @@ window.DASH = window.DASH || {};
       ? `<div class="ef-banner info on">This was changed since you opened it — probably by the agent.
          <button class="btn" data-act="rebase">Apply my edits on top of the latest</button></div>` : '';
     return `${banner}<div class="ef-sub">Check what will change in “${h(S.values[nameKey()] || S.id)}”.</div>${rows.join('') || '<div class="ef-sub">Nothing changed.</div>'}`;
+  }
+  // Only the card fields that changed, one line each, "Kael · Label: Friend".
+  function persDiff(f, before, after) {
+    const was = [], now = [];
+    Object.keys(Object.assign({}, before, after)).forEach((cid) => {
+      const x = before[cid], y = after[cid], who = entityName(f.ref, cid);
+      f.fields.forEach((sf) => {
+        const xv = x ? x[sf.key] : '', yv = y ? y[sf.key] : '';
+        if (eq(xv, yv)) return;
+        const show = (v) => sf.kind === 'toggle' ? (v ? 'yes' : 'no') : (v === '' || v == null ? '—' : String(v));
+        const lab = sf.kind === 'toggle' ? 'Hidden' : sf.label;
+        was.push(x ? `${h(who)} · ${h(lab)}: ${h(show(xv))}` : '—');
+        now.push(y ? `<span class="add">${h(who)} · ${h(lab)}: ${h(show(yv))}</span>` : `<span class="del">${h(who)} removed</span>`);
+      });
+    });
+    return [was.join('<br>') || '—', now.join('<br>') || '—'];
   }
   const diff = (label, was, now) => `<div class="ef-diff"><div class="ef-diff-h">${h(label)}</div>
     <div class="ef-diff-b"><div class="was">${was}</div><div class="now">${now}</div></div></div>`;
@@ -281,7 +382,7 @@ window.DASH = window.DASH || {};
         <button class="btn btn-danger" data-act="confirm-delete"${!p || !p.can_delete || S.busy ? ' disabled' : ''}>${S.busy ? 'Deleting…' : 'Delete'}</button>`;
     }
     const edit = S.mode === 'edit';
-    return `${edit ? '<button class="btn btn-danger btn-ghost" data-act="ask-delete">Delete…</button>' : ''}<div class="grow"></div>
+    return `${edit && !S.spec.singleton ? '<button class="btn btn-danger btn-ghost" data-act="ask-delete">Delete…</button>' : ''}<div class="grow"></div>
       <button class="btn" data-act="close">Cancel</button>
       <button class="btn btn-primary" data-act="save"${S.busy || (edit && !isDirty()) ? ' disabled' : ''}>${edit ? 'Review changes' : 'Create'}</button>`;
   }
@@ -295,15 +396,14 @@ window.DASH = window.DASH || {};
     i.textContent = S.mode === 'edit' ? 'id: ' + S.id : (S.newId && v ? 'id: ' + S.newId : '');
   }
 
-  // Messages show for a field once it's been touched, or after a save attempt.
+  // Errors show for a field once it's been touched, or after a save attempt; warnings always do.
   function paintMessages() {
     const show = (k) => S.submitted || S.touched.has(k);
     document.querySelectorAll('#ef-body [data-msg]').forEach((el) => {
-      const k = el.dataset.msg, err = show(k) && S.errors[k], warn = show(k) && !err && S.warnings[k];
+      const k = el.dataset.msg, err = show(k) && S.errors[k], warn = !err && S.warnings[k];   // a warning is worth seeing at once
       el.textContent = err || warn || '';
       el.className = 'ef-msg' + (err ? ' err' : warn ? ' warn' : '');
-      const input = el.parentElement.querySelector('.ef-input');
-      if (input) input.classList.toggle('ef-invalid', !!err);
+      el.parentElement.querySelectorAll('.ef-input').forEach((i) => i.classList.toggle('ef-invalid', !!err));
     });
     const b = document.getElementById('ef-banner');
     if (b) { const m = S.errors._form; b.textContent = m || ''; b.className = 'ef-banner' + (m ? ' on' : ''); }
@@ -315,7 +415,8 @@ window.DASH = window.DASH || {};
     const key = Object.keys(S.errors).find((k) => k !== '_form');
     if (key && S.tab !== 'fields') { S.tab = 'fields'; render(); }
     else if (S.step !== 'form') { S.step = 'form'; render(); }
-    const el = key && document.querySelector(`[data-key="${CSS.escape(key)}"]`);
+    const k = key && CSS.escape(key);
+    const el = key && document.querySelector(`[data-key="${k}"],[data-path="${k}"],[data-ref="${k}"]`);
     if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); }
   }
 
@@ -412,11 +513,16 @@ window.DASH = window.DASH || {};
     } finally { S.busy = false; syncFooter(); }
   }
 
+  function reopenPanel(type, id) {
+    if (type === 'plot' && D.showPlotPanel) D.showPlotPanel(id);
+    else if (PANEL_TYPES.includes(type) && D.panelTabs) D.panelTabs.openEntity(type + ':' + id);
+  }
+
   async function finish(res, verb) {
     const type = S.type, name = res.values[nameKey()] || res.id;
     close();
     if (D.reloadData) await D.reloadData(); else location.reload();
-    if (PANEL_TYPES.includes(type) && D.panelTabs) D.panelTabs.openEntity(type + ':' + res.id);
+    reopenPanel(type, res.id);
     toast(`${verb} “${name}”`);
   }
 
@@ -437,6 +543,13 @@ window.DASH = window.DASH || {};
         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
       }
+      case 'ref-add': {
+        const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
+        renderBody(); const rows = document.querySelectorAll(`[data-ref="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
+      }
+      case 'ref-del': {
+        S.values[el.dataset.key].splice(+el.dataset.i, 1); syncPersp(); renderBody(); afterEdit(); break;
+      }
       case 'list-del': {
         S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
       }
@@ -445,22 +558,51 @@ window.DASH = window.DASH || {};
 
   function afterEdit() { scheduleCheck(); syncFooter(); paintHeader(); }
 
+  const field = (key) => S.spec.fields.find((f) => f.key === key);
+  const persField = () => S.spec.fields.find((f) => f.kind === 'perspectives');
+
+  // Keep exactly one card per chosen entity: new picks get a blank card, dropped ones lose theirs.
+  function syncPersp() {
+    const f = persField(); if (!f) return;
+    const ids = (S.values[f.keyed_by] || []).filter(Boolean), cur = S.values[f.key] || {}, next = {};
+    ids.forEach((id) => { next[id] = cur[id] || blankPersp(); });
+    S.values[f.key] = next;
+  }
+
+  // A relationship is usually named for its two people; fill it in until the person writes their own.
+  function autoName() {
+    const a = S.spec.auto_name; if (!a || S.mode !== 'create' || S.nameTyped) return;   // typed, not merely visited
+    const f = field(a.from), ids = (S.values[a.from] || []).filter(Boolean);
+    S.values[nameKey()] = ids.length && ids.length === (f.count || ids.length) ? ids.map((id) => entityName(f.ref, id)).join(a.join) : '';
+  }
+
   function onInput(e) {
-    const el = e.target;
-    if (el.dataset.key != null) {
-      S.values[el.dataset.key] = el.type === 'checkbox' ? el.checked : el.value;
-      S.touched.add(el.dataset.key);
-    } else if (el.dataset.list != null) {
-      S.values[el.dataset.list][+el.dataset.i] = el.value; S.touched.add(el.dataset.list);
-    } else if (el.dataset.section != null) {
-      S.sections[el.dataset.section] = el.value;
+    const el = e.target, d = el.dataset;
+    let rerender = false;
+    if (d.key != null) {
+      S.values[d.key] = el.type === 'checkbox' ? el.checked : el.value;
+      S.touched.add(d.key); rerender = dependedOn(d.key);
+      if (d.key === nameKey()) S.nameTyped = true;
+    } else if (d.ref != null) {
+      const arr = S.values[d.ref] = S.values[d.ref] || [];
+      while (arr.length <= +d.i) arr.push('');
+      arr[+d.i] = el.value; S.touched.add(d.ref);
+      syncPersp(); autoName(); rerender = true;              // the other slot's choices and the cards depend on this
+    } else if (d.pc != null) {
+      const f = persField(), cards = S.values[f.key] = S.values[f.key] || {};
+      (cards[d.pc] = cards[d.pc] || blankPersp())[d.pf] = el.type === 'checkbox' ? el.checked : el.value;
+      S.touched.add(d.path);
+    } else if (d.list != null) {
+      S.values[d.list][+d.i] = el.value; S.touched.add(d.list);
+    } else if (d.section != null) {
+      S.sections[d.section] = el.value;
     } else return;
     if (el.tagName === 'TEXTAREA') autosize(el);
+    if (rerender) { const id = el.id; renderBody(); const n = id && document.getElementById(id); if (n) n.focus(); }
     afterEdit();
   }
 
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); requestClose(); return; }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); const b = rootEl.querySelector('.ef-foot .btn-primary:not([disabled])'); if (b) b.click(); return; }
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.list != null) {
       e.preventDefault();
@@ -496,10 +638,14 @@ window.DASH = window.DASH || {};
       };
     };
     wrap('showCharacterPanel', 'character'); wrap('showLocationPanel', 'location'); wrap('showWorldPanel', 'world');
+    wrap('showPlotPanel', 'plot'); wrap('showRelationshipPanel', 'relationship');
     const open = D.openPanel, close_ = D.closePanel;
     D.openPanel = function () { const r = open.apply(this, arguments); D._formTarget = D._pendingFormTarget || null; syncEditButton(); return r; };
     D.closePanel = function () { D._formTarget = null; syncEditButton(); return close_.apply(this, arguments); };
   }
+
+  // The project is one record that always exists; the server finds it whatever id we name.
+  D.openProjectForm = function () { D.openEntityForm({ type: 'project', id: slugFromHash() }); };
 
   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
 
@@ -534,10 +680,14 @@ window.DASH = window.DASH || {};
     });
     rootEl.addEventListener('input', onInput);
     rootEl.addEventListener('focusout', (e) => {
-      const k = e.target.dataset && (e.target.dataset.key || e.target.dataset.list);
+      const k = e.target.dataset && (e.target.dataset.key || e.target.dataset.list || e.target.dataset.path || e.target.dataset.ref);
       if (k && S.open) { S.touched.add(k); paintMessages(); }
     });
     rootEl.addEventListener('keydown', onKey);
+    // Escape must work wherever focus is — a re-render can drop it onto the page behind.
+    document.addEventListener('keydown', (e) => {
+      if (S.open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); requestClose(); }
+    }, true);
     wrapPanels();
     const edit = document.getElementById('panel-edit');
     if (edit) edit.addEventListener('click', () => { if (D._formTarget) D.openEntityForm(D._formTarget); });

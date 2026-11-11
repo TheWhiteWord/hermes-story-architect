@@ -137,3 +137,17 @@ textarea.ef-input { resize: none; min-height: 34px; overflow: hidden; }
 .ef-menu button:hover { background: var(--card); }
 .ef-menu small { color: var(--muted-foreground); font-size: var(--font-size-xs); }
 .ef-menu .new { color: var(--accent); border-top: 1px solid var(--border); border-radius: 0 0 4px 4px; margin-top: 4px; padding-top: 7px; }
+
+/* ─── phase 2: groups, cards, pickers ─────────────────────────────────── */
+.ef-group { margin: 6px 0 -4px; padding-top: 12px; border-top: 1px solid var(--border); font-size: var(--font-size-xs);
+  letter-spacing: .08em; text-transform: uppercase; font-weight: 500; color: var(--muted-foreground); }
+.ef-check { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-sm); cursor: pointer; }
+.ef-check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+.ef-sub-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 12px;
+  background: color-mix(in srgb, var(--foreground) 2.5%, transparent); }
+.ef-sub-card + .ef-sub-card { margin-top: 10px; }
+.ef-sub-card-h { font-size: var(--font-size-sm); font-weight: 500; margin-bottom: 8px; color: var(--accent); }
+.ef-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.ef-grid .ef-wide { grid-column: 1 / -1; }
+.ef-rowlabel { margin: -3px 0 2px 2px; }
+@media (max-width: 560px) { .ef-grid { grid-template-columns: 1fr; } }

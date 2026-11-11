@@ -179,6 +179,9 @@
       <div class="view-header">
         <div class="view-title" id="story-project-name">Story</div>
         <div class="view-subtitle" id="story-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openProjectForm()" title="Edit title, genre, structure and title page">Edit project</button>
+        </div>
       </div>
       <div class="view-body" id="story-body"></div>
     </div>
@@ -240,6 +243,9 @@
       <div class="view-header">
         <div class="view-title">Plots</div>
         <div class="view-subtitle" id="plots-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'plot'})" title="Add a plot">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="plot-list"></div>
@@ -253,6 +259,9 @@
       <div class="view-header">
         <div class="view-title">Relationships</div>
         <div class="view-subtitle" id="relationships-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'relationship'})" title="Add a relationship">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="relationship-list"></div>
