@@ -1,0 +1,153 @@
+/* ─── Entity form overlay ─────────────────────────────────────────────────
+   Same family as the Memory dialog: its backdrop, surface, border and radius.
+   Only theme tokens are used, so it follows the host. */
+
+.ef-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 40;
+  align-items: center; justify-content: center; padding: 16px;
+  background: color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+.ef-backdrop.open { display: flex; }
+
+.ef-card {
+  width: min(660px, 100%); height: min(740px, 92vh);
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--panel-bg); color: var(--foreground);
+  box-shadow: 0 16px 48px color-mix(in srgb, #000 45%, transparent);
+}
+
+/* header */
+.ef-head { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px 10px; flex-shrink: 0; }
+.ef-titles { flex: 1; min-width: 0; }
+.ef-kicker { font-size: var(--font-size-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
+.ef-name { font-size: var(--font-size-lg); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ef-name.empty { color: var(--muted-foreground); font-weight: 400; }
+.ef-id { font-size: var(--font-size-xs); color: var(--muted-foreground); margin-top: 1px; min-height: 15px; }
+.ef-x-close { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted-foreground);
+  width: 24px; height: 24px; line-height: 1; cursor: pointer; font-size: 14px; }
+.ef-x-close:hover { color: var(--foreground); }
+
+/* tabs */
+.ef-tabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.ef-tab { position: relative; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 7px 10px; font: inherit; font-size: var(--font-size-sm); color: var(--muted-foreground); cursor: pointer; }
+.ef-tab:hover { color: var(--foreground); }
+.ef-tab.active { color: var(--foreground); border-bottom-color: var(--accent); }
+.ef-tab small { color: var(--muted-foreground); margin-left: 4px; font-size: var(--font-size-xs); }
+.ef-tab .ef-dot { display: none; width: 6px; height: 6px; border-radius: 50%; background: var(--role-antagonist);
+  position: absolute; top: 7px; right: 1px; }
+.ef-tab .ef-dot.on { display: block; }
+
+/* body */
+.ef-body { flex: 1; overflow-y: auto; padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.ef-field { display: flex; flex-direction: column; gap: 4px; }
+.ef-label { font-size: var(--font-size-sm); font-weight: 500; }
+.ef-req { color: var(--accent); text-decoration: none; margin-left: 3px; }
+.ef-help { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+
+.ef-input {
+  width: 100%; font: inherit; font-size: var(--font-size-base); color: var(--foreground);
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 6px 8px; line-height: 1.45;
+}
+.ef-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
+.ef-input:disabled { opacity: .6; cursor: not-allowed; }
+.ef-input.ef-invalid { border-color: var(--role-antagonist); }
+select.ef-input { appearance: auto; }
+textarea.ef-input { resize: none; min-height: 34px; overflow: hidden; }
+.ef-area { min-height: 84px; }
+
+.ef-msg { font-size: var(--font-size-xs); min-height: 0; }
+.ef-msg.err { color: var(--role-antagonist); }
+.ef-msg.warn { color: var(--c-gap); }
+
+.ef-banner { display: none; padding: 7px 10px; border-radius: var(--radius); font-size: var(--font-size-sm);
+  border: 1px solid color-mix(in srgb, var(--role-antagonist) 45%, transparent);
+  background: color-mix(in srgb, var(--role-antagonist) 10%, transparent); }
+.ef-banner.on { display: block; }
+.ef-banner.info { border-color: color-mix(in srgb, var(--c-gap) 45%, transparent); background: color-mix(in srgb, var(--c-gap) 10%, transparent); }
+.ef-banner button { margin-left: 8px; }
+
+/* list of strings */
+.ef-list { display: flex; flex-direction: column; gap: 5px; }
+.ef-row { display: flex; gap: 5px; }
+.ef-row .ef-input { flex: 1; }
+.ef-rm { width: 26px; flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--muted-foreground); cursor: pointer; font-size: 14px; line-height: 1; }
+.ef-rm:hover { color: var(--role-antagonist); border-color: var(--role-antagonist); }
+.ef-add { align-self: flex-start; background: none; border: 1px dashed var(--border); border-radius: var(--radius);
+  color: var(--muted-foreground); font: inherit; font-size: var(--font-size-xs); padding: 3px 10px; cursor: pointer; }
+.ef-add:hover { color: var(--accent); border-color: var(--accent); }
+
+/* derived (read-only) */
+.ef-derived { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+.ef-derived .ef-label::after { content: 'derived'; margin-left: 8px; font-size: var(--font-size-xs); font-weight: 400;
+  color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 3px; padding: 0 5px; }
+.ef-ro { display: flex; flex-direction: column; gap: 3px; padding: 7px 10px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent); color: var(--muted-foreground); font-size: var(--font-size-sm); }
+.ef-ro.none { font-style: italic; }
+.ef-note { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+
+/* review / delete */
+.ef-sub { font-size: var(--font-size-sm); color: var(--muted-foreground); }
+.ef-diff { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.ef-diff-h { padding: 5px 10px; font-size: var(--font-size-sm); font-weight: 500; background: var(--card); border-bottom: 1px solid var(--border); }
+.ef-diff-b { display: grid; grid-template-columns: 1fr 1fr; }
+.ef-diff-b > div { padding: 7px 10px; font-size: var(--font-size-sm); white-space: pre-wrap; word-break: break-word; }
+.ef-diff-b .was { color: var(--muted-foreground); border-right: 1px solid var(--border); }
+.ef-diff-b .was::before, .ef-diff-b .now::before { display: block; font-size: var(--font-size-xs); letter-spacing: .08em;
+  text-transform: uppercase; margin-bottom: 2px; color: var(--muted-foreground); }
+.ef-diff-b .was::before { content: 'Before'; } .ef-diff-b .now::before { content: 'After'; }
+.ef-diff .add { color: var(--status-active); } .ef-diff .del { color: var(--role-antagonist); text-decoration: line-through; }
+
+.ef-impact { display: flex; flex-direction: column; gap: 6px; }
+.ef-impact h4 { font-size: var(--font-size-xs); letter-spacing: .08em; text-transform: uppercase; font-weight: 500; color: var(--muted-foreground); margin: 6px 0 0; }
+.ef-impact ul { margin: 0; padding-left: 18px; font-size: var(--font-size-sm); }
+.ef-impact li { margin: 3px 0; }
+.ef-impact .block li { color: var(--role-antagonist); }
+
+/* footer */
+.ef-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.ef-foot .grow { flex: 1; font-size: var(--font-size-sm); color: var(--muted-foreground); }
+.ef-foot .btn { padding: 5px 14px; font-size: var(--font-size-sm); }
+.ef-foot .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn-danger { color: var(--role-antagonist); border-color: color-mix(in srgb, var(--role-antagonist) 40%, transparent); }
+.btn-danger:hover { background: color-mix(in srgb, var(--role-antagonist) 12%, transparent); color: var(--role-antagonist); }
+.btn-ghost { background: none; border-color: transparent; }
+
+/* toast */
+.ef-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; padding: 8px 14px;
+  border-radius: var(--radius); background: var(--panel-bg); border: 1px solid var(--border); color: var(--foreground);
+  font-size: var(--font-size-sm); box-shadow: 0 8px 24px color-mix(in srgb, #000 45%, transparent); }
+.ef-toast.bad { border-color: var(--role-antagonist); }
+
+/* entry points */
+.panel-edit { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted-foreground);
+  font: inherit; font-size: var(--font-size-xs); padding: 2px 8px; cursor: pointer; flex-shrink: 0; display: none; }
+.panel-edit.on { display: inline-block; }
+.panel-edit:hover { color: var(--accent); border-color: var(--accent); }
+
+.ef-menu { position: fixed; z-index: 45; min-width: 230px; max-height: 60vh; overflow-y: auto; padding: 4px;
+  background: var(--panel-bg); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 10px 30px color-mix(in srgb, #000 45%, transparent); }
+.ef-menu button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; text-align: left; gap: 0;
+  background: none; border: none; color: var(--foreground); font: inherit; font-size: var(--font-size-sm);
+  padding: 5px 8px; border-radius: 4px; cursor: pointer; }
+.ef-menu button:hover { background: var(--card); }
+.ef-menu small { color: var(--muted-foreground); font-size: var(--font-size-xs); }
+.ef-menu .new { color: var(--accent); border-top: 1px solid var(--border); border-radius: 0 0 4px 4px; margin-top: 4px; padding-top: 7px; }
+
+/* ─── phase 2: groups, cards, pickers ─────────────────────────────────── */
+.ef-group { margin: 6px 0 -4px; padding-top: 12px; border-top: 1px solid var(--border); font-size: var(--font-size-xs);
+  letter-spacing: .08em; text-transform: uppercase; font-weight: 500; color: var(--muted-foreground); }
+.ef-check { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-sm); cursor: pointer; }
+.ef-check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+.ef-sub-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 12px;
+  background: color-mix(in srgb, var(--foreground) 2.5%, transparent); }
+.ef-sub-card + .ef-sub-card { margin-top: 10px; }
+.ef-sub-card-h { font-size: var(--font-size-sm); font-weight: 500; margin-bottom: 8px; color: var(--accent); }
+.ef-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.ef-grid .ef-wide { grid-column: 1 / -1; }
+.ef-rowlabel { margin: -3px 0 2px 2px; }
+@media (max-width: 560px) { .ef-grid { grid-template-columns: 1fr; } }

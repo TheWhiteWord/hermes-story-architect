@@ -428,7 +428,7 @@ def findings(*, scene: dict, heading: dict, heading_line: str | None,
     if not lossless:
         out.append(_finding(CRITICAL, "not_editable",
                             "This script uses Fountain the editor cannot round-trip "
-                            "without losing text, so it opens read-only. Edit it with Hermes."))
+                            "without losing text, so it opens read-only. Edit it with the harness."))
     if not heading_line:
         out.append(_finding(CRITICAL, "heading_missing",
                             "The script has no scene heading. A scene without one is "

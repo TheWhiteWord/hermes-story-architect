@@ -12,9 +12,9 @@ or location by hand): add a function here, validate, call `core.writes`. Keep
 HTTP out of it — `app/routes/scripts.py` is the thin layer over this.
 
 Concurrency: nothing in the schema is versioned, so each load hands back a
-`hash` of what the editor is looking at and a save must present it. If Hermes
-committed in between, the save is refused (`ScriptConflict`) and the person
-decides, rather than one side's work silently overwriting the other's.
+`hash` of what the editor is looking at and a save must present it. If the
+harness committed in between, the save is refused (`ScriptConflict`) and the
+person decides, rather than one side's work silently overwriting the other's.
 """
 from __future__ import annotations
 

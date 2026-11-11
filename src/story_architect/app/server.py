@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hmac
+import mimetypes
 
 from contextlib import asynccontextmanager
 
@@ -15,8 +16,13 @@ from story_architect.app.mcp_server import create_mcp_server, StreamableHTTPSess
 from story_architect.app.routes import agent as agent_routes
 from story_architect.app.routes import chat as chat_routes
 from story_architect.app.routes import drafts as drafts_routes
+from story_architect.app.routes import entities as entities_routes
 from story_architect.app.routes import projects as projects_routes
 from story_architect.app.routes import scripts as scripts_routes
+
+# Some systems have no `.webmanifest` entry in /etc/mime.types, and Chrome
+# refuses a manifest served as application/octet-stream.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 def create_app(config: Config) -> FastAPI:
@@ -77,6 +83,7 @@ def create_app(config: Config) -> FastAPI:
     app.include_router(drafts_routes.make_router(config, app))
     app.include_router(projects_routes.make_router(config, app))
     app.include_router(scripts_routes.make_router(config, app))
+    app.include_router(entities_routes.make_router(config, app))
 
     @app.get("/healthz")
     def healthz():

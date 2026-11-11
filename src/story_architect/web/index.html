@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Dashboard</title>
+<meta name="theme-color" content="#7b9cf0">
+<link rel="manifest" href="manifest.webmanifest">
 
 <!-- vis-network from CDN (MIT/Apache 2.0) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
@@ -25,6 +27,7 @@
 <link rel="stylesheet" href="css/scene-beats.css">
 <link rel="stylesheet" href="css/character-journey.css">
 <link rel="stylesheet" href="css/script-editor.css">
+<link rel="stylesheet" href="css/entity-form.css">
 <link rel="stylesheet" href="css/chat.css">
 </head>
 
@@ -178,6 +181,9 @@
       <div class="view-header">
         <div class="view-title" id="story-project-name">Story</div>
         <div class="view-subtitle" id="story-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openProjectForm()" title="Edit title, genre, structure and title page">Edit project</button>
+        </div>
       </div>
       <div class="view-body" id="story-body"></div>
     </div>
@@ -188,6 +194,7 @@
         <div class="view-title">Character web</div>
         <div class="view-subtitle" id="graph-subtitle">—</div>
         <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'character'})" title="Add a character">+ New</button>
           <button class="btn" onclick="DASH.resetGraphLayout()" title="Reset layout">Reset</button>
         </div>
       </div>
@@ -224,6 +231,9 @@
       <div class="view-header">
         <div class="view-title">Locations</div>
         <div class="view-subtitle" id="locations-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'location'})" title="Add a location">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="location-list"></div>
@@ -235,6 +245,9 @@
       <div class="view-header">
         <div class="view-title">Plots</div>
         <div class="view-subtitle" id="plots-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'plot'})" title="Add a plot">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="plot-list"></div>
@@ -248,6 +261,9 @@
       <div class="view-header">
         <div class="view-title">Relationships</div>
         <div class="view-subtitle" id="relationships-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'relationship'})" title="Add a relationship">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="relationship-list"></div>
@@ -259,6 +275,9 @@
       <div class="view-header">
         <div class="view-title">Worlds</div>
         <div class="view-subtitle" id="worlds-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openEntityForm({type:'world'})" title="Add a world">+ New</button>
+        </div>
       </div>
       <div class="view-body">
         <div class="entity-grid" id="world-list"></div>
@@ -270,6 +289,9 @@
       <div class="view-header">
         <div class="view-title">Values</div>
         <div class="view-subtitle" id="values-subtitle">—</div>
+        <div class="view-header-actions">
+          <button class="btn" onclick="DASH.openValuesMenu(this)" title="Add or edit a value">Edit values ▾</button>
+        </div>
       </div>
       <div class="view-body" id="values-body"></div>
     </div>
@@ -504,6 +526,7 @@
         <div class="panel-entity-type" id="panel-type">—</div>
         <div class="panel-name" id="panel-name">—</div>
       </div>
+      <button class="panel-edit" id="panel-edit" title="Edit by hand">Edit</button>
       <button class="panel-close" onclick="DASH.closePanel()">✕</button>
     </div>
     <div class="panel-body" id="panel-body"></div>
@@ -540,6 +563,8 @@
 <script src="js/script-editor/model.js"></script>
 <script src="js/script-editor/editor.js"></script>
 <script src="js/script-view.js"></script>
-<script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>DASH.boot();</script>
+<script src="js/forms/entity-form.js"></script>
+<script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+<script>DASH.boot();</script>
 </body>
 </html>

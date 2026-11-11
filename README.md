@@ -4,7 +4,15 @@ Standalone local app for story/screenplay development.
 
 ## Install
 
-pip install -e .
+Python 3.11+ and pipx (`sudo apt install pipx`, or `brew install pipx`).
+
+```
+pipx install git+https://github.com/TheWhiteWord/hermes-story-architect
+story-architect --install-desktop     # icon in the desktop app grid
+story-architect --uninstall-desktop   # remove it again
+```
+
+Development, from a clone: `pip install -e .`
 
 ## Run
 
