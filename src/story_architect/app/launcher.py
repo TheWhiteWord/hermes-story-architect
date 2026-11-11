@@ -60,18 +60,26 @@ def main(argv=None):
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--no-open", action="store_true")
     parser.add_argument("--reload", action="store_true")
-    parser.add_argument("--create-root", action="store_true")
+    parser.add_argument("--install-desktop", action="store_true",
+                        help="Add a launcher entry (and icon) to the desktop")
+    parser.add_argument("--uninstall-desktop", action="store_true",
+                        help="Remove the launcher entry and icon")
     args = parser.parse_args(argv)
+
+    from story_architect.app import desktop
+    if args.install_desktop:
+        return desktop.install()
+    if args.uninstall_desktop:
+        return desktop.uninstall()
 
     config = load_config(cli_root=args.root, cli_port=args.port, cli_no_open=args.no_open)
 
+    # No prompt: launched from a .desktop entry there is no controlling terminal,
+    # so waiting on stdin would hang the app with no way to answer.
     if not config.root.exists():
-        if args.create_root or input(f"Root {config.root} does not exist. Create? [y/N] ").strip().lower() == "y":
-            config.root.mkdir(parents=True, exist_ok=True)
-            (config.root / "projects").mkdir(exist_ok=True)
-        else:
-            print(f"Root does not exist: {config.root}")
-            return 1
+        config.root.mkdir(parents=True, exist_ok=True)
+        (config.root / "projects").mkdir(exist_ok=True)
+        print(f"Created root {config.root}")
 
     if is_healthy(config.port):
         url = f"http://127.0.0.1:{config.port}"
