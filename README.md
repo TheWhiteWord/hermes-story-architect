@@ -14,9 +14,18 @@ story-architect --uninstall-desktop   # remove it again
 
 Development, from a clone: `pip install -e .`
 
+## Update
+
+```
+pipx upgrade story-architect
+```
+
 ## Run
 
 story-architect --root <projects root>
+
+The server stops on its own a few seconds after you close the last browser tab.
+`--no-idle-exit` keeps it running.
 
 ## Demo data
 

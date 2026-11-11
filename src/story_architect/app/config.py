@@ -20,6 +20,7 @@ class Config:
     hermes_api_port: int = 8642
     hermes_profile: str = "story-architect"
     agent_autostart: bool = False
+    idle_exit: bool = False
 
 
 def _config_file() -> Path:

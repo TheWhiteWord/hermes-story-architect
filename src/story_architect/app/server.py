@@ -1,8 +1,12 @@
 """FastAPI app factory."""
 from __future__ import annotations
 
+import asyncio
 import hmac
 import mimetypes
+import os
+import signal
+import time
 
 from contextlib import asynccontextmanager
 
@@ -24,6 +28,29 @@ from story_architect.app.routes import scripts as scripts_routes
 # refuses a manifest served as application/octet-stream.
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
+IDLE_EXIT_SECONDS = 30
+
+
+def _tick(app, now: float) -> bool:
+    """One watcher pass: refresh while a reply streams, else report staleness."""
+    if app.state.active_replies:
+        app.state.last_heartbeat = now
+        return False
+    return now - app.state.last_heartbeat > IDLE_EXIT_SECONDS
+
+
+async def _watch_idle_exit(app) -> None:
+    """Stop the server once no open page has heartbeated for a while.
+
+    The dashboard pings /api/heartbeat every few seconds, so closing the last
+    tab ends the server shortly after. A streaming reply postpones it.
+    """
+    while True:
+        await asyncio.sleep(5)
+        if _tick(app, time.time()):
+            os.kill(os.getpid(), signal.SIGTERM)
+            return
+
 
 def create_app(config: Config) -> FastAPI:
     server = create_mcp_server(config)
@@ -32,12 +59,18 @@ def create_app(config: Config) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app):
         async with manager.run():
-            yield
+            watcher = asyncio.create_task(_watch_idle_exit(app)) if config.idle_exit else None
+            try:
+                yield
+            finally:
+                if watcher is not None:
+                    watcher.cancel()
 
     app = FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     app.state.config = config
     app.state.mcp_manager = manager
     app.state.active_replies = {}
+    app.state.last_heartbeat = time.time()
     app.state.agent_started_by_app = False
     # chat service (backend over the profile's API server)
     try:
@@ -87,6 +120,11 @@ def create_app(config: Config) -> FastAPI:
 
     @app.get("/healthz")
     def healthz():
+        return {"ok": True}
+
+    @app.get("/api/heartbeat")
+    def heartbeat(request: Request):
+        request.app.state.last_heartbeat = time.time()
         return {"ok": True}
 
     class _MCPApp:

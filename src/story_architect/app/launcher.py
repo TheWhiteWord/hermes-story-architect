@@ -64,6 +64,8 @@ def main(argv=None):
                         help="Add a launcher entry (and icon) to the desktop")
     parser.add_argument("--uninstall-desktop", action="store_true",
                         help="Remove the launcher entry and icon")
+    parser.add_argument("--no-idle-exit", action="store_true",
+                        help="Keep the server running after the last browser tab closes")
     args = parser.parse_args(argv)
 
     from story_architect.app import desktop
@@ -73,6 +75,7 @@ def main(argv=None):
         return desktop.uninstall()
 
     config = load_config(cli_root=args.root, cli_port=args.port, cli_no_open=args.no_open)
+    config.idle_exit = not args.no_idle_exit
 
     # No prompt: launched from a .desktop entry there is no controlling terminal,
     # so waiting on stdin would hang the app with no way to answer.
