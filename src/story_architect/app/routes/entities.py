@@ -82,4 +82,38 @@ def make_router(config, app):
         from story_architect.core import manual_entities as me
         return _run(slug, lambda p: me.delete_form_entity(p, etype, eid))
 
+    # ── structure: reorder acts, sequences and scenes ──
+    def _structure(slug, fn):
+        from story_architect.core import manual_structure as ms
+        try:
+            project = _project(slug)
+        except ValueError as e:
+            return _err(404, "not_found", str(e))
+        try:
+            return fn(project)
+        except ms.StructureConflict as e:
+            return _err(409, "conflict", str(e), current_version=e.current_version)
+        except ms.StructureError as e:
+            return _err(422, "invalid", str(e))
+
+    @router.get("/api/projects/{slug}/structure")
+    def structure(slug: str):
+        from story_architect.core import manual_structure as ms
+        return _structure(slug, ms.load_tree)
+
+    @router.post("/api/projects/{slug}/structure/plan")
+    def structure_plan(slug: str, body: dict):
+        """What a target order would move, in words. Writes nothing."""
+        from story_architect.core import manual_structure as ms
+
+        def go(p):
+            r = ms.plan(p, body)
+            return {"changes": r["changes"], "unchanged": r["unchanged"]}
+        return _structure(slug, go)
+
+    @router.post("/api/projects/{slug}/structure/apply")
+    def structure_apply(slug: str, body: dict):
+        from story_architect.core import manual_structure as ms
+        return _structure(slug, lambda p: ms.apply(p, body))
+
     return router

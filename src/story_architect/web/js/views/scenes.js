@@ -3,6 +3,7 @@ window.DASH = window.DASH || {};
 DASH.allScenes = [];
 
 DASH.buildScenesView = function() {
+  if (DASH.reorderExit) DASH.reorderExit();     // fresh data arrived: a half-made reorder no longer matches it
   DASH.allScenes = DASH.story.scenes || [];
   document.getElementById('scenes-subtitle').textContent = DASH.allScenes.length + ' scenes';
   DASH.renderSceneList(DASH.allScenes);
@@ -67,7 +68,10 @@ DASH.renderSceneItem = function(s) {
 
 DASH.renderSceneList = function(scenes) {
   const list = document.getElementById('scene-list');
-  if (!scenes.length) {
+  // Unfiltered, the whole structure shows — including a sequence or act with nothing in it yet,
+  // otherwise something you just made would look as if it had vanished.
+  const showEmpty = scenes.length === (DASH.story.scenes || []).length;
+  if (!scenes.length && !(showEmpty && ((DASH.story.acts || []).length || (DASH.story.sequences || []).length))) {
     list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No scenes yet</div><div class="empty-state-sub">Create scenes to see them here.</div></div>';
     return;
   }
@@ -94,10 +98,12 @@ DASH.renderSceneList = function(scenes) {
     let actHtml = '';
     for (const seq of actSeqs) {
       const seqScenes = seqMap[seq.id];
-      if (!seqScenes.length) continue;
+      if (!seqScenes.length && !showEmpty) continue;
       actHtml += `<div class="scene-sequence-header clickable" onclick="DASH.showSequencePanel('${seq.id}')" style="cursor:pointer;font-size:var(--font-size-sm);color:var(--muted-foreground);padding:6px 10px 2px;font-weight:500;">${DASH.escapeHtml(seq.title || seq.id)}</div>`;
-      actHtml += seqScenes.map(s => DASH.renderSceneItem(s)).join('');
+      actHtml += seqScenes.length ? seqScenes.map(s => DASH.renderSceneItem(s)).join('')
+        : '<div class="panel-muted" style="font-size:var(--font-size-xs);padding:2px 10px 4px;">No scenes yet</div>';
     }
+    if (showEmpty && !actSeqs.length) actHtml = '<div class="panel-muted" style="font-size:var(--font-size-xs);padding:2px 10px 4px;">No sequences yet</div>';
     if (actHtml) {
       html += `<div class="DASH.story-section-title clickable" onclick="DASH.showActPanel('${act.id}')" style="cursor:pointer;margin-top:12px">${DASH.escapeHtml(act.title || act.id)}</div>` + actHtml;
     }
