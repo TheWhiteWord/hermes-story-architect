@@ -27,7 +27,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .constants import (ACT_STATUSES, ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES,
+from .constants import (ACT_STATUSES, CONFLICT_LEVELS, ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES,
                         PLOT_TYPES, SCENE_DRAMATIC_ROLES, SCENE_STATUSES, SEQUENCE_STATUSES,
                         STRUCTURE_TYPES, VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
 from .db import get_db
@@ -149,12 +149,26 @@ UI_REFS = {
 # changes only through Reorder, which keeps the three levels consistent with each other.
 POSITION = {("sequence", "act_id"), ("scene", "sequence_id")}
 # `order` is Reorder's; a scene's `act_id` is just its sequence's act, kept in step by the form.
-HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id")}
+HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id"),
+          ("scene", "turning_point"), ("scene", "scene_beats")}      # the last two live in the Beats tab
 # Written by the script editor together with the script, so the heading line and
 # these fields can never disagree. Shown, with a way to get there; never edited here.
 SCRIPT_FIELDS = ("heading", "location", "time_of_day", "characters")
-# Shown but not editable in this form (yet).
-READ_ONLY = {("scene", "value_turns"): "Edited with the agent for now."}
+# Shown but not editable in this form.
+READ_ONLY: dict = {}
+# Written by the form, but as a purpose-built editor on its own tab rather than a generic widget.
+EDITORS = {("scene", "value_turns"): ("valueturns", "turns")}
+# The beats record is its own entity (one per scene, `<scene>-beats`) but belongs to the scene
+# as far as a writer is concerned, so the scene form edits it as a tab and writes it alongside.
+BLANK_SHEET = {"driver": "", "turning_point": "", "true_character": [], "changes": [], "beats": []}
+SHEET_KEY = "beat_sheet"
+LEVELS = [
+    {"key": "inner", "label": "Inner", "help": "Within them — doubts, fears, the self."},
+    {"key": "personal", "label": "Personal", "help": "Between them and the people close to them."},
+    {"key": "extra-personal", "label": "Extra-personal", "help": "Between them and society, institutions, the world."},
+]
+BEAT_BY_TYPES = ("character", "location", "world")                    # who can act
+CHANGE_TYPES = ("character", "relationship", "location", "world")    # what can change
 HIDDEN_SECTIONS = {"scene": {"Content"}}            # the script itself: the script editor's
 
 # A list of small records, edited as a stack of cards.
@@ -311,6 +325,10 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
     if (entity_type, key) in READ_ONLY:
         spec.update(kind="computed", hint=READ_ONLY[(entity_type, key)])
         return spec
+    if (entity_type, key) in EDITORS:
+        kind, tab = EDITORS[(entity_type, key)]
+        spec.update(kind=kind, tab=tab, levels=LEVELS)
+        return spec
     if (entity_type, key) in REPEATERS:
         spec.update(kind="repeater", fields=REPEATERS[(entity_type, key)], add_label="Add plot role")
         return spec
@@ -360,6 +378,9 @@ def form_spec(entity_type: str) -> dict:
     nk = name_key(entity_type)
     fields = [_field_spec(entity_type, k, m) for k, m in ENTITY_SCHEMAS[entity_type].items()
               if k not in ("id", "type") and (entity_type, k) not in HIDDEN]
+    if entity_type == "scene":
+        fields.append({"key": SHEET_KEY, "label": "Beats", "help": "", "required": False,
+                       "default": json.loads(json.dumps(BLANK_SHEET)), "kind": "beatsheet", "tab": "beats"})
     order = FIELD_ORDER.get(entity_type)
     if order:
         fields.sort(key=lambda f: order.index(f["key"]) if f["key"] in order else len(order))
@@ -376,7 +397,8 @@ def form_spec(entity_type: str) -> dict:
         "fields": fields,
         "sections": _sections(entity_type),
         "singleton": entity_type in SINGLETONS,
-        **({"script_link": True} if entity_type == "scene" else {}),
+        **({"script_link": True, "tabs": [{"id": "turns", "label": "Value turns"},
+                                          {"id": "beats", "label": "Beats"}]} if entity_type == "scene" else {}),
         **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
     }
 
@@ -442,19 +464,9 @@ def _scene_rows(conn, scene_id: str) -> dict:
     cast = [r[0] for r in conn.execute(
         "SELECT e.name FROM relations r JOIN entities e ON e.id=r.from_id "
         "WHERE r.to_id=? AND r.kind='character_scene' AND e.is_deleted=0 ORDER BY r.\"order\"", (scene_id,))]
-    beats = conn.execute("SELECT id FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
-                         (scene_id,)).fetchone()
-    turns = []
-    for t in ex.get("value_turns") or []:
-        if isinstance(t, dict):
-            turns.append({"display": f"{t.get('value', '?')}: {t.get('from', '?')} → {t.get('to', '?')}"
-                                     + (f" ({t['plot']})" if t.get("plot") else "")})
     return {
         "heading": one(ex.get("heading")), "location": one(loc),
         "time_of_day": one(ex.get("time_of_day")), "characters": [{"display": n} for n in cast],
-        "turning_point": one(ex.get("turning_point")),
-        "scene_beats": [{"display": "A beats record exists"}] if beats else [],
-        "value_turns": turns,
     }
 
 
@@ -512,6 +524,65 @@ def _computed(conn, entity_type: str, entity_id: str, project_path: Path | None 
         except Exception:                      # a derived display must never block the form
             out["value_focus"] = []
     return out
+
+
+def _s(v) -> str:
+    return "" if v is None else str(v).strip()
+
+
+def _turns_form(raw, drop_blank: bool = False) -> list:
+    """Value turns as the form holds them. With `drop_blank`, empty shells are dropped:
+    a level with nothing in it, an effect with no character and no levels, an untouched turn."""
+    out = []
+    for t in raw if isinstance(raw, list) else []:
+        if not isinstance(t, dict):
+            continue
+        effects = []
+        for e in t.get("effects") if isinstance(t.get("effects"), list) else []:
+            if not isinstance(e, dict):
+                continue
+            levels = [{"conflict_level": _s(l.get("conflict_level")), "effect": _s(l.get("effect"))}
+                      for l in (e.get("levels") if isinstance(e.get("levels"), list) else []) if isinstance(l, dict)]
+            if drop_blank:
+                levels = [l for l in levels if l["conflict_level"] or l["effect"]]
+            eff = {"character": _s(e.get("character")), "levels": levels}
+            if not drop_blank or eff["character"] or levels:
+                effects.append(eff)
+        turn = {"plot": _s(t.get("plot")), "value": _s(t.get("value")), "from": _s(t.get("from")),
+                "to": _s(t.get("to")), "effects": effects}
+        if not drop_blank or any(turn[k] for k in ("plot", "value", "from", "to")) or effects:
+            out.append(turn)
+    return out
+
+
+def _side(raw) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    return {"by": _s(raw.get("by")), "surface": _s(raw.get("surface")), "subtext": _s(raw.get("subtext"))}
+
+
+def _sheet_form(raw, drop_blank: bool = False) -> dict:
+    """The beats record as the form holds it. `scene_objective` is left out on purpose: the scene
+    shows one Objective (the scene's own, else the record's) and the form edits that one."""
+    raw = raw if isinstance(raw, dict) else {}
+    tcs = [{"character": _s(t.get("character")), "dilemma": _s(t.get("dilemma")),
+            "choice_reveals": _s(t.get("choice_reveals"))}
+           for t in (raw.get("true_character") if isinstance(raw.get("true_character"), list) else []) if isinstance(t, dict)]
+    chg = [{"entity": _s(c.get("entity")), "change": _s(c.get("change"))}
+           for c in (raw.get("changes") if isinstance(raw.get("changes"), list) else []) if isinstance(c, dict)]
+    beats = [{"action": _side(b.get("action")), "reaction": _side(b.get("reaction")), "gap": _s(b.get("gap"))}
+             for b in (raw.get("beats") if isinstance(raw.get("beats"), list) else []) if isinstance(b, dict)]
+    if drop_blank:
+        tcs = [t for t in tcs if any(t.values())]
+        chg = [c for c in chg if any(c.values())]
+        beats = [b for b in beats if any(b["action"].values()) or any(b["reaction"].values()) or b["gap"]]
+    return {"driver": _s(raw.get("driver")), "turning_point": _s(raw.get("turning_point")),
+            "true_character": tcs, "changes": chg, "beats": beats}
+
+
+def _beats_row(conn, scene_id: str):
+    r = conn.execute("SELECT id, extra FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+                     (scene_id,)).fetchone()
+    return (r[0], json.loads(r[1]) if r[1] else {}) if r else (None, {})
 
 
 def _persp_form(raw) -> dict:
@@ -594,6 +665,12 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
             if key == "perspectives" and entity_type == "relationship":
                 v = _persp_form(v)
             values[key] = v
+        if entity_type == "scene":
+            _, beats_extra = _beats_row(conn, entity_id)
+            values["value_turns"] = _turns_form(extra.get("value_turns"))
+            # one Objective, as the dashboard reads it: the scene's own, else the beats record's
+            values["scene_objective"] = _s(extra.get("scene_objective")) or _s(beats_extra.get("scene_objective"))
+            values[SHEET_KEY] = _sheet_form(beats_extra)
         sections = {h: "" for h in _sections(entity_type)}
         for heading, body in conn.execute(
                 "SELECT heading, body FROM sections WHERE entity_id=?", (entity_id,)):
@@ -619,6 +696,9 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
     values, errors = {}, {}
     for key, v in raw.items():
         meta = schema.get(key)
+        if entity_type == "scene" and key == SHEET_KEY:
+            values[key] = _clean_sheet(v, errors)
+            continue
         if meta is None:
             errors["_form"] = f"Unknown field “{key}”. Reload the page and try again."
             continue
@@ -627,7 +707,9 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
             continue                                   # derived, or someone else's: never written
         t = meta.get("type")
         label = LABELS.get(key) or _humanize(key)
-        if (entity_type, key) in REPEATERS:
+        if (entity_type, key) in EDITORS:
+            values[key] = _clean_turns(v, errors)
+        elif (entity_type, key) in REPEATERS:
             values[key] = _clean_repeater(REPEATERS[(entity_type, key)], v, key, errors)
         elif entity_type == "relationship" and key == "perspectives":
             values[key] = _clean_perspectives(v, errors)
@@ -667,6 +749,20 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
         keep = [c for c in values["characters"] if c]
         values["perspectives"] = {c: values["perspectives"].get(c) or _persp_form({c: {}})[c] for c in keep}
     return values, errors
+
+
+def _clean_turns(raw, errors: dict) -> list:
+    if not isinstance(raw, list):
+        errors["value_turns"] = "This should be a list of value turns."
+        return []
+    return _turns_form(raw, drop_blank=True)
+
+
+def _clean_sheet(raw, errors: dict) -> dict:
+    if not isinstance(raw, dict):
+        errors[SHEET_KEY] = "The beats should be a set of sections."
+        return json.loads(json.dumps(BLANK_SHEET))
+    return _sheet_form(raw, drop_blank=True)
 
 
 def _clean_repeater(fields: list, raw, key: str, errors: dict) -> list:
@@ -795,7 +891,7 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
                 none = conn.execute("SELECT 1 FROM entities WHERE type=? AND is_deleted=0", (f["ref"],)).fetchone() is None
                 errors[f["key"]] = (f"There are no {target}s yet — create one first." if none
                                     else f"Choose the {target} this belongs in.")
-    _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings)
+    _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings, baseline)
 
     if is_value:
         words = {r: values.get(r, "") for r in VALUE_LADDER}
@@ -820,7 +916,7 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
     return warnings, new_id
 
 
-def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings) -> None:
+def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings, baseline=None) -> None:
     if entity_type == "relationship" and "characters" not in errors:
         chars = values.get("characters") or []
         if len(chars) != 2 or len(set(chars)) != 2:
@@ -835,6 +931,13 @@ def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnin
                                               f"already have a relationship (“{rname}”). Saving adds another.")
                     break
     elif entity_type == "scene":
+        # Turns are judged on every save: the write path re-validates a scene's stored turns on
+        # ANY edit to the scene, so a turn gone stale (its value deleted, say) would block even an
+        # unrelated change — better said plainly on its card than as an agent-style refusal.
+        # The beats record is a separate entity, validated only when it changes.
+        _validate_turns(conn, values.get("value_turns") or [], errors, warnings)
+        if baseline is None or values.get(SHEET_KEY) != baseline.get(SHEET_KEY):
+            _validate_sheet(conn, values.get(SHEET_KEY) or BLANK_SHEET, errors)
         roles = values.get("plot_roles") or []
         seen = set()
         for i, r in enumerate(roles):
@@ -859,6 +962,102 @@ def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnin
         have = conn.execute("SELECT COUNT(*) FROM entities WHERE type='act' AND is_deleted=0").fetchone()[0]
         if "act_count" not in errors and values["act_count"] < have:
             warnings["act_count"] = f"You already have {have} acts, so the count will stay at {have}."
+
+
+def _exists_any(conn, slug: str, types) -> bool:
+    return conn.execute(f"SELECT 1 FROM entities WHERE id=? AND is_deleted=0 AND type IN ({','.join('?' * len(types))})",
+                        (slug, *types)).fetchone() is not None
+
+
+def _validate_turns(conn, turns: list, errors: dict, warnings: dict) -> None:
+    """The rules `entity.validate_scene_value_turns` enforces, said to a person and keyed to the field.
+
+    The write path's messages are written for an agent holding a malformed turn. Here most of
+    them can't happen (the form offers only existing plots, values, words and protagonists);
+    what's left is a card left half-filled, or a plot changed under effects already written."""
+    plots = {r[0]: (r[1], json.loads(r[2]) if r[2] else {}) for r in conn.execute(
+        "SELECT id, name, extra FROM entities WHERE type='plot' AND is_deleted=0")}
+    vals = {}
+    for name, extra in conn.execute("SELECT name, extra FROM entities WHERE type='value' AND is_deleted=0"):
+        ex = json.loads(extra) if extra else {}
+        vals[str(name or "").strip().lower()] = (name, [_s(ex.get(r)) for r in VALUE_LADDER])
+    cnames = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM entities WHERE type='character'")}
+    level_label = {l["key"]: l["label"].lower() for l in LEVELS}
+    for i, t in enumerate(turns):
+        at = f"value_turns.{i}"
+        plot = plots.get(t["plot"])
+        if not t["plot"]:
+            errors[f"{at}.plot"] = "Choose the plot this shift belongs to."
+        elif plot is None:
+            errors[f"{at}.plot"] = f"There is no plot “{t['plot']}” — pick one from the list."
+        value = vals.get(t["value"].lower())
+        if not t["value"]:
+            errors[f"{at}.value"] = "Choose the value that shifts."
+        elif value is None:
+            errors[f"{at}.value"] = f"“{t['value']}” isn’t a defined value — pick one from the list, or create it first."
+        for key, when in (("from", "opens"), ("to", "closes")):
+            word = t[key]
+            if not word:
+                errors[f"{at}.{key}"] = f"Pick where the value stands when the scene {when}."
+            elif value is not None and word.lower() not in {w.lower() for w in value[1]}:
+                errors[f"{at}.{key}"] = f"“{word}” isn’t one of the words of “{value[0]}”."
+        if t["from"] and t["from"].lower() == t["to"].lower() and f"{at}.to" not in errors:
+            warnings[f"{at}.to"] = "The value ends where it started — is anything shifting?"
+        if not t["effects"]:
+            errors[f"{at}.effects"] = "Say who this affects: tick at least one level for a protagonist of the plot."
+        allowed = (plot[1].get("characters") or []) if plot else None
+        seen = set()
+        for j, e in enumerate(t["effects"]):
+            ea = f"{at}.effects.{j}"
+            who = cnames.get(e["character"], e["character"])
+            if not e["character"]:
+                errors[f"{ea}.character"] = "Choose the character."
+            elif allowed is not None and e["character"] not in allowed:
+                errors[f"{ea}.character"] = (f"{who} isn’t a protagonist of “{plot[0]}”. "
+                                             f"Add them to the plot first, or remove this effect.")
+            elif e["character"] in seen:
+                errors[f"{ea}.character"] = f"{who} appears twice — one entry per protagonist."
+            seen.add(e["character"])
+            if not e["levels"]:
+                errors[f"{ea}.levels"] = "Tick at least one level."
+            circles = set()
+            for k, lv in enumerate(e["levels"]):
+                la = f"{ea}.levels.{k}"
+                if lv["conflict_level"] not in CONFLICT_LEVELS:
+                    errors[f"{la}.conflict_level"] = "Choose a level."
+                elif lv["conflict_level"] in circles:
+                    errors[f"{la}.conflict_level"] = "One entry per level."
+                circles.add(lv["conflict_level"])
+                if not lv["effect"]:
+                    errors[f"{la}.effect"] = (f"Say in one sentence what this does to {who} at the "
+                                              f"{level_label.get(lv['conflict_level'], 'chosen')} level.")
+
+
+def _validate_sheet(conn, sheet: dict, errors: dict) -> None:
+    pre = SHEET_KEY
+    cn = lambda slug: (conn.execute("SELECT name FROM entities WHERE id=?", (slug,)).fetchone() or [slug])[0]   # noqa: E731
+    if sheet["driver"] and not _exists_any(conn, sheet["driver"], ("character",)):
+        errors[f"{pre}.driver"] = f"There is no character “{sheet['driver']}” — pick one from the list."
+    for i, t in enumerate(sheet["true_character"]):
+        if not t["character"]:
+            errors[f"{pre}.true_character.{i}.character"] = "Choose who faces the choice."
+        elif not _exists_any(conn, t["character"], ("character",)):
+            errors[f"{pre}.true_character.{i}.character"] = f"There is no character “{t['character']}”."
+    for i, c in enumerate(sheet["changes"]):
+        if not c["entity"]:
+            errors[f"{pre}.changes.{i}.entity"] = "Choose what changed."
+        elif not _exists_any(conn, c["entity"], CHANGE_TYPES):
+            errors[f"{pre}.changes.{i}.entity"] = f"“{c['entity']}” isn’t a character, relationship, location or world."
+        if c["entity"] and not c["change"]:
+            errors[f"{pre}.changes.{i}.change"] = f"Say what is different for {cn(c['entity'])} now — the new state, not the event."
+    for i, b in enumerate(sheet["beats"]):
+        for side in ("action", "reaction"):
+            by = b[side]["by"]
+            if by and not _exists_any(conn, by, BEAT_BY_TYPES):
+                errors[f"{pre}.beats.{i}.{side}.by"] = f"“{by}” isn’t a character, location or world."
+        has = any(b[s][k] for s in ("action", "reaction") for k in ("surface", "subtext")) or b["gap"]
+        if not has:
+            errors[f"{pre}.beats.{i}"] = "A beat needs something shown, said or broken — add a surface, subtext or gap, or remove it."
 
 
 def _clean_sections(entity_type: str, raw, errors: dict) -> dict:
@@ -900,6 +1099,30 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
 # ─── Writing ─────────────────────────────────────────────────────────────────
 
 SUMMARY = "Edited by hand in the entity form"
+
+
+def _write_sheet(project_path: Path, scene_id: str, new: dict, old: dict, saved_scene: bool) -> None:
+    """The scene's beats record: edit what changed, or make it on first use. Its own entity
+    (`<scene>-beats`), written after the scene it belongs to."""
+    from .writes import create_entity, edit_entity
+
+    conn = get_db(project_path)
+    try:
+        rec_id, _ = _beats_row(conn, scene_id)
+        free_id = None if rec_id else _unique_id(conn, f"{scene_id}-beats")
+    finally:
+        conn.close()
+    try:
+        if rec_id:
+            diff = {k: v for k, v in new.items() if old.get(k) != v}
+            if diff:
+                edit_entity(project_path, "scene_beats", rec_id, diff, SUMMARY)
+        elif any(new.get(k) not in ("", [], None) for k in new):
+            create_entity(project_path, "scene_beats", free_id,
+                          {"scene": scene_id, **{k: v for k, v in new.items() if v not in ("", [], None)}}, {})
+    except ValueError as e:
+        raise EntityInvalid({"_form": (("The scene was saved, but the beats were not: " if saved_scene else "")
+                                       + str(e))})
 
 
 def _refuse_singleton(entity_type: str, creating: bool = False, deleting: bool = False) -> None:
@@ -950,11 +1173,14 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
         values["perspectives"] = {c: (values.get("perspectives") or {}).get(c) or _persp_form({c: {}})[c]
                                   for c in values.get("characters") or []}
     fm = {k: v for k, v in _to_storage(entity_type, values).items() if v not in ("", [], None)}
+    sheet = fm.pop(SHEET_KEY, None)
     try:
         create_entity(project_path, entity_type, new_id, fm,
                       {h: b for h, b in sections.items() if b})
     except ValueError as e:
         raise _write_error(e)
+    if sheet is not None:
+        _write_sheet(project_path, new_id, sheet, BLANK_SHEET, saved_scene=True)
     return {**load_entity(project_path, entity_type, new_id), "created": True, "warnings": warnings}
 
 
@@ -981,12 +1207,17 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
     # rewritten, so an agent edit to it elsewhere is not clobbered by a stale copy.
     changed = {k: v for k, v in values.items() if current["values"].get(k) != v}
     changed.update({h: b for h, b in sections.items() if current["sections"].get(h, "") != b})
-    if not changed:
+    sheet = changed.pop(SHEET_KEY, None)
+    if not changed and sheet is None:
         return {**current, "unchanged": True, "warnings": warnings}
-    try:
-        edit_entity(project_path, entity_type, entity_id, _to_storage(entity_type, changed), SUMMARY)
-    except ValueError as e:
-        raise _write_error(e)
+    if changed:
+        try:
+            edit_entity(project_path, entity_type, entity_id, _to_storage(entity_type, changed), SUMMARY)
+        except ValueError as e:
+            raise _write_error(e)
+    if sheet is not None:
+        _write_sheet(project_path, entity_id, sheet, current["values"].get(SHEET_KEY) or BLANK_SHEET,
+                     saved_scene=bool(changed))
     return {**load_entity(project_path, entity_type, entity_id), "unchanged": False,
             "warnings": warnings}
 

@@ -1,0 +1,1258 @@
+diff --git a/src/story_architect/core/manual_entities.py b/src/story_architect/core/manual_entities.py
+index eb5bfef..fff9f51 100644
+--- a/src/story_architect/core/manual_entities.py
++++ b/src/story_architect/core/manual_entities.py
+@@ -27,7 +27,7 @@ import hashlib
+ import json
+ from pathlib import Path
+ 
+-from .constants import (ACT_STATUSES, ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES,
++from .constants import (ACT_STATUSES, CONFLICT_LEVELS, ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES,
+                         PLOT_TYPES, SCENE_DRAMATIC_ROLES, SCENE_STATUSES, SEQUENCE_STATUSES,
+                         STRUCTURE_TYPES, VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
+ from .db import get_db
+@@ -149,12 +149,26 @@ UI_REFS = {
+ # changes only through Reorder, which keeps the three levels consistent with each other.
+ POSITION = {("sequence", "act_id"), ("scene", "sequence_id")}
+ # `order` is Reorder's; a scene's `act_id` is just its sequence's act, kept in step by the form.
+-HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id")}
++HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id"),
++          ("scene", "turning_point"), ("scene", "scene_beats")}      # the last two live in the Beats tab
+ # Written by the script editor together with the script, so the heading line and
+ # these fields can never disagree. Shown, with a way to get there; never edited here.
+ SCRIPT_FIELDS = ("heading", "location", "time_of_day", "characters")
+-# Shown but not editable in this form (yet).
+-READ_ONLY = {("scene", "value_turns"): "Edited with the agent for now."}
++# Shown but not editable in this form.
++READ_ONLY: dict = {}
++# Written by the form, but as a purpose-built editor on its own tab rather than a generic widget.
++EDITORS = {("scene", "value_turns"): ("valueturns", "turns")}
++# The beats record is its own entity (one per scene, `<scene>-beats`) but belongs to the scene
++# as far as a writer is concerned, so the scene form edits it as a tab and writes it alongside.
++BLANK_SHEET = {"driver": "", "turning_point": "", "true_character": [], "changes": [], "beats": []}
++SHEET_KEY = "beat_sheet"
++LEVELS = [
++    {"key": "inner", "label": "Inner", "help": "Within them — doubts, fears, the self."},
++    {"key": "personal", "label": "Personal", "help": "Between them and the people close to them."},
++    {"key": "extra-personal", "label": "Extra-personal", "help": "Between them and society, institutions, the world."},
++]
++BEAT_BY_TYPES = ("character", "location", "world")                    # who can act
++CHANGE_TYPES = ("character", "relationship", "location", "world")    # what can change
+ HIDDEN_SECTIONS = {"scene": {"Content"}}            # the script itself: the script editor's
+ 
+ # A list of small records, edited as a stack of cards.
+@@ -311,6 +325,10 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
+     if (entity_type, key) in READ_ONLY:
+         spec.update(kind="computed", hint=READ_ONLY[(entity_type, key)])
+         return spec
++    if (entity_type, key) in EDITORS:
++        kind, tab = EDITORS[(entity_type, key)]
++        spec.update(kind=kind, tab=tab, levels=LEVELS)
++        return spec
+     if (entity_type, key) in REPEATERS:
+         spec.update(kind="repeater", fields=REPEATERS[(entity_type, key)], add_label="Add plot role")
+         return spec
+@@ -360,6 +378,9 @@ def form_spec(entity_type: str) -> dict:
+     nk = name_key(entity_type)
+     fields = [_field_spec(entity_type, k, m) for k, m in ENTITY_SCHEMAS[entity_type].items()
+               if k not in ("id", "type") and (entity_type, k) not in HIDDEN]
++    if entity_type == "scene":
++        fields.append({"key": SHEET_KEY, "label": "Beats", "help": "", "required": False,
++                       "default": json.loads(json.dumps(BLANK_SHEET)), "kind": "beatsheet", "tab": "beats"})
+     order = FIELD_ORDER.get(entity_type)
+     if order:
+         fields.sort(key=lambda f: order.index(f["key"]) if f["key"] in order else len(order))
+@@ -376,7 +397,8 @@ def form_spec(entity_type: str) -> dict:
+         "fields": fields,
+         "sections": _sections(entity_type),
+         "singleton": entity_type in SINGLETONS,
+-        **({"script_link": True} if entity_type == "scene" else {}),
++        **({"script_link": True, "tabs": [{"id": "turns", "label": "Value turns"},
++                                          {"id": "beats", "label": "Beats"}]} if entity_type == "scene" else {}),
+         **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
+     }
+ 
+@@ -442,19 +464,9 @@ def _scene_rows(conn, scene_id: str) -> dict:
+     cast = [r[0] for r in conn.execute(
+         "SELECT e.name FROM relations r JOIN entities e ON e.id=r.from_id "
+         "WHERE r.to_id=? AND r.kind='character_scene' AND e.is_deleted=0 ORDER BY r.\"order\"", (scene_id,))]
+-    beats = conn.execute("SELECT id FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+-                         (scene_id,)).fetchone()
+-    turns = []
+-    for t in ex.get("value_turns") or []:
+-        if isinstance(t, dict):
+-            turns.append({"display": f"{t.get('value', '?')}: {t.get('from', '?')} → {t.get('to', '?')}"
+-                                     + (f" ({t['plot']})" if t.get("plot") else "")})
+     return {
+         "heading": one(ex.get("heading")), "location": one(loc),
+         "time_of_day": one(ex.get("time_of_day")), "characters": [{"display": n} for n in cast],
+-        "turning_point": one(ex.get("turning_point")),
+-        "scene_beats": [{"display": "A beats record exists"}] if beats else [],
+-        "value_turns": turns,
+     }
+ 
+ 
+@@ -514,6 +526,65 @@ def _computed(conn, entity_type: str, entity_id: str, project_path: Path | None
+     return out
+ 
+ 
++def _s(v) -> str:
++    return "" if v is None else str(v).strip()
++
++
++def _turns_form(raw, drop_blank: bool = False) -> list:
++    """Value turns as the form holds them. With `drop_blank`, empty shells are dropped:
++    a level with nothing in it, an effect with no character and no levels, an untouched turn."""
++    out = []
++    for t in raw if isinstance(raw, list) else []:
++        if not isinstance(t, dict):
++            continue
++        effects = []
++        for e in t.get("effects") if isinstance(t.get("effects"), list) else []:
++            if not isinstance(e, dict):
++                continue
++            levels = [{"conflict_level": _s(l.get("conflict_level")), "effect": _s(l.get("effect"))}
++                      for l in (e.get("levels") if isinstance(e.get("levels"), list) else []) if isinstance(l, dict)]
++            if drop_blank:
++                levels = [l for l in levels if l["conflict_level"] or l["effect"]]
++            eff = {"character": _s(e.get("character")), "levels": levels}
++            if not drop_blank or eff["character"] or levels:
++                effects.append(eff)
++        turn = {"plot": _s(t.get("plot")), "value": _s(t.get("value")), "from": _s(t.get("from")),
++                "to": _s(t.get("to")), "effects": effects}
++        if not drop_blank or any(turn[k] for k in ("plot", "value", "from", "to")) or effects:
++            out.append(turn)
++    return out
++
++
++def _side(raw) -> dict:
++    raw = raw if isinstance(raw, dict) else {}
++    return {"by": _s(raw.get("by")), "surface": _s(raw.get("surface")), "subtext": _s(raw.get("subtext"))}
++
++
++def _sheet_form(raw, drop_blank: bool = False) -> dict:
++    """The beats record as the form holds it. `scene_objective` is left out on purpose: the scene
++    shows one Objective (the scene's own, else the record's) and the form edits that one."""
++    raw = raw if isinstance(raw, dict) else {}
++    tcs = [{"character": _s(t.get("character")), "dilemma": _s(t.get("dilemma")),
++            "choice_reveals": _s(t.get("choice_reveals"))}
++           for t in (raw.get("true_character") if isinstance(raw.get("true_character"), list) else []) if isinstance(t, dict)]
++    chg = [{"entity": _s(c.get("entity")), "change": _s(c.get("change"))}
++           for c in (raw.get("changes") if isinstance(raw.get("changes"), list) else []) if isinstance(c, dict)]
++    beats = [{"action": _side(b.get("action")), "reaction": _side(b.get("reaction")), "gap": _s(b.get("gap"))}
++             for b in (raw.get("beats") if isinstance(raw.get("beats"), list) else []) if isinstance(b, dict)]
++    if drop_blank:
++        tcs = [t for t in tcs if any(t.values())]
++        chg = [c for c in chg if any(c.values())]
++        beats = [b for b in beats if any(b["action"].values()) or any(b["reaction"].values()) or b["gap"]]
++    return {"driver": _s(raw.get("driver")), "turning_point": _s(raw.get("turning_point")),
++            "true_character": tcs, "changes": chg, "beats": beats}
++
++
++def _beats_row(conn, scene_id: str):
++    r = conn.execute("SELECT id, extra FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
++                     (scene_id,)).fetchone()
++    return (r[0], json.loads(r[1]) if r[1] else {}) if r else (None, {})
++
++
+ def _persp_form(raw) -> dict:
+     """Perspectives as the form holds them: every field present, `""` when unset."""
+     out = {}
+@@ -594,6 +665,12 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+             if key == "perspectives" and entity_type == "relationship":
+                 v = _persp_form(v)
+             values[key] = v
++        if entity_type == "scene":
++            _, beats_extra = _beats_row(conn, entity_id)
++            values["value_turns"] = _turns_form(extra.get("value_turns"))
++            # one Objective, as the dashboard reads it: the scene's own, else the beats record's
++            values["scene_objective"] = _s(extra.get("scene_objective")) or _s(beats_extra.get("scene_objective"))
++            values[SHEET_KEY] = _sheet_form(beats_extra)
+         sections = {h: "" for h in _sections(entity_type)}
+         for heading, body in conn.execute(
+                 "SELECT heading, body FROM sections WHERE entity_id=?", (entity_id,)):
+@@ -619,6 +696,9 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+     values, errors = {}, {}
+     for key, v in raw.items():
+         meta = schema.get(key)
++        if entity_type == "scene" and key == SHEET_KEY:
++            values[key] = _clean_sheet(v, errors)
++            continue
+         if meta is None:
+             errors["_form"] = f"Unknown field “{key}”. Reload the page and try again."
+             continue
+@@ -627,7 +707,9 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+             continue                                   # derived, or someone else's: never written
+         t = meta.get("type")
+         label = LABELS.get(key) or _humanize(key)
+-        if (entity_type, key) in REPEATERS:
++        if (entity_type, key) in EDITORS:
++            values[key] = _clean_turns(v, errors)
++        elif (entity_type, key) in REPEATERS:
+             values[key] = _clean_repeater(REPEATERS[(entity_type, key)], v, key, errors)
+         elif entity_type == "relationship" and key == "perspectives":
+             values[key] = _clean_perspectives(v, errors)
+@@ -669,6 +751,20 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+     return values, errors
+ 
+ 
++def _clean_turns(raw, errors: dict) -> list:
++    if not isinstance(raw, list):
++        errors["value_turns"] = "This should be a list of value turns."
++        return []
++    return _turns_form(raw, drop_blank=True)
++
++
++def _clean_sheet(raw, errors: dict) -> dict:
++    if not isinstance(raw, dict):
++        errors[SHEET_KEY] = "The beats should be a set of sections."
++        return json.loads(json.dumps(BLANK_SHEET))
++    return _sheet_form(raw, drop_blank=True)
++
++
+ def _clean_repeater(fields: list, raw, key: str, errors: dict) -> list:
+     """A list of records from cards. A card with nothing in it is not a record: dropped."""
+     if not isinstance(raw, list):
+@@ -795,7 +891,7 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+                 none = conn.execute("SELECT 1 FROM entities WHERE type=? AND is_deleted=0", (f["ref"],)).fetchone() is None
+                 errors[f["key"]] = (f"There are no {target}s yet — create one first." if none
+                                     else f"Choose the {target} this belongs in.")
+-    _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings)
++    _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings, baseline)
+ 
+     if is_value:
+         words = {r: values.get(r, "") for r in VALUE_LADDER}
+@@ -820,7 +916,7 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+     return warnings, new_id
+ 
+ 
+-def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings) -> None:
++def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings, baseline=None) -> None:
+     if entity_type == "relationship" and "characters" not in errors:
+         chars = values.get("characters") or []
+         if len(chars) != 2 or len(set(chars)) != 2:
+@@ -835,6 +931,13 @@ def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnin
+                                               f"already have a relationship (“{rname}”). Saving adds another.")
+                     break
+     elif entity_type == "scene":
++        # Turns are judged on every save: the write path re-validates a scene's stored turns on
++        # ANY edit to the scene, so a turn gone stale (its value deleted, say) would block even an
++        # unrelated change — better said plainly on its card than as an agent-style refusal.
++        # The beats record is a separate entity, validated only when it changes.
++        _validate_turns(conn, values.get("value_turns") or [], errors, warnings)
++        if baseline is None or values.get(SHEET_KEY) != baseline.get(SHEET_KEY):
++            _validate_sheet(conn, values.get(SHEET_KEY) or BLANK_SHEET, errors)
+         roles = values.get("plot_roles") or []
+         seen = set()
+         for i, r in enumerate(roles):
+@@ -861,6 +964,102 @@ def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnin
+             warnings["act_count"] = f"You already have {have} acts, so the count will stay at {have}."
+ 
+ 
++def _exists_any(conn, slug: str, types) -> bool:
++    return conn.execute(f"SELECT 1 FROM entities WHERE id=? AND is_deleted=0 AND type IN ({','.join('?' * len(types))})",
++                        (slug, *types)).fetchone() is not None
++
++
++def _validate_turns(conn, turns: list, errors: dict, warnings: dict) -> None:
++    """The rules `entity.validate_scene_value_turns` enforces, said to a person and keyed to the field.
++
++    The write path's messages are written for an agent holding a malformed turn. Here most of
++    them can't happen (the form offers only existing plots, values, words and protagonists);
++    what's left is a card left half-filled, or a plot changed under effects already written."""
++    plots = {r[0]: (r[1], json.loads(r[2]) if r[2] else {}) for r in conn.execute(
++        "SELECT id, name, extra FROM entities WHERE type='plot' AND is_deleted=0")}
++    vals = {}
++    for name, extra in conn.execute("SELECT name, extra FROM entities WHERE type='value' AND is_deleted=0"):
++        ex = json.loads(extra) if extra else {}
++        vals[str(name or "").strip().lower()] = (name, [_s(ex.get(r)) for r in VALUE_LADDER])
++    cnames = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM entities WHERE type='character'")}
++    level_label = {l["key"]: l["label"].lower() for l in LEVELS}
++    for i, t in enumerate(turns):
++        at = f"value_turns.{i}"
++        plot = plots.get(t["plot"])
++        if not t["plot"]:
++            errors[f"{at}.plot"] = "Choose the plot this shift belongs to."
++        elif plot is None:
++            errors[f"{at}.plot"] = f"There is no plot “{t['plot']}” — pick one from the list."
++        value = vals.get(t["value"].lower())
++        if not t["value"]:
++            errors[f"{at}.value"] = "Choose the value that shifts."
++        elif value is None:
++            errors[f"{at}.value"] = f"“{t['value']}” isn’t a defined value — pick one from the list, or create it first."
++        for key, when in (("from", "opens"), ("to", "closes")):
++            word = t[key]
++            if not word:
++                errors[f"{at}.{key}"] = f"Pick where the value stands when the scene {when}."
++            elif value is not None and word.lower() not in {w.lower() for w in value[1]}:
++                errors[f"{at}.{key}"] = f"“{word}” isn’t one of the words of “{value[0]}”."
++        if t["from"] and t["from"].lower() == t["to"].lower() and f"{at}.to" not in errors:
++            warnings[f"{at}.to"] = "The value ends where it started — is anything shifting?"
++        if not t["effects"]:
++            errors[f"{at}.effects"] = "Say who this affects: tick at least one level for a protagonist of the plot."
++        allowed = (plot[1].get("characters") or []) if plot else None
++        seen = set()
++        for j, e in enumerate(t["effects"]):
++            ea = f"{at}.effects.{j}"
++            who = cnames.get(e["character"], e["character"])
++            if not e["character"]:
++                errors[f"{ea}.character"] = "Choose the character."
++            elif allowed is not None and e["character"] not in allowed:
++                errors[f"{ea}.character"] = (f"{who} isn’t a protagonist of “{plot[0]}”. "
++                                             f"Add them to the plot first, or remove this effect.")
++            elif e["character"] in seen:
++                errors[f"{ea}.character"] = f"{who} appears twice — one entry per protagonist."
++            seen.add(e["character"])
++            if not e["levels"]:
++                errors[f"{ea}.levels"] = "Tick at least one level."
++            circles = set()
++            for k, lv in enumerate(e["levels"]):
++                la = f"{ea}.levels.{k}"
++                if lv["conflict_level"] not in CONFLICT_LEVELS:
++                    errors[f"{la}.conflict_level"] = "Choose a level."
++                elif lv["conflict_level"] in circles:
++                    errors[f"{la}.conflict_level"] = "One entry per level."
++                circles.add(lv["conflict_level"])
++                if not lv["effect"]:
++                    errors[f"{la}.effect"] = (f"Say in one sentence what this does to {who} at the "
++                                              f"{level_label.get(lv['conflict_level'], 'chosen')} level.")
++
++
++def _validate_sheet(conn, sheet: dict, errors: dict) -> None:
++    pre = SHEET_KEY
++    cn = lambda slug: (conn.execute("SELECT name FROM entities WHERE id=?", (slug,)).fetchone() or [slug])[0]   # noqa: E731
++    if sheet["driver"] and not _exists_any(conn, sheet["driver"], ("character",)):
++        errors[f"{pre}.driver"] = f"There is no character “{sheet['driver']}” — pick one from the list."
++    for i, t in enumerate(sheet["true_character"]):
++        if not t["character"]:
++            errors[f"{pre}.true_character.{i}.character"] = "Choose who faces the choice."
++        elif not _exists_any(conn, t["character"], ("character",)):
++            errors[f"{pre}.true_character.{i}.character"] = f"There is no character “{t['character']}”."
++    for i, c in enumerate(sheet["changes"]):
++        if not c["entity"]:
++            errors[f"{pre}.changes.{i}.entity"] = "Choose what changed."
++        elif not _exists_any(conn, c["entity"], CHANGE_TYPES):
++            errors[f"{pre}.changes.{i}.entity"] = f"“{c['entity']}” isn’t a character, relationship, location or world."
++        if c["entity"] and not c["change"]:
++            errors[f"{pre}.changes.{i}.change"] = f"Say what is different for {cn(c['entity'])} now — the new state, not the event."
++    for i, b in enumerate(sheet["beats"]):
++        for side in ("action", "reaction"):
++            by = b[side]["by"]
++            if by and not _exists_any(conn, by, BEAT_BY_TYPES):
++                errors[f"{pre}.beats.{i}.{side}.by"] = f"“{by}” isn’t a character, location or world."
++        has = any(b[s][k] for s in ("action", "reaction") for k in ("surface", "subtext")) or b["gap"]
++        if not has:
++            errors[f"{pre}.beats.{i}"] = "A beat needs something shown, said or broken — add a surface, subtext or gap, or remove it."
++
++
+ def _clean_sections(entity_type: str, raw, errors: dict) -> dict:
+     if raw in (None, {}):
+         return {}
+@@ -902,6 +1101,30 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
+ SUMMARY = "Edited by hand in the entity form"
+ 
+ 
++def _write_sheet(project_path: Path, scene_id: str, new: dict, old: dict, saved_scene: bool) -> None:
++    """The scene's beats record: edit what changed, or make it on first use. Its own entity
++    (`<scene>-beats`), written after the scene it belongs to."""
++    from .writes import create_entity, edit_entity
++
++    conn = get_db(project_path)
++    try:
++        rec_id, _ = _beats_row(conn, scene_id)
++        free_id = None if rec_id else _unique_id(conn, f"{scene_id}-beats")
++    finally:
++        conn.close()
++    try:
++        if rec_id:
++            diff = {k: v for k, v in new.items() if old.get(k) != v}
++            if diff:
++                edit_entity(project_path, "scene_beats", rec_id, diff, SUMMARY)
++        elif any(new.get(k) not in ("", [], None) for k in new):
++            create_entity(project_path, "scene_beats", free_id,
++                          {"scene": scene_id, **{k: v for k, v in new.items() if v not in ("", [], None)}}, {})
++    except ValueError as e:
++        raise EntityInvalid({"_form": (("The scene was saved, but the beats were not: " if saved_scene else "")
++                                       + str(e))})
++
++
+ def _refuse_singleton(entity_type: str, creating: bool = False, deleting: bool = False) -> None:
+     if entity_type in SINGLETONS and (creating or deleting):
+         raise EntityInvalid({"_form": f"The {entity_type} can be edited here, "
+@@ -950,11 +1173,14 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
+         values["perspectives"] = {c: (values.get("perspectives") or {}).get(c) or _persp_form({c: {}})[c]
+                                   for c in values.get("characters") or []}
+     fm = {k: v for k, v in _to_storage(entity_type, values).items() if v not in ("", [], None)}
++    sheet = fm.pop(SHEET_KEY, None)
+     try:
+         create_entity(project_path, entity_type, new_id, fm,
+                       {h: b for h, b in sections.items() if b})
+     except ValueError as e:
+         raise _write_error(e)
++    if sheet is not None:
++        _write_sheet(project_path, new_id, sheet, BLANK_SHEET, saved_scene=True)
+     return {**load_entity(project_path, entity_type, new_id), "created": True, "warnings": warnings}
+ 
+ 
+@@ -981,12 +1207,17 @@ def edit_form_entity(project_path: Path, entity_type: str, entity_id: str, paylo
+     # rewritten, so an agent edit to it elsewhere is not clobbered by a stale copy.
+     changed = {k: v for k, v in values.items() if current["values"].get(k) != v}
+     changed.update({h: b for h, b in sections.items() if current["sections"].get(h, "") != b})
+-    if not changed:
++    sheet = changed.pop(SHEET_KEY, None)
++    if not changed and sheet is None:
+         return {**current, "unchanged": True, "warnings": warnings}
+-    try:
+-        edit_entity(project_path, entity_type, entity_id, _to_storage(entity_type, changed), SUMMARY)
+-    except ValueError as e:
+-        raise _write_error(e)
++    if changed:
++        try:
++            edit_entity(project_path, entity_type, entity_id, _to_storage(entity_type, changed), SUMMARY)
++        except ValueError as e:
++            raise _write_error(e)
++    if sheet is not None:
++        _write_sheet(project_path, entity_id, sheet, current["values"].get(SHEET_KEY) or BLANK_SHEET,
++                     saved_scene=bool(changed))
+     return {**load_entity(project_path, entity_type, entity_id), "unchanged": False,
+             "warnings": warnings}
+ 
+diff --git a/src/story_architect/web/css/entity-form.css b/src/story_architect/web/css/entity-form.css
+index 06e10ec..aefed8a 100644
+--- a/src/story_architect/web/css/entity-form.css
++++ b/src/story_architect/web/css/entity-form.css
+@@ -161,3 +161,37 @@ textarea.ef-input { resize: none; min-height: 34px; overflow: hidden; }
+ .ef-moves li { padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--font-size-sm); }
+ .ef-moves li b { font-weight: 500; }
+ .ef-moves li .where { color: var(--muted-foreground); }
++
++/* ─── phase 3b: value turns and beat sheet ────────────────────────────── */
++.ve-intro { font-size: var(--font-size-sm); color: var(--muted-foreground); }
++.ve-sum { margin-left: 10px; font-weight: 400; color: var(--muted-foreground); font-size: var(--font-size-xs); }
++.ve-ladder { display: flex; gap: 6px; flex-wrap: wrap; }
++.ve-ladder.none { color: var(--muted-foreground); font-size: var(--font-size-xs); }
++.ve-chip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 88px; padding: 5px 10px;
++  border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--foreground);
++  font: inherit; font-size: var(--font-size-sm); cursor: pointer; text-align: left; }
++.ve-chip i { font-style: normal; font-size: 10px; letter-spacing: .08em; color: var(--muted-foreground); }
++.ve-chip:hover { border-color: var(--accent); }
++.ve-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
++.ve-chip.on i { color: var(--accent); }
++.ve-chip.stray { border-style: dashed; }
++.ve-eff { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); }
++.ve-eff + .ve-eff { margin-top: 8px; }
++.ve-eff.stale { border-style: dashed; border-color: color-mix(in srgb, var(--role-antagonist) 45%, transparent); }
++.ve-who { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); font-weight: 500; }
++.ve-who .ef-rm { margin-left: auto; width: 22px; height: 22px; }
++.ve-note { font-weight: 400; color: var(--muted-foreground); font-size: var(--font-size-xs); }
++.ve-levels { display: flex; gap: 6px; flex-wrap: wrap; }
++.ve-lv { padding: 2px 11px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--muted-foreground);
++  font: inherit; font-size: var(--font-size-xs); cursor: pointer; }
++.ve-lv:hover { border-color: var(--accent); color: var(--foreground); }
++.ve-lv.on { color: var(--foreground); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
++.ve-small { font-size: var(--font-size-xs); font-weight: 400; color: var(--muted-foreground); }
++.ve-warn { color: var(--c-gap); }
++.ve-sub { margin-top: 2px; font-size: var(--font-size-xs); color: var(--muted-foreground); }
++.ve-section { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
++.ve-section-h { font-size: var(--font-size-xs); letter-spacing: .08em; text-transform: uppercase; font-weight: 500; color: var(--muted-foreground); }
++.ve-ctl { float: right; display: inline-flex; gap: 4px; align-items: center; }
++.ve-ctl .ef-rm { width: 24px; height: 22px; }
++.ve-side { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); }
++.ve-side-h { font-size: var(--font-size-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+diff --git a/src/story_architect/web/index.html b/src/story_architect/web/index.html
+index 03c9e96..207ae18 100644
+--- a/src/story_architect/web/index.html
++++ b/src/story_architect/web/index.html
+@@ -4,8 +4,6 @@
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Story Dashboard</title>
+-<meta name="theme-color" content="#7b9cf0">
+-<link rel="manifest" href="manifest.webmanifest">
+ 
+ <!-- vis-network from CDN (MIT/Apache 2.0) -->
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+@@ -572,9 +570,8 @@
+ <script src="js/script-editor/editor.js"></script>
+ <script src="js/script-view.js"></script>
+ <script src="js/forms/entity-form.js"></script>
++<script src="js/forms/scene-editors.js"></script>
+ <script src="js/views/reorder.js"></script>
+-<script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+-<script>setInterval(() => fetch('/api/heartbeat').catch(() => {}), 10000);</script>
+-<script>DASH.boot();</script>
++<script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>DASH.boot();</script>
+ </body>
+ </html>
+diff --git a/src/story_architect/web/js/forms/entity-form.js b/src/story_architect/web/js/forms/entity-form.js
+index 268f808..e206c68 100644
+--- a/src/story_architect/web/js/forms/entity-form.js
++++ b/src/story_architect/web/js/forms/entity-form.js
+@@ -5,7 +5,8 @@
+ // appears here with no change to this file. Nothing here knows what a
+ // "character" is; it knows kinds: text, textarea, select, ref, reflist, list,
+ // perspectives (a card per chosen entity), repeater (a stack of small cards), linked,
+-// computed.
++// computed — plus any kind a plugin registers in DASH.efKinds (see scene-editors.js), which brings
++// its own widget, normalisation and review diff, and may live on a tab of its own.
+ //
+ //   DASH.openEntityForm({ type, id?, values? })   id => edit, no id => create
+ //
+@@ -53,6 +54,25 @@ window.DASH = window.DASH || {};
+   }
+ 
+   D.efToast = toast;
++  D.efKinds = D.efKinds || {};                       // kind -> { html, norm, onInput, onAct, diff, count }
++  const plugin = (f) => D.efKinds[f.kind];
++  // What a plugin may use. Everything else about the form stays private to this file.
++  const ctx = () => ({
++    S, h, clone, eq, refName, field: (k) => S.spec.fields.find((f) => f.key === k),
++    touch: (path) => S.touched.add(path),
++    after: () => afterEdit(),
++    rerender: (focusId) => { renderBody(); if (focusId) { const n = document.getElementById(focusId); if (n) n.focus(); } },
++    // Two lists of {key, html}. Only what DIFFERS is shown — a one-word fix to a long beat sheet
++    // should read as one line — with a quiet count of how much stayed the same.
++    listDiff: (xs, ys) => {
++      const xk = xs.map((i) => i.key), yk = ys.map((i) => i.key);
++      const gone = xs.filter((i) => !yk.includes(i.key)), added = ys.filter((i) => !xk.includes(i.key));
++      const same = ys.length - added.length;
++      const note = same ? `<div class="ve-sub">${same} unchanged</div>` : '';
++      return [gone.length ? gone.map((i) => `<span class="del">${i.html}</span>`).join('<br>') : '—',
++        (added.length ? added.map((i) => `<span class="add">${i.html}</span>`).join('<br>') : '—') + note];
++    },
++  });
+ 
+   // ─── Values: normalise, diff, dirty ──────────────────────────────────────
+   const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && f.kind !== 'unsupported');
+@@ -67,6 +87,7 @@ window.DASH = window.DASH || {};
+       let v = values[f.key];
+       if (f.show_if && !Object.keys(f.show_if).every((k) => values[k] === f.show_if[k])) v = clone(f.default);
+       else if (f.kind === 'list' || f.kind === 'reflist') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
++      else if (plugin(f)) v = plugin(f).norm(f, v);
+       else if (f.kind === 'repeater') {
+         v = (v || []).map((r) => { const o = {}; f.fields.forEach((sf) => { o[sf.key] = String(r[sf.key] == null ? '' : r[sf.key]).trim(); }); return o; })
+           .filter((r) => Object.values(r).some(Boolean));
+@@ -169,14 +190,18 @@ window.DASH = window.DASH || {};
+     const filled = S.spec.sections.filter((n) => String(S.sections[n] || '').trim()).length;
+     const tab = (id, label, extra) => `<button class="ef-tab${S.tab === id ? ' active' : ''}" data-act="tab" data-tab="${id}">${label}${extra || ''}<i class="ef-dot" data-dot="${id}"></i></button>`;
+     const script = S.spec.script_link && S.mode === 'edit' ? tab('script', 'Script') : '';
+-    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${script}</div>`;
++    const extra = (S.spec.tabs || []).map((t) => {
++      const f = S.spec.fields.find((x) => x.tab === t.id), n = f && plugin(f) && plugin(f).count ? plugin(f).count(f, S.values[f.key]) : 0;
++      return tab(t.id, t.label, n ? `<small>${n}</small>` : '');
++    }).join('');
++    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${extra}${script}</div>`;
+   }
+ 
+   function renderBody() {
+     const body = document.getElementById('ef-body'); if (!body) return;
+     const top = body.scrollTop;
+     body.innerHTML = S.step === 'review' ? reviewHtml() : S.step === 'delete' ? deleteHtml()
+-      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : fieldsHtml());
++      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : S.tab === 'fields' ? fieldsHtml() : tabFieldsHtml(S.tab));
+     body.scrollTop = top;
+     body.querySelectorAll('textarea').forEach(autosize);
+     paintMessages();
+@@ -184,7 +209,7 @@ window.DASH = window.DASH || {};
+ 
+   function fieldsHtml() {
+     let last = null, html = '';
+-    S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && visible(f)).forEach((f) => {
++    S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && !f.tab && visible(f)).forEach((f) => {
+       if ((f.group || null) !== last) { last = f.group || null; if (last) html += `<h3 class="ef-group">${h(last)}</h3>`; }
+       html += fieldHtml(f);
+     });
+@@ -192,7 +217,11 @@ window.DASH = window.DASH || {};
+     return html + (derived ? `<div class="ef-derived">${derived}</div>` : '');
+   }
+ 
++  // A tab of its own: the fields that declare `tab`, each drawn by its plugin.
++  const tabFieldsHtml = (id) => S.spec.fields.filter((f) => f.tab === id).map(fieldHtml).join('');
++
+   function fieldHtml(f) {
++    if (plugin(f)) return `<div class="ef-field">${plugin(f).html(f, ctx())}<div class="ef-msg" data-msg="${h(f.key)}"></div></div>`;
+     const locked = S.mode === 'edit' && f.locked_on_edit;
+     const note = locked ? f.locked_on_edit : f.help;
+     const err = `<div class="ef-msg" data-msg="${h(f.key)}"></div>`;
+@@ -376,7 +405,8 @@ window.DASH = window.DASH || {};
+     const a = norm(S.orig.values), b = norm(S.values), rows = [];
+     changedFields().forEach((f) => {
+       let was, now;
+-      if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
++      if (plugin(f)) { const r = plugin(f).diff(f, a[f.key], b[f.key], ctx()); was = r[0]; now = r[1]; }
++      else if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
+       else if (f.kind === 'list' || f.kind === 'reflist' || f.kind === 'repeater') {
+         const rec = (r) => f.fields.map((sf) => sf.kind === 'ref' ? (r[sf.key] ? refName(sf.ref, r[sf.key]) : '')
+           : sf.kind === 'select' ? ((sf.option_labels || {})[r[sf.key]] || r[sf.key]) : r[sf.key]).filter(Boolean).join(' · ');
+@@ -468,13 +498,18 @@ window.DASH = window.DASH || {};
+     });
+     const b = document.getElementById('ef-banner');
+     if (b) { const m = S.errors._form; b.textContent = m || ''; b.className = 'ef-banner' + (m ? ' on' : ''); }
+-    const dot = document.querySelector('[data-dot="fields"]');
+-    if (dot) dot.classList.toggle('on', S.tab !== 'fields' && Object.keys(S.errors).some((k) => k !== '_form' && show(k)));
++    document.querySelectorAll('[data-dot]').forEach((dot) => {
++      const id = dot.dataset.dot;
++      dot.classList.toggle('on', S.tab !== id && Object.keys(S.errors).some((k) => k !== '_form' && show(k) && tabOfKey(k) === id));
++    });
+   }
+ 
++  // Which tab an error belongs to: its key is `field` or `field.path.to.the.input`.
++  const tabOfKey = (key) => { const f = S.spec.fields.find((x) => x.key === key.split('.')[0]); return (f && f.tab) || 'fields'; };
++
+   function jumpToFirstError() {
+     const key = Object.keys(S.errors).find((k) => k !== '_form');
+-    if (key && S.tab !== 'fields') { S.tab = 'fields'; render(); }
++    if (key && S.tab !== tabOfKey(key)) { S.tab = tabOfKey(key); S.step = 'form'; render(); }
+     else if (S.step !== 'form') { S.step = 'form'; render(); }
+     const k = key && CSS.escape(key);
+     const el = key && document.querySelector(`[data-key="${k}"],[data-path="${k}"],[data-ref="${k}"]`);
+@@ -604,6 +639,11 @@ window.DASH = window.DASH || {};
+         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
+         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
+       }
++      case 'ext': {
++        const k = D.efKinds[el.dataset.k]; if (!k) break;
++        k.onAct(el.dataset.op, el, fieldOfKind(el.dataset.k), ctx());
++        afterEdit(); break;
++      }
+       case 'ref-add': {
+         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
+         renderBody(); const rows = document.querySelectorAll(`[data-ref="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
+@@ -626,9 +666,12 @@ window.DASH = window.DASH || {};
+     }
+   }
+ 
+-  function afterEdit() { scheduleCheck(); syncFooter(); paintHeader(); }
++  // Tab badges (how many sections are filled, how many turns / beats) stay true as you type.
++  function refreshTabs() { const t = document.querySelector('.ef-tabs'); if (t && S.step === 'form') t.outerHTML = tabsHtml(); }
++  function afterEdit() { scheduleCheck(); syncFooter(); paintHeader(); refreshTabs(); paintMessages(); }
+ 
+   const field = (key) => S.spec.fields.find((f) => f.key === key);
++  const fieldOfKind = (kind) => S.spec.fields.find((f) => f.kind === kind);
+   const persField = () => S.spec.fields.find((f) => f.kind === 'perspectives');
+ 
+   // Keep exactly one card per chosen entity: new picks get a blank card, dropped ones lose theirs.
+@@ -649,6 +692,11 @@ window.DASH = window.DASH || {};
+   function onInput(e) {
+     const el = e.target, d = el.dataset;
+     let rerender = false;
++    if (d.k && D.efKinds[d.k]) {
++      D.efKinds[d.k].onInput(el, fieldOfKind(d.k), ctx());
++      if (el.tagName === 'TEXTAREA') autosize(el);
++      afterEdit(); return;
++    }
+     if (d.key != null) {
+       S.values[d.key] = el.type === 'checkbox' ? el.checked : el.value;
+       S.touched.add(d.key); rerender = dependedOn(d.key);
+diff --git a/src/story_architect/web/js/forms/scene-editors.js b/src/story_architect/web/js/forms/scene-editors.js
+new file mode 100644
+index 0000000..5d4a24f
+--- /dev/null
++++ b/src/story_architect/web/js/forms/scene-editors.js
+@@ -0,0 +1,285 @@
++// Scene editors — value turns and the beat sheet.
++//
++// Two purpose-built widgets for the scene form, registered as kinds in DASH.efKinds. Each is one tab
++// of the scene overlay and is saved with the scene (the beat sheet is a separate record behind the
++// scenes; the writer never has to know).
++//
++// Value turns are built around the thing they are about: a value has four words (a "ladder"), a
++// turn is a move from one word to another, so you PICK the two words on the ladder instead of
++// typing them; and the protagonists to affect come from the chosen plot, so you tick which levels
++// the shift reaches instead of free-typing a name. What can't be wrong isn't offered.
++//
++// The server's validation is the authority (see core/manual_entities.py); this file only makes the
++// right thing the easy thing, and shows the server's messages where they belong.
++window.DASH = window.DASH || {};
++(function (D) {
++  'use strict';
++
++  const K = D.efKinds = D.efKinds || {};
++  const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
++    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
++  const eqCI = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
++  const list = (k) => (D.story || {})[k] || [];
++  const nameOf = (e) => e.name || e.title || e.id;
++  const byId = (k, id) => list(k).find((e) => e.id === id);
++  const nameIn = (k, id) => { const e = byId(k, id); return e ? nameOf(e) : id; };
++  const anyName = (id) => { for (const k of ['characters', 'relationships', 'locations', 'worlds']) { const e = byId(k, id); if (e) return nameOf(e); } return id; };
++  const setIn = (root, parts, val) => { let o = root; for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]]; o[parts[parts.length - 1]] = val; };
++  const idFor = (prefix, path) => `${prefix}-${path.replace(/\./g, '-')}`;
++  const sorted = (xs) => xs.slice().sort((a, b) => String(nameOf(a)).localeCompare(String(nameOf(b))));
++
++  const RUNGS = [
++    { key: 'p', code: 'P', help: 'Positive — the ideal' },
++    { key: 'c', code: 'C', help: 'Contrary — the opposite, not the absolute negation' },
++    { key: 'cd', code: 'CD', help: 'Contradictory — the direct negation' },
++    { key: 'nn', code: 'NN', help: 'Negation of the negation — a false version of the positive' },
++  ];
++  const act = (k, op, extra) => `data-act="ext" data-k="${k}" data-op="${op}"${extra || ''}`;
++  const msg = (path) => `<div class="ef-msg" data-msg="${h(path)}"></div>`;
++
++  // ═══ Value turns ═══════════════════════════════════════════════════════════
++  const valueOf = (name) => list('values').find((v) => eqCI(v.name, name));
++  const wordsOf = (v) => (v ? RUNGS.map((r) => ({ ...r, word: v[r.key] })).filter((w) => w.word) : []);
++
++  function normTurns(v) {
++    const s = (x) => String(x == null ? '' : x).trim();
++    const out = [];
++    (v || []).forEach((t) => {
++      const effects = (t.effects || []).map((e) => ({
++        character: s(e.character),
++        levels: (e.levels || []).map((l) => ({ conflict_level: s(l.conflict_level), effect: s(l.effect) })).filter((l) => l.conflict_level || l.effect),
++      })).filter((e) => e.character || e.levels.length);
++      const turn = { plot: s(t.plot), value: s(t.value), from: s(t.from), to: s(t.to), effects };
++      if (turn.plot || turn.value || turn.from || turn.to || effects.length) out.push(turn);
++    });
++    return out;
++  }
++
++  const select = (attrs, id, options, current, blank, stray) =>
++    `<select class="ef-input" ${attrs} id="${id}"><option value="">${blank}</option>
++      ${current && !options.some((o) => o[0] === current) ? `<option value="${h(current)}" selected>${h(stray || current)} (missing)</option>` : ''}
++      ${options.map(([v, l]) => `<option value="${h(v)}"${v === current ? ' selected' : ''}>${h(l)}</option>`).join('')}</select>`;
++
++  function ladder(t, i, pos, label) {
++    const v = valueOf(t.value), words = wordsOf(v), path = `value_turns.${i}.${pos}`;
++    const chips = words.map((w) => {
++      const on = eqCI(t[pos], w.word);
++      return `<button type="button" class="ve-chip${on ? ' on' : ''}" ${act('valueturns', 'pick', ` data-i="${i}" data-pos="${pos}" data-word="${h(w.word)}"`)} aria-pressed="${on}" title="${h(w.help)}"><i>${w.code}</i><span>${h(w.word)}</span></button>`;
++    }).join('');
++    const stray = t[pos] && v && !words.some((w) => eqCI(w.word, t[pos]))
++      ? `<button type="button" class="ve-chip on stray" ${act('valueturns', 'pick', ` data-i="${i}" data-pos="${pos}" data-word="${h(t[pos])}"`)} title="Not a word of this value">${h(t[pos])}</button>` : '';
++    return `<div class="ef-field"><div class="ef-label">${label}</div>
++      ${v ? `<div class="ve-ladder" role="group" aria-label="${h(label)}">${chips}${stray}</div>` : '<div class="ve-ladder none">Choose a value to see its four words.</div>'}
++      ${msg(path)}</div>`;
++  }
++
++  function effects(f, t, i) {
++    if (!t.plot) return '<div class="ef-note">Choose a plot to see its protagonists.</div>';
++    const plot = byId('plots', t.plot), prot = (plot && plot.characters) || [];
++    let html = prot.length ? '' : '<div class="ef-note ve-warn">This plot has no protagonists yet. Add them in the plot’s form (Plots → Edit), then come back.</div>';
++    html += prot.map((cid) => {
++      const ei = t.effects.findIndex((e) => e.character === cid), e = ei >= 0 ? t.effects[ei] : null, who = nameIn('characters', cid);
++      const toggles = f.levels.map((l) => {
++        const on = !!e && e.levels.some((x) => x.conflict_level === l.key);
++        return `<button type="button" class="ve-lv${on ? ' on' : ''}" ${act('valueturns', 'level', ` data-i="${i}" data-c="${h(cid)}" data-l="${l.key}"`)} aria-pressed="${on}" title="${h(l.help)}">${h(l.label)}</button>`;
++      }).join('');
++      const inputs = e ? e.levels.map((lv, li) => {
++        const lab = (f.levels.find((l) => l.key === lv.conflict_level) || {}).label || lv.conflict_level, vp = `${i}.effects.${ei}.levels.${li}.effect`;
++        return `<div class="ef-field"><label class="ef-label ve-small" for="${idFor('ve', vp)}">${h(lab)}</label>
++          <input class="ef-input" data-k="valueturns" data-vp="${vp}" data-path="value_turns.${vp}" id="${idFor('ve', vp)}" value="${h(lv.effect)}" autocomplete="off"
++            placeholder="One sentence: what this does to ${h(who)} at the ${h(lab.toLowerCase())} level">${msg('value_turns.' + vp)}</div>`;
++      }).join('') : '';
++      return `<div class="ve-eff"><div class="ve-who">${h(who)}</div><div class="ve-levels">${toggles}</div>${inputs}
++        ${e ? msg(`value_turns.${i}.effects.${ei}.character`) + msg(`value_turns.${i}.effects.${ei}.levels`) : ''}</div>`;
++    }).join('');
++    // Effects already written for someone who is not (or is no longer) a protagonist of this plot:
++    // shown, never silently dropped, and removable.
++    t.effects.forEach((e, ei) => {
++      if (prot.includes(e.character)) return;
++      html += `<div class="ve-eff stale"><div class="ve-who">${h(nameIn('characters', e.character) || 'Someone')} <span class="ve-note">— not a protagonist of this plot</span>
++        <button type="button" class="ef-rm" ${act('valueturns', 'eff-del', ` data-i="${i}" data-e="${ei}"`)} aria-label="Remove" title="Remove">×</button></div>
++        ${e.levels.map((l) => `<div class="ve-sub">${h(l.conflict_level)}: ${h(l.effect)}</div>`).join('')}${msg(`value_turns.${i}.effects.${ei}.character`)}</div>`;
++    });
++    return html;
++  }
++
++  function turnHtml(f, t, i) {
++    const plots = sorted(list('plots')).map((p) => [p.id, nameOf(p)]), values = sorted(list('values')).map((v) => [v.name, v.name]);
++    const sum = t.value && (t.from || t.to) ? `${h(t.value)}: ${h(t.from || '?')} → ${h(t.to || '?')}` : '';
++    const at = (leaf) => `data-k="valueturns" data-vp="${i}.${leaf}" data-path="value_turns.${i}.${leaf}"`;
++    return `<div class="ef-sub-card ve-turn">
++      <div class="ef-sub-card-h">Value turn ${i + 1}<span class="ve-sum">${sum}</span>
++        <button type="button" class="ef-rm ef-rm-card" ${act('valueturns', 'turn-del', ` data-i="${i}"`)} aria-label="Remove" title="Remove">×</button></div>
++      <div class="ef-grid">
++        <div class="ef-field"><label class="ef-label" for="${idFor('ve', i + '.plot')}">Plot</label>${select(at('plot'), idFor('ve', i + '.plot'), plots, t.plot, '— choose —')}${msg(`value_turns.${i}.plot`)}</div>
++        <div class="ef-field"><label class="ef-label" for="${idFor('ve', i + '.value')}">Value</label>${select(at('value'), idFor('ve', i + '.value'), values, valueOf(t.value) ? valueOf(t.value).name : t.value, '— choose —')}${msg(`value_turns.${i}.value`)}</div>
++      </div>
++      ${ladder(t, i, 'from', 'When the scene opens')}${ladder(t, i, 'to', 'When it closes')}
++      <div class="ef-field"><div class="ef-label">How it lands on the protagonists</div>${effects(f, t, i)}${msg(`value_turns.${i}.effects`)}</div></div>`;
++  }
++
++  K.valueturns = {
++    count: (f, v) => normTurns(v).length,
++    norm: (f, v) => normTurns(v),
++    html(f, c) {
++      const turns = c.S.values[f.key] || [];
++      return `<div class="ve-intro">A value turn records how a value shifts in this scene — and how that lands on each protagonist of the plot.</div>
++        ${turns.map((t, i) => turnHtml(f, t, i)).join('')}
++        <button type="button" class="ef-add" ${act('valueturns', 'turn-add')}>+ Add value turn</button>
++        ${!list('values').length ? '<div class="ef-note ve-warn">There are no values yet — create one from the Values view first.</div>' : ''}
++        ${!list('plots').length ? '<div class="ef-note ve-warn">There are no plots yet — create one from the Plots view first.</div>' : ''}`;
++    },
++    onInput(el, f, c) {
++      const turns = c.S.values[f.key], parts = el.dataset.vp.split('.');
++      setIn(turns, parts, el.value); c.touch(el.dataset.path);
++      const leaf = parts[parts.length - 1];
++      if (parts.length === 2 && (leaf === 'plot' || leaf === 'value')) {
++        const t = turns[+parts[0]];
++        if (leaf === 'value') {                                   // a different value has different words
++          const words = wordsOf(valueOf(t.value));
++          ['from', 'to'].forEach((p) => { if (!words.some((w) => eqCI(w.word, t[p]))) t[p] = ''; });
++        }
++        c.rerender(el.id);
++      }
++    },
++    onAct(op, el, f, c) {
++      const turns = c.S.values[f.key] = c.S.values[f.key] || [], i = +el.dataset.i;
++      if (op === 'turn-add') {
++        const roles = (c.S.values.plot_roles || []).map((r) => r.plot).filter(Boolean);   // this scene's own plot, if it has one
++        const plots = list('plots'), plot = roles[0] || (plots.length === 1 ? plots[0].id : '');
++        turns.push({ plot, value: '', from: '', to: '', effects: [] });
++        c.rerender(idFor('ve', `${turns.length - 1}.${plot ? 'value' : 'plot'}`));
++      } else if (op === 'turn-del') { turns.splice(i, 1); c.rerender(); }
++      else if (op === 'pick') {
++        const t = turns[i], word = el.dataset.word, pos = el.dataset.pos;
++        t[pos] = eqCI(t[pos], word) ? '' : word; c.touch(`value_turns.${i}.${pos}`); c.rerender();
++      } else if (op === 'eff-del') { turns[i].effects.splice(+el.dataset.e, 1); c.rerender(); }
++      else if (op === 'level') {
++        const t = turns[i], cid = el.dataset.c, lk = el.dataset.l, order = f.levels.map((l) => l.key);
++        let e = t.effects.find((x) => x.character === cid);
++        if (!e) { e = { character: cid, levels: [] }; t.effects.push(e); }
++        const at = e.levels.findIndex((l) => l.conflict_level === lk);
++        if (at >= 0) e.levels.splice(at, 1);
++        else { e.levels.push({ conflict_level: lk, effect: '' }); e.levels.sort((a, b) => order.indexOf(a.conflict_level) - order.indexOf(b.conflict_level)); }
++        if (!e.levels.length) t.effects.splice(t.effects.indexOf(e), 1);
++        const ei = t.effects.indexOf(e), li = e.levels.findIndex((l) => l.conflict_level === lk);
++        c.rerender(at < 0 && ei >= 0 ? idFor('ve', `${i}.effects.${ei}.levels.${li}.effect`) : null);
++      }
++    },
++    diff(f, a, b, c) {
++      const line = (t) => {
++        const eff = t.effects.map((e) => `${h(nameIn('characters', e.character))} — ${e.levels.map((l) => `${h(l.conflict_level)}: ${h(l.effect)}`).join('; ')}`);
++        return `<b>${h(nameIn('plots', t.plot) || '?')}</b> · ${h(t.value || '?')}: ${h(t.from || '?')} → ${h(t.to || '?')}${eff.map((x) => `<div class="ve-sub">${x}</div>`).join('')}`;
++      };
++      const items = (v) => normTurns(v).map((t) => ({ key: JSON.stringify(t), html: line(t) }));
++      return c.listDiff(items(a), items(b));
++    },
++  };
++
++  // ═══ Beat sheet ════════════════════════════════════════════════════════════
++  const BLANK_SIDE = () => ({ by: '', surface: '', subtext: '' });
++  const blankBeat = (by) => ({ action: { ...BLANK_SIDE(), by: by || '' }, reaction: BLANK_SIDE(), gap: '' });
++
++  function normSheet(v) {
++    const s = (x) => String(x == null ? '' : x).trim(), v_ = v || {};
++    const side = (o) => ({ by: s((o || {}).by), surface: s((o || {}).surface), subtext: s((o || {}).subtext) });
++    return {
++      driver: s(v_.driver), turning_point: s(v_.turning_point),
++      true_character: (v_.true_character || []).map((t) => ({ character: s(t.character), dilemma: s(t.dilemma), choice_reveals: s(t.choice_reveals) })).filter((t) => Object.values(t).some(Boolean)),
++      changes: (v_.changes || []).map((c) => ({ entity: s(c.entity), change: s(c.change) })).filter((c) => c.entity || c.change),
++      beats: (v_.beats || []).map((b) => ({ action: side(b.action), reaction: side(b.reaction), gap: s(b.gap) }))
++        .filter((b) => Object.values(b.action).some(Boolean) || Object.values(b.reaction).some(Boolean) || b.gap),
++    };
++  }
++
++  const groups = (types, current) => {
++    let known = false;
++    const html = types.map(([k, title]) => {
++      const opts = sorted(list(k)).map((e) => { if (e.id === current) known = true; return `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(nameOf(e))}</option>`; }).join('');
++      return opts ? `<optgroup label="${title}">${opts}</optgroup>` : '';
++    }).join('');
++    return (current && !known ? `<option value="${h(current)}" selected>${h(current)} (missing)</option>` : '') + html;
++  };
++  const BY = [['characters', 'Characters'], ['locations', 'Locations'], ['worlds', 'Worlds']];
++  const CHANGED = [['characters', 'Characters'], ['relationships', 'Relationships'], ['locations', 'Locations'], ['worlds', 'Worlds']];
++
++  const bp = (path) => `data-k="beatsheet" data-bp="${path}" data-path="beat_sheet.${path}" id="${idFor('bs', path)}"`;
++  const field = (label, path, control, help, wide) => `<div class="ef-field${wide ? ' ef-wide' : ''}"><label class="ef-label" for="${idFor('bs', path)}">${label}</label>${control}${help ? `<div class="ef-help">${help}</div>` : ''}${msg('beat_sheet.' + path)}</div>`;
++  const text = (path, v, ph) => `<input class="ef-input" ${bp(path)} value="${h(v)}" autocomplete="off"${ph ? ` placeholder="${h(ph)}"` : ''}>`;
++  const area = (path, v, ph) => `<textarea class="ef-input" ${bp(path)} rows="2"${ph ? ` placeholder="${h(ph)}"` : ''}>${h(v)}</textarea>`;
++  const pick = (path, v, types, blank) => `<select class="ef-input" ${bp(path)}><option value="">${blank}</option>${groups(types, v)}</select>`;
++  const head = (title, help) => `<div class="ve-section"><div class="ve-section-h">${title}</div>${help ? `<div class="ef-help">${help}</div>` : ''}</div>`;
++  const ctl = (op, i, label, glyph, off) => `<button type="button" class="ro-btn" ${act('beatsheet', op, ` data-i="${i}"`)} aria-label="${label}" title="${label}"${off ? ' disabled' : ''}>${glyph}</button>`;
++
++  function beatCard(b, i, n) {
++    const side = (kind, title) => `<div class="ve-side"><div class="ve-side-h">${title}</div>
++      ${field('By', `beats.${i}.${kind}.by`, pick(`beats.${i}.${kind}.by`, b[kind].by, BY, '— nobody —'))}
++      ${field('Surface', `beats.${i}.${kind}.surface`, area(`beats.${i}.${kind}.surface`, b[kind].surface), 'What is shown or said.')}
++      ${field('Subtext', `beats.${i}.${kind}.subtext`, text(`beats.${i}.${kind}.subtext`, b[kind].subtext), 'The underlying action, as a gerund phrase — “testing the rules”.')}</div>`;
++    return `<div class="ef-sub-card"><div class="ef-sub-card-h">Beat ${i + 1}<span class="ve-ctl">${ctl('beat-up', i, 'Move up', '↑', i === 0)}${ctl('beat-down', i, 'Move down', '↓', i === n - 1)}
++        <button type="button" class="ef-rm" ${act('beatsheet', 'beat-del', ` data-i="${i}"`)} aria-label="Remove" title="Remove">×</button></span></div>
++      <div class="ef-grid">${side('action', 'Action')}${side('reaction', 'Reaction')}
++        ${field('Gap', `beats.${i}.gap`, area(`beats.${i}.gap`, b.gap), 'The break between what was expected and what came back. Leave empty if this beat is only activity.', true)}</div>
++      ${msg(`beat_sheet.beats.${i}`)}</div>`;
++  }
++
++  K.beatsheet = {
++    count: (f, v) => normSheet(v).beats.length,
++    norm: (f, v) => normSheet(v),
++    html(f, c) {
++      const s = c.S.values[f.key] = Object.assign({ driver: '', turning_point: '', true_character: [], changes: [], beats: [] }, c.S.values[f.key]);
++      const tc = s.true_character.map((t, i) => `<div class="ef-sub-card"><div class="ef-sub-card-h">Moment ${i + 1}
++          <button type="button" class="ef-rm ef-rm-card" ${act('beatsheet', 'tc-del', ` data-i="${i}"`)} aria-label="Remove" title="Remove">×</button></div>
++        <div class="ef-grid">${field('Character', `true_character.${i}.character`, pick(`true_character.${i}.character`, t.character, [['characters', 'Characters']], '— choose —'))}
++          ${field('What the choice reveals', `true_character.${i}.choice_reveals`, text(`true_character.${i}.choice_reveals`, t.choice_reveals))}
++          ${field('The dilemma', `true_character.${i}.dilemma`, area(`true_character.${i}.dilemma`, t.dilemma), 'The alternatives, and what choosing costs.', true)}</div></div>`).join('');
++      const ch = s.changes.map((x, i) => `<div class="ef-sub-card"><div class="ef-sub-card-h">Change ${i + 1}
++          <button type="button" class="ef-rm ef-rm-card" ${act('beatsheet', 'ch-del', ` data-i="${i}"`)} aria-label="Remove" title="Remove">×</button></div>
++        <div class="ef-grid">${field('Who or what', `changes.${i}.entity`, pick(`changes.${i}.entity`, x.entity, CHANGED, '— choose —'))}
++          ${field('What is different now', `changes.${i}.change`, area(`changes.${i}.change`, x.change), 'The new state, not the event.')}</div></div>`).join('');
++      return `<div class="ve-intro">The scene’s beat sheet: who drives it, where it turns, and the beats of action and reaction. The scene’s objective is on the Fields tab.</div>
++        <div class="ef-grid">${field('Driver', 'driver', pick('driver', s.driver, [['characters', 'Characters']], '— none —'), 'The character who drives the scene.')}
++          ${field('Turning point', 'turning_point', area('turning_point', s.turning_point), 'The moment the biggest gap opens and the value turns. It starts the closing state — it doesn’t resolve it.')}</div>
++        ${head('True-character moments', 'Choices that reveal who a character really is. None, one or several.')}${tc}
++        <button type="button" class="ef-add" ${act('beatsheet', 'tc-add')}>+ Add moment</button>
++        ${head('What changed by the end', 'Only where something changed. No entry means unchanged.')}${ch}
++        <button type="button" class="ef-add" ${act('beatsheet', 'ch-add')}>+ Add change</button>
++        ${head('Beats', 'In order. A beat with no gap is activity, not action.')}${s.beats.map((b, i) => beatCard(b, i, s.beats.length)).join('')}
++        <button type="button" class="ef-add" ${act('beatsheet', 'beat-add')}>+ Add beat</button>`;
++    },
++    onInput(el, f, c) {
++      setIn(c.S.values[f.key], el.dataset.bp.split('.'), el.value); c.touch(el.dataset.path);
++    },
++    onAct(op, el, f, c) {
++      const s = c.S.values[f.key], i = +el.dataset.i;
++      if (op === 'tc-add') { s.true_character.push({ character: '', dilemma: '', choice_reveals: '' }); c.rerender(idFor('bs', `true_character.${s.true_character.length - 1}.character`)); }
++      else if (op === 'tc-del') { s.true_character.splice(i, 1); c.rerender(); }
++      else if (op === 'ch-add') { s.changes.push({ entity: '', change: '' }); c.rerender(idFor('bs', `changes.${s.changes.length - 1}.entity`)); }
++      else if (op === 'ch-del') { s.changes.splice(i, 1); c.rerender(); }
++      else if (op === 'beat-add') { s.beats.push(blankBeat(s.driver)); c.rerender(idFor('bs', `beats.${s.beats.length - 1}.action.${s.driver ? 'surface' : 'by'}`)); }
++      else if (op === 'beat-del') { s.beats.splice(i, 1); c.rerender(); }
++      else if (op === 'beat-up' && i > 0) { [s.beats[i - 1], s.beats[i]] = [s.beats[i], s.beats[i - 1]]; c.rerender(); }
++      else if (op === 'beat-down' && i < s.beats.length - 1) { [s.beats[i + 1], s.beats[i]] = [s.beats[i], s.beats[i + 1]]; c.rerender(); }
++    },
++    diff(f, a, b, c) {
++      const items = (v) => {
++        const s = normSheet(v), out = [];
++        const clip = (x) => (x.length > 90 ? x.slice(0, 90) + '…' : x);
++        if (s.driver) out.push({ key: 'd:' + s.driver, html: `Driver: ${h(nameIn('characters', s.driver))}` });
++        if (s.turning_point) out.push({ key: 't:' + s.turning_point, html: `Turning point: ${h(clip(s.turning_point))}` });
++        s.true_character.forEach((t) => out.push({ key: 'tc:' + JSON.stringify(t), html: `True-character: ${h(nameIn('characters', t.character))}${t.dilemma ? ' — ' + h(clip(t.dilemma)) : ''}${t.choice_reveals ? ' → ' + h(clip(t.choice_reveals)) : ''}` }));
++        s.changes.forEach((x) => out.push({ key: 'c:' + JSON.stringify(x), html: `Changed: ${h(anyName(x.entity))} — ${h(clip(x.change))}` }));
++        s.beats.forEach((x) => {
++          const side = (o) => `${o.by ? h(anyName(o.by)) + ': ' : ''}${h(clip(o.surface || o.subtext || '…'))}`;
++          out.push({ key: 'b:' + JSON.stringify(x), html: `Beat: ${side(x.action)} ⇄ ${side(x.reaction)}${x.gap ? ' — gap: ' + h(clip(x.gap)) : ''}` });
++        });
++        return out;
++      };
++      const was = items(a), now = items(b), r = c.listDiff(was, now);
++      // Same beats, different order: the list diff sees nothing, so say it.
++      if (JSON.stringify(normSheet(a).beats) !== JSON.stringify(normSheet(b).beats)
++          && JSON.stringify(was.map((x) => x.key).sort()) === JSON.stringify(now.map((x) => x.key).sort())) r[1] += '<br><span class="add">Beats reordered</span>';
++      return r;
++    },
++  };
++})(window.DASH);
+diff --git a/tests/test_manual_scene_editors.py b/tests/test_manual_scene_editors.py
+new file mode 100644
+index 0000000..f7e4e6b
+--- /dev/null
++++ b/tests/test_manual_scene_editors.py
+@@ -0,0 +1,301 @@
++"""Scene form, part two: value turns and the beat sheet.
++
++Both are edited on the scene's own overlay. Value turns are stored on the scene; the beat
++sheet is a separate record (`<scene>-beats`) the form reads and writes alongside it. These tests
++read back through the same write path the agent uses, and check that what the form accepts is
++what the core accepts, because a form that passes what the write path then refuses is worse
++than no form."""
++import json
++
++import pytest
++
++from story_architect.core import manual_entities as me
++from story_architect.core.db import get_db
++from story_architect.core.writes import create_entity, edit_entity
++
++TURN = {"plot": "main", "value": "trust", "from": "trust", "to": "betrayal",
++        "effects": [{"character": "kael", "levels": [
++            {"conflict_level": "inner", "effect": "He doubts his own judgement."},
++            {"conflict_level": "personal", "effect": "Mira's loyalty is in question."}]}]}
++
++
++@pytest.fixture
++def project(tmp_path):
++    from story_architect.core.writes import create_project
++    (tmp_path / "projects").mkdir()
++    create_project("demo", {"name": "Demo"}, tmp_path)
++    p = tmp_path / "projects" / "demo"
++    for slug, name in (("kael", "Kael"), ("mira", "Mira"), ("oak", "Oak")):
++        create_entity(p, "character", slug, {"name": name, "one_sentence": "x"})
++    create_entity(p, "location", "kitchen", {"name": "Kitchen", "one_sentence": "x"})
++    create_entity(p, "world", "gilead", {"name": "Gilead", "one_sentence": "x"})
++    create_entity(p, "relationship", "kael-mira", {"name": "Kael & Mira", "characters": ["kael", "mira"],
++                                                   "perspectives": {"kael": {}, "mira": {}}})
++    create_entity(p, "value", "trust", {"name": "trust", "p": "trust", "c": "distrust", "cd": "betrayal", "nn": "blind faith"})
++    create_entity(p, "plot", "main", {"name": "The Escape", "characters": ["kael"]})
++    create_entity(p, "act", "a1", {"title": "Act One", "order": 1})
++    create_entity(p, "sequence", "s1", {"title": "Seq", "act_id": "a1", "order": 1})
++    create_entity(p, "scene", "sc1", {"title": "Dinner", "sequence_id": "s1", "act_id": "a1"})
++    return p
++
++
++def _extra(p, eid):
++    conn = get_db(p)
++    try:
++        r = conn.execute("SELECT extra FROM entities WHERE id=?", (eid,)).fetchone()
++        return json.loads(r[0]) if r and r[0] else None
++    finally:
++        conn.close()
++
++
++def _save(p, scene_id="sc1", **changes):
++    cur = me.load_entity(p, "scene", scene_id)
++    return me.edit_form_entity(p, "scene", scene_id, {"base_version": cur["version"],
++                                                      "values": {**cur["values"], **changes}})
++
++
++def _errors(p, values, scene_id="sc1"):
++    cur = me.load_entity(p, "scene", scene_id)
++    return me.check_entity(p, "scene", {"values": {**cur["values"], **values}}, scene_id)
++
++
++# ─── spec ────────────────────────────────────────────────────────────────────
++
++class TestSpec:
++    def test_two_tabs_and_their_editors(self):
++        sp = me.form_spec("scene")
++        by = {f["key"]: f for f in sp["fields"]}
++        assert [t["id"] for t in sp["tabs"]] == ["turns", "beats"]
++        assert by["value_turns"]["kind"] == "valueturns" and by["value_turns"]["tab"] == "turns"
++        assert [l["key"] for l in by["value_turns"]["levels"]] == ["inner", "personal", "extra-personal"]
++        assert by["beat_sheet"]["kind"] == "beatsheet" and by["beat_sheet"]["tab"] == "beats"
++        assert by["beat_sheet"]["default"] == {"driver": "", "turning_point": "", "true_character": [], "changes": [], "beats": []}
++
++    def test_other_types_have_no_extra_tabs(self):
++        assert "tabs" not in me.form_spec("character")
++
++
++# ─── value turns ─────────────────────────────────────────────────────────────
++
++class TestValueTurns:
++    def test_round_trip_reaches_the_write_path_unchanged(self, project):
++        out = _save(project, value_turns=[TURN])
++        assert out["values"]["value_turns"] == [TURN]
++        assert _extra(project, "sc1")["value_turns"] == [TURN]          # stored exactly as the agent stores it
++
++    def test_empty_shells_are_dropped_not_errors(self, project):
++        shells = [{"plot": "", "value": "", "from": "", "to": "", "effects": []},
++                  {**TURN, "effects": TURN["effects"] + [{"character": "", "levels": []},
++                                                         {"character": "", "levels": [{"conflict_level": "", "effect": ""}]}]}]
++        out = _save(project, value_turns=shells)
++        assert out["values"]["value_turns"] == [TURN]
++
++    def test_each_missing_piece_names_its_field(self, project):
++        e = _errors(project, {"value_turns": [{"plot": "", "value": "", "from": "", "to": "", "effects": [
++            {"character": "kael", "levels": [{"conflict_level": "inner", "effect": "x"}]}]}]})["errors"]
++        assert e["value_turns.0.plot"] == "Choose the plot this shift belongs to."
++        assert e["value_turns.0.value"] == "Choose the value that shifts."
++        assert "when the scene opens" in e["value_turns.0.from"] and "when the scene closes" in e["value_turns.0.to"]
++
++    def test_a_word_must_belong_to_the_value(self, project):
++        e = _errors(project, {"value_turns": [{**TURN, "from": "serenity"}]})["errors"]
++        assert e["value_turns.0.from"] == "“serenity” isn’t one of the words of “trust”."
++
++    def test_words_match_case_insensitively_like_the_core(self, project):
++        assert _errors(project, {"value_turns": [{**TURN, "value": "TRUST", "from": "Trust"}]})["ok"]
++
++    def test_effects_are_required(self, project):
++        e = _errors(project, {"value_turns": [{**TURN, "effects": []}]})["errors"]
++        assert "tick at least one level" in e["value_turns.0.effects"]
++
++    def test_only_protagonists_of_the_plot(self, project):
++        bad = {**TURN, "effects": [{"character": "mira", "levels": TURN["effects"][0]["levels"]}]}
++        e = _errors(project, {"value_turns": [bad]})["errors"]
++        assert e["value_turns.0.effects.0.character"] == ("Mira isn’t a protagonist of “The Escape”. "
++                                                          "Add them to the plot first, or remove this effect.")
++
++    def test_a_level_needs_its_sentence_and_circles_are_unique(self, project):
++        bad = {**TURN, "effects": [{"character": "kael", "levels": [
++            {"conflict_level": "inner", "effect": ""}, {"conflict_level": "inner", "effect": "x"}]}]}
++        e = _errors(project, {"value_turns": [bad]})["errors"]
++        assert e["value_turns.0.effects.0.levels.0.effect"] == "Say in one sentence what this does to Kael at the inner level."
++        assert e["value_turns.0.effects.0.levels.1.conflict_level"] == "One entry per level."
++
++    def test_a_character_twice_and_a_card_with_no_levels(self, project):
++        e = _errors(project, {"value_turns": [{**TURN, "effects": [
++            {"character": "kael", "levels": TURN["effects"][0]["levels"]},
++            {"character": "kael", "levels": []}]}]})["errors"]
++        assert "appears twice" in e["value_turns.0.effects.1.character"]
++        assert e["value_turns.0.effects.1.levels"] == "Tick at least one level."
++
++    def test_no_shift_is_a_warning_not_an_error(self, project):
++        chk = _errors(project, {"value_turns": [{**TURN, "to": "trust"}]})
++        assert chk["ok"] and "ends where it started" in chk["warnings"]["value_turns.0.to"]
++
++    def test_whatever_the_form_accepts_the_core_accepts(self, project):
++        from story_architect.core.entity import validate_scene_value_turns
++        turns = me.load_entity(project, "scene", "sc1")["values"]["value_turns"] + [TURN]
++        assert _errors(project, {"value_turns": turns})["ok"]
++        validate_scene_value_turns(project, turns)                     # raises if the core disagrees
++
++    def test_a_stale_turn_is_explained_on_its_card_and_removing_it_unblocks_the_scene(self, project):
++        """The write path re-validates stored turns on ANY scene edit, so a stale one blocks
++        unrelated changes. The form says why, in place, instead of passing a check the save then fails."""
++        conn = get_db(project)
++        try:
++            ex = _extra(project, "sc1")
++            ex["value_turns"] = [{**TURN, "value": "deleted-value"}]
++            conn.execute("UPDATE entities SET extra=? WHERE id='sc1'", (json.dumps(ex),))
++        finally:
++            conn.close()
++        chk = _errors(project, {"one_sentence": "New summary."})
++        assert not chk["ok"] and "isn’t a defined value" in chk["errors"]["value_turns.0.value"]
++        with pytest.raises(me.EntityInvalid):
++            _save(project, one_sentence="New summary.")
++        assert _save(project, one_sentence="New summary.", value_turns=[])["values"]["one_sentence"] == "New summary."
++
++
++# ─── beat sheet ──────────────────────────────────────────────────────────────
++
++SHEET = {"driver": "kael", "turning_point": "The door swings open.",
++         "true_character": [{"character": "kael", "dilemma": "Stay or go.", "choice_reveals": "He goes."}],
++         "changes": [{"entity": "kael-mira", "change": "They now trust each other less."},
++                     {"entity": "kitchen", "change": "No longer safe."}],
++         "beats": [{"action": {"by": "kael", "surface": "Tries the handle.", "subtext": "testing the rules"},
++                    "reaction": {"by": "kitchen", "surface": "It gives.", "subtext": ""}, "gap": "It was never locked."},
++                   {"action": {"by": "", "surface": "", "subtext": ""},
++                    "reaction": {"by": "mira", "surface": "Mira freezes.", "subtext": "hiding fear"}, "gap": ""}]}
++
++
++class TestBeatSheet:
++    def test_blank_until_there_is_a_record(self, project):
++        v = me.load_entity(project, "scene", "sc1")["values"]
++        assert v["beat_sheet"] == me.BLANK_SHEET and _extra(project, "sc1-beats") is None
++
++    def test_first_save_makes_the_record(self, project):
++        out = _save(project, beat_sheet=SHEET)
++        assert out["values"]["beat_sheet"] == SHEET
++        rec = _extra(project, "sc1-beats")
++        assert rec["driver"] == "kael" and rec["beats"][0]["gap"] == "It was never locked."
++        conn = get_db(project)
++        try:
++            assert conn.execute("SELECT parent_id FROM entities WHERE id='sc1-beats'").fetchone()[0] == "sc1"
++        finally:
++            conn.close()
++
++    def test_a_scene_made_with_a_sheet_gets_its_record(self, project):
++        out = me.create_form_entity(project, "scene", {"values": {"title": "Breakfast", "sequence_id": "s1",
++                                                                  "beat_sheet": SHEET}})
++        assert out["values"]["beat_sheet"] == SHEET and _extra(project, f"{out['id']}-beats")["driver"] == "kael"
++
++    def test_a_scene_made_without_one_does_not_get_an_empty_record(self, project):
++        out = me.create_form_entity(project, "scene", {"values": {"title": "Breakfast", "sequence_id": "s1"}})
++        assert _extra(project, f"{out['id']}-beats") is None
++
++    def test_second_save_edits_only_what_changed(self, project, monkeypatch):
++        _save(project, beat_sheet=SHEET)
++        sent = []
++        from story_architect.core import writes
++        real = writes.edit_entity
++        monkeypatch.setattr(writes, "edit_entity", lambda p, t, i, d, s: sent.append((t, i, d)) or real(p, t, i, d, s))
++        cur = me.load_entity(project, "scene", "sc1")["values"]["beat_sheet"]
++        cur["turning_point"] = "The door swings wide."
++        _save(project, beat_sheet=cur)
++        assert sent == [("scene_beats", "sc1-beats", {"turning_point": "The door swings wide."})]
++
++    def test_a_scene_only_edit_leaves_the_record_alone(self, project, monkeypatch):
++        _save(project, beat_sheet=SHEET)
++        sent = []
++        from story_architect.core import writes
++        real = writes.edit_entity
++        monkeypatch.setattr(writes, "edit_entity", lambda p, t, i, d, s: sent.append(t) or real(p, t, i, d, s))
++        _save(project, one_sentence="Only the scene.")
++        assert sent == ["scene"]
++
++    def test_there_is_one_objective_and_it_is_the_scenes(self, project):
++        create_entity(project, "scene_beats", "sc1-beats", {"scene": "sc1", "scene_objective": "From the beats"})
++        cur = me.load_entity(project, "scene", "sc1")["values"]
++        assert cur["scene_objective"] == "From the beats"               # the same merge the dashboard shows
++        assert "scene_objective" not in cur["beat_sheet"]
++        _save(project, scene_objective="Edited here")
++        assert _extra(project, "sc1")["scene_objective"] == "Edited here"
++        assert _extra(project, "sc1-beats")["scene_objective"] == "From the beats"    # the record is not rewritten
++
++    def test_empty_entries_are_dropped(self, project):
++        out = _save(project, beat_sheet={**SHEET, "true_character": [{"character": "", "dilemma": "", "choice_reveals": ""}],
++                                         "changes": [], "beats": [SHEET["beats"][0], {"action": {}, "reaction": {}, "gap": ""}]})
++        assert out["values"]["beat_sheet"]["true_character"] == [] and len(out["values"]["beat_sheet"]["beats"]) == 1
++
++    def test_every_reference_names_its_field(self, project):
++        bad = {**SHEET, "driver": "ghost",
++               "true_character": [{"character": "", "dilemma": "d", "choice_reveals": ""}],
++               "changes": [{"entity": "nowhere", "change": "x"}, {"entity": "kael", "change": ""}],
++               "beats": [{"action": {"by": "kael-mira", "surface": "s", "subtext": ""}, "reaction": {"by": "", "surface": "", "subtext": ""}, "gap": ""},
++                         {"action": {"by": "kael", "surface": "", "subtext": ""}, "reaction": {"by": "", "surface": "", "subtext": ""}, "gap": ""}]}
++        e = _errors(project, {"beat_sheet": bad})["errors"]
++        assert "ghost" in e["beat_sheet.driver"]
++        assert e["beat_sheet.true_character.0.character"] == "Choose who faces the choice."
++        assert "nowhere" in e["beat_sheet.changes.0.entity"]
++        assert e["beat_sheet.changes.1.change"] == "Say what is different for Kael now — the new state, not the event."
++        assert "isn’t a character, location or world" in e["beat_sheet.beats.0.action.by"]     # a relationship cannot act
++        assert e["beat_sheet.beats.1"].startswith("A beat needs something")
++
++    def test_a_relationship_can_be_what_changed_but_not_who_acts(self, project):
++        ok = {**SHEET, "beats": []}
++        assert _errors(project, {"beat_sheet": ok})["ok"]                # changes[].entity = a relationship: fine
++
++    def test_whatever_the_form_accepts_the_core_accepts(self, project):
++        from story_architect.core.entity import validate_scene_beats
++        assert _errors(project, {"beat_sheet": SHEET})["ok"]
++        _save(project, beat_sheet=SHEET)                                # the write path ran its own validation
++
++    def test_the_agent_changing_the_record_is_a_conflict(self, project):
++        _save(project, beat_sheet=SHEET)
++        cur = me.load_entity(project, "scene", "sc1")
++        edit_entity(project, "scene_beats", "sc1-beats", {"turning_point": "Agent rewrote this."}, "agent")
++        with pytest.raises(me.EntityConflict):
++            me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"],
++                                                          "values": {**cur["values"], "one_sentence": "x"}})
++        assert me.load_entity(project, "scene", "sc1")["values"]["beat_sheet"]["turning_point"] == "Agent rewrote this."
++
++    def test_scene_saved_but_beats_failed_says_which(self, project, monkeypatch):
++        from story_architect.core import writes
++        real = writes.create_entity
++        def boom(p, t, i, fm, sec=None):
++            if t == "scene_beats":
++                raise ValueError("beats exploded")
++            return real(p, t, i, fm, sec or {})
++        monkeypatch.setattr(writes, "create_entity", boom)
++        cur = me.load_entity(project, "scene", "sc1")
++        with pytest.raises(me.EntityInvalid) as e:
++            me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"], "values": {
++                **cur["values"], "one_sentence": "Saved.", "beat_sheet": SHEET}})
++        assert "The scene was saved, but the beats were not: beats exploded" in e.value.errors["_form"]
++        assert me.load_entity(project, "scene", "sc1")["values"]["one_sentence"] == "Saved."
++
++    def test_deleting_the_scene_takes_its_beats_and_says_so(self, project):
++        _save(project, beat_sheet=SHEET)
++        prev = me.delete_preview(project, "scene", "sc1")
++        assert [c["id"] for c in prev["also_deleted"]] == ["sc1-beats"]
++        me.delete_form_entity(project, "scene", "sc1")
++        with pytest.raises(me.EntityNotFound):
++            me.load_entity(project, "scene", "sc1")
++
++
++# ─── over HTTP ───────────────────────────────────────────────────────────────
++
++class TestHttp:
++    def test_turns_and_beats_round_trip(self, project, monkeypatch):
++        from fastapi.testclient import TestClient
++        from story_architect.app.config import Config
++        from story_architect.app.server import create_app
++        monkeypatch.setattr("story_architect.app.token.load_api_key", lambda: "k")
++        c = TestClient(create_app(Config(root=project.parent.parent, port=8731)), base_url="http://127.0.0.1:8731")
++        c.headers.update({"X-Story-Architect": "1"})
++        d = c.get("/api/projects/demo/entities/scene/sc1/form").json()
++        r = c.put("/api/projects/demo/entities/scene/sc1", json={"base_version": d["version"], "values": {
++            **d["values"], "value_turns": [TURN], "beat_sheet": SHEET}})
++        assert r.status_code == 200 and r.json()["values"]["beat_sheet"]["driver"] == "kael"
++        bad = {**r.json()["values"], "value_turns": [{**TURN, "from": "serenity"}]}
++        r2 = c.put("/api/projects/demo/entities/scene/sc1", json={"base_version": r.json()["version"], "values": bad})
++        assert r2.status_code == 422 and "value_turns.0.from" in r2.json()["error"]["errors"]
+diff --git a/tests/test_manual_structure.py b/tests/test_manual_structure.py
+index 36bfe1f..2c042b4 100644
+--- a/tests/test_manual_structure.py
++++ b/tests/test_manual_structure.py
+@@ -65,7 +65,8 @@ class TestSpec:
+         assert "order" not in by and "act_id" not in by            # Reorder's, not the form's
+         assert by["sequence_id"]["required"] and by["sequence_id"]["ref"] == "sequence"
+         assert all(by[k]["kind"] == "linked" for k in ("heading", "location", "time_of_day", "characters"))
+-        assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "computed"
++        assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "valueturns"
++        assert "turning_point" not in by and "scene_beats" not in by          # they live in the Beats tab
+         assert "Content" not in sp["sections"] and sp["script_link"]
+         assert [f["key"] for f in sp["fields"]][:3] == ["title", "sequence_id", "status"]
+ 

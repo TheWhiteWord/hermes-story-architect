@@ -5,7 +5,8 @@
 // appears here with no change to this file. Nothing here knows what a
 // "character" is; it knows kinds: text, textarea, select, ref, reflist, list,
 // perspectives (a card per chosen entity), repeater (a stack of small cards), linked,
-// computed.
+// computed — plus any kind a plugin registers in DASH.efKinds (see scene-editors.js), which brings
+// its own widget, normalisation and review diff, and may live on a tab of its own.
 //
 //   DASH.openEntityForm({ type, id?, values? })   id => edit, no id => create
 //
@@ -53,6 +54,25 @@ window.DASH = window.DASH || {};
   }
 
   D.efToast = toast;
+  D.efKinds = D.efKinds || {};                       // kind -> { html, norm, onInput, onAct, diff, count }
+  const plugin = (f) => D.efKinds[f.kind];
+  // What a plugin may use. Everything else about the form stays private to this file.
+  const ctx = () => ({
+    S, h, clone, eq, refName, field: (k) => S.spec.fields.find((f) => f.key === k),
+    touch: (path) => S.touched.add(path),
+    after: () => afterEdit(),
+    rerender: (focusId) => { renderBody(); if (focusId) { const n = document.getElementById(focusId); if (n) n.focus(); } },
+    // Two lists of {key, html}. Only what DIFFERS is shown — a one-word fix to a long beat sheet
+    // should read as one line — with a quiet count of how much stayed the same.
+    listDiff: (xs, ys) => {
+      const xk = xs.map((i) => i.key), yk = ys.map((i) => i.key);
+      const gone = xs.filter((i) => !yk.includes(i.key)), added = ys.filter((i) => !xk.includes(i.key));
+      const same = ys.length - added.length;
+      const note = same ? `<div class="ve-sub">${same} unchanged</div>` : '';
+      return [gone.length ? gone.map((i) => `<span class="del">${i.html}</span>`).join('<br>') : '—',
+        (added.length ? added.map((i) => `<span class="add">${i.html}</span>`).join('<br>') : '—') + note];
+    },
+  });
 
   // ─── Values: normalise, diff, dirty ──────────────────────────────────────
   const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && f.kind !== 'unsupported');
@@ -67,6 +87,7 @@ window.DASH = window.DASH || {};
       let v = values[f.key];
       if (f.show_if && !Object.keys(f.show_if).every((k) => values[k] === f.show_if[k])) v = clone(f.default);
       else if (f.kind === 'list' || f.kind === 'reflist') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
+      else if (plugin(f)) v = plugin(f).norm(f, v);
       else if (f.kind === 'repeater') {
         v = (v || []).map((r) => { const o = {}; f.fields.forEach((sf) => { o[sf.key] = String(r[sf.key] == null ? '' : r[sf.key]).trim(); }); return o; })
           .filter((r) => Object.values(r).some(Boolean));
@@ -169,14 +190,18 @@ window.DASH = window.DASH || {};
     const filled = S.spec.sections.filter((n) => String(S.sections[n] || '').trim()).length;
     const tab = (id, label, extra) => `<button class="ef-tab${S.tab === id ? ' active' : ''}" data-act="tab" data-tab="${id}">${label}${extra || ''}<i class="ef-dot" data-dot="${id}"></i></button>`;
     const script = S.spec.script_link && S.mode === 'edit' ? tab('script', 'Script') : '';
-    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${script}</div>`;
+    const extra = (S.spec.tabs || []).map((t) => {
+      const f = S.spec.fields.find((x) => x.tab === t.id), n = f && plugin(f) && plugin(f).count ? plugin(f).count(f, S.values[f.key]) : 0;
+      return tab(t.id, t.label, n ? `<small>${n}</small>` : '');
+    }).join('');
+    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${extra}${script}</div>`;
   }
 
   function renderBody() {
     const body = document.getElementById('ef-body'); if (!body) return;
     const top = body.scrollTop;
     body.innerHTML = S.step === 'review' ? reviewHtml() : S.step === 'delete' ? deleteHtml()
-      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : fieldsHtml());
+      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : S.tab === 'fields' ? fieldsHtml() : tabFieldsHtml(S.tab));
     body.scrollTop = top;
     body.querySelectorAll('textarea').forEach(autosize);
     paintMessages();
@@ -184,7 +209,7 @@ window.DASH = window.DASH || {};
 
   function fieldsHtml() {
     let last = null, html = '';
-    S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && visible(f)).forEach((f) => {
+    S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && !f.tab && visible(f)).forEach((f) => {
       if ((f.group || null) !== last) { last = f.group || null; if (last) html += `<h3 class="ef-group">${h(last)}</h3>`; }
       html += fieldHtml(f);
     });
@@ -192,7 +217,11 @@ window.DASH = window.DASH || {};
     return html + (derived ? `<div class="ef-derived">${derived}</div>` : '');
   }
 
+  // A tab of its own: the fields that declare `tab`, each drawn by its plugin.
+  const tabFieldsHtml = (id) => S.spec.fields.filter((f) => f.tab === id).map(fieldHtml).join('');
+
   function fieldHtml(f) {
+    if (plugin(f)) return `<div class="ef-field">${plugin(f).html(f, ctx())}<div class="ef-msg" data-msg="${h(f.key)}"></div></div>`;
     const locked = S.mode === 'edit' && f.locked_on_edit;
     const note = locked ? f.locked_on_edit : f.help;
     const err = `<div class="ef-msg" data-msg="${h(f.key)}"></div>`;
@@ -376,7 +405,8 @@ window.DASH = window.DASH || {};
     const a = norm(S.orig.values), b = norm(S.values), rows = [];
     changedFields().forEach((f) => {
       let was, now;
-      if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
+      if (plugin(f)) { const r = plugin(f).diff(f, a[f.key], b[f.key], ctx()); was = r[0]; now = r[1]; }
+      else if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
       else if (f.kind === 'list' || f.kind === 'reflist' || f.kind === 'repeater') {
         const rec = (r) => f.fields.map((sf) => sf.kind === 'ref' ? (r[sf.key] ? refName(sf.ref, r[sf.key]) : '')
           : sf.kind === 'select' ? ((sf.option_labels || {})[r[sf.key]] || r[sf.key]) : r[sf.key]).filter(Boolean).join(' · ');
@@ -468,13 +498,18 @@ window.DASH = window.DASH || {};
     });
     const b = document.getElementById('ef-banner');
     if (b) { const m = S.errors._form; b.textContent = m || ''; b.className = 'ef-banner' + (m ? ' on' : ''); }
-    const dot = document.querySelector('[data-dot="fields"]');
-    if (dot) dot.classList.toggle('on', S.tab !== 'fields' && Object.keys(S.errors).some((k) => k !== '_form' && show(k)));
+    document.querySelectorAll('[data-dot]').forEach((dot) => {
+      const id = dot.dataset.dot;
+      dot.classList.toggle('on', S.tab !== id && Object.keys(S.errors).some((k) => k !== '_form' && show(k) && tabOfKey(k) === id));
+    });
   }
+
+  // Which tab an error belongs to: its key is `field` or `field.path.to.the.input`.
+  const tabOfKey = (key) => { const f = S.spec.fields.find((x) => x.key === key.split('.')[0]); return (f && f.tab) || 'fields'; };
 
   function jumpToFirstError() {
     const key = Object.keys(S.errors).find((k) => k !== '_form');
-    if (key && S.tab !== 'fields') { S.tab = 'fields'; render(); }
+    if (key && S.tab !== tabOfKey(key)) { S.tab = tabOfKey(key); S.step = 'form'; render(); }
     else if (S.step !== 'form') { S.step = 'form'; render(); }
     const k = key && CSS.escape(key);
     const el = key && document.querySelector(`[data-key="${k}"],[data-path="${k}"],[data-ref="${k}"]`);
@@ -604,6 +639,11 @@ window.DASH = window.DASH || {};
         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
       }
+      case 'ext': {
+        const k = D.efKinds[el.dataset.k]; if (!k) break;
+        k.onAct(el.dataset.op, el, fieldOfKind(el.dataset.k), ctx());
+        afterEdit(); break;
+      }
       case 'ref-add': {
         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
         renderBody(); const rows = document.querySelectorAll(`[data-ref="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
@@ -626,9 +666,12 @@ window.DASH = window.DASH || {};
     }
   }
 
-  function afterEdit() { scheduleCheck(); syncFooter(); paintHeader(); }
+  // Tab badges (how many sections are filled, how many turns / beats) stay true as you type.
+  function refreshTabs() { const t = document.querySelector('.ef-tabs'); if (t && S.step === 'form') t.outerHTML = tabsHtml(); }
+  function afterEdit() { scheduleCheck(); syncFooter(); paintHeader(); refreshTabs(); paintMessages(); }
 
   const field = (key) => S.spec.fields.find((f) => f.key === key);
+  const fieldOfKind = (kind) => S.spec.fields.find((f) => f.kind === kind);
   const persField = () => S.spec.fields.find((f) => f.kind === 'perspectives');
 
   // Keep exactly one card per chosen entity: new picks get a blank card, dropped ones lose theirs.
@@ -649,6 +692,11 @@ window.DASH = window.DASH || {};
   function onInput(e) {
     const el = e.target, d = el.dataset;
     let rerender = false;
+    if (d.k && D.efKinds[d.k]) {
+      D.efKinds[d.k].onInput(el, fieldOfKind(d.k), ctx());
+      if (el.tagName === 'TEXTAREA') autosize(el);
+      afterEdit(); return;
+    }
     if (d.key != null) {
       S.values[d.key] = el.type === 'checkbox' ? el.checked : el.value;
       S.touched.add(d.key); rerender = dependedOn(d.key);

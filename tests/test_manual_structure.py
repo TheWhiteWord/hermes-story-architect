@@ -65,7 +65,8 @@ class TestSpec:
         assert "order" not in by and "act_id" not in by            # Reorder's, not the form's
         assert by["sequence_id"]["required"] and by["sequence_id"]["ref"] == "sequence"
         assert all(by[k]["kind"] == "linked" for k in ("heading", "location", "time_of_day", "characters"))
-        assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "computed"
+        assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "valueturns"
+        assert "turning_point" not in by and "scene_beats" not in by          # they live in the Beats tab
         assert "Content" not in sp["sections"] and sp["script_link"]
         assert [f["key"] for f in sp["fields"]][:3] == ["title", "sequence_id", "status"]
 

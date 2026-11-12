@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Dashboard</title>
-<meta name="theme-color" content="#7b9cf0">
-<link rel="manifest" href="manifest.webmanifest">
 
 <!-- vis-network from CDN (MIT/Apache 2.0) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
@@ -572,9 +570,8 @@
 <script src="js/script-editor/editor.js"></script>
 <script src="js/script-view.js"></script>
 <script src="js/forms/entity-form.js"></script>
+<script src="js/forms/scene-editors.js"></script>
 <script src="js/views/reorder.js"></script>
-<script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
-<script>setInterval(() => fetch('/api/heartbeat').catch(() => {}), 10000);</script>
-<script>DASH.boot();</script>
+<script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>DASH.boot();</script>
 </body>
 </html>
