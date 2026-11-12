@@ -1,0 +1,40 @@
+/* ─── Reorder mode (Scenes tab) ───────────────────────────────────────────
+   The grouped list becomes a set of draggable rows. Same tokens as the rest. */
+.reorder-bar { display: none; align-items: center; gap: 8px; }
+.reorder-hint { font-size: var(--font-size-xs); color: var(--muted-foreground); }
+#scenes-view.reordering .reorder-bar { display: flex; }
+#scenes-view.reordering .search-bar,
+#scenes-view.reordering #btn-new-struct,
+#scenes-view.reordering #btn-reorder { display: none; }
+#reorder-review[disabled] { opacity: .45; cursor: not-allowed; }
+
+.ro-act { margin-top: 12px; }
+.ro-children { margin-left: 20px; display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.ro-head, .ro-scene {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--card); font-size: var(--font-size-sm); position: relative;
+}
+.ro-act-h { font-weight: 500; font-size: var(--font-size-base); }
+.ro-seq-h { color: var(--muted-foreground); font-weight: 500; }
+.ro-scene { background: transparent; }
+.ro-grip { cursor: grab; color: var(--muted-foreground); user-select: none; line-height: 1; letter-spacing: -2px; }
+.ro-head[draggable=true]:active .ro-grip, .ro-scene[draggable=true]:active .ro-grip { cursor: grabbing; }
+.ro-num { color: var(--muted-foreground); font-variant-numeric: tabular-nums; min-width: 1.6em; text-align: right; }
+.ro-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ro-sub { color: var(--muted-foreground); font-size: var(--font-size-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28%; }
+.ro-ctl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ro-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted-foreground);
+  width: 24px; height: 22px; line-height: 1; cursor: pointer; font-size: 12px; padding: 0; }
+.ro-btn:hover:not([disabled]) { color: var(--accent); border-color: var(--accent); }
+.ro-btn[disabled] { opacity: .3; cursor: default; }
+.ro-select { font: inherit; font-size: var(--font-size-xs); color: var(--muted-foreground); background: var(--card);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 2px 4px; max-width: 150px; }
+.ro-empty { padding: 6px 10px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted-foreground);
+  font-size: var(--font-size-xs); }
+.ro-unassigned-h { margin-top: 14px; font-size: var(--font-size-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
+
+.ro-dragging { opacity: .4; }
+.ro-drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
+.ro-drop-after  { box-shadow: 0 2px 0 0 var(--accent); }
+.ro-drop-into   { outline: 1px dashed var(--accent); outline-offset: 1px; }
+.ro-moved { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }

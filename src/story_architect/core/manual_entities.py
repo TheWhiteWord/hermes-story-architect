@@ -27,7 +27,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from .constants import (ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES, PLOT_TYPES,
+from .constants import (ACT_STATUSES, ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES,
+                        PLOT_TYPES, SCENE_DRAMATIC_ROLES, SCENE_STATUSES, SEQUENCE_STATUSES,
                         STRUCTURE_TYPES, VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
 from .db import get_db
 from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELDS,
@@ -35,7 +36,8 @@ from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELD
 
 # What the form can edit today. The spec builder is generic; this is the gate,
 # so a type goes live when its form has been exercised, not when its schema exists.
-FORM_TYPES = ("character", "location", "world", "value", "plot", "relationship", "project")
+FORM_TYPES = ("character", "location", "world", "value", "plot", "relationship", "project",
+              "act", "sequence", "scene")
 
 # The project is a single record that exists from the start: it can be edited,
 # never created or deleted from here.
@@ -94,6 +96,11 @@ LABELS = {
     "draft_date": "Draft date", "setups": "Setups", "inciting_incident": "Inciting incident",
     "complications": "Complications", "crisis": "Crisis", "climax": "Climax",
     "resolutions": "Resolutions", "value_focus": "Values that shift",
+    "act_id": "Act", "sequence_id": "Sequence", "primary_plot": "Primary plot",
+    "act_objective": "Objective", "scene_objective": "Objective", "purpose": "Purpose",
+    "dramatic_role": "Dramatic role", "plot_roles": "Plot roles", "no_cast": "No characters",
+    "heading": "Heading", "time_of_day": "Time of day", "turning_point": "Turning point",
+    "scene_beats": "Beats record", "value_turns": "Value turns", "location": "Location",
 }
 
 # Closed vocabularies that live in `constants` / `entity`, not in the schema.
@@ -106,6 +113,17 @@ ENUMS = {
     ("relationship", "status"): ["active", "resolved", "complex"],
     ("project", "status"): ["active", "abandoned", "archived"],
     ("project", "structure_type"): STRUCTURE_TYPES,
+    ("act", "status"): ACT_STATUSES,
+    ("sequence", "status"): SEQUENCE_STATUSES,
+    ("scene", "status"): SCENE_STATUSES,
+    ("scene", "dramatic_role"): SCENE_DRAMATIC_ROLES,
+}
+
+# Labels for options whose stored word reads badly in a list.
+OPTION_LABELS = {
+    "role": {"setup": "Setup", "inciting_incident": "Inciting incident", "complication": "Complication",
+             "crisis": "Crisis", "climax": "Climax", "resolution": "Resolution"},
+    "dramatic_role": {"plot_role": "Plot role", "transition": "Transition", "non-event": "Non-event"},
 }
 
 # The kinds a perspective can have. The schema only lists them in prose, and the
@@ -122,14 +140,45 @@ UI_REFS = {
     ("world", "variant_of"): "world",
     ("relationship", "characters"): "character",
     ("relationship", "scenes"): "scene",
+    ("sequence", "act_id"): "act",
+    ("sequence", "primary_plot"): "plot",
+    ("scene", "sequence_id"): "sequence",
 }
+
+# Where an act / sequence / scene sits is chosen once, when it is made. After that it
+# changes only through Reorder, which keeps the three levels consistent with each other.
+POSITION = {("sequence", "act_id"), ("scene", "sequence_id")}
+# `order` is Reorder's; a scene's `act_id` is just its sequence's act, kept in step by the form.
+HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id")}
+# Written by the script editor together with the script, so the heading line and
+# these fields can never disagree. Shown, with a way to get there; never edited here.
+SCRIPT_FIELDS = ("heading", "location", "time_of_day", "characters")
+# Shown but not editable in this form (yet).
+READ_ONLY = {("scene", "value_turns"): "Edited with the agent for now."}
+HIDDEN_SECTIONS = {"scene": {"Content"}}            # the script itself: the script editor's
+
+# A list of small records, edited as a stack of cards.
+PLOT_ROLE_FIELDS = [
+    {"key": "plot", "label": "Plot", "kind": "ref", "ref": "plot", "required": True},
+    {"key": "role", "label": "Role", "kind": "select", "options": list(PLOT_ROLES),
+     "option_labels": OPTION_LABELS["role"], "allow_blank": False, "required": True},
+    {"key": "description", "label": "What happens", "kind": "text",
+     "help": "What this scene does for the plot."},
+]
+REPEATERS = {("scene", "plot_roles"): PLOT_ROLE_FIELDS}
 
 # Fields that only matter when another field has a given value. Hidden, they are
 # reset to their default, so a stale value can't linger behind the form.
 SHOW_IF = {("plot", "plot_type"): {"plot_scope": "sub"}}
 
 # Where the schema's own order reads badly in a form.
-FIELD_ORDER = {"relationship": ["name", "characters", "perspectives", "status", "history", "scenes"]}
+FIELD_ORDER = {
+    "relationship": ["name", "characters", "perspectives", "status", "history", "scenes"],
+    "act": ["title", "status", "act_objective"],
+    "sequence": ["title", "act_id", "status", "primary_plot", "purpose"],
+    "scene": ["title", "sequence_id", "status", "one_sentence", "scene_objective", "no_cast",
+              "dramatic_role", "plot_roles"],
+}
 
 # A name the form can suggest from other fields until the person types their own.
 AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
@@ -138,7 +187,7 @@ AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
 GROUPS = {("project", k): "Title page" for k in
           ("screenplay_title", "credit", "author", "contact", "draft_date", "draft")}
 
-MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea"}
+MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea", "act_objective"}
 
 # Help written for the person at the form. The schema's own descriptions are
 # written for the agent ("Slug of the base location…") and would read as jargon.
@@ -177,6 +226,16 @@ HELP = {
     ("project", "draft_date"): "Printed bottom-left on the title page.",
     ("project", "contact"): "Printed bottom-right on the title page.",
     ("project", "screenplay_title"): "Printed centred on the title page.",
+    ("act", "title"): "e.g. Act I.",
+    ("act", "act_objective"): "The protagonist’s immediate goal in this act.",
+    ("sequence", "purpose"): "What this sequence is for, dramatically.",
+    ("sequence", "primary_plot"): "The plot this sequence mainly serves.",
+    ("sequence", "act_id"): "Which act it belongs to. Choose once — move it later with Reorder.",
+    ("scene", "sequence_id"): "Which sequence it belongs to. Choose once — move it later with Reorder.",
+    ("scene", "one_sentence"): "One line that sums up the scene.",
+    ("scene", "scene_objective"): "What the driving character wants in this scene.",
+    ("scene", "dramatic_role"): "Leave empty if the scene serves a plot. Transition and non-event scenes serve none.",
+    ("scene", "no_cast"): "Tick this when nobody appears on purpose, e.g. an empty room.",
     **{k: v for k, v in VALUE_LADDER.items()},
 }
 
@@ -188,10 +247,17 @@ HINTS = {
        ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions")},
     ("plot", "value_focus"): "Counted from the value turns written on scenes.",
     ("project", "value_focus"): "Counted from the value turns written on scenes.",
+    ("act", "value_focus"): "Counted from the value turns written on its scenes.",
+    ("sequence", "value_focus"): "Counted from the value turns written on its scenes.",
+    ("scene", "turning_point"): "Written with the scene’s beats.",
+    ("scene", "scene_beats"): "Edited with the agent for now.",
+    **{("scene", k): "Written by the script editor." for k in SCRIPT_FIELDS},
 }
 
 # A field whose value cannot change once the entity exists.
 LOCKED_ON_EDIT = {
+    ("sequence", "act_id"): "To move it to another act, use Reorder in the Scenes tab.",
+    ("scene", "sequence_id"): "To move it to another sequence, use Reorder in the Scenes tab.",
     ("value", "name"):
         "A value is named by its positive pole, and scenes refer to it by that name — "
         "it can't be renamed. Create a new value instead.",
@@ -237,6 +303,17 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
         spec["group"] = GROUPS[(entity_type, key)]
     if (entity_type, key) in SHOW_IF:
         spec["show_if"] = SHOW_IF[(entity_type, key)]
+    if (entity_type, key) in POSITION:
+        spec["required"] = True
+    if entity_type == "scene" and key in SCRIPT_FIELDS:
+        spec.update(kind="linked", hint=HINTS.get((entity_type, key), ""))
+        return spec
+    if (entity_type, key) in READ_ONLY:
+        spec.update(kind="computed", hint=READ_ONLY[(entity_type, key)])
+        return spec
+    if (entity_type, key) in REPEATERS:
+        spec.update(kind="repeater", fields=REPEATERS[(entity_type, key)], add_label="Add plot role")
+        return spec
     if meta.get("computed"):
         spec.update(kind="computed", hint=HINTS.get((entity_type, key), ""))
         return spec
@@ -246,6 +323,8 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
     if enum:
         spec.update(kind="select", options=list(enum),
                     allow_blank=meta.get("default", "") in ("", None))
+        if key in OPTION_LABELS:
+            spec["option_labels"] = OPTION_LABELS[key]
     elif entity_type == "relationship" and key == "characters":
         spec.update(kind="reflist", ref=ref, count=2, row_labels=["First character", "Second character"])
     elif ref and kind_t == "list":
@@ -280,7 +359,7 @@ def form_spec(entity_type: str) -> dict:
         raise EntityNotFound(f"Unknown entity type: {entity_type}")
     nk = name_key(entity_type)
     fields = [_field_spec(entity_type, k, m) for k, m in ENTITY_SCHEMAS[entity_type].items()
-              if k not in ("id", "type")]
+              if k not in ("id", "type") and (entity_type, k) not in HIDDEN]
     order = FIELD_ORDER.get(entity_type)
     if order:
         fields.sort(key=lambda f: order.index(f["key"]) if f["key"] in order else len(order))
@@ -295,10 +374,16 @@ def form_spec(entity_type: str) -> dict:
         "label": ENTITY_LABELS.get(entity_type, entity_type.capitalize()),
         "name_key": nk,
         "fields": fields,
-        "sections": standard_sections(entity_type),
+        "sections": _sections(entity_type),
         "singleton": entity_type in SINGLETONS,
+        **({"script_link": True} if entity_type == "scene" else {}),
         **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
     }
+
+
+def _sections(entity_type: str) -> list:
+    hidden = HIDDEN_SECTIONS.get(entity_type, ())
+    return [n for n in standard_sections(entity_type) if n not in hidden]
 
 
 def all_specs() -> dict:
@@ -345,6 +430,34 @@ ROLE_FIELD = {"setup": "setups", "inciting_incident": "inciting_incident", "comp
               "crisis": "crisis", "climax": "climax", "resolution": "resolutions"}
 
 
+def _scene_rows(conn, scene_id: str) -> dict:
+    """What the script editor owns on a scene, plus the derived records — display only."""
+    row = conn.execute("SELECT location_id, extra FROM entities WHERE id=?", (scene_id,)).fetchone()
+    ex = json.loads(row[1]) if row and row[1] else {}
+    one = lambda text: [{"display": text}] if text else []          # noqa: E731
+    loc = ""
+    if row and row[0]:
+        r = conn.execute("SELECT name FROM entities WHERE id=?", (row[0],)).fetchone()
+        loc = (r[0] if r else row[0]) or row[0]
+    cast = [r[0] for r in conn.execute(
+        "SELECT e.name FROM relations r JOIN entities e ON e.id=r.from_id "
+        "WHERE r.to_id=? AND r.kind='character_scene' AND e.is_deleted=0 ORDER BY r.\"order\"", (scene_id,))]
+    beats = conn.execute("SELECT id FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
+                         (scene_id,)).fetchone()
+    turns = []
+    for t in ex.get("value_turns") or []:
+        if isinstance(t, dict):
+            turns.append({"display": f"{t.get('value', '?')}: {t.get('from', '?')} → {t.get('to', '?')}"
+                                     + (f" ({t['plot']})" if t.get("plot") else "")})
+    return {
+        "heading": one(ex.get("heading")), "location": one(loc),
+        "time_of_day": one(ex.get("time_of_day")), "characters": [{"display": n} for n in cast],
+        "turning_point": one(ex.get("turning_point")),
+        "scene_beats": [{"display": "A beats record exists"}] if beats else [],
+        "value_turns": turns,
+    }
+
+
 def _focus_rows(focus: dict) -> list:
     rows = []
     for label, key in (("Major", "major"), ("Minor", "minor")):
@@ -386,11 +499,15 @@ def _computed(conn, entity_type: str, entity_id: str, project_path: Path | None 
                 by_field[field].append({"display": (sname or sid) + (f" — {note}" if note else ""),
                                         "ref": f"scene:{sid}"})
         out.update(by_field)
-    if entity_type in ("plot", "project") and project_path is not None:
+    elif entity_type == "scene":
+        out.update(_scene_rows(conn, entity_id))
+    if entity_type in ("plot", "project", "act", "sequence") and project_path is not None:
         try:
             from . import value_focus
-            focus = (value_focus.for_plot(project_path, entity_id) if entity_type == "plot"
-                     else value_focus.for_project(project_path))
+            focus = {"plot": lambda: value_focus.for_plot(project_path, entity_id),
+                     "project": lambda: value_focus.for_project(project_path),
+                     "act": lambda: value_focus.for_act(project_path, entity_id),
+                     "sequence": lambda: value_focus.for_sequence(project_path, entity_id)}[entity_type]()
             out["value_focus"] = _focus_rows(focus)
         except Exception:                      # a derived display must never block the form
             out["value_focus"] = []
@@ -445,12 +562,21 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
         extra = json.loads(row[7]) if row[7] else {}
         schema = ENTITY_SCHEMAS[entity_type]
         colmap = ENTITY_COLUMN_MAP.get(entity_type, {})
+        editable_keys = {f["key"] for f in form_spec(entity_type)["fields"]
+                         if f["kind"] not in ("computed", "linked", "unsupported")}
         cols = {"name": row[1], "one_sentence": row[2], "order_key": row[3],
                 "status": row[4], "parent_id": row[5], "location_id": row[6]}
         rels = _RELATION_FIELDS.get(entity_type, {})
         values = {}
         for key, meta in schema.items():
-            if meta.get("computed") or key in ("id", "type"):
+            if key not in editable_keys:
+                continue
+            if key == "plot_roles" and entity_type == "scene":
+                v = [{"plot": r[0], "role": r[1][len("plot_"):], "description": r[2] or ""}
+                     for r in conn.execute(
+                         "SELECT from_id, kind, note FROM relations WHERE to_id=? AND kind LIKE 'plot\\_%' "
+                         "ESCAPE '\\' ORDER BY \"order\"", (entity_id,))]
+                values[key] = v
                 continue
             if key in colmap:
                 v = cols.get(colmap[key])
@@ -468,7 +594,7 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
             if key == "perspectives" and entity_type == "relationship":
                 v = _persp_form(v)
             values[key] = v
-        sections = {h: "" for h in standard_sections(entity_type)}
+        sections = {h: "" for h in _sections(entity_type)}
         for heading, body in conn.execute(
                 "SELECT heading, body FROM sections WHERE entity_id=?", (entity_id,)):
             if heading in sections:
@@ -496,11 +622,14 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
         if meta is None:
             errors["_form"] = f"Unknown field “{key}”. Reload the page and try again."
             continue
-        if meta.get("computed"):
-            continue                                   # derived: never written
+        if (meta.get("computed") or (entity_type, key) in HIDDEN or (entity_type, key) in READ_ONLY
+                or (entity_type == "scene" and key in SCRIPT_FIELDS)):
+            continue                                   # derived, or someone else's: never written
         t = meta.get("type")
         label = LABELS.get(key) or _humanize(key)
-        if entity_type == "relationship" and key == "perspectives":
+        if (entity_type, key) in REPEATERS:
+            values[key] = _clean_repeater(REPEATERS[(entity_type, key)], v, key, errors)
+        elif entity_type == "relationship" and key == "perspectives":
             values[key] = _clean_perspectives(v, errors)
         elif t == "string":
             values[key] = "" if v is None else str(v).strip()
@@ -538,6 +667,20 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
         keep = [c for c in values["characters"] if c]
         values["perspectives"] = {c: values["perspectives"].get(c) or _persp_form({c: {}})[c] for c in keep}
     return values, errors
+
+
+def _clean_repeater(fields: list, raw, key: str, errors: dict) -> list:
+    """A list of records from cards. A card with nothing in it is not a record: dropped."""
+    if not isinstance(raw, list):
+        errors[key] = "This should be a list of cards."
+        return []
+    out = []
+    for entry in raw:
+        entry = entry if isinstance(entry, dict) else {}
+        rec = {f["key"]: ("" if entry.get(f["key"]) is None else str(entry[f["key"]]).strip()) for f in fields}
+        if any(rec.values()):
+            out.append(rec)
+    return out
 
 
 def _clean_perspectives(raw, errors: dict) -> dict:
@@ -610,6 +753,10 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
                 errors[nk] = f"The id “{slug}” is already used by a {taken[0]}. Pick a different name."
         else:
             new_id = _unique_id(conn, slug)
+    if mode_edit and baseline is not None:
+        for key in [k for (t, k) in POSITION if t == entity_type]:
+            if key in values and values[key] != baseline.get(key) and key not in errors:
+                errors[key] = LOCKED_ON_EDIT[(entity_type, key)]
     if mode_edit and is_value and slug and slug != entity_id:
         errors[nk] = LOCKED_ON_EDIT[("value", "name")]
 
@@ -641,6 +788,13 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
             if missing:
                 errors[key] = f"Not found: {', '.join(missing)}."
 
+    if not mode_edit:
+        for f in spec["fields"]:
+            if (entity_type, f["key"]) in POSITION and f["key"] not in errors and not values.get(f["key"]):
+                target = ENTITY_LABELS.get(f["ref"], f["ref"]).lower()
+                none = conn.execute("SELECT 1 FROM entities WHERE type=? AND is_deleted=0", (f["ref"],)).fetchone() is None
+                errors[f["key"]] = (f"There are no {target}s yet — create one first." if none
+                                    else f"Choose the {target} this belongs in.")
     _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings)
 
     if is_value:
@@ -680,6 +834,24 @@ def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnin
                     warnings["characters"] = (f"{nm.get(chars[0], chars[0])} and {nm.get(chars[1], chars[1])} "
                                               f"already have a relationship (“{rname}”). Saving adds another.")
                     break
+    elif entity_type == "scene":
+        roles = values.get("plot_roles") or []
+        seen = set()
+        for i, r in enumerate(roles):
+            at = f"plot_roles.{i}"
+            if not r.get("plot"):
+                errors[f"{at}.plot"] = "Choose the plot."
+            elif not _exists(conn, "plot", r["plot"]):
+                errors[f"{at}.plot"] = f"There is no plot “{r['plot']}” — pick one from the list."
+            elif r["plot"] in seen:
+                errors[f"{at}.plot"] = "This scene already has a role in that plot — one role per plot."
+            else:
+                seen.add(r["plot"])
+            if r.get("role") not in PLOT_ROLES:
+                errors[f"{at}.role"] = "Choose a role."
+        if values.get("dramatic_role") in ("transition", "non-event") and roles and "dramatic_role" not in errors:
+            errors["dramatic_role"] = (f"A {values['dramatic_role']} scene serves no plot, but it has plot roles. "
+                                       f"Remove them, or leave the dramatic role empty.")
     elif entity_type == "plot":
         if values.get("plot_scope") == "sub" and not values.get("plot_type"):
             warnings["plot_type"] = "A subplot normally has a kind — pick how it relates to the main plot."
@@ -718,7 +890,8 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
         if entity_id is not None:
             row = _row(conn, entity_type, entity_id)
             entity_id = row[0]
-        warnings, new_id = _validate(conn, entity_type, entity_id, values, errors)
+            baseline = load_entity(project_path, entity_type, entity_id)["values"]   # same bar as save
+        warnings, new_id = _validate(conn, entity_type, entity_id, values, errors, baseline=baseline)
     finally:
         conn.close()
     return {"ok": not errors, "errors": errors, "warnings": warnings, "id": new_id}
@@ -761,6 +934,18 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
     if errors or not new_id:
         raise EntityInvalid(errors or {"_form": "Could not make an id from that name."}, warnings)
 
+    if entity_type in ("scene", "act"):
+        conn = get_db(project_path)
+        try:
+            if entity_type == "scene":                  # a scene's act is its sequence's act
+                r = conn.execute("SELECT parent_id FROM entities WHERE id=?", (values["sequence_id"],)).fetchone()
+                values["act_id"] = r[0] if r else ""
+            else:                                       # acts are not auto-numbered by the write path
+                r = conn.execute("SELECT COALESCE(MAX(order_key), 0) FROM entities WHERE type='act' "
+                                 "AND is_deleted=0").fetchone()
+                values["order"] = int(r[0]) + 1
+        finally:
+            conn.close()
     if entity_type == "relationship":               # one card per character, even if never opened
         values["perspectives"] = {c: (values.get("perspectives") or {}).get(c) or _persp_form({c: {}})[c]
                                   for c in values.get("characters") or []}
@@ -857,7 +1042,23 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
         children = conn.execute(
             "SELECT id, type, name FROM entities WHERE parent_id=? AND is_deleted=0",
             (entity_id,)).fetchall()
-        also = [{"id": c[0], "type": c[1], "name": c[2] or c[0]} for c in children]
+        def _lab(t):
+            return ENTITY_LABELS.get(t) or t.replace("_", " ").capitalize()
+        also = [{"id": c[0], "type": c[1], "name": c[2] or c[0], "label": _lab(c[1])} for c in children]
+        # A sequence or act that still holds scenes / sequences is not deleted around them:
+        # they are moved or deleted on purpose first.
+        structural: list[str] = []
+        if entity_type in ("sequence", "act"):
+            kids = [c for c in also if c["type"] in ("scene", "sequence")]
+            also = [c for c in also if c not in kids]
+            if kids:
+                noun = kids[0]["type"]
+                structural.append(
+                    f"“{row[1] or entity_id}” still contains {_plural(len(kids), noun)}: "
+                    f"{_list([k['name'] for k in kids])}. Move or delete them first"
+                    f"{' — use Reorder in the Scenes tab to move scenes' if entity_type == 'sequence' else ''}.")
+                structural[-1] = structural[-1].replace(
+                    "Move or delete them first", "Move or delete " + ("it" if len(kids) == 1 else "them") + " first")
 
         # A character's relationships go with them: a bond with one person left
         # is not a relationship. (The agent path keeps the surviving half; the
@@ -889,6 +1090,12 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
                 plots.append(pname or pid)
         if plots:
             effects.append(f"No longer a protagonist of {_plural(len(plots), 'plot')}: {_list(plots)}.")
+        if entity_type == "scene":
+            body = conn.execute("SELECT body FROM sections WHERE entity_id=? AND heading='Content'",
+                                (entity_id,)).fetchone()
+            text = (body[0] or "") if body else ""
+            if text.strip() and not _is_placeholder(text):
+                effects.insert(0, f"Its script ({len(text):,} characters) is deleted with it.")
         if entity_type == "plot":
             roles = [r[0] for r in conn.execute(
                 f"SELECT DISTINCT e.name FROM relations r JOIN entities e ON e.id=r.to_id "
@@ -914,7 +1121,7 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
         names = _names(conn, gone)
         scene_names = {r[0]: r[1] or r[0] for r in conn.execute(
             "SELECT id, name FROM entities WHERE type='scene' AND is_deleted=0")}
-        blockers: list[str] = []
+        blockers: list[str] = list(structural)
         by_scene: dict[str, set] = {}
         for sid, bex in conn.execute(
                 "SELECT parent_id, extra FROM entities WHERE type='scene_beats' AND is_deleted=0"):

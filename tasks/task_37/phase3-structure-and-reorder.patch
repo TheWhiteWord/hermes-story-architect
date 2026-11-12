@@ -1,0 +1,1881 @@
+diff --git a/src/story_architect/app/routes/entities.py b/src/story_architect/app/routes/entities.py
+index fec17c2..7dfebc5 100644
+--- a/src/story_architect/app/routes/entities.py
++++ b/src/story_architect/app/routes/entities.py
+@@ -82,4 +82,38 @@ def make_router(config, app):
+         from story_architect.core import manual_entities as me
+         return _run(slug, lambda p: me.delete_form_entity(p, etype, eid))
+ 
++    # ── structure: reorder acts, sequences and scenes ──
++    def _structure(slug, fn):
++        from story_architect.core import manual_structure as ms
++        try:
++            project = _project(slug)
++        except ValueError as e:
++            return _err(404, "not_found", str(e))
++        try:
++            return fn(project)
++        except ms.StructureConflict as e:
++            return _err(409, "conflict", str(e), current_version=e.current_version)
++        except ms.StructureError as e:
++            return _err(422, "invalid", str(e))
++
++    @router.get("/api/projects/{slug}/structure")
++    def structure(slug: str):
++        from story_architect.core import manual_structure as ms
++        return _structure(slug, ms.load_tree)
++
++    @router.post("/api/projects/{slug}/structure/plan")
++    def structure_plan(slug: str, body: dict):
++        """What a target order would move, in words. Writes nothing."""
++        from story_architect.core import manual_structure as ms
++
++        def go(p):
++            r = ms.plan(p, body)
++            return {"changes": r["changes"], "unchanged": r["unchanged"]}
++        return _structure(slug, go)
++
++    @router.post("/api/projects/{slug}/structure/apply")
++    def structure_apply(slug: str, body: dict):
++        from story_architect.core import manual_structure as ms
++        return _structure(slug, lambda p: ms.apply(p, body))
++
+     return router
+diff --git a/src/story_architect/core/manual_entities.py b/src/story_architect/core/manual_entities.py
+index 54979c7..eb5bfef 100644
+--- a/src/story_architect/core/manual_entities.py
++++ b/src/story_architect/core/manual_entities.py
+@@ -27,7 +27,8 @@ import hashlib
+ import json
+ from pathlib import Path
+ 
+-from .constants import (ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES, PLOT_TYPES,
++from .constants import (ACT_STATUSES, ENTITY_LABELS, ENTITY_SCHEMAS, PLOT_ROLES, PLOT_SCOPES,
++                        PLOT_TYPES, SCENE_DRAMATIC_ROLES, SCENE_STATUSES, SEQUENCE_STATUSES,
+                         STRUCTURE_TYPES, VALID_ROLES, VALID_STATUSES, VALUE_ARCS, VALUE_LADDER)
+ from .db import get_db
+ from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELDS,
+@@ -35,7 +36,8 @@ from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELD
+ 
+ # What the form can edit today. The spec builder is generic; this is the gate,
+ # so a type goes live when its form has been exercised, not when its schema exists.
+-FORM_TYPES = ("character", "location", "world", "value", "plot", "relationship", "project")
++FORM_TYPES = ("character", "location", "world", "value", "plot", "relationship", "project",
++              "act", "sequence", "scene")
+ 
+ # The project is a single record that exists from the start: it can be edited,
+ # never created or deleted from here.
+@@ -94,6 +96,11 @@ LABELS = {
+     "draft_date": "Draft date", "setups": "Setups", "inciting_incident": "Inciting incident",
+     "complications": "Complications", "crisis": "Crisis", "climax": "Climax",
+     "resolutions": "Resolutions", "value_focus": "Values that shift",
++    "act_id": "Act", "sequence_id": "Sequence", "primary_plot": "Primary plot",
++    "act_objective": "Objective", "scene_objective": "Objective", "purpose": "Purpose",
++    "dramatic_role": "Dramatic role", "plot_roles": "Plot roles", "no_cast": "No characters",
++    "heading": "Heading", "time_of_day": "Time of day", "turning_point": "Turning point",
++    "scene_beats": "Beats record", "value_turns": "Value turns", "location": "Location",
+ }
+ 
+ # Closed vocabularies that live in `constants` / `entity`, not in the schema.
+@@ -106,6 +113,17 @@ ENUMS = {
+     ("relationship", "status"): ["active", "resolved", "complex"],
+     ("project", "status"): ["active", "abandoned", "archived"],
+     ("project", "structure_type"): STRUCTURE_TYPES,
++    ("act", "status"): ACT_STATUSES,
++    ("sequence", "status"): SEQUENCE_STATUSES,
++    ("scene", "status"): SCENE_STATUSES,
++    ("scene", "dramatic_role"): SCENE_DRAMATIC_ROLES,
++}
++
++# Labels for options whose stored word reads badly in a list.
++OPTION_LABELS = {
++    "role": {"setup": "Setup", "inciting_incident": "Inciting incident", "complication": "Complication",
++             "crisis": "Crisis", "climax": "Climax", "resolution": "Resolution"},
++    "dramatic_role": {"plot_role": "Plot role", "transition": "Transition", "non-event": "Non-event"},
+ }
+ 
+ # The kinds a perspective can have. The schema only lists them in prose, and the
+@@ -122,14 +140,45 @@ UI_REFS = {
+     ("world", "variant_of"): "world",
+     ("relationship", "characters"): "character",
+     ("relationship", "scenes"): "scene",
++    ("sequence", "act_id"): "act",
++    ("sequence", "primary_plot"): "plot",
++    ("scene", "sequence_id"): "sequence",
+ }
+ 
++# Where an act / sequence / scene sits is chosen once, when it is made. After that it
++# changes only through Reorder, which keeps the three levels consistent with each other.
++POSITION = {("sequence", "act_id"), ("scene", "sequence_id")}
++# `order` is Reorder's; a scene's `act_id` is just its sequence's act, kept in step by the form.
++HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id")}
++# Written by the script editor together with the script, so the heading line and
++# these fields can never disagree. Shown, with a way to get there; never edited here.
++SCRIPT_FIELDS = ("heading", "location", "time_of_day", "characters")
++# Shown but not editable in this form (yet).
++READ_ONLY = {("scene", "value_turns"): "Edited with the agent for now."}
++HIDDEN_SECTIONS = {"scene": {"Content"}}            # the script itself: the script editor's
++
++# A list of small records, edited as a stack of cards.
++PLOT_ROLE_FIELDS = [
++    {"key": "plot", "label": "Plot", "kind": "ref", "ref": "plot", "required": True},
++    {"key": "role", "label": "Role", "kind": "select", "options": list(PLOT_ROLES),
++     "option_labels": OPTION_LABELS["role"], "allow_blank": False, "required": True},
++    {"key": "description", "label": "What happens", "kind": "text",
++     "help": "What this scene does for the plot."},
++]
++REPEATERS = {("scene", "plot_roles"): PLOT_ROLE_FIELDS}
++
+ # Fields that only matter when another field has a given value. Hidden, they are
+ # reset to their default, so a stale value can't linger behind the form.
+ SHOW_IF = {("plot", "plot_type"): {"plot_scope": "sub"}}
+ 
+ # Where the schema's own order reads badly in a form.
+-FIELD_ORDER = {"relationship": ["name", "characters", "perspectives", "status", "history", "scenes"]}
++FIELD_ORDER = {
++    "relationship": ["name", "characters", "perspectives", "status", "history", "scenes"],
++    "act": ["title", "status", "act_objective"],
++    "sequence": ["title", "act_id", "status", "primary_plot", "purpose"],
++    "scene": ["title", "sequence_id", "status", "one_sentence", "scene_objective", "no_cast",
++              "dramatic_role", "plot_roles"],
++}
+ 
+ # A name the form can suggest from other fields until the person types their own.
+ AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
+@@ -138,7 +187,7 @@ AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
+ GROUPS = {("project", k): "Title page" for k in
+           ("screenplay_title", "credit", "author", "contact", "draft_date", "draft")}
+ 
+-MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea"}
++MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea", "act_objective"}
+ 
+ # Help written for the person at the form. The schema's own descriptions are
+ # written for the agent ("Slug of the base location…") and would read as jargon.
+@@ -177,6 +226,16 @@ HELP = {
+     ("project", "draft_date"): "Printed bottom-left on the title page.",
+     ("project", "contact"): "Printed bottom-right on the title page.",
+     ("project", "screenplay_title"): "Printed centred on the title page.",
++    ("act", "title"): "e.g. Act I.",
++    ("act", "act_objective"): "The protagonist’s immediate goal in this act.",
++    ("sequence", "purpose"): "What this sequence is for, dramatically.",
++    ("sequence", "primary_plot"): "The plot this sequence mainly serves.",
++    ("sequence", "act_id"): "Which act it belongs to. Choose once — move it later with Reorder.",
++    ("scene", "sequence_id"): "Which sequence it belongs to. Choose once — move it later with Reorder.",
++    ("scene", "one_sentence"): "One line that sums up the scene.",
++    ("scene", "scene_objective"): "What the driving character wants in this scene.",
++    ("scene", "dramatic_role"): "Leave empty if the scene serves a plot. Transition and non-event scenes serve none.",
++    ("scene", "no_cast"): "Tick this when nobody appears on purpose, e.g. an empty room.",
+     **{k: v for k, v in VALUE_LADDER.items()},
+ }
+ 
+@@ -188,10 +247,17 @@ HINTS = {
+        ("setups", "inciting_incident", "complications", "crisis", "climax", "resolutions")},
+     ("plot", "value_focus"): "Counted from the value turns written on scenes.",
+     ("project", "value_focus"): "Counted from the value turns written on scenes.",
++    ("act", "value_focus"): "Counted from the value turns written on its scenes.",
++    ("sequence", "value_focus"): "Counted from the value turns written on its scenes.",
++    ("scene", "turning_point"): "Written with the scene’s beats.",
++    ("scene", "scene_beats"): "Edited with the agent for now.",
++    **{("scene", k): "Written by the script editor." for k in SCRIPT_FIELDS},
+ }
+ 
+ # A field whose value cannot change once the entity exists.
+ LOCKED_ON_EDIT = {
++    ("sequence", "act_id"): "To move it to another act, use Reorder in the Scenes tab.",
++    ("scene", "sequence_id"): "To move it to another sequence, use Reorder in the Scenes tab.",
+     ("value", "name"):
+         "A value is named by its positive pole, and scenes refer to it by that name — "
+         "it can't be renamed. Create a new value instead.",
+@@ -237,6 +303,17 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
+         spec["group"] = GROUPS[(entity_type, key)]
+     if (entity_type, key) in SHOW_IF:
+         spec["show_if"] = SHOW_IF[(entity_type, key)]
++    if (entity_type, key) in POSITION:
++        spec["required"] = True
++    if entity_type == "scene" and key in SCRIPT_FIELDS:
++        spec.update(kind="linked", hint=HINTS.get((entity_type, key), ""))
++        return spec
++    if (entity_type, key) in READ_ONLY:
++        spec.update(kind="computed", hint=READ_ONLY[(entity_type, key)])
++        return spec
++    if (entity_type, key) in REPEATERS:
++        spec.update(kind="repeater", fields=REPEATERS[(entity_type, key)], add_label="Add plot role")
++        return spec
+     if meta.get("computed"):
+         spec.update(kind="computed", hint=HINTS.get((entity_type, key), ""))
+         return spec
+@@ -246,6 +323,8 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
+     if enum:
+         spec.update(kind="select", options=list(enum),
+                     allow_blank=meta.get("default", "") in ("", None))
++        if key in OPTION_LABELS:
++            spec["option_labels"] = OPTION_LABELS[key]
+     elif entity_type == "relationship" and key == "characters":
+         spec.update(kind="reflist", ref=ref, count=2, row_labels=["First character", "Second character"])
+     elif ref and kind_t == "list":
+@@ -280,7 +359,7 @@ def form_spec(entity_type: str) -> dict:
+         raise EntityNotFound(f"Unknown entity type: {entity_type}")
+     nk = name_key(entity_type)
+     fields = [_field_spec(entity_type, k, m) for k, m in ENTITY_SCHEMAS[entity_type].items()
+-              if k not in ("id", "type")]
++              if k not in ("id", "type") and (entity_type, k) not in HIDDEN]
+     order = FIELD_ORDER.get(entity_type)
+     if order:
+         fields.sort(key=lambda f: order.index(f["key"]) if f["key"] in order else len(order))
+@@ -295,12 +374,18 @@ def form_spec(entity_type: str) -> dict:
+         "label": ENTITY_LABELS.get(entity_type, entity_type.capitalize()),
+         "name_key": nk,
+         "fields": fields,
+-        "sections": standard_sections(entity_type),
++        "sections": _sections(entity_type),
+         "singleton": entity_type in SINGLETONS,
++        **({"script_link": True} if entity_type == "scene" else {}),
+         **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
+     }
+ 
+ 
++def _sections(entity_type: str) -> list:
++    hidden = HIDDEN_SECTIONS.get(entity_type, ())
++    return [n for n in standard_sections(entity_type) if n not in hidden]
++
++
+ def all_specs() -> dict:
+     return {t: form_spec(t) for t in FORM_TYPES}
+ 
+@@ -345,6 +430,34 @@ ROLE_FIELD = {"setup": "setups", "inciting_incident": "inciting_incident", "comp
+               "crisis": "crisis", "climax": "climax", "resolution": "resolutions"}
+ 
+ 
++def _scene_rows(conn, scene_id: str) -> dict:
++    """What the script editor owns on a scene, plus the derived records — display only."""
++    row = conn.execute("SELECT location_id, extra FROM entities WHERE id=?", (scene_id,)).fetchone()
++    ex = json.loads(row[1]) if row and row[1] else {}
++    one = lambda text: [{"display": text}] if text else []          # noqa: E731
++    loc = ""
++    if row and row[0]:
++        r = conn.execute("SELECT name FROM entities WHERE id=?", (row[0],)).fetchone()
++        loc = (r[0] if r else row[0]) or row[0]
++    cast = [r[0] for r in conn.execute(
++        "SELECT e.name FROM relations r JOIN entities e ON e.id=r.from_id "
++        "WHERE r.to_id=? AND r.kind='character_scene' AND e.is_deleted=0 ORDER BY r.\"order\"", (scene_id,))]
++    beats = conn.execute("SELECT id FROM entities WHERE type='scene_beats' AND parent_id=? AND is_deleted=0",
++                         (scene_id,)).fetchone()
++    turns = []
++    for t in ex.get("value_turns") or []:
++        if isinstance(t, dict):
++            turns.append({"display": f"{t.get('value', '?')}: {t.get('from', '?')} → {t.get('to', '?')}"
++                                     + (f" ({t['plot']})" if t.get("plot") else "")})
++    return {
++        "heading": one(ex.get("heading")), "location": one(loc),
++        "time_of_day": one(ex.get("time_of_day")), "characters": [{"display": n} for n in cast],
++        "turning_point": one(ex.get("turning_point")),
++        "scene_beats": [{"display": "A beats record exists"}] if beats else [],
++        "value_turns": turns,
++    }
++
++
+ def _focus_rows(focus: dict) -> list:
+     rows = []
+     for label, key in (("Major", "major"), ("Minor", "minor")):
+@@ -386,11 +499,15 @@ def _computed(conn, entity_type: str, entity_id: str, project_path: Path | None
+                 by_field[field].append({"display": (sname or sid) + (f" — {note}" if note else ""),
+                                         "ref": f"scene:{sid}"})
+         out.update(by_field)
+-    if entity_type in ("plot", "project") and project_path is not None:
++    elif entity_type == "scene":
++        out.update(_scene_rows(conn, entity_id))
++    if entity_type in ("plot", "project", "act", "sequence") and project_path is not None:
+         try:
+             from . import value_focus
+-            focus = (value_focus.for_plot(project_path, entity_id) if entity_type == "plot"
+-                     else value_focus.for_project(project_path))
++            focus = {"plot": lambda: value_focus.for_plot(project_path, entity_id),
++                     "project": lambda: value_focus.for_project(project_path),
++                     "act": lambda: value_focus.for_act(project_path, entity_id),
++                     "sequence": lambda: value_focus.for_sequence(project_path, entity_id)}[entity_type]()
+             out["value_focus"] = _focus_rows(focus)
+         except Exception:                      # a derived display must never block the form
+             out["value_focus"] = []
+@@ -445,12 +562,21 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+         extra = json.loads(row[7]) if row[7] else {}
+         schema = ENTITY_SCHEMAS[entity_type]
+         colmap = ENTITY_COLUMN_MAP.get(entity_type, {})
++        editable_keys = {f["key"] for f in form_spec(entity_type)["fields"]
++                         if f["kind"] not in ("computed", "linked", "unsupported")}
+         cols = {"name": row[1], "one_sentence": row[2], "order_key": row[3],
+                 "status": row[4], "parent_id": row[5], "location_id": row[6]}
+         rels = _RELATION_FIELDS.get(entity_type, {})
+         values = {}
+         for key, meta in schema.items():
+-            if meta.get("computed") or key in ("id", "type"):
++            if key not in editable_keys:
++                continue
++            if key == "plot_roles" and entity_type == "scene":
++                v = [{"plot": r[0], "role": r[1][len("plot_"):], "description": r[2] or ""}
++                     for r in conn.execute(
++                         "SELECT from_id, kind, note FROM relations WHERE to_id=? AND kind LIKE 'plot\\_%' "
++                         "ESCAPE '\\' ORDER BY \"order\"", (entity_id,))]
++                values[key] = v
+                 continue
+             if key in colmap:
+                 v = cols.get(colmap[key])
+@@ -468,7 +594,7 @@ def load_entity(project_path: Path, entity_type: str, entity_id: str) -> dict:
+             if key == "perspectives" and entity_type == "relationship":
+                 v = _persp_form(v)
+             values[key] = v
+-        sections = {h: "" for h in standard_sections(entity_type)}
++        sections = {h: "" for h in _sections(entity_type)}
+         for heading, body in conn.execute(
+                 "SELECT heading, body FROM sections WHERE entity_id=?", (entity_id,)):
+             if heading in sections:
+@@ -496,11 +622,14 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+         if meta is None:
+             errors["_form"] = f"Unknown field “{key}”. Reload the page and try again."
+             continue
+-        if meta.get("computed"):
+-            continue                                   # derived: never written
++        if (meta.get("computed") or (entity_type, key) in HIDDEN or (entity_type, key) in READ_ONLY
++                or (entity_type == "scene" and key in SCRIPT_FIELDS)):
++            continue                                   # derived, or someone else's: never written
+         t = meta.get("type")
+         label = LABELS.get(key) or _humanize(key)
+-        if entity_type == "relationship" and key == "perspectives":
++        if (entity_type, key) in REPEATERS:
++            values[key] = _clean_repeater(REPEATERS[(entity_type, key)], v, key, errors)
++        elif entity_type == "relationship" and key == "perspectives":
+             values[key] = _clean_perspectives(v, errors)
+         elif t == "string":
+             values[key] = "" if v is None else str(v).strip()
+@@ -540,6 +669,20 @@ def _clean(entity_type: str, raw) -> tuple[dict, dict]:
+     return values, errors
+ 
+ 
++def _clean_repeater(fields: list, raw, key: str, errors: dict) -> list:
++    """A list of records from cards. A card with nothing in it is not a record: dropped."""
++    if not isinstance(raw, list):
++        errors[key] = "This should be a list of cards."
++        return []
++    out = []
++    for entry in raw:
++        entry = entry if isinstance(entry, dict) else {}
++        rec = {f["key"]: ("" if entry.get(f["key"]) is None else str(entry[f["key"]]).strip()) for f in fields}
++        if any(rec.values()):
++            out.append(rec)
++    return out
++
++
+ def _clean_perspectives(raw, errors: dict) -> dict:
+     if not isinstance(raw, dict):
+         errors["perspectives"] = "Perspectives should be a set of cards, one per character."
+@@ -610,6 +753,10 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+                 errors[nk] = f"The id “{slug}” is already used by a {taken[0]}. Pick a different name."
+         else:
+             new_id = _unique_id(conn, slug)
++    if mode_edit and baseline is not None:
++        for key in [k for (t, k) in POSITION if t == entity_type]:
++            if key in values and values[key] != baseline.get(key) and key not in errors:
++                errors[key] = LOCKED_ON_EDIT[(entity_type, key)]
+     if mode_edit and is_value and slug and slug != entity_id:
+         errors[nk] = LOCKED_ON_EDIT[("value", "name")]
+ 
+@@ -641,6 +788,13 @@ def _validate(conn, entity_type: str, entity_id: str | None, values: dict,
+             if missing:
+                 errors[key] = f"Not found: {', '.join(missing)}."
+ 
++    if not mode_edit:
++        for f in spec["fields"]:
++            if (entity_type, f["key"]) in POSITION and f["key"] not in errors and not values.get(f["key"]):
++                target = ENTITY_LABELS.get(f["ref"], f["ref"]).lower()
++                none = conn.execute("SELECT 1 FROM entities WHERE type=? AND is_deleted=0", (f["ref"],)).fetchone() is None
++                errors[f["key"]] = (f"There are no {target}s yet — create one first." if none
++                                    else f"Choose the {target} this belongs in.")
+     _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnings)
+ 
+     if is_value:
+@@ -680,6 +834,24 @@ def _validate_kind_specific(conn, entity_type, entity_id, values, errors, warnin
+                     warnings["characters"] = (f"{nm.get(chars[0], chars[0])} and {nm.get(chars[1], chars[1])} "
+                                               f"already have a relationship (“{rname}”). Saving adds another.")
+                     break
++    elif entity_type == "scene":
++        roles = values.get("plot_roles") or []
++        seen = set()
++        for i, r in enumerate(roles):
++            at = f"plot_roles.{i}"
++            if not r.get("plot"):
++                errors[f"{at}.plot"] = "Choose the plot."
++            elif not _exists(conn, "plot", r["plot"]):
++                errors[f"{at}.plot"] = f"There is no plot “{r['plot']}” — pick one from the list."
++            elif r["plot"] in seen:
++                errors[f"{at}.plot"] = "This scene already has a role in that plot — one role per plot."
++            else:
++                seen.add(r["plot"])
++            if r.get("role") not in PLOT_ROLES:
++                errors[f"{at}.role"] = "Choose a role."
++        if values.get("dramatic_role") in ("transition", "non-event") and roles and "dramatic_role" not in errors:
++            errors["dramatic_role"] = (f"A {values['dramatic_role']} scene serves no plot, but it has plot roles. "
++                                       f"Remove them, or leave the dramatic role empty.")
+     elif entity_type == "plot":
+         if values.get("plot_scope") == "sub" and not values.get("plot_type"):
+             warnings["plot_type"] = "A subplot normally has a kind — pick how it relates to the main plot."
+@@ -718,7 +890,8 @@ def check_entity(project_path: Path, entity_type: str, payload: dict,
+         if entity_id is not None:
+             row = _row(conn, entity_type, entity_id)
+             entity_id = row[0]
+-        warnings, new_id = _validate(conn, entity_type, entity_id, values, errors)
++            baseline = load_entity(project_path, entity_type, entity_id)["values"]   # same bar as save
++        warnings, new_id = _validate(conn, entity_type, entity_id, values, errors, baseline=baseline)
+     finally:
+         conn.close()
+     return {"ok": not errors, "errors": errors, "warnings": warnings, "id": new_id}
+@@ -761,6 +934,18 @@ def create_form_entity(project_path: Path, entity_type: str, payload: dict) -> d
+     if errors or not new_id:
+         raise EntityInvalid(errors or {"_form": "Could not make an id from that name."}, warnings)
+ 
++    if entity_type in ("scene", "act"):
++        conn = get_db(project_path)
++        try:
++            if entity_type == "scene":                  # a scene's act is its sequence's act
++                r = conn.execute("SELECT parent_id FROM entities WHERE id=?", (values["sequence_id"],)).fetchone()
++                values["act_id"] = r[0] if r else ""
++            else:                                       # acts are not auto-numbered by the write path
++                r = conn.execute("SELECT COALESCE(MAX(order_key), 0) FROM entities WHERE type='act' "
++                                 "AND is_deleted=0").fetchone()
++                values["order"] = int(r[0]) + 1
++        finally:
++            conn.close()
+     if entity_type == "relationship":               # one card per character, even if never opened
+         values["perspectives"] = {c: (values.get("perspectives") or {}).get(c) or _persp_form({c: {}})[c]
+                                   for c in values.get("characters") or []}
+@@ -857,7 +1042,23 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
+         children = conn.execute(
+             "SELECT id, type, name FROM entities WHERE parent_id=? AND is_deleted=0",
+             (entity_id,)).fetchall()
+-        also = [{"id": c[0], "type": c[1], "name": c[2] or c[0]} for c in children]
++        def _lab(t):
++            return ENTITY_LABELS.get(t) or t.replace("_", " ").capitalize()
++        also = [{"id": c[0], "type": c[1], "name": c[2] or c[0], "label": _lab(c[1])} for c in children]
++        # A sequence or act that still holds scenes / sequences is not deleted around them:
++        # they are moved or deleted on purpose first.
++        structural: list[str] = []
++        if entity_type in ("sequence", "act"):
++            kids = [c for c in also if c["type"] in ("scene", "sequence")]
++            also = [c for c in also if c not in kids]
++            if kids:
++                noun = kids[0]["type"]
++                structural.append(
++                    f"“{row[1] or entity_id}” still contains {_plural(len(kids), noun)}: "
++                    f"{_list([k['name'] for k in kids])}. Move or delete them first"
++                    f"{' — use Reorder in the Scenes tab to move scenes' if entity_type == 'sequence' else ''}.")
++                structural[-1] = structural[-1].replace(
++                    "Move or delete them first", "Move or delete " + ("it" if len(kids) == 1 else "them") + " first")
+ 
+         # A character's relationships go with them: a bond with one person left
+         # is not a relationship. (The agent path keeps the surviving half; the
+@@ -889,6 +1090,12 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
+                 plots.append(pname or pid)
+         if plots:
+             effects.append(f"No longer a protagonist of {_plural(len(plots), 'plot')}: {_list(plots)}.")
++        if entity_type == "scene":
++            body = conn.execute("SELECT body FROM sections WHERE entity_id=? AND heading='Content'",
++                                (entity_id,)).fetchone()
++            text = (body[0] or "") if body else ""
++            if text.strip() and not _is_placeholder(text):
++                effects.insert(0, f"Its script ({len(text):,} characters) is deleted with it.")
+         if entity_type == "plot":
+             roles = [r[0] for r in conn.execute(
+                 f"SELECT DISTINCT e.name FROM relations r JOIN entities e ON e.id=r.to_id "
+@@ -914,7 +1121,7 @@ def delete_preview(project_path: Path, entity_type: str, entity_id: str) -> dict
+         names = _names(conn, gone)
+         scene_names = {r[0]: r[1] or r[0] for r in conn.execute(
+             "SELECT id, name FROM entities WHERE type='scene' AND is_deleted=0")}
+-        blockers: list[str] = []
++        blockers: list[str] = list(structural)
+         by_scene: dict[str, set] = {}
+         for sid, bex in conn.execute(
+                 "SELECT parent_id, extra FROM entities WHERE type='scene_beats' AND is_deleted=0"):
+diff --git a/src/story_architect/core/manual_structure.py b/src/story_architect/core/manual_structure.py
+new file mode 100644
+index 0000000..d4ba057
+--- /dev/null
++++ b/src/story_architect/core/manual_structure.py
+@@ -0,0 +1,286 @@
++"""Reordering the story's structure by hand: acts, sequences and scenes.
++
++The Scenes tab's Reorder mode edits a COPY of the tree and sends the whole target
++shape back. Three steps, all here, so the browser holds no rules:
++
++  * `load_tree` — the current shape, plus a `version` that changes whenever any
++    act, sequence or scene is added, removed or moved. A plan or an apply made
++    against an older version is refused (the agent may have changed things).
++  * `plan`      — validates the target shape and lists what MOVES, in words.
++    Only the items that actually moved are listed: if one scene jumps from 3rd to
++    7th, the four it passed are not "changed". (Longest increasing subsequence.)
++  * `apply`     — writes it through `core.writes`, the agent's own path, in an
++    order that keeps the three levels consistent: sequences into their new acts
++    first, then each scene into its new sequence AND act (a scene carries its act
++    as a denormalised shortcut, and `edit_entity` would not otherwise update it),
++    then the renumbering.
++
++Nothing is invented: a move is `edit_entity`, a renumber is `reorder`.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++from pathlib import Path
++
++from .db import get_db
++
++SUMMARY = "Reordered by hand"
++
++
++class StructureError(ValueError):
++    """Something in the requested shape cannot be applied. Message is user-facing."""
++
++
++class StructureConflict(StructureError):
++    def __init__(self, current_version: str):
++        super().__init__("The structure changed since you opened Reorder — probably by the agent.")
++        self.current_version = current_version
++
++
++# ─── Reading ─────────────────────────────────────────────────────────────────
++
++def _rows(conn):
++    acts = conn.execute("SELECT id, name, order_key FROM entities WHERE type='act' AND is_deleted=0 "
++                        "ORDER BY order_key, name, id").fetchall()
++    seqs = conn.execute("SELECT id, name, parent_id FROM entities WHERE type='sequence' AND is_deleted=0 "
++                        "ORDER BY order_key, name, id").fetchall()
++    scenes = conn.execute("SELECT id, name, parent_id, extra FROM entities WHERE type='scene' AND is_deleted=0 "
++                          "ORDER BY order_key, name, id").fetchall()
++    return acts, seqs, scenes
++
++
++def _shape(acts, seqs, scenes) -> dict:
++    tree = {"acts": [], "unassigned": []}
++    by_act = {a[0]: [] for a in acts}
++    for q in seqs:
++        if q[2] in by_act:
++            by_act[q[2]].append({"id": q[0], "title": q[1] or q[0], "scenes": []})
++    seq_node = {q["id"]: q for qs in by_act.values() for q in qs}
++    for sc in scenes:
++        ex = json.loads(sc[3]) if sc[3] else {}
++        node = {"id": sc[0], "title": sc[1] or sc[0], "heading": ex.get("heading") or ""}
++        if sc[2] in seq_node:
++            seq_node[sc[2]]["scenes"].append(node)
++        else:
++            tree["unassigned"].append(node)
++    for a in acts:
++        tree["acts"].append({"id": a[0], "title": a[1] or a[0], "sequences": by_act[a[0]]})
++    return tree
++
++
++def _version(tree: dict) -> str:
++    flat = [[a["id"], [[q["id"], [s["id"] for s in q["scenes"]]] for q in a["sequences"]]] for a in tree["acts"]]
++    flat.append([s["id"] for s in tree["unassigned"]])
++    return hashlib.sha256(json.dumps(flat).encode()).hexdigest()[:16]
++
++
++def load_tree(project_path: Path) -> dict:
++    conn = get_db(project_path)
++    try:
++        tree = _shape(*_rows(conn))
++    finally:
++        conn.close()
++    tree["version"] = _version(tree)
++    return tree
++
++
++# ─── Planning ────────────────────────────────────────────────────────────────
++
++def _lis_keep(old_positions: list[int | None]) -> set[int]:
++    """Indices of the longest increasing run among entries that have an old position.
++
++    These are the items that did not move relative to each other; everything else
++    in the list is what the person actually moved.
++    """
++    idx = [i for i, p in enumerate(old_positions) if p is not None]
++    best: dict[int, tuple[int, int | None]] = {}        # i -> (length, previous i)
++    for pos, i in enumerate(idx):
++        length, prev = 1, None
++        for j in idx[:pos]:
++            if old_positions[j] < old_positions[i] and best[j][0] + 1 > length:
++                length, prev = best[j][0] + 1, j
++        best[i] = (length, prev)
++    if not best:
++        return set()
++    end = max(best, key=lambda i: best[i][0])
++    keep = set()
++    while end is not None:
++        keep.add(end)
++        end = best[end][1]
++    return keep
++
++
++def _validate_target(cur: dict, target) -> dict:
++    """The requested shape, checked against what exists. Returns it normalised."""
++    if not isinstance(target, dict) or not isinstance(target.get("acts"), list):
++        raise StructureError("The order sent was not understood. Reload and try again.")
++    cur_acts = {a["id"] for a in cur["acts"]}
++    cur_seqs = {q["id"] for a in cur["acts"] for q in a["sequences"]}
++    cur_assigned = {s["id"] for a in cur["acts"] for q in a["sequences"] for s in q["scenes"]}
++    cur_unassigned = {s["id"] for s in cur["unassigned"]}
++
++    seen_a, seen_q, seen_s = [], [], []
++    acts = []
++    for a in target["acts"]:
++        if not isinstance(a, dict) or not isinstance(a.get("sequences"), list):
++            raise StructureError("The order sent was not understood. Reload and try again.")
++        seqs = []
++        for q in a["sequences"]:
++            if not isinstance(q, dict) or not isinstance(q.get("scenes"), list):
++                raise StructureError("The order sent was not understood. Reload and try again.")
++            seen_s += [str(x) for x in q["scenes"]]
++            seqs.append({"id": str(q.get("id")), "scenes": [str(x) for x in q["scenes"]]})
++        seen_a.append(str(a.get("id")))
++        seen_q += [q["id"] for q in seqs]
++        acts.append({"id": str(a.get("id")), "sequences": seqs})
++
++    def dupes(xs):
++        return sorted({x for x in xs if xs.count(x) > 1})
++    for kind, xs in (("act", seen_a), ("sequence", seen_q), ("scene", seen_s)):
++        if dupes(xs):
++            raise StructureError(f"A {kind} appears in two places: {', '.join(dupes(xs))}.")
++    if set(seen_a) != cur_acts or set(seen_q) != cur_seqs:
++        raise StructureError("Acts and sequences can be moved here, not added or removed. "
++                             "Reload and try again.")
++    unknown = set(seen_s) - cur_assigned - cur_unassigned
++    if unknown:
++        raise StructureError(f"Not found: {', '.join(sorted(unknown))}.")
++    lost = cur_assigned - set(seen_s)
++    if lost:
++        raise StructureError("A scene can't be taken out of the story here: "
++                             + ", ".join(sorted(lost)) + ".")
++    return {"acts": acts}
++
++
++def _index(tree: dict) -> dict:
++    """Where everything is now: id -> (parent id, position)."""
++    where = {}
++    for i, a in enumerate(tree["acts"]):
++        where[a["id"]] = (None, i)
++        for j, q in enumerate(a["sequences"]):
++            where[q["id"]] = (a["id"], j)
++            for k, s in enumerate(q["scenes"]):
++                where[s["id"]] = (q["id"], k)
++    for k, s in enumerate(tree["unassigned"]):
++        where[s["id"]] = ("_unassigned", k)
++    return where
++
++
++def plan(project_path: Path, payload: dict) -> dict:
++    """Validate a target shape and list what it moves. Writes nothing."""
++    cur = load_tree(project_path)
++    if (payload or {}).get("base_version") != cur["version"]:
++        raise StructureConflict(cur["version"])
++    target = _validate_target(cur, payload)
++    old = _index(cur)
++    title = {a["id"]: a["title"] for a in cur["acts"]}
++    for a in cur["acts"]:
++        for q in a["sequences"]:
++            title[q["id"]] = q["title"]
++            for s in q["scenes"]:
++                title[s["id"]] = s["title"]
++    for s in cur["unassigned"]:
++        title[s["id"]] = s["title"]
++    act_of_seq = {q["id"]: a["id"] for a in cur["acts"] for q in a["sequences"]}
++    for a in target["acts"]:
++        for q in a["sequences"]:
++            act_of_seq.setdefault(q["id"], a["id"])
++    new_act_of_seq = {q["id"]: a["id"] for a in target["acts"] for q in a["sequences"]}
++
++    def where_is(parent, kind):                 # words for a place
++        if parent == "_unassigned":
++            return "Unassigned"
++        if kind == "scene":
++            return f"{title[new_act_of_seq.get(parent) or act_of_seq[parent]]} › {title[parent]}"
++        return title[parent] if parent else "the story"
++
++    def old_place(eid, kind):
++        parent, pos = old[eid]
++        if kind == "scene":
++            return "Unassigned" if parent == "_unassigned" else \
++                f"{title[act_of_seq[parent]]} › {title[parent]} · {pos + 1}"
++        if kind == "sequence":
++            return f"{title[parent]} · {pos + 1}"
++        return f"position {pos + 1}"
++
++    changes = []
++
++    def visit(kind, parent, ids):
++        positions = [old[i][1] if old[i][0] == parent else None for i in ids]
++        stable = _lis_keep(positions)
++        for pos, eid in enumerate(ids):
++            if pos in stable:
++                continue
++            was_parent = old[eid][0]
++            new_place = (f"{where_is(parent, kind)} · {pos + 1}" if kind != "act" else f"position {pos + 1}")
++            text = f"Move {kind} “{title[eid]}” from {old_place(eid, kind)} to {new_place}"
++            changes.append({"type": kind, "id": eid, "title": title[eid], "text": text,
++                            "moved": was_parent != parent})
++
++    visit("act", None, [a["id"] for a in target["acts"]])
++    for a in target["acts"]:
++        visit("sequence", a["id"], [q["id"] for q in a["sequences"]])
++        for q in a["sequences"]:
++            visit("scene", q["id"], q["scenes"])
++    # A sequence that changed act carries its scenes' act with it; say so once.
++    for c in changes:
++        if c["type"] == "sequence" and c["moved"]:
++            n = sum(len(q["scenes"]) for a in cur["acts"] for q in a["sequences"] if q["id"] == c["id"])
++            if n:
++                c["text"] += f" (its {n} scene{'s' if n != 1 else ''} {'move' if n != 1 else 'moves'} with it)"
++    return {"changes": changes, "unchanged": not changes, "target": target, "current": cur}
++
++
++# ─── Applying ────────────────────────────────────────────────────────────────
++
++def apply(project_path: Path, payload: dict) -> dict:
++    """Write a planned shape. Everything is validated first; the writes then go in an
++    order that keeps acts, sequences and scenes agreeing with each other."""
++    from .writes import edit_entity, reorder
++
++    p = plan(project_path, payload)
++    if p["unchanged"]:
++        return {"applied": 0, "tree": p["current"], "version": p["current"]["version"]}
++    cur, target = p["current"], p["target"]
++    old = _index(cur)
++    new_act_of_seq = {q["id"]: a["id"] for a in target["acts"] for q in a["sequences"]}
++    steps = 0
++    try:
++        # 1. Sequences into their new acts.
++        for q, act in new_act_of_seq.items():
++            if old[q][0] != act:
++                edit_entity(project_path, "sequence", q, {"act_id": act}, SUMMARY); steps += 1
++        # 2. Scenes into their new sequence — and the act that sequence is now in.
++        conn = get_db(project_path)
++        try:
++            cur_act = {sid: (json.loads(ex) if ex else {}).get("act_id", "")
++                       for sid, ex in conn.execute("SELECT id, extra FROM entities WHERE type='scene' AND is_deleted=0")}
++        finally:
++            conn.close()
++        for a in target["acts"]:
++            for q in a["sequences"]:
++                for sid in q["scenes"]:
++                    if old[sid][0] != q["id"] or cur_act.get(sid) != a["id"]:
++                        edit_entity(project_path, "scene", sid,
++                                    {"sequence_id": q["id"], "act_id": a["id"]}, SUMMARY); steps += 1
++        # 3. Renumber every list whose membership or order changed.
++        for a in target["acts"]:
++            ids = [q["id"] for q in a["sequences"]]
++            if ids and ids != [q["id"] for ca in cur["acts"] if ca["id"] == a["id"] for q in ca["sequences"]]:
++                reorder(project_path, "sequence", ids, SUMMARY); steps += 1
++            for q in a["sequences"]:
++                before = [s["id"] for ca in cur["acts"] for cq in ca["sequences"] if cq["id"] == q["id"]
++                          for s in cq["scenes"]]
++                if q["scenes"] and q["scenes"] != before:
++                    reorder(project_path, "scene", q["scenes"], SUMMARY); steps += 1
++        # 4. Acts have no parent, so `reorder` does not cover them: number them directly.
++        act_ids = [a["id"] for a in target["acts"]]
++        if act_ids != [a["id"] for a in cur["acts"]]:
++            for i, aid in enumerate(act_ids, 1):
++                edit_entity(project_path, "act", aid, {"order": i}, SUMMARY); steps += 1
++    except ValueError as e:
++        raise StructureError(f"Stopped after {steps} change{'s' if steps != 1 else ''}: {e} "
++                             f"Reload to see where things stand.")
++    tree = load_tree(project_path)
++    return {"applied": len(p["changes"]), "tree": tree, "version": tree["version"]}
+diff --git a/src/story_architect/web/css/entity-form.css b/src/story_architect/web/css/entity-form.css
+index da685a2..06e10ec 100644
+--- a/src/story_architect/web/css/entity-form.css
++++ b/src/story_architect/web/css/entity-form.css
+@@ -151,3 +151,13 @@ textarea.ef-input { resize: none; min-height: 34px; overflow: hidden; }
+ .ef-grid .ef-wide { grid-column: 1 / -1; }
+ .ef-rowlabel { margin: -3px 0 2px 2px; }
+ @media (max-width: 560px) { .ef-grid { grid-template-columns: 1fr; } }
++
++/* ─── phase 3: repeater cards, small dialog ───────────────────────────── */
++.ef-rm-card { float: right; width: 22px; height: 22px; }
++.ef-card-sm { width: min(560px, 100%); height: auto; max-height: 86vh; }
++.ef-card-sm .ef-body { flex: 0 1 auto; }
++.ef-card:focus { outline: none; }
++.ef-moves { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
++.ef-moves li { padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--font-size-sm); }
++.ef-moves li b { font-weight: 500; }
++.ef-moves li .where { color: var(--muted-foreground); }
+diff --git a/src/story_architect/web/css/reorder.css b/src/story_architect/web/css/reorder.css
+new file mode 100644
+index 0000000..12b274b
+--- /dev/null
++++ b/src/story_architect/web/css/reorder.css
+@@ -0,0 +1,40 @@
++/* ─── Reorder mode (Scenes tab) ───────────────────────────────────────────
++   The grouped list becomes a set of draggable rows. Same tokens as the rest. */
++.reorder-bar { display: none; align-items: center; gap: 8px; }
++.reorder-hint { font-size: var(--font-size-xs); color: var(--muted-foreground); }
++#scenes-view.reordering .reorder-bar { display: flex; }
++#scenes-view.reordering .search-bar,
++#scenes-view.reordering #btn-new-struct,
++#scenes-view.reordering #btn-reorder { display: none; }
++#reorder-review[disabled] { opacity: .45; cursor: not-allowed; }
++
++.ro-act { margin-top: 12px; }
++.ro-children { margin-left: 20px; display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
++.ro-head, .ro-scene {
++  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--border);
++  border-radius: var(--radius); background: var(--card); font-size: var(--font-size-sm); position: relative;
++}
++.ro-act-h { font-weight: 500; font-size: var(--font-size-base); }
++.ro-seq-h { color: var(--muted-foreground); font-weight: 500; }
++.ro-scene { background: transparent; }
++.ro-grip { cursor: grab; color: var(--muted-foreground); user-select: none; line-height: 1; letter-spacing: -2px; }
++.ro-head[draggable=true]:active .ro-grip, .ro-scene[draggable=true]:active .ro-grip { cursor: grabbing; }
++.ro-num { color: var(--muted-foreground); font-variant-numeric: tabular-nums; min-width: 1.6em; text-align: right; }
++.ro-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.ro-sub { color: var(--muted-foreground); font-size: var(--font-size-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28%; }
++.ro-ctl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
++.ro-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted-foreground);
++  width: 24px; height: 22px; line-height: 1; cursor: pointer; font-size: 12px; padding: 0; }
++.ro-btn:hover:not([disabled]) { color: var(--accent); border-color: var(--accent); }
++.ro-btn[disabled] { opacity: .3; cursor: default; }
++.ro-select { font: inherit; font-size: var(--font-size-xs); color: var(--muted-foreground); background: var(--card);
++  border: 1px solid var(--border); border-radius: var(--radius); padding: 2px 4px; max-width: 150px; }
++.ro-empty { padding: 6px 10px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted-foreground);
++  font-size: var(--font-size-xs); }
++.ro-unassigned-h { margin-top: 14px; font-size: var(--font-size-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
++
++.ro-dragging { opacity: .4; }
++.ro-drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
++.ro-drop-after  { box-shadow: 0 2px 0 0 var(--accent); }
++.ro-drop-into   { outline: 1px dashed var(--accent); outline-offset: 1px; }
++.ro-moved { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+diff --git a/src/story_architect/web/index.html b/src/story_architect/web/index.html
+index 687d0d6..03c9e96 100644
+--- a/src/story_architect/web/index.html
++++ b/src/story_architect/web/index.html
+@@ -28,6 +28,7 @@
+ <link rel="stylesheet" href="css/character-journey.css">
+ <link rel="stylesheet" href="css/script-editor.css">
+ <link rel="stylesheet" href="css/entity-form.css">
++<link rel="stylesheet" href="css/reorder.css">
+ <link rel="stylesheet" href="css/chat.css">
+ </head>
+ 
+@@ -215,6 +216,13 @@
+         <div class="view-title">Scenes</div>
+         <div class="view-subtitle" id="scenes-subtitle">—</div>
+         <div class="view-header-actions">
++          <button class="btn" id="btn-new-struct" onclick="DASH.openStructureMenu(this)" title="Add a scene, sequence or act">+ New ▾</button>
++          <button class="btn" id="btn-reorder" onclick="DASH.toggleReorder()" title="Move scenes between sequences and sequences between acts">Reorder</button>
++          <div class="reorder-bar" id="reorder-bar">
++            <span class="reorder-hint">Drag to move, or use ↑ ↓ and “Move to…”.</span>
++            <button class="btn" onclick="DASH.reorderCancel()">Cancel</button>
++            <button class="btn btn-primary" id="reorder-review" onclick="DASH.reorderReview()" disabled>Review changes</button>
++          </div>
+           <div class="search-bar">
+             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><line x1="7" y1="7" x2="9" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+             <input type="text" placeholder="Filter scenes…" id="scene-search" oninput="DASH.filterScenes(this.value)">
+@@ -564,6 +572,7 @@
+ <script src="js/script-editor/editor.js"></script>
+ <script src="js/script-view.js"></script>
+ <script src="js/forms/entity-form.js"></script>
++<script src="js/views/reorder.js"></script>
+ <script src="js/chat-api.js"></script><script src="js/chat-md.js"></script><script src="js/chat-render.js"></script><script src="js/chat-app.js"></script><script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+ <script>setInterval(() => fetch('/api/heartbeat').catch(() => {}), 10000);</script>
+ <script>DASH.boot();</script>
+diff --git a/src/story_architect/web/js/forms/entity-form.js b/src/story_architect/web/js/forms/entity-form.js
+index b7db198..268f808 100644
+--- a/src/story_architect/web/js/forms/entity-form.js
++++ b/src/story_architect/web/js/forms/entity-form.js
+@@ -4,7 +4,8 @@
+ // (`/form-spec`, built from ENTITY_SCHEMAS), so a field added to the schema
+ // appears here with no change to this file. Nothing here knows what a
+ // "character" is; it knows kinds: text, textarea, select, ref, reflist, list,
+-// perspectives (a card per chosen entity), computed.
++// perspectives (a card per chosen entity), repeater (a stack of small cards), linked,
++// computed.
+ //
+ //   DASH.openEntityForm({ type, id?, values? })   id => edit, no id => create
+ //
+@@ -21,8 +22,9 @@ window.DASH = window.DASH || {};
+   const clone = (v) => JSON.parse(JSON.stringify(v));
+   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+   const slugFromHash = () => { const m = (location.hash || '').match(/^#\/p\/([^/?]+)/); return m ? decodeURIComponent(m[1]) : null; };
+-  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values', scene: 'scenes' };
++  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values', scene: 'scenes', sequence: 'sequences', act: 'acts' };
+   const PANEL_TYPES = ['character', 'location', 'world', 'plot', 'relationship'];
++  const PANELS = { plot: 'showPlotPanel', scene: 'showScenePanel', sequence: 'showSequencePanel', act: 'showActPanel' };
+   const blankPersp = () => ({ label: '', feeling: '', type: '', strength: '', secret: false });
+ 
+   let specs = null, rootEl = null, toastTimer = 0, menuEl = null;
+@@ -50,8 +52,10 @@ window.DASH = window.DASH || {};
+     toastTimer = setTimeout(() => t.remove(), kind === 'bad' ? 6000 : 3200);
+   }
+ 
++  D.efToast = toast;
++
+   // ─── Values: normalise, diff, dirty ──────────────────────────────────────
+-  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'unsupported');
++  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && f.kind !== 'unsupported');
+   const nameKey = () => S.spec.name_key;
+   // A field with `show_if` only exists while its condition holds; hidden, it counts as its default.
+   const visible = (f) => !f.show_if || Object.keys(f.show_if).every((k) => S.values[k] === f.show_if[k]);
+@@ -63,7 +67,10 @@ window.DASH = window.DASH || {};
+       let v = values[f.key];
+       if (f.show_if && !Object.keys(f.show_if).every((k) => values[k] === f.show_if[k])) v = clone(f.default);
+       else if (f.kind === 'list' || f.kind === 'reflist') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
+-      else if (f.kind === 'perspectives') {
++      else if (f.kind === 'repeater') {
++        v = (v || []).map((r) => { const o = {}; f.fields.forEach((sf) => { o[sf.key] = String(r[sf.key] == null ? '' : r[sf.key]).trim(); }); return o; })
++          .filter((r) => Object.values(r).some(Boolean));
++      } else if (f.kind === 'perspectives') {
+         const o = {};
+         Object.keys(v || {}).forEach((id) => { const p = v[id] || {}; o[id] = {
+           label: String(p.label || '').trim(), feeling: String(p.feeling || '').trim(), type: String(p.type || '').trim(),
+@@ -119,6 +126,11 @@ window.DASH = window.DASH || {};
+     render(); focusFirst();
+   };
+ 
++  function goScript() {
++    const id = S.id; close();
++    if (D.openScriptEditor) D.openScriptEditor(id);
++  }
++
+   function close() {
+     clearTimeout(S.timer); S.seq++;
+     S.open = false; rootEl.classList.remove('open'); rootEl.innerHTML = '';
+@@ -156,14 +168,15 @@ window.DASH = window.DASH || {};
+   function tabsHtml() {
+     const filled = S.spec.sections.filter((n) => String(S.sections[n] || '').trim()).length;
+     const tab = (id, label, extra) => `<button class="ef-tab${S.tab === id ? ' active' : ''}" data-act="tab" data-tab="${id}">${label}${extra || ''}<i class="ef-dot" data-dot="${id}"></i></button>`;
+-    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}</div>`;
++    const script = S.spec.script_link && S.mode === 'edit' ? tab('script', 'Script') : '';
++    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${script}</div>`;
+   }
+ 
+   function renderBody() {
+     const body = document.getElementById('ef-body'); if (!body) return;
+     const top = body.scrollTop;
+     body.innerHTML = S.step === 'review' ? reviewHtml() : S.step === 'delete' ? deleteHtml()
+-      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : fieldsHtml());
++      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : fieldsHtml());
+     body.scrollTop = top;
+     body.querySelectorAll('textarea').forEach(autosize);
+     paintMessages();
+@@ -171,7 +184,7 @@ window.DASH = window.DASH || {};
+ 
+   function fieldsHtml() {
+     let last = null, html = '';
+-    S.spec.fields.filter((f) => f.kind !== 'computed' && visible(f)).forEach((f) => {
++    S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && visible(f)).forEach((f) => {
+       if ((f.group || null) !== last) { last = f.group || null; if (last) html += `<h3 class="ef-group">${h(last)}</h3>`; }
+       html += fieldHtml(f);
+     });
+@@ -184,6 +197,8 @@ window.DASH = window.DASH || {};
+     const note = locked ? f.locked_on_edit : f.help;
+     const err = `<div class="ef-msg" data-msg="${h(f.key)}"></div>`;
+     if (f.kind === 'perspectives') return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>${perspectivesHtml(f)}${err}</div>`;
++    if (f.kind === 'repeater') return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>${repeaterHtml(f)}${note ? `<div class="ef-help">${h(note)}</div>` : ''}${err}</div>`;
++    if (f.kind === 'toggle') return `<div class="ef-field">${widget(f, locked)}${note ? `<div class="ef-help">${h(note)}</div>` : ''}${err}</div>`;
+     return `<div class="ef-field">
+       <label class="ef-label" for="ef-f-${h(f.key)}">${h(f.label)}${f.required ? '<abbr class="ef-req" title="Required">*</abbr>' : ''}</label>
+       ${widget(f, locked)}
+@@ -198,7 +213,7 @@ window.DASH = window.DASH || {};
+       case 'textarea': return `<textarea class="ef-input" ${id} rows="2">${h(v)}</textarea>`;
+       case 'toggle': return `<label class="ef-check"><input type="checkbox" ${id}${v ? ' checked' : ''}> <span>${h(f.label)}</span></label>`;
+       case 'select': return selectHtml(f, id, v);
+-      case 'ref': return refSelect(f, id, v);
++      case 'ref': return refSelect(f, id, v, locked);
+       case 'reflist': return refListWidget(f, v || []);
+       case 'list': return listWidget(f, v || []);
+       default: return `<div class="ef-note">Not editable here yet — ask the agent.</div>`;
+@@ -208,28 +223,40 @@ window.DASH = window.DASH || {};
+   const numAttrs = (f) => ['min', 'max', 'step'].filter((k) => f[k] != null).map((k) => ` ${k}="${f[k]}"`).join('') + (f.integer ? ' step="1"' : '');
+ 
+   function selectHtml(f, attrs, v) {
+-    const stray = v && !f.options.includes(v) ? `<option selected>${h(v)}</option>` : '';     // keep a stored value we don't list
++    const lab = (o) => h((f.option_labels || {})[o] || o);
++    const stray = v && !f.options.includes(v) ? `<option value="${h(v)}" selected>${h(v)}</option>` : '';     // keep a stored value we don't list
+     return `<select class="ef-input" ${attrs}>${f.allow_blank ? '<option value="">—</option>' : ''}${stray}
+-      ${f.options.map((o) => `<option${o === v ? ' selected' : ''}>${h(o)}</option>`).join('')}</select>`;
++      ${f.options.map((o) => `<option value="${h(o)}"${o === v ? ' selected' : ''}>${lab(o)}</option>`).join('')}</select>`;
++  }
++
++  // A sequence is named with its act, so "Scene 3" in two acts can't be confused.
++  function optLabel(type, e) {
++    const n = e.name || e.title || e.id;
++    if (type !== 'sequence') return n;
++    const a = ((D.story || {}).acts || []).find((x) => x.id === e.act_id);
++    return a ? `${a.title || a.id} › ${n}` : n;
++  }
++  function optSort(type) {
++    if (type !== 'sequence') return (a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title));
++    const act = (e) => { const a = ((D.story || {}).acts || []).find((x) => x.id === e.act_id); return a ? (a.order || 0) : 0; };
++    return (a, b) => act(a) - act(b) || (a.order || 0) - (b.order || 0);
+   }
+ 
+   // A picker over entities that exist, so a link can't point at nothing.
+-  function refSelect(f, id, v) {
+-    const all = ((D.story || {})[LISTS[f.ref]] || []).filter((e) => e.id !== S.id);
+-    all.sort((a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title)));
++  function refSelect(f, id, v, locked) {
++    const all = ((D.story || {})[LISTS[f.ref]] || []).filter((e) => e.id !== S.id).sort(optSort(f.ref));
+     const known = all.some((e) => e.id === v);
+-    return `<select class="ef-input" ${id}><option value="">— none —</option>
++    return `<select class="ef-input" ${id}${locked ? ' disabled' : ''}><option value="">${f.required ? '— choose —' : '— none —'}</option>
+       ${v && !known ? `<option value="${h(v)}" selected>${h(v)} (missing)</option>` : ''}
+-      ${all.map((e) => `<option value="${h(e.id)}"${e.id === v ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('')}</select>`;
++      ${all.map((e) => `<option value="${h(e.id)}"${e.id === v ? ' selected' : ''}>${h(optLabel(f.ref, e))}</option>`).join('')}</select>`;
+   }
+ 
+   const entityName = (type, id) => refName(type, id);
+   function entityOptions(type, chosen, current) {
+-    const all = ((D.story || {})[LISTS[type]] || []).filter((e) => e.id === current || !chosen.includes(e.id));
+-    all.sort((a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title)));
++    const all = ((D.story || {})[LISTS[type]] || []).filter((e) => e.id === current || !chosen.includes(e.id)).sort(optSort(type));
+     const known = all.some((e) => e.id === current);
+     return `<option value="">— choose —</option>${current && !known ? `<option value="${h(current)}" selected>${h(current)} (missing)</option>` : ''}`
+-      + all.map((e) => `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('');
++      + all.map((e) => `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(optLabel(type, e))}</option>`).join('');
+   }
+ 
+   // Several entities of one kind. `count` fixes the number of slots (a relationship's two characters);
+@@ -266,6 +293,38 @@ window.DASH = window.DASH || {};
+     }).join('');
+   }
+ 
++  // A stack of small cards (a scene's plot roles). A card appears only when added.
++  const newCard = (f) => { const o = {}; f.fields.forEach((sf) => { o[sf.key] = sf.kind === 'select' && !sf.allow_blank ? sf.options[0] : ''; }); return o; };
++
++  function repeaterHtml(f) {
++    const items = S.values[f.key] || [];
++    const chosen = (sf) => items.map((r) => r[sf.key]).filter(Boolean);
++    return `<div class="ef-list">${items.map((it, i) => `<div class="ef-sub-card">
++        <div class="ef-sub-card-h">${h(f.label.replace(/s$/, ''))} ${i + 1}
++          <button class="ef-rm ef-rm-card" data-act="rep-del" data-key="${h(f.key)}" data-i="${i}" aria-label="Remove" title="Remove">×</button></div>
++        <div class="ef-grid">${f.fields.map((sf) => {
++          const path = `${f.key}.${i}.${sf.key}`, at = `data-rk="${h(f.key)}" data-ri="${i}" data-rf="${h(sf.key)}" data-path="${h(path)}" id="ef-r-${h(f.key)}-${i}-${h(sf.key)}"`;
++          const w = sf.kind === 'ref' ? `<select class="ef-input" ${at}>${entityOptions(sf.ref, chosen(sf).filter((x) => x !== it[sf.key]), it[sf.key])}</select>`
++            : sf.kind === 'select' ? selectHtml(sf, at, it[sf.key])
++            : `<input class="ef-input" ${at} value="${h(it[sf.key])}" autocomplete="off">`;
++          return `<div class="ef-field${sf.key === 'description' ? ' ef-wide' : ''}"><label class="ef-label" for="ef-r-${h(f.key)}-${i}-${h(sf.key)}">${h(sf.label)}</label>${w}
++            ${sf.help ? `<div class="ef-help">${h(sf.help)}</div>` : ''}<div class="ef-msg" data-msg="${h(path)}"></div></div>`;
++        }).join('')}</div></div>`).join('')}
++      <button class="ef-add" data-act="rep-add" data-key="${h(f.key)}">+ ${h(f.add_label || 'Add')}</button></div>`;
++  }
++
++  // What the script editor owns on a scene. Shown here so the form tells the whole story,
++  // never edited here so the heading line and these fields can't disagree.
++  function scriptHtml() {
++    const rows = S.spec.fields.filter((f) => f.kind === 'linked').map((f) => {
++      const r = (S.orig.computed || {})[f.key] || [];
++      return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
++        <div class="ef-ro${r.length ? '' : ' none'}">${r.length ? r.map((x) => `<div>${h(x.display)}</div>`).join('') : 'Not set'}</div></div>`;
++    }).join('');
++    return `<div class="ef-note">The script, its heading, location, time of day and cast are written together in the script editor, so they always agree.</div>
++      ${rows}<div><button class="btn" data-act="open-script">Edit in script editor →</button></div>`;
++  }
++
+   function listWidget(f, items) {
+     return `<div class="ef-list">${items.map((it, i) => `<div class="ef-row">
+         <input class="ef-input" data-list="${h(f.key)}" data-i="${i}" value="${h(it)}" autocomplete="off">
+@@ -318,9 +377,12 @@ window.DASH = window.DASH || {};
+     changedFields().forEach((f) => {
+       let was, now;
+       if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
+-      else if (f.kind === 'list' || f.kind === 'reflist') {
+-        const nm = f.kind === 'reflist' ? (i) => refName(f.ref, i) : (i) => i;
+-        const x = (a[f.key] || []).map((i) => [i, nm(i)]), y = (b[f.key] || []).map((i) => [i, nm(i)]);
++      else if (f.kind === 'list' || f.kind === 'reflist' || f.kind === 'repeater') {
++        const rec = (r) => f.fields.map((sf) => sf.kind === 'ref' ? (r[sf.key] ? refName(sf.ref, r[sf.key]) : '')
++          : sf.kind === 'select' ? ((sf.option_labels || {})[r[sf.key]] || r[sf.key]) : r[sf.key]).filter(Boolean).join(' · ');
++        const items = (v) => f.kind === 'repeater' ? (v || []).map((r) => [JSON.stringify(r), rec(r)])
++          : (v || []).map((i) => [i, f.kind === 'reflist' ? refName(f.ref, i) : i]);
++        const x = items(a[f.key]), y = items(b[f.key]);
+         const xs = x.map((i) => i[0]), ys = y.map((i) => i[0]);
+         was = x.length ? x.map(([id, n]) => ys.includes(id) ? h(n) : `<span class="del">${h(n)}</span>`).join('<br>') : '—';
+         now = y.length ? y.map(([id, n]) => xs.includes(id) ? h(n) : `<span class="add">${h(n)}</span>`).join('<br>') : '—';
+@@ -357,8 +419,7 @@ window.DASH = window.DASH || {};
+     const p = S.preview;
+     if (!p) return '<div class="ef-sub">Checking what this affects…</div>';
+     const list = (items) => `<ul>${items.map((i) => `<li>${h(i)}</li>`).join('')}</ul>`;
+-    const kind = (t) => (specs[t] ? specs[t].label : t);
+-    const also = p.also_deleted.map((e) => `${kind(e.type)}: ${e.name}`);
++    const also = p.also_deleted.map((e) => `${e.label || e.type}: ${e.name}`);
+     const rels = p.relationships.map((e) => e.name);
+     return `<div class="ef-impact">
+       <div class="ef-sub">Delete ${h(p.entity.label.toLowerCase())} “${h(p.entity.name)}”?</div>
+@@ -372,8 +433,8 @@ window.DASH = window.DASH || {};
+ 
+   // ─── Footer ──────────────────────────────────────────────────────────────
+   function footerHtml() {
+-    if (S.discard) return `<div class="grow">Discard your changes?</div>
+-      <button class="btn btn-ghost" data-act="keep">Keep editing</button><button class="btn btn-danger" data-act="discard">Discard</button>`;
++    if (S.discard) return `<div class="grow">${S.discard === 'script' ? 'Discard your changes and open the script editor?' : 'Discard your changes?'}</div>
++      <button class="btn btn-ghost" data-act="keep">Keep editing</button><button class="btn btn-danger" data-act="discard">${S.discard === 'script' ? 'Discard and open' : 'Discard'}</button>`;
+     if (S.step === 'review') return `<button class="btn" data-act="back">Back</button><div class="grow"></div>
+       <button class="btn btn-primary" data-act="confirm"${S.busy ? ' disabled' : ''}>${S.busy ? 'Saving…' : 'Confirm and save'}</button>`;
+     if (S.step === 'delete') {
+@@ -514,7 +575,7 @@ window.DASH = window.DASH || {};
+   }
+ 
+   function reopenPanel(type, id) {
+-    if (type === 'plot' && D.showPlotPanel) D.showPlotPanel(id);
++    if (PANELS[type] && D[PANELS[type]]) D[PANELS[type]](id);
+     else if (PANEL_TYPES.includes(type) && D.panelTabs) D.panelTabs.openEntity(type + ':' + id);
+   }
+ 
+@@ -538,7 +599,7 @@ window.DASH = window.DASH || {};
+       case 'ask-delete': askDelete(); break;
+       case 'confirm-delete': confirmDelete(); break;
+       case 'keep': S.discard = false; syncFooter(); break;
+-      case 'discard': close(); break;
++      case 'discard': if (S.discard === 'script') goScript(); else close(); break;
+       case 'list-add': {
+         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
+         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
+@@ -550,6 +611,15 @@ window.DASH = window.DASH || {};
+       case 'ref-del': {
+         S.values[el.dataset.key].splice(+el.dataset.i, 1); syncPersp(); renderBody(); afterEdit(); break;
+       }
++      case 'rep-add': {
++        const f = field(el.dataset.key); (S.values[f.key] = S.values[f.key] || []).push(newCard(f));
++        renderBody(); afterEdit(); const first = document.querySelectorAll(`[data-rk="${CSS.escape(f.key)}"][data-rf="${f.fields[0].key}"]`);
++        if (first.length) first[first.length - 1].focus(); break;
++      }
++      case 'rep-del': {
++        S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
++      }
++      case 'open-script': if (isDirty()) { S.discard = 'script'; syncFooter(); } else goScript(); break;
+       case 'list-del': {
+         S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
+       }
+@@ -588,6 +658,9 @@ window.DASH = window.DASH || {};
+       while (arr.length <= +d.i) arr.push('');
+       arr[+d.i] = el.value; S.touched.add(d.ref);
+       syncPersp(); autoName(); rerender = true;              // the other slot's choices and the cards depend on this
++    } else if (d.rk != null) {
++      S.values[d.rk][+d.ri][d.rf] = el.value; S.touched.add(d.path);
++      rerender = d.rf === 'plot';                              // the other cards' choices exclude this one
+     } else if (d.pc != null) {
+       const f = persField(), cards = S.values[f.key] = S.values[f.key] || {};
+       (cards[d.pc] = cards[d.pc] || blankPersp())[d.pf] = el.type === 'checkbox' ? el.checked : el.value;
+@@ -639,6 +712,7 @@ window.DASH = window.DASH || {};
+     };
+     wrap('showCharacterPanel', 'character'); wrap('showLocationPanel', 'location'); wrap('showWorldPanel', 'world');
+     wrap('showPlotPanel', 'plot'); wrap('showRelationshipPanel', 'relationship');
++    wrap('showScenePanel', 'scene'); wrap('showSequencePanel', 'sequence'); wrap('showActPanel', 'act');
+     const open = D.openPanel, close_ = D.closePanel;
+     D.openPanel = function () { const r = open.apply(this, arguments); D._formTarget = D._pendingFormTarget || null; syncEditButton(); return r; };
+     D.closePanel = function () { D._formTarget = null; syncEditButton(); return close_.apply(this, arguments); };
+@@ -647,6 +721,50 @@ window.DASH = window.DASH || {};
+   // The project is one record that always exists; the server finds it whatever id we name.
+   D.openProjectForm = function () { D.openEntityForm({ type: 'project', id: slugFromHash() }); };
+ 
++  // "+ New" in the Scenes tab: three kinds of thing can be made there.
++  D.openStructureMenu = function (btn) {
++    if (menuEl) { closeMenu(); return; }
++    menuEl = document.createElement('div'); menuEl.className = 'ef-menu';
++    menuEl.innerHTML = [['scene', 'Scene', 'a scene in a sequence'], ['sequence', 'Sequence', 'a group of scenes in an act'], ['act', 'Act', 'a part of the story']]
++      .map(([t, n, d]) => `<button data-new="${t}">${n}<small>${d}</small></button>`).join('');
++    const r = btn.getBoundingClientRect();
++    menuEl.style.top = (r.bottom + 4) + 'px'; menuEl.style.right = (window.innerWidth - r.right) + 'px';
++    menuEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; closeMenu(); D.openEntityForm({ type: b.dataset.new }); });
++    document.body.appendChild(menuEl);
++    setTimeout(() => document.addEventListener('click', function off(e) {
++      if (menuEl && !menuEl.contains(e.target)) closeMenu();
++      document.removeEventListener('click', off);
++    }), 0);
++  };
++
++  // A small confirm dialog in the same style, for things that aren't a form (Reorder's review).
++  //   const d = DASH.efDialog({ title, kicker, bodyHtml, confirm, onConfirm }); d.error(html); d.busy(bool); d.close();
++  D.efDialog = function (o) {
++    const el = document.createElement('div'); el.className = 'ef-backdrop open';
++    el.innerHTML = `<div class="ef-card ef-card-sm" role="dialog" aria-modal="true" tabindex="-1">
++      <div class="ef-head"><div class="ef-titles"><div class="ef-kicker">${h(o.kicker || '')}</div><div class="ef-name">${h(o.title || '')}</div></div>
++        <button class="ef-x-close" data-d="close" aria-label="Close">×</button></div>
++      <div class="ef-body"><div class="ef-banner" data-d="err"></div>${o.bodyHtml || ''}</div>
++      <div class="ef-foot"><div class="grow"></div><button class="btn" data-d="close">${h(o.cancel || 'Cancel')}</button>
++        <button class="btn btn-primary" data-d="ok">${h(o.confirm || 'OK')}</button></div></div>`;
++    document.body.appendChild(el);
++    const api_ = {
++      close() { el.remove(); document.removeEventListener('keydown', esc, true); if (o.onClose) o.onClose(); },
++      error(html) { const b = el.querySelector('[data-d=err]'); b.innerHTML = html || ''; b.className = 'ef-banner' + (html ? ' on' : ''); },
++      busy(on) { const b = el.querySelector('[data-d=ok]'); b.disabled = !!on; b.textContent = on ? 'Working…' : (o.confirm || 'OK'); },
++      el,
++    };
++    const esc = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); api_.close(); } };
++    document.addEventListener('keydown', esc, true);
++    el.addEventListener('click', (e) => {
++      const t = e.target.closest('[data-d]');
++      if (t && t.dataset.d === 'close' || e.target === el) api_.close();
++      else if (t && t.dataset.d === 'ok' && o.onConfirm) o.onConfirm(api_);
++    });
++    el.querySelector('.ef-card').focus();
++    return api_;
++  };
++
+   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+ 
+   // Values have no list or panel of their own, so the Values view gets a menu.
+diff --git a/src/story_architect/web/js/views/reorder.js b/src/story_architect/web/js/views/reorder.js
+new file mode 100644
+index 0000000..c407fa6
+--- /dev/null
++++ b/src/story_architect/web/js/views/reorder.js
+@@ -0,0 +1,246 @@
++// Reorder — move scenes between (or within) sequences, and sequences between (or within) acts.
++//
++// The Scenes tab's grouped list turns into draggable rows. The browser edits a COPY of the tree
++// and sends the whole target shape to the server, which validates it, says in words what moves
++// (`/structure/plan`), and writes it through the same path the agent uses (`/structure/apply`).
++// Nothing is written until the person has read that list and confirmed.
++//
++// Every move has a keyboard path: ↑ ↓ within a list, and "Move to…" across lists.
++window.DASH = window.DASH || {};
++(function (D) {
++  'use strict';
++
++  const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
++    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
++  const clone = (v) => JSON.parse(JSON.stringify(v));
++  const slugFromHash = () => { const m = (location.hash || '').match(/^#\/p\/([^/?]+)/); return m ? decodeURIComponent(m[1]) : null; };
++  const toast = (m, k) => { if (D.efToast) D.efToast(m, k); };
++
++  let R = null;          // { tree, orig, version, drag, focus, moved }
++  const view = () => document.getElementById('scenes-view');
++
++  async function api(path, opts) {
++    const o = Object.assign({ headers: { 'Content-Type': 'application/json', 'X-Story-Architect': '1' } }, opts || {});
++    const res = await fetch('/api/projects/' + encodeURIComponent(slugFromHash()) + path, o);
++    const j = await res.json().catch(() => ({}));
++    if (!res.ok) { const e = new Error((j.error && j.error.message) || res.statusText); e.status = res.status; e.body = j.error || {}; throw e; }
++    return j;
++  }
++
++  // ─── The working copy ────────────────────────────────────────────────────
++  const shape = (tree) => tree.acts.map((a) => ({ id: a.id, sequences: a.sequences.map((q) => ({ id: q.id, scenes: q.scenes.map((s) => s.id) })) }));
++  const dirty = () => !!R && JSON.stringify(shape(R.tree)) !== JSON.stringify(shape(R.orig));
++
++  function find(kind, id) {
++    if (kind === 'act') return { list: R.tree.acts, i: R.tree.acts.findIndex((a) => a.id === id), parent: null };
++    for (const a of R.tree.acts) {
++      if (kind === 'sequence') { const i = a.sequences.findIndex((q) => q.id === id); if (i >= 0) return { list: a.sequences, i, parent: a.id }; }
++      else for (const q of a.sequences) { const i = q.scenes.findIndex((s) => s.id === id); if (i >= 0) return { list: q.scenes, i, parent: q.id }; }
++    }
++    if (kind === 'scene') return { list: R.tree.unassigned, i: R.tree.unassigned.findIndex((s) => s.id === id), parent: '_unassigned' };
++    return null;
++  }
++
++  function listOf(kind, parentId) {
++    if (kind === 'act') return R.tree.acts;
++    if (kind === 'sequence') return (R.tree.acts.find((a) => a.id === parentId) || {}).sequences;
++    for (const a of R.tree.acts) { const q = a.sequences.find((x) => x.id === parentId); if (q) return q.scenes; }
++    return null;
++  }
++
++  // `index` is a position in the destination list as it is BEFORE the item is lifted out.
++  function moveTo(kind, id, parentId, index) {
++    const from = find(kind, id), dest = listOf(kind, parentId);
++    if (!from || !dest) return;
++    const [item] = from.list.splice(from.i, 1);
++    let idx = index === 'end' ? dest.length : index;
++    if (dest === from.list && idx > from.i) idx -= 1;
++    dest.splice(Math.max(0, Math.min(idx, dest.length)), 0, item);
++    R.moved.add(id);
++  }
++
++  // ─── Render ──────────────────────────────────────────────────────────────
++  const grip = '<span class="ro-grip" aria-hidden="true">⋮⋮</span>';
++  const btn = (ro, kind, id, label, glyph, off) => `<button class="ro-btn" data-ro="${ro}" data-kind="${kind}" data-id="${h(id)}" aria-label="${label}" title="${label}"${off ? ' disabled' : ''}>${glyph}</button>`;
++
++  function sequenceOptions(curSeq) {
++    return '<option value="">Move to…</option>' + R.tree.acts.map((a) => {
++      const opts = a.sequences.filter((q) => q.id !== curSeq).map((q) => `<option value="${h(q.id)}">${h(q.title)}</option>`).join('');
++      return opts ? `<optgroup label="${h(a.title)}">${opts}</optgroup>` : '';
++    }).join('');
++  }
++  const actOptions = (curAct) => '<option value="">Move to…</option>'
++    + R.tree.acts.filter((a) => a.id !== curAct).map((a) => `<option value="${h(a.id)}">${h(a.title)}</option>`).join('');
++
++  function sceneRow(s, i, n, inSeq) {
++    const moved = R.moved.has(s.id) ? ' ro-moved' : '';
++    return `<div class="ro-scene${moved}" draggable="true" data-kind="scene" data-id="${h(s.id)}">
++      ${grip}${inSeq ? `<span class="ro-num">${i + 1}</span>` : ''}
++      <span class="ro-title">${h(s.title)}</span>${s.heading ? `<span class="ro-sub">${h(s.heading)}</span>` : ''}
++      <span class="ro-ctl">${inSeq ? btn('up', 'scene', s.id, 'Move up', '↑', i === 0) + btn('down', 'scene', s.id, 'Move down', '↓', i === n - 1) : ''}
++        <select class="ro-select" data-ro="moveto" data-kind="scene" data-id="${h(s.id)}" aria-label="Move ${h(s.title)} to">${sequenceOptions(inSeq ? find('scene', s.id).parent : null)}</select></span></div>`;
++  }
++
++  function render() {
++    const list = document.getElementById('scene-list'); if (!list) return;
++    list.innerHTML = R.tree.acts.map((a, ai) => `<div class="ro-act" data-actblock="${h(a.id)}">
++      <div class="ro-head ro-act-h${R.moved.has(a.id) ? ' ro-moved' : ''}" draggable="true" data-kind="act" data-id="${h(a.id)}">${grip}
++        <span class="ro-title">${h(a.title)}</span>
++        <span class="ro-ctl">${btn('up', 'act', a.id, 'Move act up', '↑', ai === 0)}${btn('down', 'act', a.id, 'Move act down', '↓', ai === R.tree.acts.length - 1)}</span></div>
++      <div class="ro-children">${a.sequences.length ? a.sequences.map((q, qi) => `<div class="ro-seq" data-seqblock="${h(q.id)}">
++          <div class="ro-head ro-seq-h${R.moved.has(q.id) ? ' ro-moved' : ''}" draggable="true" data-kind="sequence" data-id="${h(q.id)}">${grip}
++            <span class="ro-title">${h(q.title)}</span>
++            <span class="ro-ctl">${btn('up', 'sequence', q.id, 'Move sequence up', '↑', qi === 0)}${btn('down', 'sequence', q.id, 'Move sequence down', '↓', qi === a.sequences.length - 1)}
++              <select class="ro-select" data-ro="moveto" data-kind="sequence" data-id="${h(q.id)}" aria-label="Move ${h(q.title)} to act">${actOptions(a.id)}</select></span></div>
++          <div class="ro-children">${q.scenes.length ? q.scenes.map((s, si) => sceneRow(s, si, q.scenes.length, true)).join('')
++            : `<div class="ro-empty" data-drop="seq" data-id="${h(q.id)}">No scenes — drop one here</div>`}</div></div>`).join('')
++        : `<div class="ro-empty" data-drop="act" data-id="${h(a.id)}">No sequences — drop one here</div>`}</div></div>`).join('')
++      + (R.tree.unassigned.length ? `<div class="ro-unassigned-h">Unassigned</div><div class="ro-children" style="margin-left:0">${R.tree.unassigned.map((s) => sceneRow(s, 0, 0, false)).join('')}</div>` : '');
++    if (R.focus) {
++      const f = R.focus;
++      const el = list.querySelector(`[data-ro="${f.ro}"][data-id="${CSS.escape(f.id)}"]:not([disabled])`)
++        || list.querySelector(`[data-ro="${f.ro === 'up' ? 'down' : 'up'}"][data-id="${CSS.escape(f.id)}"]:not([disabled])`);
++      if (el) el.focus();
++      R.focus = null;
++    }
++    const review = document.getElementById('reorder-review'); if (review) review.disabled = !dirty();
++  }
++
++  // ─── Events ──────────────────────────────────────────────────────────────
++  function onClick(e) {
++    const b = e.target.closest('[data-ro=up],[data-ro=down]'); if (!R || !b) return;
++    const { kind, id } = b.dataset, f = find(kind, id), step = b.dataset.ro === 'up' ? -1 : 1;
++    if (!f) return;
++    moveTo(kind, id, f.parent, step < 0 ? f.i - 1 : f.i + 2);     // +2: "after the next one", measured before lifting
++    R.focus = { ro: b.dataset.ro, id }; render();
++  }
++
++  function onChange(e) {
++    const s = e.target.closest('[data-ro=moveto]'); if (!R || !s || !s.value) return;
++    moveTo(s.dataset.kind, s.dataset.id, s.value, 'end'); render();
++  }
++
++  // Where a drop would land. Over a row: before or after it, by which half the cursor is in.
++  // Over a header or an empty slot: into that parent, at the start.
++  function dropSpec(e) {
++    const d = R && R.drag; if (!d) return null;
++    const t = e.target;
++    const half = (el) => { const r = el.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; };
++    if (d.kind === 'scene') {
++      const row = t.closest('.ro-scene'), head = t.closest('.ro-seq-h'), slot = t.closest('[data-drop=seq]');
++      if (row) { const f = find('scene', row.dataset.id); if (f.parent === '_unassigned') return null; const up = half(row); return { el: row, parent: f.parent, index: f.i + (up ? 0 : 1), cls: up ? 'before' : 'after' }; }
++      if (head) return { el: head, parent: head.dataset.id, index: 0, cls: 'into' };
++      if (slot) return { el: slot, parent: slot.dataset.id, index: 0, cls: 'into' };
++    } else if (d.kind === 'sequence') {
++      const block = t.closest('[data-seqblock]'), head = t.closest('.ro-act-h'), slot = t.closest('[data-drop=act]');
++      if (block) { const f = find('sequence', block.dataset.seqblock), up = half(block); return { el: block, parent: f.parent, index: f.i + (up ? 0 : 1), cls: up ? 'before' : 'after' }; }
++      if (head) return { el: head, parent: head.dataset.id, index: 0, cls: 'into' };
++      if (slot) return { el: slot, parent: slot.dataset.id, index: 0, cls: 'into' };
++    } else if (d.kind === 'act') {
++      const block = t.closest('[data-actblock]');
++      if (block) { const f = find('act', block.dataset.actblock), up = half(block); return { el: block, parent: null, index: f.i + (up ? 0 : 1), cls: up ? 'before' : 'after' }; }
++    }
++    return null;
++  }
++
++  const clearMarks = () => document.querySelectorAll('.ro-drop-before,.ro-drop-after,.ro-drop-into')
++    .forEach((n) => n.classList.remove('ro-drop-before', 'ro-drop-after', 'ro-drop-into'));
++
++  function onDragStart(e) {
++    const el = e.target.closest('[data-kind][draggable=true]'); if (!R || !el) return;
++    R.drag = { kind: el.dataset.kind, id: el.dataset.id };
++    e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', R.drag.kind + ':' + R.drag.id);
++    setTimeout(() => el.classList.add('ro-dragging'), 0);
++  }
++  function onDragOver(e) {
++    if (!R || !R.drag) return;
++    const spec = dropSpec(e); clearMarks();
++    if (!spec) return;
++    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
++    spec.el.classList.add('ro-drop-' + spec.cls);
++  }
++  function onDrop(e) {
++    if (!R || !R.drag) return;
++    const spec = dropSpec(e); clearMarks();
++    if (!spec) return;
++    e.preventDefault();
++    moveTo(R.drag.kind, R.drag.id, spec.parent, spec.index); R.drag = null; render();
++  }
++  function onDragEnd() { if (R) R.drag = null; clearMarks(); document.querySelectorAll('.ro-dragging').forEach((n) => n.classList.remove('ro-dragging')); }
++
++  // ─── Enter / leave ───────────────────────────────────────────────────────
++  D.reorderActive = () => !!R;
++
++  function leave(redraw) {
++    R = null;
++    const v = view(); if (v) v.classList.remove('reordering');
++    if (redraw && D.renderSceneList) D.renderSceneList(D.allScenes || []);
++  }
++  D.reorderExit = () => { if (R) leave(false); };
++
++  function start(tree) {
++    R = { tree: clone(tree), orig: clone(tree), version: tree.version, drag: null, focus: null, moved: new Set() };
++    const search = document.getElementById('scene-search'); if (search) search.value = '';
++    view().classList.add('reordering'); render();
++  }
++
++  D.toggleReorder = async function () {
++    if (R) return;
++    try { start(await api('/structure')); } catch (e) { toast(e.message, 'bad'); }
++  };
++
++  D.reorderCancel = function () {
++    if (!R) return;
++    if (!dirty()) { leave(true); return; }
++    D.efDialog({ kicker: 'Reorder', title: 'Discard the new order?', bodyHtml: '<div class="ef-sub">Nothing has been saved yet.</div>',
++      confirm: 'Discard', cancel: 'Keep editing', onConfirm: (d) => { d.close(); leave(true); } });
++  };
++
++  function conflict() {
++    D.efDialog({ kicker: 'Reorder', title: 'The story changed', confirm: 'Reload Reorder', cancel: 'Close',
++      bodyHtml: '<div class="ef-sub">Something was added, removed or moved since you opened Reorder — probably by the agent. Your arrangement can’t be applied safely, so it needs to start again from the current order.</div>',
++      onConfirm: async (d) => { d.close(); try { start(await api('/structure')); } catch (e) { toast(e.message, 'bad'); } } });
++  }
++
++  D.reorderReview = async function () {
++    if (!R || !dirty()) return;
++    const body = JSON.stringify({ base_version: R.version, acts: shape(R.tree) });
++    let plan;
++    try { plan = await api('/structure/plan', { method: 'POST', body }); }
++    catch (e) { if (e.status === 409) conflict(); else toast(e.message, 'bad'); return; }
++    if (plan.unchanged) { toast('Nothing to change'); return; }
++    const n = plan.changes.length;
++    D.efDialog({
++      kicker: 'Reorder', title: `Apply ${n} change${n === 1 ? '' : 's'}?`, confirm: 'Apply order',
++      bodyHtml: `<ul class="ef-moves">${plan.changes.map((c) => `<li>${h(c.text)}</li>`).join('')}</ul>
++        <div class="ef-note">Scene numbers and the script follow the new order. Scripts themselves are not changed.</div>`,
++      onConfirm: async (d) => {
++        d.busy(true);
++        try {
++          D._ownWriteUntil = Date.now() + 8000;
++          await api('/structure/apply', { method: 'POST', body });
++          d.close(); leave(false);
++          if (D.reloadData) await D.reloadData();
++          toast(`Order saved · ${n} change${n === 1 ? '' : 's'}`);
++        } catch (e) {
++          d.close();
++          if (e.status === 409) conflict(); else { toast(e.message, 'bad'); }
++        }
++      },
++    });
++  };
++
++  function init() {
++    const list = document.getElementById('scene-list'); if (!list) return;
++    list.addEventListener('click', onClick);
++    list.addEventListener('change', onChange);
++    list.addEventListener('dragstart', onDragStart);
++    list.addEventListener('dragover', onDragOver);
++    list.addEventListener('drop', onDrop);
++    list.addEventListener('dragend', onDragEnd);
++    document.addEventListener('keydown', (e) => {
++      if (e.key === 'Escape' && R && !document.querySelector('.ef-backdrop.open')) { e.preventDefault(); D.reorderCancel(); }
++    });
++  }
++  init();
++})(window.DASH);
+diff --git a/src/story_architect/web/js/views/scenes.js b/src/story_architect/web/js/views/scenes.js
+index 30a0205..9ad4ec9 100644
+--- a/src/story_architect/web/js/views/scenes.js
++++ b/src/story_architect/web/js/views/scenes.js
+@@ -3,6 +3,7 @@ window.DASH = window.DASH || {};
+ DASH.allScenes = [];
+ 
+ DASH.buildScenesView = function() {
++  if (DASH.reorderExit) DASH.reorderExit();     // fresh data arrived: a half-made reorder no longer matches it
+   DASH.allScenes = DASH.story.scenes || [];
+   document.getElementById('scenes-subtitle').textContent = DASH.allScenes.length + ' scenes';
+   DASH.renderSceneList(DASH.allScenes);
+@@ -67,7 +68,10 @@ DASH.renderSceneItem = function(s) {
+ 
+ DASH.renderSceneList = function(scenes) {
+   const list = document.getElementById('scene-list');
+-  if (!scenes.length) {
++  // Unfiltered, the whole structure shows — including a sequence or act with nothing in it yet,
++  // otherwise something you just made would look as if it had vanished.
++  const showEmpty = scenes.length === (DASH.story.scenes || []).length;
++  if (!scenes.length && !(showEmpty && ((DASH.story.acts || []).length || (DASH.story.sequences || []).length))) {
+     list.innerHTML = '<div class="empty-state"><div class="empty-state-title">No scenes yet</div><div class="empty-state-sub">Create scenes to see them here.</div></div>';
+     return;
+   }
+@@ -94,10 +98,12 @@ DASH.renderSceneList = function(scenes) {
+     let actHtml = '';
+     for (const seq of actSeqs) {
+       const seqScenes = seqMap[seq.id];
+-      if (!seqScenes.length) continue;
++      if (!seqScenes.length && !showEmpty) continue;
+       actHtml += `<div class="scene-sequence-header clickable" onclick="DASH.showSequencePanel('${seq.id}')" style="cursor:pointer;font-size:var(--font-size-sm);color:var(--muted-foreground);padding:6px 10px 2px;font-weight:500;">${DASH.escapeHtml(seq.title || seq.id)}</div>`;
+-      actHtml += seqScenes.map(s => DASH.renderSceneItem(s)).join('');
++      actHtml += seqScenes.length ? seqScenes.map(s => DASH.renderSceneItem(s)).join('')
++        : '<div class="panel-muted" style="font-size:var(--font-size-xs);padding:2px 10px 4px;">No scenes yet</div>';
+     }
++    if (showEmpty && !actSeqs.length) actHtml = '<div class="panel-muted" style="font-size:var(--font-size-xs);padding:2px 10px 4px;">No sequences yet</div>';
+     if (actHtml) {
+       html += `<div class="DASH.story-section-title clickable" onclick="DASH.showActPanel('${act.id}')" style="cursor:pointer;margin-top:12px">${DASH.escapeHtml(act.title || act.id)}</div>` + actHtml;
+     }
+diff --git a/tests/test_manual_structure.py b/tests/test_manual_structure.py
+new file mode 100644
+index 0000000..36bfe1f
+--- /dev/null
++++ b/tests/test_manual_structure.py
+@@ -0,0 +1,363 @@
++"""Entity form (acts, sequences, scenes) and Reorder.
++
++Moves are checked against what the database holds afterwards — the scene's parent,
++its denormalised `act_id`, and its order — because those three agreeing with each
++other is the whole point of doing a move through one place.
++"""
++import json
++
++import pytest
++
++from story_architect.core import manual_entities as me
++from story_architect.core import manual_structure as ms
++from story_architect.core.db import get_db
++from story_architect.core.writes import create_entity, edit_entity
++
++
++@pytest.fixture
++def project(tmp_path):
++    from story_architect.core.writes import create_project
++    (tmp_path / "projects").mkdir()
++    create_project("demo", {"name": "Demo"}, tmp_path)
++    p = tmp_path / "projects" / "demo"
++    create_entity(p, "plot", "main", {"name": "Main"})
++    create_entity(p, "act", "a1", {"title": "Act One", "order": 1})
++    create_entity(p, "act", "a2", {"title": "Act Two", "order": 2})
++    for sid, act, order in (("s1", "a1", 1), ("s2", "a1", 2), ("s3", "a2", 1)):
++        create_entity(p, "sequence", sid, {"title": f"Seq {sid}", "act_id": act, "order": order})
++    for sc, seq, act in (("sc1", "s1", "a1"), ("sc2", "s1", "a1"), ("sc3", "s1", "a1"), ("sc4", "s2", "a1")):
++        create_entity(p, "scene", sc, {"title": f"Scene {sc}", "sequence_id": seq, "act_id": act})
++    return p
++
++
++def _scene(p, sid):
++    conn = get_db(p)
++    try:
++        r = conn.execute("SELECT parent_id, order_key, extra FROM entities WHERE id=?", (sid,)).fetchone()
++        return {"seq": r[0], "order": r[1], "act": json.loads(r[2]).get("act_id")}
++    finally:
++        conn.close()
++
++
++def _ids(tree):
++    return {a["id"]: {q["id"]: [s["id"] for s in q["scenes"]] for q in a["sequences"]} for a in tree["acts"]}
++
++
++def _target(p, mutate):
++    t = ms.load_tree(p)
++    shape = {"base_version": t["version"],
++             "acts": [{"id": a["id"], "sequences": [{"id": q["id"], "scenes": [s["id"] for s in q["scenes"]]}
++                                                    for q in a["sequences"]]} for a in t["acts"]]}
++    mutate(shape)
++    return shape
++
++
++def _seq(shape, sid):
++    return next(q for a in shape["acts"] for q in a["sequences"] if q["id"] == sid)
++
++
++# ─── forms ───────────────────────────────────────────────────────────────────
++
++class TestSpec:
++    def test_scene(self):
++        sp = me.form_spec("scene")
++        by = {f["key"]: f for f in sp["fields"]}
++        assert "order" not in by and "act_id" not in by            # Reorder's, not the form's
++        assert by["sequence_id"]["required"] and by["sequence_id"]["ref"] == "sequence"
++        assert all(by[k]["kind"] == "linked" for k in ("heading", "location", "time_of_day", "characters"))
++        assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "computed"
++        assert "Content" not in sp["sections"] and sp["script_link"]
++        assert [f["key"] for f in sp["fields"]][:3] == ["title", "sequence_id", "status"]
++
++    def test_sequence_and_act(self):
++        assert {f["key"] for f in me.form_spec("sequence")["fields"]} >= {"title", "act_id", "primary_plot", "purpose"}
++        assert "order" not in {f["key"] for f in me.form_spec("act")["fields"]}
++
++
++class TestCreate:
++    def test_acts_are_numbered_in_turn(self, project):
++        out = me.create_form_entity(project, "act", {"values": {"title": "Act Three"}})
++        conn = get_db(project)
++        try:
++            assert conn.execute("SELECT order_key FROM entities WHERE id=?", (out["id"],)).fetchone()[0] == 3
++        finally:
++            conn.close()
++
++    def test_sequence_needs_an_act(self, project):
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(project, "sequence", {"values": {"title": "X"}})
++        assert "Choose the act" in e.value.errors["act_id"]
++        out = me.create_form_entity(project, "sequence", {"values": {"title": "X", "act_id": "a2", "primary_plot": "main"}})
++        assert out["values"]["act_id"] == "a2" and out["values"]["primary_plot"] == "main"
++
++    def test_no_acts_yet_says_so(self, tmp_path):
++        from story_architect.core.writes import create_project
++        (tmp_path / "projects").mkdir()
++        create_project("empty", {"name": "E"}, tmp_path)
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(tmp_path / "projects" / "empty", "sequence", {"values": {"title": "X"}})
++        assert "no acts yet" in e.value.errors["act_id"]
++
++    def test_scene_takes_its_acts_from_its_sequence(self, project):
++        out = me.create_form_entity(project, "scene", {"values": {"title": "New", "sequence_id": "s3"}})
++        assert _scene(project, out["id"]) == {"seq": "s3", "order": 1, "act": "a2"}
++
++    def test_scene_needs_a_sequence(self, project):
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(project, "scene", {"values": {"title": "New"}})
++        assert "Choose the sequence" in e.value.errors["sequence_id"]
++
++    def test_unknown_sequence_is_named(self, project):
++        with pytest.raises(me.EntityInvalid) as e:
++            me.create_form_entity(project, "scene", {"values": {"title": "New", "sequence_id": "nope"}})
++        assert "nope" in e.value.errors["sequence_id"]
++
++
++class TestScene:
++    def test_plot_roles_round_trip(self, project):
++        out = me.create_form_entity(project, "scene", {"values": {
++            "title": "Dinner", "sequence_id": "s1",
++            "plot_roles": [{"plot": "main", "role": "crisis", "description": "Boom"}, {"plot": "", "role": "", "description": ""}]}})
++        assert out["values"]["plot_roles"] == [{"plot": "main", "role": "crisis", "description": "Boom"}]   # blank card dropped
++        v = out["values"]
++        v["plot_roles"][0]["description"] = "Bigger boom"
++        got = me.edit_form_entity(project, "scene", out["id"], {"base_version": out["version"], "values": v})
++        assert got["values"]["plot_roles"][0]["description"] == "Bigger boom"
++        v = got["values"]; v["plot_roles"] = []
++        got = me.edit_form_entity(project, "scene", out["id"], {"base_version": got["version"], "values": v})
++        assert got["values"]["plot_roles"] == []
++
++    def test_card_errors_are_keyed_to_the_card(self, project):
++        chk = me.check_entity(project, "scene", {"values": {"title": "X", "sequence_id": "s1", "plot_roles": [
++            {"plot": "main", "role": "crisis"}, {"plot": "main", "role": "climax"},
++            {"plot": "ghost", "role": "setup"}, {"plot": "main"}]}})
++        e = chk["errors"]
++        assert "one role per plot" in e["plot_roles.1.plot"]
++        assert "ghost" in e["plot_roles.2.plot"]
++        assert e["plot_roles.3.role"] == "Choose a role."
++
++    def test_transition_scene_cannot_have_plot_roles(self, project):
++        chk = me.check_entity(project, "scene", {"values": {
++            "title": "X", "sequence_id": "s1", "dramatic_role": "transition",
++            "plot_roles": [{"plot": "main", "role": "setup"}]}})
++        assert "serves no plot" in chk["errors"]["dramatic_role"]
++
++    def test_position_cannot_change_from_the_form(self, project):
++        cur = me.load_entity(project, "scene", "sc1")
++        v = {**cur["values"], "sequence_id": "s3"}
++        with pytest.raises(me.EntityInvalid) as e:
++            me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"], "values": v})
++        assert "Reorder" in e.value.errors["sequence_id"]
++        assert me.check_entity(project, "scene", {"values": v}, "sc1")["errors"]["sequence_id"]
++        assert _scene(project, "sc1")["seq"] == "s1"
++
++    def test_script_fields_are_shown_not_written(self, project):
++        create_entity(project, "location", "kitchen", {"name": "Kitchen", "one_sentence": "x"})
++        create_entity(project, "character", "kael", {"name": "Kael", "one_sentence": "x"})
++        edit_entity(project, "scene", "sc1", {"heading": "INT. KITCHEN - DAY", "time_of_day": "DAY",
++                                              "location": "kitchen", "characters": ["kael"]}, "t")
++        c = me.load_entity(project, "scene", "sc1")["computed"]
++        assert c["heading"][0]["display"] == "INT. KITCHEN - DAY" and c["location"][0]["display"] == "Kitchen"
++        assert c["time_of_day"][0]["display"] == "DAY" and c["characters"][0]["display"] == "Kael"
++        cur = me.load_entity(project, "scene", "sc1")
++        assert "heading" not in cur["values"]
++        out = me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"], "values": {
++            **cur["values"], "heading": "HACKED", "location": "x", "characters": [], "one_sentence": "s"}})
++        assert out["computed"]["heading"][0]["display"] == "INT. KITCHEN - DAY"       # untouched
++        assert out["computed"]["characters"][0]["display"] == "Kael"
++
++    def test_the_script_is_never_touched(self, project):
++        edit_entity(project, "scene", "sc1", {"Content": "INT. KITCHEN - DAY\n\nKael waits."}, "t")
++        cur = me.load_entity(project, "scene", "sc1")
++        assert "Content" not in cur["sections"]
++        me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"], "values": {
++            **cur["values"], "one_sentence": "Waiting."}, "sections": {"Objective": "Wait."}})
++        conn = get_db(project)
++        try:
++            body = conn.execute("SELECT body FROM sections WHERE entity_id='sc1' AND heading='Content'").fetchone()[0]
++        finally:
++            conn.close()
++        assert "Kael waits." in body
++
++    def test_a_legacy_value_does_not_block_check_either(self, project):
++        """`check` is what 'Review changes' calls — it must hold the person to the same bar as save."""
++        create_entity(project, "plot", "old", {"name": "Old"})
++        conn = get_db(project)
++        try:
++            ex = json.loads(conn.execute("SELECT extra FROM entities WHERE id='old'").fetchone()[0])
++            ex["value_arc"] = "Legacy"
++            conn.execute("UPDATE entities SET extra=? WHERE id='old'", (json.dumps(ex),))
++        finally:
++            conn.close()
++        cur = me.load_entity(project, "plot", "old")
++        assert me.check_entity(project, "plot", {"values": cur["values"]}, "old")["ok"]
++
++
++class TestDelete:
++    def test_sequence_with_scenes_is_blocked_with_a_way_out(self, project):
++        prev = me.delete_preview(project, "sequence", "s1")
++        assert not prev["can_delete"] and "3 scenes" in prev["blockers"][0] and "Reorder" in prev["blockers"][0]
++        one = me.delete_preview(project, "sequence", "s2")
++        assert "Move or delete it first" in one["blockers"][0]
++
++    def test_empty_sequence_deletes(self, project):
++        me.delete_form_entity(project, "sequence", "s3")
++        with pytest.raises(me.EntityNotFound):
++            me.load_entity(project, "sequence", "s3")
++
++    def test_act_with_sequences_is_blocked(self, project):
++        prev = me.delete_preview(project, "act", "a1")
++        assert not prev["can_delete"] and "2 sequences" in prev["blockers"][0]
++
++    def test_scene_delete_warns_about_its_script_and_beats(self, project):
++        edit_entity(project, "scene", "sc1", {"Content": "INT. ROOM - DAY\n\nSomething happens."}, "t")
++        create_entity(project, "scene_beats", "sc1-beats", {"scene": "sc1"})
++        prev = me.delete_preview(project, "scene", "sc1")
++        assert prev["can_delete"] and "script" in prev["effects"][0] and "characters" in prev["effects"][0]
++        assert [c["label"] for c in prev["also_deleted"]] and prev["also_deleted"][0]["id"] == "sc1-beats"
++        me.delete_form_entity(project, "scene", "sc1")
++        with pytest.raises(me.EntityNotFound):
++            me.load_entity(project, "scene", "sc1")
++
++
++# ─── reorder ─────────────────────────────────────────────────────────────────
++
++class TestTree:
++    def test_shape_and_version(self, project):
++        t = ms.load_tree(project)
++        assert _ids(t) == {"a1": {"s1": ["sc1", "sc2", "sc3"], "s2": ["sc4"]}, "a2": {"s3": []}}
++        assert t["unassigned"] == [] and t["version"] == ms.load_tree(project)["version"]
++        edit_entity(project, "scene", "sc4", {"sequence_id": "s1"}, "t")
++        assert ms.load_tree(project)["version"] != t["version"]
++
++
++class TestPlan:
++    def test_no_change_no_moves(self, project):
++        p = ms.plan(project, _target(project, lambda s: None))
++        assert p["unchanged"] and p["changes"] == []
++
++    def test_a_jump_lists_only_the_item_that_moved(self, project):
++        def mut(s): _seq(s, "s1")["scenes"] = ["sc2", "sc3", "sc1"]          # sc1 jumps from 1st to 3rd
++        p = ms.plan(project, _target(project, mut))
++        assert [c["id"] for c in p["changes"]] == ["sc1"]
++        assert p["changes"][0]["text"] == "Move scene “Scene sc1” from Act One › Seq s1 · 1 to Act One › Seq s1 · 3"
++
++    def test_a_move_across_acts_reads_as_a_move(self, project):
++        def mut(s):
++            _seq(s, "s1")["scenes"].remove("sc2"); _seq(s, "s3")["scenes"].append("sc2")
++        p = ms.plan(project, _target(project, mut))
++        assert p["changes"][0]["text"] == "Move scene “Scene sc2” from Act One › Seq s1 · 2 to Act Two › Seq s3 · 1"
++
++    def test_a_sequence_move_says_its_scenes_go_with_it(self, project):
++        def mut(s):
++            q = _seq(s, "s1"); s["acts"][0]["sequences"].remove(q); s["acts"][1]["sequences"].append(q)
++        p = ms.plan(project, _target(project, mut))
++        assert p["changes"][0]["type"] == "sequence" and "its 3 scenes move with it" in p["changes"][0]["text"]
++        assert len(p["changes"]) == 1                    # the scenes inside are not listed as moves
++
++    def test_stale_version_is_refused(self, project):
++        shape = _target(project, lambda s: None)
++        edit_entity(project, "scene", "sc4", {"sequence_id": "s1"}, "t")
++        with pytest.raises(ms.StructureConflict):
++            ms.plan(project, shape)
++
++    @pytest.mark.parametrize("mut,msg", [
++        (lambda s: _seq(s, "s2")["scenes"].append("sc1"), "appears in two places"),
++        (lambda s: _seq(s, "s1")["scenes"].remove("sc2"), "can't be taken out"),
++        (lambda s: _seq(s, "s2")["scenes"].append("ghost"), "Not found"),
++        (lambda s: s["acts"].pop(), "not added or removed"),
++    ])
++    def test_invalid_shapes(self, project, mut, msg):
++        with pytest.raises(ms.StructureError) as e:
++            ms.plan(project, _target(project, mut))
++        assert msg in str(e.value)
++
++
++class TestApply:
++    def test_reorder_within_a_sequence(self, project):
++        def mut(s): _seq(s, "s1")["scenes"] = ["sc3", "sc1", "sc2"]
++        out = ms.apply(project, _target(project, mut))
++        assert _ids(out["tree"])["a1"]["s1"] == ["sc3", "sc1", "sc2"] and out["applied"] == 1
++        assert [_scene(project, s)["order"] for s in ("sc3", "sc1", "sc2")] == [1, 2, 3]
++
++    def test_scene_into_another_act_updates_all_three(self, project):
++        def mut(s):
++            _seq(s, "s1")["scenes"].remove("sc2"); _seq(s, "s3")["scenes"].append("sc2")
++        ms.apply(project, _target(project, mut))
++        assert _scene(project, "sc2") == {"seq": "s3", "order": 1, "act": "a2"}       # parent, order AND act
++        assert _ids(ms.load_tree(project))["a1"]["s1"] == ["sc1", "sc3"]
++        assert [_scene(project, s)["order"] for s in ("sc1", "sc3")] == [1, 2]        # the gap closed
++
++    def test_sequence_into_another_act_carries_its_scenes_act(self, project):
++        def mut(s):
++            q = _seq(s, "s1"); s["acts"][0]["sequences"].remove(q); s["acts"][1]["sequences"].insert(0, q)
++        ms.apply(project, _target(project, mut))
++        assert _ids(ms.load_tree(project)) == {"a1": {"s2": ["sc4"]}, "a2": {"s1": ["sc1", "sc2", "sc3"], "s3": []}}
++        assert all(_scene(project, s)["act"] == "a2" for s in ("sc1", "sc2", "sc3"))  # the denormalised act followed
++        assert _scene(project, "sc4")["act"] == "a1"                                   # a bystander did not
++
++    def test_move_into_an_empty_sequence(self, project):
++        ms.apply(project, _target(project, lambda s: (_seq(s, "s2")["scenes"].clear(), _seq(s, "s3")["scenes"].append("sc4"))))
++        assert _scene(project, "sc4") == {"seq": "s3", "order": 1, "act": "a2"}
++
++    def test_acts_swap(self, project):
++        out = ms.apply(project, _target(project, lambda s: s["acts"].reverse()))
++        assert [a["id"] for a in out["tree"]["acts"]] == ["a2", "a1"]
++
++    def test_unassigned_scene_can_be_placed(self, project):
++        conn = get_db(project)
++        try:
++            conn.execute("UPDATE entities SET parent_id='' WHERE id='sc4'")
++        finally:
++            conn.close()
++        assert [s["id"] for s in ms.load_tree(project)["unassigned"]] == ["sc4"]
++        ms.apply(project, _target(project, lambda s: _seq(s, "s3")["scenes"].append("sc4")))
++        assert _scene(project, "sc4")["seq"] == "s3" and ms.load_tree(project)["unassigned"] == []
++
++    def test_script_text_survives_a_move(self, project):
++        edit_entity(project, "scene", "sc2", {"Content": "INT. ROOM - DAY\n\nKeep me."}, "t")
++        ms.apply(project, _target(project, lambda s: (_seq(s, "s1")["scenes"].remove("sc2"), _seq(s, "s3")["scenes"].append("sc2"))))
++        conn = get_db(project)
++        try:
++            assert "Keep me." in conn.execute("SELECT body FROM sections WHERE entity_id='sc2' AND heading='Content'").fetchone()[0]
++        finally:
++            conn.close()
++
++    def test_applying_nothing_writes_nothing(self, project):
++        before = ms.load_tree(project)["version"]
++        assert ms.apply(project, _target(project, lambda s: None))["applied"] == 0
++        assert ms.load_tree(project)["version"] == before
++
++
++# ─── over HTTP ───────────────────────────────────────────────────────────────
++
++class TestHttp:
++    @pytest.fixture
++    def client(self, project, monkeypatch):
++        from fastapi.testclient import TestClient
++        from story_architect.app.config import Config
++        from story_architect.app.server import create_app
++        monkeypatch.setattr("story_architect.app.token.load_api_key", lambda: "k")
++        c = TestClient(create_app(Config(root=project.parent.parent, port=8731)), base_url="http://127.0.0.1:8731")
++        c.headers.update({"X-Story-Architect": "1"})
++        return c
++
++    def test_plan_apply_and_refusals(self, client):
++        t = client.get("/api/projects/demo/structure").json()
++        shape = {"base_version": t["version"], "acts": [
++            {"id": a["id"], "sequences": [{"id": q["id"], "scenes": [s["id"] for s in q["scenes"]]} for q in a["sequences"]]}
++            for a in t["acts"]]}
++        shape["acts"][0]["sequences"][0]["scenes"].reverse()
++        plan = client.post("/api/projects/demo/structure/plan", json=shape).json()
++        assert not plan["unchanged"] and plan["changes"][0]["text"].startswith("Move scene")
++        r = client.post("/api/projects/demo/structure/apply", json=shape)
++        assert r.status_code == 200 and [s["id"] for s in r.json()["tree"]["acts"][0]["sequences"][0]["scenes"]] == ["sc3", "sc2", "sc1"]
++        assert client.post("/api/projects/demo/structure/apply", json=shape).status_code == 409      # now stale
++        bad = {**shape, "base_version": r.json()["version"], "acts": shape["acts"][:1]}
++        assert client.post("/api/projects/demo/structure/apply", json=bad).status_code == 422
++        assert client.post("/api/projects/demo/structure/apply", json=shape).headers  # still responds
++        assert client.get("/api/projects/nope/structure").status_code == 404
++
++    def test_writes_need_the_custom_header(self, client):
++        del client.headers["X-Story-Architect"]
++        assert client.post("/api/projects/demo/structure/apply", json={}).status_code == 403

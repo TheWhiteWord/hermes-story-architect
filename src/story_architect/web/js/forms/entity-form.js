@@ -4,7 +4,8 @@
 // (`/form-spec`, built from ENTITY_SCHEMAS), so a field added to the schema
 // appears here with no change to this file. Nothing here knows what a
 // "character" is; it knows kinds: text, textarea, select, ref, reflist, list,
-// perspectives (a card per chosen entity), computed.
+// perspectives (a card per chosen entity), repeater (a stack of small cards), linked,
+// computed.
 //
 //   DASH.openEntityForm({ type, id?, values? })   id => edit, no id => create
 //
@@ -21,8 +22,9 @@ window.DASH = window.DASH || {};
   const clone = (v) => JSON.parse(JSON.stringify(v));
   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const slugFromHash = () => { const m = (location.hash || '').match(/^#\/p\/([^/?]+)/); return m ? decodeURIComponent(m[1]) : null; };
-  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values', scene: 'scenes' };
+  const LISTS = { character: 'characters', location: 'locations', world: 'worlds', plot: 'plots', value: 'values', scene: 'scenes', sequence: 'sequences', act: 'acts' };
   const PANEL_TYPES = ['character', 'location', 'world', 'plot', 'relationship'];
+  const PANELS = { plot: 'showPlotPanel', scene: 'showScenePanel', sequence: 'showSequencePanel', act: 'showActPanel' };
   const blankPersp = () => ({ label: '', feeling: '', type: '', strength: '', secret: false });
 
   let specs = null, rootEl = null, toastTimer = 0, menuEl = null;
@@ -50,8 +52,10 @@ window.DASH = window.DASH || {};
     toastTimer = setTimeout(() => t.remove(), kind === 'bad' ? 6000 : 3200);
   }
 
+  D.efToast = toast;
+
   // ─── Values: normalise, diff, dirty ──────────────────────────────────────
-  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'unsupported');
+  const editable = () => S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && f.kind !== 'unsupported');
   const nameKey = () => S.spec.name_key;
   // A field with `show_if` only exists while its condition holds; hidden, it counts as its default.
   const visible = (f) => !f.show_if || Object.keys(f.show_if).every((k) => S.values[k] === f.show_if[k]);
@@ -63,7 +67,10 @@ window.DASH = window.DASH || {};
       let v = values[f.key];
       if (f.show_if && !Object.keys(f.show_if).every((k) => values[k] === f.show_if[k])) v = clone(f.default);
       else if (f.kind === 'list' || f.kind === 'reflist') v = (v || []).map((x) => String(x).trim()).filter(Boolean);
-      else if (f.kind === 'perspectives') {
+      else if (f.kind === 'repeater') {
+        v = (v || []).map((r) => { const o = {}; f.fields.forEach((sf) => { o[sf.key] = String(r[sf.key] == null ? '' : r[sf.key]).trim(); }); return o; })
+          .filter((r) => Object.values(r).some(Boolean));
+      } else if (f.kind === 'perspectives') {
         const o = {};
         Object.keys(v || {}).forEach((id) => { const p = v[id] || {}; o[id] = {
           label: String(p.label || '').trim(), feeling: String(p.feeling || '').trim(), type: String(p.type || '').trim(),
@@ -119,6 +126,11 @@ window.DASH = window.DASH || {};
     render(); focusFirst();
   };
 
+  function goScript() {
+    const id = S.id; close();
+    if (D.openScriptEditor) D.openScriptEditor(id);
+  }
+
   function close() {
     clearTimeout(S.timer); S.seq++;
     S.open = false; rootEl.classList.remove('open'); rootEl.innerHTML = '';
@@ -156,14 +168,15 @@ window.DASH = window.DASH || {};
   function tabsHtml() {
     const filled = S.spec.sections.filter((n) => String(S.sections[n] || '').trim()).length;
     const tab = (id, label, extra) => `<button class="ef-tab${S.tab === id ? ' active' : ''}" data-act="tab" data-tab="${id}">${label}${extra || ''}<i class="ef-dot" data-dot="${id}"></i></button>`;
-    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}</div>`;
+    const script = S.spec.script_link && S.mode === 'edit' ? tab('script', 'Script') : '';
+    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${script}</div>`;
   }
 
   function renderBody() {
     const body = document.getElementById('ef-body'); if (!body) return;
     const top = body.scrollTop;
     body.innerHTML = S.step === 'review' ? reviewHtml() : S.step === 'delete' ? deleteHtml()
-      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : fieldsHtml());
+      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : fieldsHtml());
     body.scrollTop = top;
     body.querySelectorAll('textarea').forEach(autosize);
     paintMessages();
@@ -171,7 +184,7 @@ window.DASH = window.DASH || {};
 
   function fieldsHtml() {
     let last = null, html = '';
-    S.spec.fields.filter((f) => f.kind !== 'computed' && visible(f)).forEach((f) => {
+    S.spec.fields.filter((f) => f.kind !== 'computed' && f.kind !== 'linked' && visible(f)).forEach((f) => {
       if ((f.group || null) !== last) { last = f.group || null; if (last) html += `<h3 class="ef-group">${h(last)}</h3>`; }
       html += fieldHtml(f);
     });
@@ -184,6 +197,8 @@ window.DASH = window.DASH || {};
     const note = locked ? f.locked_on_edit : f.help;
     const err = `<div class="ef-msg" data-msg="${h(f.key)}"></div>`;
     if (f.kind === 'perspectives') return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>${perspectivesHtml(f)}${err}</div>`;
+    if (f.kind === 'repeater') return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>${repeaterHtml(f)}${note ? `<div class="ef-help">${h(note)}</div>` : ''}${err}</div>`;
+    if (f.kind === 'toggle') return `<div class="ef-field">${widget(f, locked)}${note ? `<div class="ef-help">${h(note)}</div>` : ''}${err}</div>`;
     return `<div class="ef-field">
       <label class="ef-label" for="ef-f-${h(f.key)}">${h(f.label)}${f.required ? '<abbr class="ef-req" title="Required">*</abbr>' : ''}</label>
       ${widget(f, locked)}
@@ -198,7 +213,7 @@ window.DASH = window.DASH || {};
       case 'textarea': return `<textarea class="ef-input" ${id} rows="2">${h(v)}</textarea>`;
       case 'toggle': return `<label class="ef-check"><input type="checkbox" ${id}${v ? ' checked' : ''}> <span>${h(f.label)}</span></label>`;
       case 'select': return selectHtml(f, id, v);
-      case 'ref': return refSelect(f, id, v);
+      case 'ref': return refSelect(f, id, v, locked);
       case 'reflist': return refListWidget(f, v || []);
       case 'list': return listWidget(f, v || []);
       default: return `<div class="ef-note">Not editable here yet — ask the agent.</div>`;
@@ -208,28 +223,40 @@ window.DASH = window.DASH || {};
   const numAttrs = (f) => ['min', 'max', 'step'].filter((k) => f[k] != null).map((k) => ` ${k}="${f[k]}"`).join('') + (f.integer ? ' step="1"' : '');
 
   function selectHtml(f, attrs, v) {
-    const stray = v && !f.options.includes(v) ? `<option selected>${h(v)}</option>` : '';     // keep a stored value we don't list
+    const lab = (o) => h((f.option_labels || {})[o] || o);
+    const stray = v && !f.options.includes(v) ? `<option value="${h(v)}" selected>${h(v)}</option>` : '';     // keep a stored value we don't list
     return `<select class="ef-input" ${attrs}>${f.allow_blank ? '<option value="">—</option>' : ''}${stray}
-      ${f.options.map((o) => `<option${o === v ? ' selected' : ''}>${h(o)}</option>`).join('')}</select>`;
+      ${f.options.map((o) => `<option value="${h(o)}"${o === v ? ' selected' : ''}>${lab(o)}</option>`).join('')}</select>`;
+  }
+
+  // A sequence is named with its act, so "Scene 3" in two acts can't be confused.
+  function optLabel(type, e) {
+    const n = e.name || e.title || e.id;
+    if (type !== 'sequence') return n;
+    const a = ((D.story || {}).acts || []).find((x) => x.id === e.act_id);
+    return a ? `${a.title || a.id} › ${n}` : n;
+  }
+  function optSort(type) {
+    if (type !== 'sequence') return (a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title));
+    const act = (e) => { const a = ((D.story || {}).acts || []).find((x) => x.id === e.act_id); return a ? (a.order || 0) : 0; };
+    return (a, b) => act(a) - act(b) || (a.order || 0) - (b.order || 0);
   }
 
   // A picker over entities that exist, so a link can't point at nothing.
-  function refSelect(f, id, v) {
-    const all = ((D.story || {})[LISTS[f.ref]] || []).filter((e) => e.id !== S.id);
-    all.sort((a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title)));
+  function refSelect(f, id, v, locked) {
+    const all = ((D.story || {})[LISTS[f.ref]] || []).filter((e) => e.id !== S.id).sort(optSort(f.ref));
     const known = all.some((e) => e.id === v);
-    return `<select class="ef-input" ${id}><option value="">— none —</option>
+    return `<select class="ef-input" ${id}${locked ? ' disabled' : ''}><option value="">${f.required ? '— choose —' : '— none —'}</option>
       ${v && !known ? `<option value="${h(v)}" selected>${h(v)} (missing)</option>` : ''}
-      ${all.map((e) => `<option value="${h(e.id)}"${e.id === v ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('')}</select>`;
+      ${all.map((e) => `<option value="${h(e.id)}"${e.id === v ? ' selected' : ''}>${h(optLabel(f.ref, e))}</option>`).join('')}</select>`;
   }
 
   const entityName = (type, id) => refName(type, id);
   function entityOptions(type, chosen, current) {
-    const all = ((D.story || {})[LISTS[type]] || []).filter((e) => e.id === current || !chosen.includes(e.id));
-    all.sort((a, b) => String(a.name || a.title).localeCompare(String(b.name || b.title)));
+    const all = ((D.story || {})[LISTS[type]] || []).filter((e) => e.id === current || !chosen.includes(e.id)).sort(optSort(type));
     const known = all.some((e) => e.id === current);
     return `<option value="">— choose —</option>${current && !known ? `<option value="${h(current)}" selected>${h(current)} (missing)</option>` : ''}`
-      + all.map((e) => `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(e.name || e.title || e.id)}</option>`).join('');
+      + all.map((e) => `<option value="${h(e.id)}"${e.id === current ? ' selected' : ''}>${h(optLabel(type, e))}</option>`).join('');
   }
 
   // Several entities of one kind. `count` fixes the number of slots (a relationship's two characters);
@@ -264,6 +291,38 @@ window.DASH = window.DASH || {};
       }).join('');
       return `<div class="ef-sub-card"><div class="ef-sub-card-h">${h(title)}</div><div class="ef-grid">${sub}</div></div>`;
     }).join('');
+  }
+
+  // A stack of small cards (a scene's plot roles). A card appears only when added.
+  const newCard = (f) => { const o = {}; f.fields.forEach((sf) => { o[sf.key] = sf.kind === 'select' && !sf.allow_blank ? sf.options[0] : ''; }); return o; };
+
+  function repeaterHtml(f) {
+    const items = S.values[f.key] || [];
+    const chosen = (sf) => items.map((r) => r[sf.key]).filter(Boolean);
+    return `<div class="ef-list">${items.map((it, i) => `<div class="ef-sub-card">
+        <div class="ef-sub-card-h">${h(f.label.replace(/s$/, ''))} ${i + 1}
+          <button class="ef-rm ef-rm-card" data-act="rep-del" data-key="${h(f.key)}" data-i="${i}" aria-label="Remove" title="Remove">×</button></div>
+        <div class="ef-grid">${f.fields.map((sf) => {
+          const path = `${f.key}.${i}.${sf.key}`, at = `data-rk="${h(f.key)}" data-ri="${i}" data-rf="${h(sf.key)}" data-path="${h(path)}" id="ef-r-${h(f.key)}-${i}-${h(sf.key)}"`;
+          const w = sf.kind === 'ref' ? `<select class="ef-input" ${at}>${entityOptions(sf.ref, chosen(sf).filter((x) => x !== it[sf.key]), it[sf.key])}</select>`
+            : sf.kind === 'select' ? selectHtml(sf, at, it[sf.key])
+            : `<input class="ef-input" ${at} value="${h(it[sf.key])}" autocomplete="off">`;
+          return `<div class="ef-field${sf.key === 'description' ? ' ef-wide' : ''}"><label class="ef-label" for="ef-r-${h(f.key)}-${i}-${h(sf.key)}">${h(sf.label)}</label>${w}
+            ${sf.help ? `<div class="ef-help">${h(sf.help)}</div>` : ''}<div class="ef-msg" data-msg="${h(path)}"></div></div>`;
+        }).join('')}</div></div>`).join('')}
+      <button class="ef-add" data-act="rep-add" data-key="${h(f.key)}">+ ${h(f.add_label || 'Add')}</button></div>`;
+  }
+
+  // What the script editor owns on a scene. Shown here so the form tells the whole story,
+  // never edited here so the heading line and these fields can't disagree.
+  function scriptHtml() {
+    const rows = S.spec.fields.filter((f) => f.kind === 'linked').map((f) => {
+      const r = (S.orig.computed || {})[f.key] || [];
+      return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
+        <div class="ef-ro${r.length ? '' : ' none'}">${r.length ? r.map((x) => `<div>${h(x.display)}</div>`).join('') : 'Not set'}</div></div>`;
+    }).join('');
+    return `<div class="ef-note">The script, its heading, location, time of day and cast are written together in the script editor, so they always agree.</div>
+      ${rows}<div><button class="btn" data-act="open-script">Edit in script editor →</button></div>`;
   }
 
   function listWidget(f, items) {
@@ -318,9 +377,12 @@ window.DASH = window.DASH || {};
     changedFields().forEach((f) => {
       let was, now;
       if (f.kind === 'perspectives') { const r = persDiff(f, a[f.key] || {}, b[f.key] || {}); was = r[0]; now = r[1]; }
-      else if (f.kind === 'list' || f.kind === 'reflist') {
-        const nm = f.kind === 'reflist' ? (i) => refName(f.ref, i) : (i) => i;
-        const x = (a[f.key] || []).map((i) => [i, nm(i)]), y = (b[f.key] || []).map((i) => [i, nm(i)]);
+      else if (f.kind === 'list' || f.kind === 'reflist' || f.kind === 'repeater') {
+        const rec = (r) => f.fields.map((sf) => sf.kind === 'ref' ? (r[sf.key] ? refName(sf.ref, r[sf.key]) : '')
+          : sf.kind === 'select' ? ((sf.option_labels || {})[r[sf.key]] || r[sf.key]) : r[sf.key]).filter(Boolean).join(' · ');
+        const items = (v) => f.kind === 'repeater' ? (v || []).map((r) => [JSON.stringify(r), rec(r)])
+          : (v || []).map((i) => [i, f.kind === 'reflist' ? refName(f.ref, i) : i]);
+        const x = items(a[f.key]), y = items(b[f.key]);
         const xs = x.map((i) => i[0]), ys = y.map((i) => i[0]);
         was = x.length ? x.map(([id, n]) => ys.includes(id) ? h(n) : `<span class="del">${h(n)}</span>`).join('<br>') : '—';
         now = y.length ? y.map(([id, n]) => xs.includes(id) ? h(n) : `<span class="add">${h(n)}</span>`).join('<br>') : '—';
@@ -357,8 +419,7 @@ window.DASH = window.DASH || {};
     const p = S.preview;
     if (!p) return '<div class="ef-sub">Checking what this affects…</div>';
     const list = (items) => `<ul>${items.map((i) => `<li>${h(i)}</li>`).join('')}</ul>`;
-    const kind = (t) => (specs[t] ? specs[t].label : t);
-    const also = p.also_deleted.map((e) => `${kind(e.type)}: ${e.name}`);
+    const also = p.also_deleted.map((e) => `${e.label || e.type}: ${e.name}`);
     const rels = p.relationships.map((e) => e.name);
     return `<div class="ef-impact">
       <div class="ef-sub">Delete ${h(p.entity.label.toLowerCase())} “${h(p.entity.name)}”?</div>
@@ -372,8 +433,8 @@ window.DASH = window.DASH || {};
 
   // ─── Footer ──────────────────────────────────────────────────────────────
   function footerHtml() {
-    if (S.discard) return `<div class="grow">Discard your changes?</div>
-      <button class="btn btn-ghost" data-act="keep">Keep editing</button><button class="btn btn-danger" data-act="discard">Discard</button>`;
+    if (S.discard) return `<div class="grow">${S.discard === 'script' ? 'Discard your changes and open the script editor?' : 'Discard your changes?'}</div>
+      <button class="btn btn-ghost" data-act="keep">Keep editing</button><button class="btn btn-danger" data-act="discard">${S.discard === 'script' ? 'Discard and open' : 'Discard'}</button>`;
     if (S.step === 'review') return `<button class="btn" data-act="back">Back</button><div class="grow"></div>
       <button class="btn btn-primary" data-act="confirm"${S.busy ? ' disabled' : ''}>${S.busy ? 'Saving…' : 'Confirm and save'}</button>`;
     if (S.step === 'delete') {
@@ -514,7 +575,7 @@ window.DASH = window.DASH || {};
   }
 
   function reopenPanel(type, id) {
-    if (type === 'plot' && D.showPlotPanel) D.showPlotPanel(id);
+    if (PANELS[type] && D[PANELS[type]]) D[PANELS[type]](id);
     else if (PANEL_TYPES.includes(type) && D.panelTabs) D.panelTabs.openEntity(type + ':' + id);
   }
 
@@ -538,7 +599,7 @@ window.DASH = window.DASH || {};
       case 'ask-delete': askDelete(); break;
       case 'confirm-delete': confirmDelete(); break;
       case 'keep': S.discard = false; syncFooter(); break;
-      case 'discard': close(); break;
+      case 'discard': if (S.discard === 'script') goScript(); else close(); break;
       case 'list-add': {
         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
@@ -550,6 +611,15 @@ window.DASH = window.DASH || {};
       case 'ref-del': {
         S.values[el.dataset.key].splice(+el.dataset.i, 1); syncPersp(); renderBody(); afterEdit(); break;
       }
+      case 'rep-add': {
+        const f = field(el.dataset.key); (S.values[f.key] = S.values[f.key] || []).push(newCard(f));
+        renderBody(); afterEdit(); const first = document.querySelectorAll(`[data-rk="${CSS.escape(f.key)}"][data-rf="${f.fields[0].key}"]`);
+        if (first.length) first[first.length - 1].focus(); break;
+      }
+      case 'rep-del': {
+        S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
+      }
+      case 'open-script': if (isDirty()) { S.discard = 'script'; syncFooter(); } else goScript(); break;
       case 'list-del': {
         S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
       }
@@ -588,6 +658,9 @@ window.DASH = window.DASH || {};
       while (arr.length <= +d.i) arr.push('');
       arr[+d.i] = el.value; S.touched.add(d.ref);
       syncPersp(); autoName(); rerender = true;              // the other slot's choices and the cards depend on this
+    } else if (d.rk != null) {
+      S.values[d.rk][+d.ri][d.rf] = el.value; S.touched.add(d.path);
+      rerender = d.rf === 'plot';                              // the other cards' choices exclude this one
     } else if (d.pc != null) {
       const f = persField(), cards = S.values[f.key] = S.values[f.key] || {};
       (cards[d.pc] = cards[d.pc] || blankPersp())[d.pf] = el.type === 'checkbox' ? el.checked : el.value;
@@ -639,6 +712,7 @@ window.DASH = window.DASH || {};
     };
     wrap('showCharacterPanel', 'character'); wrap('showLocationPanel', 'location'); wrap('showWorldPanel', 'world');
     wrap('showPlotPanel', 'plot'); wrap('showRelationshipPanel', 'relationship');
+    wrap('showScenePanel', 'scene'); wrap('showSequencePanel', 'sequence'); wrap('showActPanel', 'act');
     const open = D.openPanel, close_ = D.closePanel;
     D.openPanel = function () { const r = open.apply(this, arguments); D._formTarget = D._pendingFormTarget || null; syncEditButton(); return r; };
     D.closePanel = function () { D._formTarget = null; syncEditButton(); return close_.apply(this, arguments); };
@@ -646,6 +720,50 @@ window.DASH = window.DASH || {};
 
   // The project is one record that always exists; the server finds it whatever id we name.
   D.openProjectForm = function () { D.openEntityForm({ type: 'project', id: slugFromHash() }); };
+
+  // "+ New" in the Scenes tab: three kinds of thing can be made there.
+  D.openStructureMenu = function (btn) {
+    if (menuEl) { closeMenu(); return; }
+    menuEl = document.createElement('div'); menuEl.className = 'ef-menu';
+    menuEl.innerHTML = [['scene', 'Scene', 'a scene in a sequence'], ['sequence', 'Sequence', 'a group of scenes in an act'], ['act', 'Act', 'a part of the story']]
+      .map(([t, n, d]) => `<button data-new="${t}">${n}<small>${d}</small></button>`).join('');
+    const r = btn.getBoundingClientRect();
+    menuEl.style.top = (r.bottom + 4) + 'px'; menuEl.style.right = (window.innerWidth - r.right) + 'px';
+    menuEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; closeMenu(); D.openEntityForm({ type: b.dataset.new }); });
+    document.body.appendChild(menuEl);
+    setTimeout(() => document.addEventListener('click', function off(e) {
+      if (menuEl && !menuEl.contains(e.target)) closeMenu();
+      document.removeEventListener('click', off);
+    }), 0);
+  };
+
+  // A small confirm dialog in the same style, for things that aren't a form (Reorder's review).
+  //   const d = DASH.efDialog({ title, kicker, bodyHtml, confirm, onConfirm }); d.error(html); d.busy(bool); d.close();
+  D.efDialog = function (o) {
+    const el = document.createElement('div'); el.className = 'ef-backdrop open';
+    el.innerHTML = `<div class="ef-card ef-card-sm" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="ef-head"><div class="ef-titles"><div class="ef-kicker">${h(o.kicker || '')}</div><div class="ef-name">${h(o.title || '')}</div></div>
+        <button class="ef-x-close" data-d="close" aria-label="Close">×</button></div>
+      <div class="ef-body"><div class="ef-banner" data-d="err"></div>${o.bodyHtml || ''}</div>
+      <div class="ef-foot"><div class="grow"></div><button class="btn" data-d="close">${h(o.cancel || 'Cancel')}</button>
+        <button class="btn btn-primary" data-d="ok">${h(o.confirm || 'OK')}</button></div></div>`;
+    document.body.appendChild(el);
+    const api_ = {
+      close() { el.remove(); document.removeEventListener('keydown', esc, true); if (o.onClose) o.onClose(); },
+      error(html) { const b = el.querySelector('[data-d=err]'); b.innerHTML = html || ''; b.className = 'ef-banner' + (html ? ' on' : ''); },
+      busy(on) { const b = el.querySelector('[data-d=ok]'); b.disabled = !!on; b.textContent = on ? 'Working…' : (o.confirm || 'OK'); },
+      el,
+    };
+    const esc = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); api_.close(); } };
+    document.addEventListener('keydown', esc, true);
+    el.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-d]');
+      if (t && t.dataset.d === 'close' || e.target === el) api_.close();
+      else if (t && t.dataset.d === 'ok' && o.onConfirm) o.onConfirm(api_);
+    });
+    el.querySelector('.ef-card').focus();
+    return api_;
+  };
 
   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
 
