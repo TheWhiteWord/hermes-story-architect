@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 
 from . import scene_script as ss
-from .constants import SCENE_TIMES_OF_DAY, PLOT_ROLES
+from .constants import INT_EXT_CHOICES, SCENE_TIMES_OF_DAY, PLOT_ROLES
 from .db import get_db
 from .entity import ENTITY_COLUMN_MAP, unfilled_fields
 from .fountain_lexer import SCENE_HEADING_RE
@@ -73,6 +73,10 @@ def _scene_state(conn, scene_id: str) -> dict:
         "id": row[0], "title": row[1], "status": row[4],
         "order": row[3] or 0, "sequence_id": row[5],
         "location": row[6] or "", "extra": extra,
+        "int_ext": extra.get("int_ext", ""),
+        "place": extra.get("place", ""),
+        "time_of_day": extra.get("time_of_day", ""),
+        "forced_heading": extra.get("forced_heading", ""),
         "raw_content": body[0] if body else "",
         "characters": chars, "plot_role_count": n_roles,
     }
@@ -100,9 +104,11 @@ def content_hash(state: dict) -> str:
     """The change token: what the editor sees, and what a save overwrites."""
     blob = json.dumps({
         "content": state["raw_content"],
-        "heading": state["extra"].get("heading", ""),
+        "int_ext": state["int_ext"],
+        "place": state["place"],
         "location": state["location"],
-        "time_of_day": state["extra"].get("time_of_day", ""),
+        "time_of_day": state["time_of_day"],
+        "forced_heading": state["forced_heading"],
         "characters": sorted(state["characters"]),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
@@ -129,38 +135,21 @@ def _view(st: dict, characters: list[dict], locations: dict, *, content: str,
     """Everything derived from one scene state. Shared by `load_scene_script`
     (the stored state) and `check_scene_script` (an unsaved draft), so a warning
     means the same thing before and after a save."""
-    extra = st["extra"]
-    heading_line, body = ss.split_heading(content)
-    blocks = ss.parse_blocks(body)
-    return _view_from_blocks(st, characters, locations, heading_line=heading_line,
-                             blocks=blocks, content=content, lossless=lossless)
+    _, body = ss.split_heading(content)
+    return _view_from_blocks(st, characters, locations, blocks=ss.parse_blocks(body),
+                             content=content, lossless=lossless)
 
 
-def _composed_heading(extra: dict, loc: dict | None) -> str:
+def _composed_heading(st: dict, loc: dict | None) -> str:
     """The scene's heading line, for readers that still show one."""
-    return ss.scene_heading(extra.get("int_ext") or "", loc["name"] if loc else "",
-                            extra.get("place") or "", extra.get("time_of_day") or "",
-                            extra.get("forced_heading") or "")
+    return ss.scene_heading(st["int_ext"], loc["name"] if loc else "",
+                            st["place"], st["time_of_day"], st["forced_heading"])
 
 
-def _view_from_blocks(st, characters, locations, *, heading_line, blocks, content,
+def _view_from_blocks(st, characters, locations, *, blocks, content,
                       lossless=True) -> dict:
     extra = st["extra"]
-    # The heading line in Content is what the script shows, so it wins. With no
-    # script yet, the scene's own fields are all there is.
-    heading = ss.parse_heading(heading_line if heading_line is not None
-                               else extra.get("heading", ""))
     loc = locations.get(st["location"])
-    heading["location"] = st["location"] if loc else ""
-    heading["int_ext"] = extra.get("int_ext", "") or "INT."
-    if extra.get("forced_heading"):
-        heading["mode"] = "custom"
-        heading["text"] = extra["forced_heading"]
-    if loc is None:
-        heading["suggested_location"] = ss.suggest_location(
-            heading["location_text"], list(locations.values()))
-    heading["time_of_day"] = extra.get("time_of_day", "") or heading.get("time_text", "")
-
     cast = ss.script_cast(blocks, characters)
     in_script = {c["id"] for c in cast if c["id"]}
     by_id = {c["id"]: c for c in characters}
@@ -181,10 +170,10 @@ def _view_from_blocks(st, characters, locations, *, heading_line, blocks, conten
     scene = {
         "id": st["id"], "title": st["title"], "status": st["status"],
         "order": st["order"], "sequence_id": st["sequence_id"],
-        "location": st["location"], "int_ext": extra.get("int_ext", ""),
-        "place": extra.get("place", ""), "time_of_day": extra.get("time_of_day", ""),
-        "forced_heading": extra.get("forced_heading", ""),
-        "heading": _composed_heading(extra, loc),
+        "location": st["location"],
+        "int_ext": st["int_ext"], "place": st["place"],
+        "time_of_day": st["time_of_day"], "forced_heading": st["forced_heading"],
+        "heading": _composed_heading(st, loc),
         "dramatic_role": extra.get("dramatic_role", ""),
         "no_cast": bool(extra.get("no_cast")),
         "scene_objective": extra.get("scene_objective", ""),
@@ -195,13 +184,13 @@ def _view_from_blocks(st, characters, locations, *, heading_line, blocks, conten
         "plot_roles": [1] * st["plot_role_count"],
     }, st["row"])
     return {
-        "scene": scene, "heading": heading, "blocks": blocks, "location": loc,
+        "scene": scene, "blocks": blocks, "location": loc,
         "cast": registered_cast,
         "adhoc": [c for c in cast if not c["registered"]],
         "cues": cues,
         "findings": ss.findings(
-            scene=scene, heading=heading, heading_line=heading_line, blocks=blocks,
-            cast=cast, location=loc, has_plot_roles=st["plot_role_count"] > 0,
+            scene=scene, blocks=blocks, cast=cast, location=loc,
+            has_plot_roles=st["plot_role_count"] > 0,
             unfilled=unfilled, lossless=lossless),
         "stats": ss.script_stats(content, cast),
     }
@@ -219,8 +208,8 @@ def load_scene_script(project_path: Path, scene_id: str) -> dict:
 
     raw = st["raw_content"]
     placeholder = ss.is_placeholder(raw)
-    heading_line, _ = ss.split_heading(raw)
-    blocks = ss.parse_blocks(ss.split_heading(raw)[1])
+    heading_line, body = ss.split_heading(raw)
+    blocks = ss.parse_blocks(body)
     lossless = (ss.is_lossless(raw, heading_line, blocks)
                 if raw.strip() and not placeholder else True)
     view = _view(st, characters, locations, content="" if placeholder else raw,
@@ -237,6 +226,39 @@ def load_scene_script(project_path: Path, scene_id: str) -> dict:
     }
 
 
+def _heading_fields(hd: dict, locations: dict) -> dict:
+    """Validate the editor's heading controls; return the fields to write.
+
+    Shared by `save_scene_script` and `check_scene_script`, so a refusal means
+    the same thing before and after a save. The write boundary re-checks the
+    merged state on every path; this is the editor's own message, before
+    anything is written.
+    """
+    slug = hd.get("location") or ""
+    if slug and slug not in locations:
+        raise ScriptError(f"Location not found: {slug}")
+    int_ext = hd.get("int_ext") or ""
+    place = hd.get("place") or ""
+    tod = hd.get("time_of_day") or ""
+    forced = (hd.get("forced_heading") or "").strip()
+    if int_ext and int_ext not in INT_EXT_CHOICES:
+        raise ScriptError(f"int_ext must be one of {', '.join(INT_EXT_CHOICES)}.")
+    if tod and tod not in SCENE_TIMES_OF_DAY:
+        raise ScriptError(f"time_of_day must be one of {', '.join(SCENE_TIMES_OF_DAY)}.")
+    if " - " in place:
+        raise ScriptError("place cannot contain ' - '.")
+    if forced:
+        if not SCENE_HEADING_RE.match(forced):
+            raise ScriptError("A forced heading must be a scene heading "
+                              "(INT./EXT. … or a forced '.HEADING').")
+        if int_ext or place or tod:
+            raise ScriptError(
+                "forced_heading is exclusive with the composed heading — "
+                "clear int_ext, place and time_of_day, or unset forced_heading")
+    return {"int_ext": int_ext, "place": place, "time_of_day": tod,
+            "forced_heading": forced, "location": slug}
+
+
 def check_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
     """What the findings, cast and stats WOULD be for an unsaved draft.
 
@@ -248,6 +270,8 @@ def check_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict
         raise ScriptError("Request body must be an object.")
     blocks = _validate_blocks(payload.get("blocks"))
     hd = payload.get("heading") or {}
+    if not isinstance(hd, dict):
+        raise ScriptError("`heading` must be an object.")
     conn = get_db(project_path)
     try:
         st = _scene_state(conn, scene_id)
@@ -255,31 +279,14 @@ def check_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict
     finally:
         conn.close()
 
-    slug = hd.get("location") or ""
-    slug = slug if slug in locations else ""
-    tod = hd.get("time_of_day") or ""
+    fields = _heading_fields(hd, locations)
     extra_cast = [c for c in (payload.get("extra_cast") or [])
                   if any(c == x["id"] for x in characters)]
-    if hd.get("mode") == "custom":
-        heading_line = (hd.get("text") or "").strip() or None
-    else:
-        name = locations[slug]["name"] if slug else (hd.get("location_text") or "").strip()
-        try:
-            heading_line = ss.compose_heading(hd.get("int_ext") or "INT.", name,
-                                              tod if tod in SCENE_TIMES_OF_DAY else "")
-        except ValueError:
-            heading_line = None
-
-    forced = (hd.get("text") or "").strip() if hd.get("mode") == "custom" else ""
-    draft = {**st, "location": slug,
-             "extra": {**st["extra"], "int_ext": hd.get("int_ext") or "",
-                       "place": hd.get("place") or "", "time_of_day": tod,
-                       "forced_heading": forced},
-             "characters": extra_cast}
-    content = ss.compose_content(heading_line, blocks)
-    view = _view_from_blocks(draft, characters, locations, heading_line=heading_line,
-                             blocks=blocks, content=content)
-    return {k: view[k] for k in ("heading", "location", "cast", "adhoc", "cues",
+    draft = {**st, **fields, "characters": extra_cast,
+             "extra": {**st["extra"], **fields}}
+    view = _view_from_blocks(draft, characters, locations, blocks=blocks,
+                             content=ss.serialize_blocks(blocks))
+    return {k: view[k] for k in ("scene", "location", "cast", "adhoc", "cues",
                                  "findings", "stats")}
 
 
@@ -303,15 +310,13 @@ def save_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
     payload = {
       base_hash: str,                        # from the load this edit is based on
       blocks: [{type, text}],
-      heading: {mode: "structured"|"custom",
-                int_ext, location (slug|""), location_text, time_of_day,   # structured
-                text},                                                      # custom
+      heading: {int_ext, place, location (slug|""), time_of_day, forced_heading},
       extra_cast: [character slugs]          # cast added by hand, not via a cue
     }
 
-    Writes Content, heading, location, time_of_day and characters together, so
-    the heading line in the script and the scene's fields cannot disagree.
-    Does not change `status`.
+    Writes the body-only Content, the heading fields, the location link and the
+    cast together, so the heading composed at assembly and the scene's fields
+    cannot disagree. Does not change `status`.
     """
     from .writes import edit_entity
 
@@ -334,26 +339,7 @@ def save_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
     if st["status"] == "locked":
         raise ScriptLocked("This scene is locked. Unlock it before editing.")
 
-    # Location: a slug must name a real location. An unregistered place is
-    # allowed to stand in the heading as text, but is never written as a link.
-    slug = hd.get("location") or ""
-    if slug and slug not in locations:
-        raise ScriptError(f"Location not found: {slug}")
-    tod = hd.get("time_of_day") or ""
-    if tod and tod not in SCENE_TIMES_OF_DAY:
-        raise ScriptError(f"time_of_day must be one of {', '.join(SCENE_TIMES_OF_DAY)}.")
-
-    if hd.get("mode") == "custom":
-        heading = (hd.get("text") or "").strip()
-        if not SCENE_HEADING_RE.match(heading):
-            raise ScriptError("A custom heading must be a scene heading "
-                              "(INT./EXT. … or a forced '.HEADING').")
-    else:
-        name = locations[slug]["name"] if slug else (hd.get("location_text") or "").strip()
-        try:
-            heading = ss.compose_heading(hd.get("int_ext") or "INT.", name, tod)
-        except ValueError as e:
-            raise ScriptError(str(e))
+    fields = _heading_fields(hd, locations)
 
     # Cast: who the script names (registered), plus whoever was added by hand.
     by_id = {c["id"]: c for c in characters}
@@ -364,19 +350,15 @@ def save_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
     cast_ids = [c["id"] for c in ss.script_cast(blocks, characters) if c["id"]]
     cast = list(dict.fromkeys(cast_ids + list(extra_cast)))
 
-    content = ss.compose_content(heading, blocks)
+    data = {"Content": ss.serialize_blocks(blocks), **fields, "characters": cast}
     previous = st["raw_content"]
-    if hd.get("mode") == "custom":
-        data = {"Content": content, "forced_heading": heading,
-                "int_ext": "", "place": "", "time_of_day": "",
-                "location": slug, "characters": cast}
-    else:
-        data = {"Content": content, "int_ext": hd.get("int_ext") or "INT.",
-                "place": hd.get("place") or "", "time_of_day": tod,
-                "location": slug, "characters": cast}
-    result = edit_entity(
-        project_path, "scene", scene_id, data,
-        "Script edited by hand in the script editor")
+    try:
+        result = edit_entity(
+            project_path, "scene", scene_id, data,
+            "Script edited by hand in the script editor")
+    except ValueError as e:
+        # The write boundary refuses a scene whose merged state has no heading.
+        raise ScriptError(str(e))
     if result.get("success") is False or result.get("error"):
         raise ScriptError(result.get("error") or result.get("message") or "Save failed.")
 

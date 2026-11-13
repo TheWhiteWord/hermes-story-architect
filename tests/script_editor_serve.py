@@ -32,7 +32,7 @@ def build(root: Path) -> None:
         create_entity(p, "character", slug, {"name": name, "story_role": role, "one_sentence": "T"})
     create_entity(p, "scene", "the-kitchen",
                   {"title": "The Kitchen", "sequence_id": "seq-1", "act_id": "act-1", "order": 2,
-                   "location": "kitchen", "time_of_day": "NIGHT", "heading": "INT. KITCHEN - NIGHT",
+                   "location": "kitchen", "time_of_day": "NIGHT", "int_ext": "INT.",
                    "characters": ["mara-chen"]},
                   sections={"Content": "INT. KITCHEN - NIGHT\n\nMara stands at the counter, a ledger open.\n\n"
                                        "MARA\n(quietly)\nYou knew.\n\nLEO\nSorry.\n"})

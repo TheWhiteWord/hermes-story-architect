@@ -41,11 +41,6 @@ BLOCK_TYPES = ("action", "character", "parenthetical", "dialogue",
 
 _PLACEHOLDER_RE = re.compile(r"^\s*\[placeholder", re.IGNORECASE)
 _NOTE_RE = re.compile(r"^\[\[(.*)\]\]$", re.DOTALL)
-_SCENE_NUMBER_RE = re.compile(r"#[-.0-9a-z]+#\s*$", re.IGNORECASE)
-_HEADING_PARTS_RE = re.compile(
-    r"^\s*(?P<ie>INT\./EXT\.|INT/EXT\.?|I/E\.?|INT\.?|EXT\.?|EST\.?)\s+(?P<rest>\S.*?)\s*$",
-    re.IGNORECASE)
-_TIME_SEP_RE = re.compile(r"\s+[-–—]\s+")
 # A line that is exactly two spaces is Fountain's in-dialogue line break, not a
 # paragraph separator.
 _LINE_BREAK = "  "
@@ -75,9 +70,9 @@ def _split_paragraphs(lines: list[str]) -> list[list[str]]:
 def split_heading(content: str) -> tuple[str | None, str]:
     """(heading line or None, the rest of the content).
 
-    The heading is the first non-blank line when it is a scene heading — the
-    one rule `scene_content_lint` enforces. Without one, everything is body and
-    `findings` reports it.
+    The heading is the first non-blank line when it is a scene heading. Used by
+    the paste path and the importer, where a heading line may still arrive in
+    the text; stored Content is body-only.
     """
     if is_placeholder(content):
         return None, ""
@@ -236,47 +231,6 @@ def is_lossless(content: str, heading: str | None, blocks: list[dict]) -> bool:
 
 # ─── Heading ─────────────────────────────────────────────────────────────────
 
-def _canon_int_ext(raw: str) -> str:
-    r = raw.upper().replace(" ", "")
-    if r.startswith(("INT./EXT", "INT/EXT", "I/E")):
-        return "INT./EXT."
-    if r.startswith("INT"):
-        return "INT."
-    if r.startswith("EXT"):
-        return "EXT."
-    return "EST."
-
-
-def parse_heading(heading: str | None) -> dict:
-    """Split a heading line into the three controls the editor shows.
-
-    `mode` is "structured" when the heading round-trips through
-    `compose_heading`, and "custom" when it does not (a forced `.SNIPER POV`
-    heading, a scene number, a time of day outside the six the schema allows).
-    A custom heading is kept verbatim and its controls are disabled.
-    """
-    text = (heading or "").strip()
-    empty = {"mode": "structured", "int_ext": "INT.", "location_text": "",
-             "time_text": "", "time_of_day": "", "text": text}
-    if not text:
-        return empty
-    custom = {**empty, "mode": "custom"}
-    if text.startswith(".") or _SCENE_NUMBER_RE.search(text):
-        return custom
-    m = _HEADING_PARTS_RE.match(text)
-    if not m:
-        return custom
-    rest = m.group("rest")
-    parts = _TIME_SEP_RE.split(rest)
-    time_text = ""
-    if len(parts) >= 2 and parts[-1].strip().upper() in SCENE_TIMES_OF_DAY:
-        time_text = parts[-1].strip().upper()
-        rest = " - ".join(parts[:-1])
-    return {"mode": "structured", "int_ext": _canon_int_ext(m.group("ie")),
-            "location_text": rest.strip(), "time_text": time_text,
-            "time_of_day": time_text, "text": text}
-
-
 def compose_heading(int_ext: str, location_name: str, place: str = "",
                     time_of_day: str = "") -> str:
     """`INT. KITCHEN - NIGHT` / `INT. KITCHEN - PANTRY - NIGHT`.
@@ -315,25 +269,6 @@ def scene_heading(int_ext: str, location_name: str, place: str = "",
         return compose_heading(int_ext, location_name, place, time_of_day)
     except ValueError:
         return ""
-
-
-def suggest_location(location_text: str, locations: list[dict]) -> str | None:
-    """A registered location whose name or slug equals the heading's text.
-
-    Exact (case/whitespace/leading "the" aside) on purpose: the heading says
-    KITCHEN, and silently linking it to "Kitchen Annex" because the words
-    overlap is a wrong link the author never sees. The editor offers the
-    suggestion; it does not apply it.
-    """
-    def norm(s):
-        s = " ".join((s or "").lower().replace("-", " ").split())
-        return s[4:] if s.startswith("the ") else s
-    want = norm(location_text)
-    if not want:
-        return None
-    hits = [l["id"] for l in locations
-            if want in (norm(l.get("name")), norm(l.get("id")))]
-    return hits[0] if len(hits) == 1 else None
 
 
 # ─── Cast ────────────────────────────────────────────────────────────────────
@@ -424,19 +359,20 @@ def script_stats(content: str, cast: list[dict]) -> dict:
 CRITICAL, OTHER = "critical", "other"
 
 # Optional fields the editor reports as gaps in the "Others" group. The ones
-# below are CRITICAL for a scene and are reported there, so they are skipped in
-# the generic unfilled list rather than reported twice.
-_REPORTED_AS_CRITICAL = {"heading", "location", "time_of_day", "plot_roles",
-                         "characters"}
+# below are skipped there rather than reported twice: `location` and
+# `time_of_day` have their own critical findings, the heading fields are
+# covered by `heading_missing` (and `place`/`forced_heading` are optional by
+# design — an empty one is not a gap).
+_REPORTED_AS_CRITICAL = {"int_ext", "place", "forced_heading", "location",
+                         "time_of_day", "plot_roles", "characters"}
 
 
 def _finding(level, code, message, **anchor):
     return {"level": level, "code": code, "message": message, **anchor}
 
 
-def findings(*, scene: dict, heading: dict, heading_line: str | None,
-             blocks: list[dict], cast: list[dict], location: dict | None,
-             has_plot_roles: bool, unfilled: list[str],
+def findings(*, scene: dict, blocks: list[dict], cast: list[dict],
+             location: dict | None, has_plot_roles: bool, unfilled: list[str],
              lossless: bool = True) -> list[dict]:
     """Everything worth telling the author about this scene's script.
 
@@ -455,9 +391,7 @@ def findings(*, scene: dict, heading: dict, heading_line: str | None,
         out.append(_finding(CRITICAL, "not_editable",
                             "This script uses Fountain the editor cannot round-trip "
                             "without losing text, so it opens read-only. Edit it with the harness."))
-    if (not heading_line
-            and not (scene.get("int_ext") and scene.get("location"))
-            and not scene.get("forced_heading")):
+    if not (scene.get("int_ext") and scene.get("location")) and not scene.get("forced_heading"):
         out.append(_finding(CRITICAL, "heading_missing",
                             "The scene has no heading. Set int_ext + location, or a "
                             "forced heading.", field="heading"))
@@ -470,7 +404,7 @@ def findings(*, scene: dict, heading: dict, heading_line: str | None,
                             "Time of day is not set.", field="time_of_day"))
 
     if location is None:
-        text = heading.get("location_text")
+        text = scene.get("location")
         out.append(_finding(
             CRITICAL, "location_unregistered",
             (f"Location '{text}' is not a registered location." if text

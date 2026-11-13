@@ -4,7 +4,7 @@ Stage: **structure only**. Folder tree, file names, and the scope of each file.
 No content drafted. Each file gets its own later stage.
 
 Source of truth is the code at the time of writing (`tools/*.py` SCHEMAs,
-`core/constants.py`, `core/entity.py`, `core/scene_content_lint.py`), with
+`core/constants.py`, `core/entity.py`), with
 `task_30/tool_note.md` and `task_30/sections.md` as raw material only.
 
 This structure was **audited against the code**, not only reasoned about:
@@ -331,9 +331,9 @@ that makes it the step most worth being careful about. Pairs with
 
 **`screenplay-format.md`** — Fountain syntax for `scene.Content`. The single
 most expensive silent failure in the system: a cue written inline renders as a
-wall of prose, and a missing leading heading makes the scene vanish from the
-script entirely with no error anywhere. `core/scene_content_lint.py` catches
-only the missing opening heading — the rest of the format is on the author.
+wall of prose, and a missing heading makes the scene vanish from the script
+entirely with no error anywhere. The editor and the write boundary are where a
+heading is enforced; the rest of the format is on the author.
 *Samples live in `samples/`*, not inline.
 
 **`staging-changes.md`** — the write path as the agent experiences it: staging

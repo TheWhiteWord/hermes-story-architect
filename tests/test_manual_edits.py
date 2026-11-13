@@ -34,8 +34,8 @@ def project(tmp_path):
 def _payload(scene, **over):
     p = {"base_hash": scene["hash"],
          "blocks": scene["blocks"],
-         "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen",
-                     "location_text": "", "place": "", "time_of_day": "NIGHT"},
+         "heading": {"int_ext": "INT.", "location": "kitchen", "place": "",
+                     "time_of_day": "NIGHT", "forced_heading": ""},
          "extra_cast": []}
     p.update(over)
     return p
@@ -44,7 +44,8 @@ def _payload(scene, **over):
 class TestLoad:
     def test_shape(self, project):
         s = me.load_scene_script(project, "the-kitchen")
-        assert s["heading"]["int_ext"] == "INT." and s["heading"]["location"] == "kitchen"
+        assert s["scene"]["int_ext"] == "INT." and s["scene"]["location"] == "kitchen"
+        assert s["scene"]["heading"] == "INT. KITCHEN - NIGHT"
         assert s["location"] == {"id": "kitchen", "name": "Kitchen",
                                  "world": {"id": "london-1950", "name": "London 1950"}}
         assert [c["id"] for c in s["cast"]] == ["mara-chen"]
@@ -79,10 +80,11 @@ class TestLoad:
         codes = {f["code"] for f in s["findings"]}
         assert {"heading_missing", "order_unset"} <= codes
 
-    def test_a_linked_location_is_not_suggested_again(self, project):
+    def test_the_view_exposes_the_heading_fields(self, project):
         s = me.load_scene_script(project, "the-kitchen")
         assert s["scene"]["location"] == "kitchen"
-        assert "suggested_location" not in s["heading"]
+        assert s["scene"]["int_ext"] == "INT." and s["scene"]["time_of_day"] == "NIGHT"
+        assert s["scene"]["place"] == "" and s["scene"]["forced_heading"] == ""
 
     def test_locked_scene_loads_locked(self, project):
         edit_entity(project, "scene", "the-kitchen", {"status": "locked"}, "lock")
@@ -104,8 +106,7 @@ class TestSave:
     def test_changing_location_and_time_rewrites_heading_everywhere(self, project):
         s = me.load_scene_script(project, "the-kitchen")
         out = me.save_scene_script(project, "the-kitchen", _payload(
-            s, heading={"mode": "structured", "int_ext": "EXT.", "location": "attic",
-                        "location_text": "", "time_of_day": "DAWN"}))
+            s, heading={"int_ext": "EXT.", "location": "attic", "time_of_day": "DAWN"}))
         assert out["content"].lstrip().startswith("Mara stands at the counter.")
         assert out["scene"]["heading"] == "EXT. ATTIC - DAWN"
         assert out["scene"]["location"] == "attic" and out["scene"]["time_of_day"] == "DAWN"
@@ -114,10 +115,12 @@ class TestSave:
     def test_place_is_composed_into_the_heading(self, project):
         s = me.load_scene_script(project, "the-kitchen")
         out = me.save_scene_script(project, "the-kitchen", _payload(
-            s, heading={"mode": "structured", "int_ext": "INT.", "location": "kitchen",
+            s, heading={"int_ext": "INT.", "location": "kitchen",
                         "place": "pantry", "time_of_day": "NIGHT"}))
         assert out["scene"]["heading"] == "INT. KITCHEN - PANTRY - NIGHT"
         assert out["scene"]["place"] == "pantry"
+        from story_architect.core.db import get_screenplay_text
+        assert "INT. KITCHEN - PANTRY - NIGHT" in get_screenplay_text(project)
 
     def test_cast_is_script_speakers_plus_hand_added(self, project):
         s = me.load_scene_script(project, "the-kitchen")
@@ -141,10 +144,9 @@ class TestSave:
     def test_custom_heading_is_kept_verbatim(self, project):
         s = me.load_scene_script(project, "the-kitchen")
         out = me.save_scene_script(project, "the-kitchen", _payload(
-            s, heading={"mode": "custom", "text": ".SNIPER SCOPE POV", "location": "kitchen",
-                        "time_of_day": "NIGHT"}))
+            s, heading={"forced_heading": ".SNIPER SCOPE POV", "location": "kitchen"}))
         assert out["scene"]["forced_heading"] == ".SNIPER SCOPE POV"
-        assert out["heading"]["mode"] == "custom"
+        assert out["scene"]["heading"] == ".SNIPER SCOPE POV"
 
     def test_stale_save_is_refused_and_nothing_is_written(self, project):
         s = me.load_scene_script(project, "the-kitchen")
@@ -164,11 +166,13 @@ class TestSave:
             me.save_scene_script(project, "the-kitchen", _payload(s2))
 
     @pytest.mark.parametrize("over,msg", [
-        ({"heading": {"mode": "structured", "int_ext": "INT.", "location": "ghost"}}, "Location not found"),
-        ({"heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen", "time_of_day": "EVENING"}}, "time_of_day"),
-        ({"heading": {"mode": "structured", "int_ext": "OUT.", "location": "kitchen"}}, "int_ext"),
-        ({"heading": {"mode": "structured", "int_ext": "INT.", "location": "", "location_text": ""}}, "location"),
-        ({"heading": {"mode": "custom", "text": "just words"}}, "scene heading"),
+        ({"heading": {"int_ext": "INT.", "location": "ghost"}}, "Location not found"),
+        ({"heading": {"int_ext": "INT.", "location": "kitchen", "time_of_day": "EVENING"}}, "time_of_day"),
+        ({"heading": {"int_ext": "OUT.", "location": "kitchen"}}, "int_ext"),
+        ({"heading": {"int_ext": "INT.", "location": "kitchen", "place": "a - b"}}, "place"),
+        ({"heading": {"int_ext": "INT.", "location": ""}}, "heading"),
+        ({"heading": {"forced_heading": "just words"}}, "scene heading"),
+        ({"heading": {"forced_heading": ".SNIPER SCOPE POV", "int_ext": "INT."}}, "exclusive"),
         ({"extra_cast": ["ghost"]}, "Character not found"),
         ({"blocks": [{"type": "bogus", "text": "x"}]}, r"blocks\[0\]"),
         ({"blocks": "nope"}, "list"),
@@ -197,12 +201,12 @@ class TestCheck:
         blocks = s["blocks"] + [{"type": "character", "text": "NORA"}, {"type": "dialogue", "text": "Hi."}]
         out = me.check_scene_script(project, "the-kitchen", {
             "blocks": blocks,
-            "heading": {"mode": "structured", "int_ext": "INT.", "location": "attic", "time_of_day": ""},
+            "heading": {"int_ext": "INT.", "location": "attic", "time_of_day": ""},
             "extra_cast": ["detective-oak"]})
         codes = {f["code"] for f in out["findings"]}
         assert {"character_unregistered", "location_no_world", "time_of_day_missing"} <= codes
         assert {c["id"] for c in out["cast"]} == {"mara-chen", "detective-oak"}
-        assert out["heading"]["location"] == "attic"
+        assert out["scene"]["location"] == "attic"
         assert me.load_scene_script(project, "the-kitchen")["hash"] == before   # nothing written
 
     def test_cues_say_which_blocks_resolved(self, project):
@@ -215,7 +219,7 @@ class TestCheck:
         s = me.load_scene_script(project, "the-kitchen")
         out = me.check_scene_script(project, "the-kitchen", {
             "blocks": s["blocks"],
-            "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen", "time_of_day": "NIGHT"},
+            "heading": {"int_ext": "INT.", "location": "kitchen", "time_of_day": "NIGHT"},
             "extra_cast": ["mara-chen"]})
         norm = lambda fs: sorted((f["code"], f.get("block"), f.get("field")) for f in fs)
         assert norm(out["findings"]) == norm(s["findings"])

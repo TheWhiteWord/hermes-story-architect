@@ -68,7 +68,7 @@ class TestRoundTrip:
         assert again == blocks
 
     def test_orphan_dialogue_is_reported_not_hidden(self):
-        f = ss.findings(scene={"order": 1, "time_of_day": "DAY"}, heading={}, heading_line="INT. A - DAY",
+        f = ss.findings(scene={"order": 1, "time_of_day": "DAY"},
                         blocks=[{"type": "dialogue", "text": "Hello?"}], cast=[], location=None,
                         has_plot_roles=True, unfilled=[])
         assert any(x["code"] == "orphan_dialogue" and x["block"] == 0 for x in f)
@@ -110,28 +110,6 @@ class TestParityWithLexer:
 
 
 class TestHeading:
-    @pytest.mark.parametrize("text,ie,loc,tod", [
-        ("INT. KITCHEN - NIGHT", "INT.", "KITCHEN", "NIGHT"),
-        ("EXT. LONDON STREET - DAY", "EXT.", "LONDON STREET", "DAY"),
-        ("INT./EXT. CAR - DUSK", "INT./EXT.", "CAR", "DUSK"),
-        ("I/E. CAR - DAWN", "INT./EXT.", "CAR", "DAWN"),
-        ("INT. KITCHEN", "INT.", "KITCHEN", ""),
-        ("EXT. A - B - DUSK", "EXT.", "A - B", "DUSK"),
-        ("INT. KITCHEN - PANTRY", "INT.", "KITCHEN - PANTRY", ""),
-    ])
-    def test_parse(self, text, ie, loc, tod):
-        p = ss.parse_heading(text)
-        assert (p["mode"], p["int_ext"], p["location_text"], p["time_of_day"]) == ("structured", ie, loc, tod)
-
-    @pytest.mark.parametrize("text", [".SNIPER SCOPE POV", "INT. KITCHEN - EVENING #12#", "INT. HALL - MOMENTS LATER"])
-    def test_custom_headings_are_kept_verbatim(self, text):
-        p = ss.parse_heading(text)
-        # "MOMENTS LATER" is not an enum time, so it stays part of the location text
-        if text.startswith("INT. HALL"):
-            assert p["mode"] == "structured" and p["time_of_day"] == ""
-        else:
-            assert p["mode"] == "custom" and p["text"] == text
-
     def test_compose(self):
         assert ss.compose_heading("INT.", "The kitchen", "", "NIGHT") == "INT. THE KITCHEN - NIGHT"
         assert ss.compose_heading("EXT.", "Pier") == "EXT. PIER - UNSPECIFIED"
@@ -140,16 +118,6 @@ class TestHeading:
             ss.compose_heading("INT.", "", "", "DAY")
         with pytest.raises(ValueError):
             ss.compose_heading("INT.", "A", "", "EVENING")
-
-    def test_compose_then_parse_is_identity(self):
-        h = ss.compose_heading("INT./EXT.", "Car", "", "DUSK")
-        p = ss.parse_heading(h)
-        assert ss.compose_heading(p["int_ext"], p["location_text"], "", p["time_of_day"]) == h
-
-    def test_suggest_is_exact_only(self):
-        locs = [{"id": "kitchen", "name": "The Kitchen"}, {"id": "kitchen-annex", "name": "Kitchen Annex"}]
-        assert ss.suggest_location("KITCHEN", locs) == "kitchen"
-        assert ss.suggest_location("KITCH", locs) is None
 
 
 class TestCast:
@@ -183,8 +151,8 @@ class TestCast:
 
 class TestFindings:
     def _f(self, **kw):
-        base = dict(scene={"order": 3, "time_of_day": "NIGHT", "dramatic_role": "", "id": "s", "title": "S"},
-                    heading={"location_text": "KITCHEN"}, heading_line="INT. KITCHEN - NIGHT",
+        base = dict(scene={"order": 3, "time_of_day": "NIGHT", "dramatic_role": "", "id": "s", "title": "S",
+                           "int_ext": "INT.", "location": "k", "forced_heading": ""},
                     blocks=[], cast=[], location={"id": "k", "name": "Kitchen", "world": {"id": "w", "name": "W"}},
                     has_plot_roles=True, unfilled=[])
         base.update(kw)
@@ -195,7 +163,7 @@ class TestFindings:
 
     def test_every_critical_rule(self):
         codes = self._f(scene={"order": 0, "time_of_day": "", "dramatic_role": "", "id": "s"},
-                        heading_line=None, location=None, has_plot_roles=False)
+                        location=None, has_plot_roles=False)
         assert {"order_unset", "time_of_day_missing", "heading_missing",
                 "location_unregistered", "plot_roles_missing"} <= codes
 
@@ -208,7 +176,7 @@ class TestFindings:
         assert "location_no_world" in self._f(location={"id": "k", "name": "Kitchen", "world": None})
 
     def test_unfilled_critical_fields_are_not_reported_twice(self):
-        f = ss.findings(scene={"order": 1, "time_of_day": "", "id": "s"}, heading={}, heading_line="INT. A",
+        f = ss.findings(scene={"order": 1, "time_of_day": "", "id": "s"},
                         blocks=[], cast=[], location={"id": "k", "name": "K", "world": {"id": "w"}},
                         has_plot_roles=True, unfilled=["time_of_day", "scene_objective"])
         assert [x["field"] for x in f if x["level"] == "other"] == ["scene_objective"]

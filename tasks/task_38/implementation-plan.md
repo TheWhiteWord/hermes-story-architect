@@ -150,13 +150,15 @@ without a heading (imported, permissive) does not shift the click mapping.
 **Goal:** load/check/save carry the fields.
 
 Checklist:
-- [ ] `core/manual_edits.py`: `_scene_state` reads the fields; `_view_from_blocks`
+- [x] `core/manual_edits.py`: `_scene_state` reads the fields; `_view_from_blocks`
       exposes them; `save_scene_script` writes the fields + Content in one
       `edit_entity` call; `check_scene_script` validates the same way.
-- [ ] `core/scene_script.py`: retire `parse_heading`; keep `split_heading` for
+- [x] `core/scene_script.py`: retire `parse_heading`; keep `split_heading` for
       paste/import; `compose_content` takes the composed line.
-- [ ] `core/scene_content_lint.py`: authored writes are guaranteed by the
-      boundary, so the lint becomes an import/legacy check.
+- [x] `core/scene_content_lint.py`: authored writes are guaranteed by the
+      boundary, so the lint becomes an import/legacy check. **Resolved as
+      removal** — the module, its `core/drafts.py` call and its two test files
+      are gone (see the Phase 5 brief).
 
 **Gate:** the editor opens a scene, edits `place`, saves, and the assembled
 script shows the new heading line.
@@ -615,3 +617,77 @@ inventory/0.4.4` and `0.4.5` follow the rename.
   scene). The root-cause fix is at the write guard — refuse a scene whose
   `Content` contains a heading line anywhere — which is a behaviour change and
   a separate call.
+
+---
+
+## Phase 5 brief — editor backend
+
+**Short summary.** The editor's load/check/save carry the structured heading.
+`manual_edits._scene_state` reads `int_ext`, `place`, `time_of_day` and
+`forced_heading` into the state; `_view_from_blocks` exposes them on `scene`
+(plus the composed `scene.heading`), and `findings`' `heading_missing` is decided
+by the fields, not by a Content line. `save_scene_script` writes the body-only
+Content and the fields in one `edit_entity` call through `_heading_fields` — the
+same helper `check_scene_script` uses — so a refusal means the same thing before
+and after a save. `scene_script.parse_heading`, `_canon_int_ext` and the three
+heading regexes are gone; `split_heading` stays for paste/import.
+`core/scene_content_lint.py`, its `core/drafts.py` call and its two test files
+are removed.
+
+**Deviations.**
+
+- **The lint was removed, not repurposed.** The checklist said it "becomes an
+  import/legacy check"; the Cleanup said remove the module. Removal satisfies
+  both: the write boundary guarantees authored writes, and Phase 7's import
+  parses and strips a leading heading line, so a "Content present but no heading
+  fields" check has no caller. The user confirmed ("we dont need legacy code").
+  The `tasks/task_30/skill-structure.md` references to the module were updated
+  with it. `tasks/task_38/spec.md:182` still names it as "import-only"; the spec
+  is the approved baseline, so the deviation is recorded here.
+- **`suggest_location` deleted with its test.** It suggested a registered
+  location from the heading's `location_text`, which the editor no longer
+  produces (the location is a linked slug). Dead once the `heading` dict went.
+- **`_heading_fields` is the editor's own validation, shared by check and save.**
+  The plan said `check_scene_script` "validates the same way"; one helper keeps
+  the two from drifting. The write boundary re-checks the merged state on every
+  path — this is the editor's message before anything is written.
+- **`save_scene_script` wraps the boundary's refusal in `ScriptError`.** The
+  boundary raises `ValueError`; the editor's tests and route expect `ScriptError`
+  (422 either way).
+- **`tests/script_editor_serve.py`'s retired `heading` field fixed here.** The
+  Phase 4 addendum flagged it; the harness now passes `int_ext`.
+- **Legacy tolerance kept in `_view`.** `load_scene_script` still strips a
+  leading heading line from stored Content before parsing blocks. Content is
+  body-only for anything written from now on, but a pre-migration project's
+  stored Content still opens with a heading line, and showing it as a raw
+  "Fountain" block in the editor is worse than the one-line split. Phase 9's
+  migration removes the need for it.
+
+**Contract changes.**
+
+- `load_scene_script` and the script routes: the `heading` dict is **gone** from
+  the response. `scene.int_ext`, `scene.place`, `scene.time_of_day` and
+  `scene.forced_heading` are present, and `scene.heading` is the composed line.
+  `findings` takes no `heading` argument.
+- The save/check payload's `heading` object is
+  `{int_ext, place, location, time_of_day, forced_heading}` — no `mode`, no
+  `text`, no `location_text`.
+- New editor refusals: `int_ext must be one of …`, `place cannot contain ' - '`,
+  and the boundary's `forced_heading is exclusive with the composed heading — …`
+  (now refused before anything is written).
+- `content_hash` covers the four heading fields + location + Content + cast.
+- `scene_script.parse_heading`, `_canon_int_ext`, `_HEADING_PARTS_RE`,
+  `_TIME_SEP_RE`, `_SCENE_NUMBER_RE` and `suggest_location` are gone.
+
+**Verification.**
+
+- Gate: `test_manual_edits.test_place_is_composed_into_the_heading` saves a
+  `place` through the real save path and asserts the assembled
+  `get_screenplay_text` contains `INT. KITCHEN - PANTRY - NIGHT`.
+- Focused suites: `test_scene_script`, `test_manual_edits`, `test_script_routes`,
+  `test_draft_preview`, `test_manual_structure` — 127 passed.
+- Full suite: **1297 passed, 2 failed** (Phase 4: 1339 / 2). The 42 dropped are
+  the 32 tests in the two removed lint files and the 12 `parse_heading` /
+  `suggest_location` tests, offset by 2 new editor refusals. The 2 failures
+  pre-date the task (`test_no_hermes_imports`, `task_30/test_skill_references`;
+  both fail on the stashed base).
