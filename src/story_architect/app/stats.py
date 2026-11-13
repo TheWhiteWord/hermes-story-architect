@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from story_architect.core.constants import ENTITY_SCHEMAS, UNFILLED
+from story_architect.core.scene_script import parse_heading_line
 
 CSS_ORDER = ["base.css", "components.css", "views.css", "statistics.css",
              "graph.css", "value-graph.css",
@@ -136,9 +137,9 @@ def _compute_screenplay_stats(screenplay_text, scene_headings=None):
     # ── Location stats ──
     loc_map = {}
     for s in scenes:
-        loc = _parse_scene_location(s['text'])
+        loc = parse_heading_line(s['text'])
         if loc:
-            name = loc['name']
+            name = loc['location']
             if name not in loc_map:
                 loc_map[name] = {
                     'name': name,
@@ -174,7 +175,7 @@ def _compute_screenplay_stats(screenplay_text, scene_headings=None):
     time_counts = {}
     scene_list = []
     for s in scenes:
-        loc = _parse_scene_location(s['text'])
+        loc = parse_heading_line(s['text'])
         loc_type = 'mixed' if (loc and loc.get('interior') and loc.get('exterior')) else \
                    'int' if (loc and loc.get('interior')) else \
                    'ext' if (loc and loc.get('exterior')) else 'other'
@@ -268,28 +269,5 @@ def _build_title_page(project_frontmatter: dict) -> dict:
     br.append(_slot(project_frontmatter, "contact", "contact"))
 
     return {"tl": [], "tc": [], "tr": [], "cc": cc, "bl": bl, "br": br, "hidden": []}
-
-
-def _parse_scene_location(heading):
-    """Parse scene heading text into location info.
-
-    The location segment splits on ` - `: the last segment is the time, the
-    middle ones are the place, the first is the parent location. Location stats
-    key on the parent only, so `INT. KITCHEN - PANTRY - NIGHT` and
-    `INT. KITCHEN - NIGHT` are the same location. The separator needs its
-    spaces, so a hyphenated name (`TWENTY-ONE`) is not split.
-    """
-    import regex as re
-    match = re.match(r'^[ \t]*([.](?![.])|(?:[*]{0,3}_?)(?:int[.]?\/ext|int[.]?\/e|ext|est|int|i[.]?\/e)[. ])(.+?)(#[-.0-9a-z]+#)?$', heading, re.IGNORECASE)
-    if not match:
-        return None
-    parts = re.split(r'\s+[-–—−]\s+', match.group(2))
-    return {
-        'name': parts[0].strip(),
-        'place': ' - '.join(parts[1:-1]).strip(),
-        'interior': 'I' in match.group(1),
-        'exterior': 'EX' in match.group(1) or 'E.' in match.group(1),
-        'time_of_day': parts[-1].strip() if len(parts) > 1 else '',
-    }
 
 

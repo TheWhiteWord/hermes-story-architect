@@ -271,6 +271,47 @@ def scene_heading(int_ext: str, location_name: str, place: str = "",
         return ""
 
 
+def parse_heading_line(line: str) -> dict | None:
+    """A scene heading line -> the fields it is made of; None if not one.
+
+    The inverse of `compose_heading`, for a note whose `## Content` still opens
+    with a heading line. `location` is the location's NAME, not its slug — the
+    caller resolves it. `int_ext` is canonicalised to `INT_EXT_CHOICES`, so a
+    hand-written `I/E.` stores as `INT./EXT.`. A forced heading (`.HEADING`)
+    yields `forced_heading`; `int_ext` is empty and `location` keeps the line's
+    first segment, which is all a reader of a forced line needs.
+    """
+    m = SCENE_HEADING_RE.match(line or "")
+    if not m:
+        return None
+    prefix, rest = m.group(1), m.group(2).strip()
+    parts = [p.strip() for p in re.split(r"\s+[-–—−]\s+", rest)]
+    forced = line.strip() if prefix.strip().startswith(".") else ""
+    int_ext, interior, exterior = "", False, False
+    if not forced:
+        token = re.sub(r"[^a-z]", "", prefix.lower())
+        if token == "est":
+            int_ext = "EST."
+        elif token in ("intext", "inte", "ie"):
+            int_ext = "INT./EXT."
+        elif token == "int":
+            int_ext = "INT."
+        elif token == "ext":
+            int_ext = "EXT."
+        else:
+            return None
+        interior, exterior = "I" in prefix, "EX" in prefix or "E." in prefix
+    return {
+        "int_ext": int_ext,
+        "location": parts[0] if parts else "",
+        "place": " - ".join(parts[1:-1]).strip(),
+        "time_of_day": parts[-1] if len(parts) > 1 else "",
+        "forced_heading": forced,
+        "interior": interior,
+        "exterior": exterior,
+    }
+
+
 # ─── Cast ────────────────────────────────────────────────────────────────────
 
 def cue_key(cue: str) -> str:

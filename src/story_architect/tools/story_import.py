@@ -344,6 +344,10 @@ def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str)
     if not folder.exists():
         return
 
+    # A scene's Content may still open with a heading line; the line carries a
+    # location NAME, which resolves against the locations imported above.
+    locations = _location_slugs_by_name(conn) if entity_type == "scene" else None
+
     for note in sorted(folder.glob("*.md")):
         if note.name.startswith("_"):
             continue
@@ -354,15 +358,20 @@ def _import_folder(conn, project_path: Path, folder_name: str, entity_type: str)
         # stem is only the fallback, for a note written before ids were written
         # out — or by hand.
         entity_id = str(fm.get("id") or note.stem)
-        _insert_entity(conn, entity_type, entity_id, fm, body)
+        fm = _insert_entity(conn, entity_type, entity_id, fm, body, locations=locations)
         _insert_relations(conn, entity_type, entity_id, fm)
 
 
+def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str,
+                   locations: dict | None = None) -> dict:
+    """Insert entity row + sections + relations. Returns the frontmatter used.
 
-
-
-def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str) -> None:
-    """Insert entity row + sections + relations."""
+    A scene's Content heading line can contribute fields, so the caller needs
+    the effective frontmatter back — the relations are derived from it, and a
+    location the line supplied must land in the reverse-index relation too.
+    """
+    if entity_type == "scene":
+        fm, body = _absorb_content_heading(slug, fm, body, locations or {})
     columns = _columns_for(entity_type, slug, fm)
     conn.execute(
         "INSERT INTO entities (id, type, name, one_sentence, order_key, status, parent_id, location_id, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -371,6 +380,65 @@ def _insert_entity(conn, entity_type: str, slug: str, fm: dict, body: str) -> No
          columns["location_id"], json.dumps(columns["extra"])),
     )
     _insert_sections(conn, columns["id"], body, entity_type)
+    return fm
+
+
+def _location_slugs_by_name(conn) -> dict:
+    """Location name -> slug, for the location segment of a heading line.
+
+    The composer emits the location's NAME, so a heading line carries a name
+    where the frontmatter wants a slug. Keyed upper-case with collapsed
+    whitespace, the way two writers case a heading differently.
+    """
+    return {" ".join(name.upper().split()): entity_id
+            for entity_id, name in conn.execute(
+                "SELECT id, name FROM entities WHERE type='location'")}
+
+
+def _absorb_content_heading(slug: str, fm: dict, body: str, locations: dict) -> tuple[dict, str]:
+    """A scene note whose `## Content` opens with a heading line.
+
+    The line is parsed into the heading fields and stripped, so the note
+    canonicalises to the target shape: fields in frontmatter, body-only
+    Content. Frontmatter wins field by field; the line fills the gaps, so a
+    note already carrying the fields keeps them and just loses the duplicate
+    line. A line naming a location that is not registered is refused — the
+    alternative is a heading that renders empty.
+    """
+    from story_architect.core.scene_script import parse_heading_line, split_heading
+    from story_architect.core.section_parser import get_section, replace_section
+
+    section = get_section(body, "Content")
+    if not section:
+        return fm, body
+    text = section.split("\n", 1)[1] if "\n" in section else ""
+    line, rest = split_heading(text)
+    if not line:
+        return fm, body
+    parsed = parse_heading_line(line)
+    if not parsed:
+        return fm, body
+
+    fm = dict(fm)
+    if parsed["forced_heading"]:
+        fm.setdefault("forced_heading", parsed["forced_heading"])
+    else:
+        for key in ("int_ext", "place", "time_of_day"):
+            fm.setdefault(key, parsed[key])
+        if not fm.get("location") and parsed["location"]:
+            resolved = locations.get(" ".join(parsed["location"].upper().split()))
+            if not resolved:
+                raise ValueError(
+                    f"{slug}: the heading line names location "
+                    f"{parsed['location']!r}, which is not a registered location. "
+                    f"Register it, or set 'location' in the note's frontmatter.")
+            fm["location"] = resolved
+    if fm.get("forced_heading") and (fm.get("int_ext") or fm.get("place")
+                                     or fm.get("time_of_day")):
+        raise ValueError(
+            f"{slug}: forced_heading is exclusive with the composed heading — "
+            f"clear int_ext, place and time_of_day, or unset forced_heading")
+    return fm, replace_section(body, "Content", rest)
 
 
 def _insert_sections(conn, entity_id: str, body: str, entity_type: str) -> None:

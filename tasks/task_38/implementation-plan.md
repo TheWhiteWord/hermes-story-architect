@@ -183,9 +183,9 @@ editor and the assembled script.
 **Goal:** the vault carries the fields.
 
 Checklist:
-- [ ] `tools/story_import.py`: read the fields from frontmatter; if `## Content`
+- [x] `tools/story_import.py`: read the fields from frontmatter; if `## Content`
       opens with a heading line, parse it into the fields and strip it.
-- [ ] `tools/story_export.py`: write the fields to frontmatter; Content stays
+- [x] `tools/story_export.py`: write the fields to frontmatter; Content stays
       body-only.
 
 **Gate:** import → export → import is byte-stable on the fixture.
@@ -775,3 +775,86 @@ the dashboard payload) and still accepts free text.
 - Full suite: **1297 passed, 2 failed** — identical to the Phase 5 baseline
   (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
   stashed base).
+
+---
+
+## Phase 7 brief — import / export
+
+**Short summary.** The vault carries the structured heading. A scene note whose
+`## Content` opens with a heading line is canonicalised on import: the line is
+parsed into `int_ext` / `location` / `place` / `time_of_day` (or
+`forced_heading`), the fields are merged into the note, and the line is
+stripped, so Content is body-only and the heading is composed at assembly like
+any other. Frontmatter wins field by field; the line fills the gaps, so a note
+already carrying the fields keeps them and just loses the duplicate line. The
+location segment is a NAME, resolved to a slug against the locations imported
+before the scenes. Export needed no change: the four fields already ride
+`extra` into frontmatter and Content is written from the stored body.
+
+**Deviations.**
+
+- **Export is unchanged.** The checklist item was already satisfied —
+  `_frontmatter_for` merges `extra` (which holds `int_ext`, `place`,
+  `time_of_day`, `forced_heading`) and `location` comes from `location_id`.
+  Verified with a probe: a scene written with `place: pantry` and one with
+  `forced_heading: '.SNIPER SCOPE POV'` export both fields and body-only
+  Content.
+- **The parser is shared with stats, not duplicated.** `parse_heading_line`
+  lives in `core/scene_script.py` (the Fountain ↔ fields bridge) and
+  `app/stats.py` now imports it; `_parse_scene_location` is gone. This is the
+  Cleanup's "one parser survives (the one stats and import share)". Parity is
+  pinned against the deleted function over a 22-heading corpus (place, unicode
+  dash, scene number, forced heading with a dash, lowercase `int.`, forced
+  action marker) — exact, including the case-sensitivity of the int/ext flags.
+- **Frontmatter wins; the line fills gaps.** The alternative (the line is
+  authoritative) would make a migrated note's duplicate Content line override
+  the declared fields, and would refuse the live project's `The Core - Day`
+  (its line says `THE CORE`, its frontmatter says `the-garden`). Filling gaps
+  lets a half-migrated note complete itself and a fully migrated one self-heal.
+- **An unresolvable location is refused, not stored.** A heading line naming a
+  location that is not registered raises `… names location 'X', which is not a
+  registered location. Register it, or set 'location' in the note's
+  frontmatter.` Storing the name as a slug would leave a heading that renders
+  empty, which is the 0-scene bug in a new place.
+- **A forced line together with composed fields is refused** (the write
+  boundary's exclusivity rule), so the importer cannot create a state the
+  authored path forbids.
+- **`_insert_entity` returns the effective frontmatter.** The relations are
+  derived from it, so a location supplied by the heading line also lands in the
+  `location_scene` reverse-index row — without this the column was set but four
+  readers in `core/db.py` stayed blind.
+
+**Contract changes.**
+
+- `scene_script.parse_heading_line(line)` is new: a heading line →
+  `{int_ext, location, place, time_of_day, forced_heading, interior, exterior}`
+  or `None`. `location` is the NAME. `app.stats._parse_scene_location` is gone.
+- Import of a scene note: a leading `## Content` heading line no longer reaches
+  the database. New refusals: unregistered location in the line; a forced
+  heading combined with `int_ext` / `place` / `time_of_day`.
+- Export: unchanged.
+
+**Verification.**
+
+- Gate: import → export → import on the fixture is **byte-stable** (probe over
+  every `.md` in the project, both passes identical).
+- Import probe against real notes: a hand-written `INT. THE KITCHEN - PANTRY -
+  NIGHT` line yields `int_ext=INT.`, `place=PANTRY`, `time_of_day=NIGHT`,
+  `location_id=the-kitchen`, the `location_scene` relation, and Content
+  `Rain.`; a note carrying the fields keeps them and loses the duplicate line;
+  `.SNIPER SCOPE POV` yields `forced_heading` and no composed fields; a
+  body-only note is untouched; an unregistered location is refused with the
+  message above.
+- Parser parity: 22/22 headings match the deleted `app.stats` parser.
+- Full suite: **1297 passed, 2 failed** — identical to the Phase 6 baseline
+  (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
+  stashed base).
+
+**Findings, not fixed here.**
+
+- `fountain_lexer.parse_location` / `parse_location_information` and
+  `screenplay.LOCATION_RE` are still the duplicate parsers the Cleanup list
+  retires; `parse_heading_line` is now the one stats and import share.
+- The live project still carries the retired `heading:` frontmatter key, so it
+  cannot import until Phase 9's one-off migration. After that migration its
+  Content heading lines will canonicalise on the next import.
