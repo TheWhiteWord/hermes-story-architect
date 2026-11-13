@@ -22,16 +22,31 @@ earlier one.
 
 ## Assumptions to verify
 
-Written as claims before checking. Mark each `[x]` with the verified result.
+Written as claims before checking. Each is marked with the verified result.
 
-- [ ] `get_screenplay_text` and `get_dashboard_data` are the only two assembly
-      paths. (Checked: `rg "screenplay_text"` → `db.py:1443`, `db.py:1567`.)
-- [ ] No reader depends on `extra.heading` outside the surfaces listed in the
-      spec. (Checked: `manual_structure.py:62`, `manual_edits.py:103,145,174`,
-      `drafts.py:183,599`, `db.py:1153,1202`, `manual_entities.py:468`,
-      `scene_content_lint.py:71`.)
-- [ ] The fixture's DB is always rebuilt from markdown, so a markdown edit is
-      enough. (Checked: `tests/conftest.py:32-52`.)
+- [x] `get_screenplay_text` and `get_dashboard_data` are the only two assembly
+      paths. (Verified: the only `FROM sections` scene-body queries are
+      `core/db.py:1437` and `core/db.py:1572`. `assemble_scene_content` no longer
+      exists; no desktop or JS assembly. Other `heading='Content'` reads are not
+      assembly — `core/manual_edits.py:61,116`, `core/db.py:1423` (`__SECTIONS__`),
+      and the FTS index — and they keep working on body-only Content.)
+- [x] No reader depends on `extra.heading` outside the surfaces listed in the
+      spec. (Verified by grep; the spec table was **incomplete** and is corrected
+      there. Full list: `scene_content_lint.py:71`, `manual_structure.py:62`,
+      `manual_edits.py:103,145,151,174,236,304`, `manual_entities.py:468`,
+      `db.py:1153,1202`, `drafts.py:183,599`; JS — `data-load.js:34,46,74-76`,
+      `core.js:111-120,143-146`, `views/scenes.js:16,62`, `views/locations.js:12`,
+      `views/reorder.js:79`, `utils.js:12`, `panels/entity-panels.js:169-186,509-511`,
+      `forms/entity-form.js:346,353`, `script-editor/editor.js`, `model.js`,
+      `script-view.js:69-91`. Verified NOT heading-dependent: `db.py` `_build_scene`
+      (the base `story_load` view omits heading), `manual_entities.py:1325`
+      (delete preview reads Content length only), `tools/story_retrieve.py`
+      (returns extra fields dynamically, no hardcoded heading).)
+- [x] The fixture's DB is always rebuilt from markdown, so a markdown edit is
+      enough. (Verified: `git ls-files tests/fixtures` tracks no `.db`;
+      `build_fixture_db` deletes the DB before importing; every test that copies
+      `FIXTURE` re-imports, and `story_import` is destructive — it deletes every
+      row and rebuilds. The on-disk `.story/story.db` is a local artefact.)
 - [x] No existing location name contains ` - `. (Checked: fixture — "The
       Central Room", "The Garden"; live project — "The Garden", "The Central
       Room", "The Garden (dream)". The no-dash rule is safe to enforce.)
@@ -43,44 +58,51 @@ gone.
 
 Checklist:
 - [ ] `core/constants.py`: replace `heading` with `int_ext` (enum
-      `INT_EXT_CHOICES`), `child` (string, optional), `forced_heading` (string,
-      optional); add `group: "Scene heading"` to `int_ext`, `child`, `location`,
+      `INT_EXT_CHOICES`), `place` (string, optional), `forced_heading` (string,
+      optional); add `group: "Scene heading"` to `int_ext`, `place`, `location`,
       `time_of_day`, `forced_heading`.
+- [ ] `core/constants.py`: add `places` to the `location` schema
+      (`computed: True`, list) — the distinct `place` values of its scenes.
 - [ ] Rewrite the descriptions of the five grouped fields so each names the
       heading it is part of — the schema description is the channel the model
       learns from, and `story_describe` emits it verbatim. `location` and
       `time_of_day` currently describe themselves as standalone facts.
 - [ ] `core/entity.py`: add `INT_EXT_CHOICES` to the imports/validators; extend
-      `validate_entity` for `scene` to check `int_ext` enum and the no-dash rule
-      on `child`.
+      `validate_entity` for `scene` to check the `int_ext` enum and the no-dash
+      rule on `place`.
+- [ ] `core/entity.py`: `validate_entity` for `location` refuses a `name`
+      containing ` - ` (verified safe: no existing location name contains one).
 - [ ] `core/manual_entities.py`: `GROUPS` reads the schema `group` key; update
-      `LABELS` (`int_ext` → "INT/EXT", `child` → "Child location",
+      `LABELS` (`int_ext` → "INT/EXT", `place` → "Place",
       `forced_heading` → "Forced heading"); `SCRIPT_FIELDS` becomes the five
       grouped fields.
-- [ ] `core/constants.py` / `entity.py`: a location-name rule rejecting ` - `
-      (verified safe: no existing location name contains one).
 
 **Gate:** `story_describe` for `scene` lists the five grouped fields together,
 each with a heading-derived description, and `validate_entity` refuses a bad
-`int_ext` and a ` - ` in `child`.
+`int_ext`, a ` - ` in `place`, and a ` - ` in a location's `name`.
 
 ## Phase 2 — Write boundary
 
 **Goal:** a scene with a script cannot be saved without a heading.
 
 Checklist:
-- [ ] `core/writes.py` `create_entity` ( beside `:186-199`) and `edit_entity`
+- [ ] `core/writes.py` `create_entity` (beside `:186-199`) and `edit_entity`
       (beside `:442-468`): a scene branch on the merged state — Content
       non-empty ⇒ structured (`int_ext` + `location`) or `forced_heading`;
       otherwise `ValueError` before `BEGIN`.
-- [ ] `core/scene_script.py`: `compose_heading(int_ext, location_name, child,
+- [ ] `core/writes.py`: the same branch refuses `forced_heading` together with
+      any of `int_ext` / `place` / `time_of_day` (exclusive heading source).
+      `location` is allowed with either.
+- [ ] `core/scene_script.py`: `compose_heading(int_ext, location_name, place,
       time_of_day)` — always emits a time (`UNSPECIFIED` when unset), uppercases
-      the location, validates the no-dash rule.
+      the location, validates the no-dash rule. The caller resolves the location
+      slug to its `name`.
 - [ ] A helper that strips a leading heading line from incoming Content
       (`split_heading`) so an agent-written line is replaced, not duplicated.
 
 **Gate:** `create_entity` / `edit_entity` refuse a scene with body-only Content
-and no heading fields; a scene with `forced_heading` passes.
+and no heading fields; a scene with `forced_heading` passes; a scene with both
+a forced heading and structured fields is refused.
 
 ## Phase 3 — Assembly
 
@@ -89,26 +111,30 @@ and no heading fields; a scene with `forced_heading` passes.
 Checklist:
 - [ ] `core/db.py` `get_screenplay_text` (`:1567-1579`) and
       `get_dashboard_data` (`:1434-1444`): compose each scene's line from its
-      fields before concatenating; skip scenes with empty Content.
+      fields before concatenating; skip scenes with empty Content. Resolve the
+      location slug to its `name` (one join, or a name map alongside the scene
+      rows).
 - [ ] `screenplay_scene_ids` is derived from the same per-scene list, so the
       ids align with the rendered headings.
+- [ ] `core/db.py`: the dashboard's location payload gains the computed `places`
+      (batched reverse lookup of each location's scenes' distinct `place`).
 
 **Gate:** the fixture (after Phase 9's markdown edit) assembles to one heading
 per scene; stats scenes = 3.
 
 ## Phase 4 — Stats + click mapping
 
-**Goal:** the parser understands the child segment; clicks map to the right
+**Goal:** the parser understands the place segment; clicks map to the right
 scene.
 
 Checklist:
 - [ ] `app/stats.py` `_parse_scene_location` (`:269-282`): split the location
-      segment on ` - `; last = time, middle = child, first = parent. Location
+      segment on ` - `; last = time, middle = place, first = parent. Location
       stats key on the parent only.
 - [ ] `web/js/script-view.js:89-93`: map ids by the rendered headings, not
       positionally against the scene list.
 
-**Gate:** a scene with a child shows the parent in location stats; a scene
+**Gate:** a scene with a place shows the parent in location stats; a scene
 without a heading (imported, permissive) does not shift the click mapping.
 
 ## Phase 5 — Editor backend
@@ -124,7 +150,7 @@ Checklist:
 - [ ] `core/scene_content_lint.py`: authored writes are guaranteed by the
       boundary, so the lint becomes an import/legacy check.
 
-**Gate:** the editor opens a scene, edits `child`, saves, and the assembled
+**Gate:** the editor opens a scene, edits `place`, saves, and the assembled
 script shows the new heading line.
 
 ## Phase 6 — Editor frontend
@@ -132,13 +158,14 @@ script shows the new heading line.
 **Goal:** the heading row edits the fields.
 
 Checklist:
-- [ ] `web/js/script-editor/model.js`: `composeHeading` gains `child`; the
+- [ ] `web/js/script-editor/model.js`: `composeHeading` gains `place`; the
       save blocker validates `int_ext` + location.
 - [ ] `web/js/script-editor/editor.js`: `headingFrom` / `payload` carry
-      `int_ext`, `child`, `forced_heading`; the custom mode becomes
-      `forced_heading`.
+      `int_ext`, `place`, `forced_heading`; the custom mode becomes
+      `forced_heading`. The place input suggests from the parent location's
+      `places` (free text still allowed).
 
-**Gate:** a manual edit of `child` and `time_of_day` round-trips through the
+**Gate:** a manual edit of `place` and `time_of_day` round-trips through the
 editor and the assembled script.
 
 ## Phase 7 — Import / export
@@ -163,6 +190,8 @@ Checklist:
       from the fields.
 - [ ] `web/js/views/scenes.js:62`, `panels/entity-panels.js:509`,
       `core.js:111-121`: heading display from the fields.
+- [ ] `tools/story_retrieve.py:128-167`: `_entity_fields` derives a location's
+      computed `places` (distinct `place` of its scenes) for the agent's read.
 
 **Gate:** the scene list, scene panel, character/location panels and the
 structure tree show the heading for a scene edited in the editor.
@@ -173,9 +202,9 @@ structure tree show the heading for a scene edited in the editor.
 
 Checklist:
 - [ ] `tests/fixtures/save-the-children/scenes/*.md`: replace `heading:` with
-      `int_ext:` + `child: ""`.
+      `int_ext:` + `place: ""`.
 - [ ] Standalone one-off script for the live project: parse each scene's FM
-      `heading` into `int_ext`/`child`. Not part of the app.
+      `heading` into `int_ext`/`place`. Not part of the app.
 
 **Gate:** the fixture DB builds and the pipeline shows 3 scenes.
 
@@ -184,7 +213,7 @@ Checklist:
 **Goal:** the invariants are pinned.
 
 Checklist:
-- [ ] `tests/test_scene_script.py`: `compose_heading` with child; the always-time
+- [ ] `tests/test_scene_script.py`: `compose_heading` with place; the always-time
       rule; the no-dash refusal.
 - [ ] `tests/test_manual_edits.py`: save with fields; refusal without a heading;
       forced heading.
@@ -241,9 +270,9 @@ end — a dead helper left behind is the next session's guess.
 
 **Fix — tests**
 
-- `tests/test_scene_script.py`: `compose_heading` with `child` and the
+- `tests/test_scene_script.py`: `compose_heading` with `place` and the
   always-time rule; the no-dash refusal.
-- `tests/test_manual_edits.py`: the payload shape (`int_ext`, `child`,
+- `tests/test_manual_edits.py`: the payload shape (`int_ext`, `place`,
   `forced_heading`).
 - `tests/test_core.py`: the `heading` field assertions (`unfilled_fields`,
   round-trip).
