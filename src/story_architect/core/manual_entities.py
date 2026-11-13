@@ -99,7 +99,8 @@ LABELS = {
     "act_id": "Act", "sequence_id": "Sequence", "primary_plot": "Primary plot",
     "act_objective": "Objective", "scene_objective": "Objective", "purpose": "Purpose",
     "dramatic_role": "Dramatic role", "plot_roles": "Plot roles", "no_cast": "No characters",
-    "heading": "Heading", "time_of_day": "Time of day", "turning_point": "Turning point",
+    "int_ext": "INT/EXT", "place": "Place", "forced_heading": "Forced heading",
+    "time_of_day": "Time of day", "turning_point": "Turning point",
     "scene_beats": "Beats record", "value_turns": "Value turns", "location": "Location",
 }
 
@@ -151,9 +152,10 @@ POSITION = {("sequence", "act_id"), ("scene", "sequence_id")}
 # `order` is Reorder's; a scene's `act_id` is just its sequence's act, kept in step by the form.
 HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id"),
           ("scene", "turning_point"), ("scene", "scene_beats")}      # the last two live in the Beats tab
-# Written by the script editor together with the script, so the heading line and
-# these fields can never disagree. Shown, with a way to get there; never edited here.
-SCRIPT_FIELDS = ("heading", "location", "time_of_day", "characters")
+# Written by the script editor together with the script, so the composed
+# heading and these fields can never disagree. Shown, with a way to get there;
+# never edited here.
+SCRIPT_FIELDS = ("int_ext", "place", "location", "time_of_day", "forced_heading", "characters")
 # Shown but not editable in this form.
 READ_ONLY: dict = {}
 # Written by the form, but as a purpose-built editor on its own tab rather than a generic widget.
@@ -197,9 +199,11 @@ FIELD_ORDER = {
 # A name the form can suggest from other fields until the person types their own.
 AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
 
-# Visual grouping inside one form.
-GROUPS = {("project", k): "Title page" for k in
-          ("screenplay_title", "credit", "author", "contact", "draft_date", "draft")}
+# Visual grouping inside one form. The group is declared on the schema field
+# (`group`), so the form shows exactly what story_describe tells the agent.
+GROUPS = {(entity_type, key): meta["group"]
+          for entity_type, schema in ENTITY_SCHEMAS.items()
+          for key, meta in schema.items() if meta.get("group")}
 
 MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea", "act_objective"}
 

@@ -4,7 +4,8 @@ characters:
 - kael
 - mira
 dramatic_role: plot_role
-heading: INT. THE CENTRAL ROOM - DAY
+int_ext: INT.
+place: ""
 id: central-room-day
 location: the-central-room
 order: 1

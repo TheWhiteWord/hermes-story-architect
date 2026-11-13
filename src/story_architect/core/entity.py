@@ -5,7 +5,7 @@ from pathlib import Path
 from .constants import (
     REQUIRED_FIELDS, ENTITY_SCHEMAS, VALID_ROLES, VALID_STATUSES,
     SCENE_STATUSES, SEQUENCE_STATUSES, ACT_STATUSES,
-    SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES,
+    SCENE_TIMES_OF_DAY, SCENE_DRAMATIC_ROLES, INT_EXT_CHOICES,
     STRUCTURE_TYPES, PLOT_TYPES,
     PLOT_SCOPES, VALUE_ARCS, PLOT_ROLES,
     CONFLICT_LEVELS, VALUE_LADDER,
@@ -61,9 +61,14 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
     if entity_type == "project":
         _validate_enum(frontmatter, "structure_type", STRUCTURE_TYPES, warnings, empty_ok=True)
 
+    if entity_type == "location":
+        _validate_no_separator(frontmatter, "name", warnings, "location name")
+
     if entity_type == "scene":
         _validate_enum(frontmatter, "status", SCENE_STATUSES, warnings)
         _validate_enum(frontmatter, "time_of_day", SCENE_TIMES_OF_DAY, warnings, empty_ok=True)
+        _validate_enum(frontmatter, "int_ext", INT_EXT_CHOICES, warnings, empty_ok=True)
+        _validate_no_separator(frontmatter, "place", warnings, "place")
         _validate_enum(frontmatter, "dramatic_role", SCENE_DRAMATIC_ROLES, warnings, empty_ok=True)
         _validate_numeric(frontmatter, "order", warnings)
 
@@ -229,6 +234,15 @@ def _validate_enum(frontmatter: dict, field: str, valid: list[str], warnings: li
         return
     if val not in valid:
         warnings.append(f"Invalid {field}: {val}")
+
+
+def _validate_no_separator(frontmatter: dict, field: str, warnings: list[str], label: str) -> None:
+    """A heading segment cannot contain the separator that splits place from time."""
+    value = frontmatter.get(field)
+    if isinstance(value, str) and " - " in value:
+        warnings.append(
+            f"{label} cannot contain ' - ' — the scene heading uses it as the "
+            f"separator between place and time")
 
 
 def _validate_numeric(frontmatter: dict, field: str, warnings: list[str]) -> None:

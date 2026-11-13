@@ -7,6 +7,9 @@ SCENE_STATUSES = ["planned", "drafted", "written", "locked"]
 SEQUENCE_STATUSES = ["planned", "in-progress", "complete"]
 ACT_STATUSES = ["planned", "in-progress", "complete"]
 SCENE_TIMES_OF_DAY = ["DAY", "NIGHT", "DUSK", "DAWN", "CONTINUOUS", "LATER"]
+# Canonical INT/EXT prefixes a composed scene heading offers. Declared here
+# because the schema, the write validation and the composer all read it.
+INT_EXT_CHOICES = ["INT.", "EXT.", "INT./EXT.", "EST."]
 # A scene's dramatic function. `plot_role` is the ordinary case: the role is
 # defined per plot in the scene's `plot_roles`, never here. The other two are
 # the only reasons a scene can serve NO plot — a bridge between beats, or a
@@ -91,12 +94,16 @@ ENTITY_SCHEMAS = {
         },
     },
     "location": {
-        "name": {"type": "string", "default": "", "optional": False, "description": "Location display name"},
+        "name": {"type": "string", "default": "", "optional": False,
+                 "description": "Location display name. Must not contain ' - '."},
         "one_sentence": {"type": "string", "default": "", "optional": False, "description": "One-sentence summary for index label"},
         "mood": {"type": "string", "default": "", "optional": True, "description": "Emotional register of the place, generalized (e.g. 'oppressive domesticity')"},
         "dramatic_function": {"type": "string", "default": "", "optional": True, "description": "Why this place exists in the story (e.g. 'where the protagonist's past catches up')"},
         "world": {"type": "string", "default": "", "optional": True, "description": "World slug this location belongs to"},
         "variant_of": {"type": "string", "default": "", "optional": True, "description": "Slug of the base location this is a variant of. Empty on base locations."},
+        "places": {"type": "list", "default": [], "optional": True, "computed": True,
+                   "description": "Distinct `place` values of this location's scenes "
+                                  "(read-only, derived at read time)."},
     },
     "world": {
         "name": {"type": "string", "default": "", "optional": False, "description": "World display name"},
@@ -156,15 +163,15 @@ ENTITY_SCHEMAS = {
         "structure_type": {"type": "string", "default": "", "optional": True, "description": "One of: Classical, Miniplot, Antiplot"},
         "genre": {"type": "string", "default": "", "optional": True, "description": "Story genre (e.g. Sci-fi thriller)"},
         "act_count": {"type": "number", "default": 3, "optional": True, "description": "Number of acts in story structure (default 3, auto-adjusts upward if more act files exist)"},
-        "screenplay_title": {"type": "string", "default": "Default", "optional": True, "description": "Title page: screenplay title (center)"},
+        "screenplay_title": {"type": "string", "default": "Default", "optional": True, "group": "Title page", "description": "Title page: screenplay title (center)"},
         "setting": {"type": "string", "default": "", "optional": True, "description": "Primary setting (e.g. Near-future city-state)"},
         "spine": {"type": "string", "default": "", "optional": True, "description": "Protagonist's desire (story-level spine)"},
         "controlling_idea": {"type": "string", "default": "", "optional": True, "description": "The story's controlling idea/argument"},
-        "credit": {"type": "string", "default": "", "optional": True, "description": "Title page: credit line (e.g. 'Written by')"},
-        "author": {"type": "string", "default": "", "optional": True, "description": "Title page: author name"},
-        "contact": {"type": "string", "default": "", "optional": True, "description": "Title page: contact info (bottom-right)"},
-        "draft_date": {"type": "string", "default": "", "optional": True, "description": "Title page: draft date (bottom-left)"},
-        "draft": {"type": "string", "default": "", "optional": True, "description": "Title page: draft label (e.g. 'First Draft')"},
+        "credit": {"type": "string", "default": "", "optional": True, "group": "Title page", "description": "Title page: credit line (e.g. 'Written by')"},
+        "author": {"type": "string", "default": "", "optional": True, "group": "Title page", "description": "Title page: author name"},
+        "contact": {"type": "string", "default": "", "optional": True, "group": "Title page", "description": "Title page: contact info (bottom-right)"},
+        "draft_date": {"type": "string", "default": "", "optional": True, "group": "Title page", "description": "Title page: draft date (bottom-left)"},
+        "draft": {"type": "string", "default": "", "optional": True, "group": "Title page", "description": "Title page: draft label (e.g. 'First Draft')"},
         "value_focus": {"type": "object", "keyed": False, "default": {"major": [], "minor": []}, "optional": True, "computed": True,
                         "description": "Computed: the story's major and minor values, as {major: [{value, scenes}], minor: [{value, scenes}]}. Major is the main plot's major values; minor is the subplots' major values not already major (design §4). scenes counts the scenes in which the value shifts. Read-only — derived from the scenes' value_turns.",
                         "sub_fields": {
@@ -181,9 +188,33 @@ ENTITY_SCHEMAS = {
         "act_id": {"type": "string", "default": "", "optional": False, "description": "Parent act slug (denormalized shortcut)"},
         "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence. Integer only. Use 0 when not yet decided (appends at end)."},
-        "heading": {"type": "string", "default": "", "optional": True, "description": "Fountain scene heading (for screenplay output)"},
-        "location": {"type": "string", "default": "", "optional": True, "description": "Slug of an existing location"},
-        "time_of_day": {"type": "string", "default": "", "optional": True, "description": "One of: DAY, NIGHT, DUSK, DAWN, CONTINUOUS, LATER"},
+        "int_ext": {
+            "type": "string", "default": "INT.", "optional": True,
+            "enum": INT_EXT_CHOICES, "group": "Scene heading",
+            "description": "Scene heading, first segment: one of INT., EXT., INT./EXT., EST.",
+        },
+        "place": {
+            "type": "string", "default": "", "optional": True, "group": "Scene heading",
+            "description": "Scene heading, middle segment: the specific place within the location "
+                           "(e.g. 'kitchen'). Optional — omit when the location names the place. "
+                           "Must not contain ' - '.",
+        },
+        "location": {
+            "type": "string", "default": "", "optional": True, "group": "Scene heading",
+            "description": "Slug of an existing location. Its name becomes the location segment "
+                           "of the scene heading.",
+        },
+        "time_of_day": {
+            "type": "string", "default": "", "optional": True, "group": "Scene heading",
+            "description": "Scene heading, last segment: one of DAY, NIGHT, DUSK, DAWN, CONTINUOUS, "
+                           "LATER. Emitted as UNSPECIFIED when unset.",
+        },
+        "forced_heading": {
+            "type": "string", "default": "", "optional": True, "group": "Scene heading",
+            "description": "A complete scene heading emitted verbatim (Fountain's escape, e.g. "
+                           "'.SNIPER SCOPE POV'). Exclusive with int_ext, place and time_of_day; "
+                           "location may still be set.",
+        },
         "characters": {"type": "list", "default": [], "optional": True, "description": "Character slugs present in this scene"},
         "no_cast": {"type": "boolean", "default": False, "optional": True, "description": "Set true when this scene deliberately has no characters (e.g. an empty room). Clears the 'characters unfilled' gap so a decision is not flagged forever"},
         "one_sentence": {"type": "string", "default": "", "optional": True, "description": "One-sentence summary of the scene"},

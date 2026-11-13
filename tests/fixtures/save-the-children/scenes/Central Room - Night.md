@@ -3,7 +3,8 @@ act_id: act-1
 characters:
 - kael
 dramatic_role: plot_role
-heading: INT. THE CENTRAL ROOM - NIGHT
+int_ext: INT.
+place: ""
 id: central-room-night
 location: the-central-room
 order: 2

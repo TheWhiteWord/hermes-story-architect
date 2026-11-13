@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 
-from .constants import SCENE_TIMES_OF_DAY
+from .constants import INT_EXT_CHOICES, SCENE_TIMES_OF_DAY
 from .fountain_lexer import (
     CHARACTER_RE,
     PARENTHETICAL_RE,
@@ -37,9 +37,6 @@ from .fountain_lexer import (
 
 BLOCK_TYPES = ("action", "character", "parenthetical", "dialogue",
                "transition", "note", "raw")
-
-# Canonical INT/EXT prefixes the heading controls offer.
-INT_EXT_CHOICES = ("INT.", "EXT.", "INT./EXT.", "EST.")
 
 _PLACEHOLDER_RE = re.compile(r"^\s*\[placeholder", re.IGNORECASE)
 _NOTE_RE = re.compile(r"^\[\[(.*)\]\]$", re.DOTALL)

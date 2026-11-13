@@ -19,6 +19,11 @@ earlier one.
   machinery.
 - **`writes` and `story_import` are the only section writers.** So the write
   boundary is `writes` (authored) plus `import` (vault); no third path.
+- **Retiring `heading` breaks the fixture immediately.** `story_import._extra_for`
+  refuses any frontmatter key the schema does not declare, so the fixture's
+  `heading:` lines stopped importing the moment Phase 1 landed. The fixture
+  markdown was therefore migrated in Phase 1 (Phase 9 item 1); the live-project
+  one-off script stays in Phase 9.
 
 ## Assumptions to verify
 
@@ -57,25 +62,26 @@ Written as claims before checking. Each is marked with the verified result.
 gone.
 
 Checklist:
-- [ ] `core/constants.py`: replace `heading` with `int_ext` (enum
+- [x] `core/constants.py`: replace `heading` with `int_ext` (enum
       `INT_EXT_CHOICES`), `place` (string, optional), `forced_heading` (string,
       optional); add `group: "Scene heading"` to `int_ext`, `place`, `location`,
       `time_of_day`, `forced_heading`.
-- [ ] `core/constants.py`: add `places` to the `location` schema
+- [x] `core/constants.py`: add `places` to the `location` schema
       (`computed: True`, list) — the distinct `place` values of its scenes.
-- [ ] Rewrite the descriptions of the five grouped fields so each names the
+- [x] Rewrite the descriptions of the five grouped fields so each names the
       heading it is part of — the schema description is the channel the model
       learns from, and `story_describe` emits it verbatim. `location` and
       `time_of_day` currently describe themselves as standalone facts.
-- [ ] `core/entity.py`: add `INT_EXT_CHOICES` to the imports/validators; extend
+- [x] `core/entity.py`: add `INT_EXT_CHOICES` to the imports/validators; extend
       `validate_entity` for `scene` to check the `int_ext` enum and the no-dash
       rule on `place`.
-- [ ] `core/entity.py`: `validate_entity` for `location` refuses a `name`
+- [x] `core/entity.py`: `validate_entity` for `location` refuses a `name`
       containing ` - ` (verified safe: no existing location name contains one).
-- [ ] `core/manual_entities.py`: `GROUPS` reads the schema `group` key; update
+- [x] `core/manual_entities.py`: `GROUPS` reads the schema `group` key; update
       `LABELS` (`int_ext` → "INT/EXT", `place` → "Place",
       `forced_heading` → "Forced heading"); `SCRIPT_FIELDS` becomes the five
-      grouped fields.
+      grouped fields — plus `characters`, which was already linked and has no
+      `ref` to fall back on (see Phase 1 brief).
 
 **Gate:** `story_describe` for `scene` lists the five grouped fields together,
 each with a heading-derived description, and `validate_entity` refuses a bad
@@ -297,3 +303,61 @@ editor depend on the assembly being right. The fixture migration lands after the
 core so the phases can be verified against a known-good project. Tests and docs
 last, because they pin and describe what the code now does — writing them earlier
 would encode the old model.
+
+---
+
+## Phase 1 brief — schema + validation
+
+**Short summary.** The scene schema carries the structured heading. `heading` is
+retired and replaced by `int_ext` (enum `INT_EXT_CHOICES`, default `INT.`),
+`place` and `forced_heading`; `location` and `time_of_day` keep their storage but
+their descriptions now name the heading segment they compose. All five carry
+`group: "Scene heading"`, and `manual_entities.GROUPS` derives from that key
+rather than a duplicate dict, so `story_describe` and the form share one source.
+`location` gained the computed `places` list. `validate_entity` refuses a bad
+`int_ext`, a ` - ` in a scene's `place`, and a ` - ` in a location's `name` —
+all VALUE problems, so every write path and the importer refuse them, not just
+the form. Fixture markdown was migrated to the new fields.
+
+**Deviations.**
+
+- **Fixture markdown migrated in Phase 1** (Phase 9 item 1). `_extra_for`
+  refuses unknown frontmatter keys, so removing `heading` stopped the fixture
+  import dead; verified an un-migrated note fails with `Unrecognised scene
+  field(s): heading`. The live-project one-off script stays in Phase 9.
+- **`SCRIPT_FIELDS` keeps `characters`.** The literal "five grouped fields"
+  would drop it; the scene schema declares no `ref` for `characters`, so the
+  form would render it as a generic list widget instead of the
+  script-editor-linked display it has today.
+- **`group: "Title page"` added to the six project fields.** Deriving `GROUPS`
+  from the schema alone silently dropped the existing title-page grouping; the
+  group now lives on the schema like every other group.
+- **`INT_EXT_CHOICES` moved to `constants.py`** (a Cleanup item) and declared as
+  a list, matching `VALID_ROLES`/`SCENE_TIMES_OF_DAY` and `_validate_enum`'s
+  signature. `scene_script.py` imports it, so composer and validator cannot
+  drift.
+
+**Contract changes.**
+
+- Scene frontmatter: `heading` gone; `int_ext`, `place`, `forced_heading` new.
+  A note still carrying `heading` is refused at import.
+- New VALUE refusals: `Invalid int_ext: <value>`, `place cannot contain ' - '`,
+  `location name cannot contain ' - '`.
+- `story_describe(scene)` emits `group: "Scene heading"` on the five fields and
+  `places` on `location`; the five are contiguous in schema order.
+- `manual_entities.SCRIPT_FIELDS` = the five heading fields + `characters`.
+
+**Verification.**
+
+- Gate: `story_describe` lists the five grouped fields with heading-derived
+  descriptions; `validate_entity` refuses bad `int_ext`, ` - ` in `place`, and
+  ` - ` in a location name; clean values produce no VALUE warnings; the form
+  renders all five as `linked` under the `Scene heading` group.
+- Fixture imports, stores `int_ext`, builds 3 scenes; round-trip and
+  scene/location suites pass.
+- Full suite: **1307 passed, 7 failed, 27 errors.** Two failures pre-date this
+  phase (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on
+  the stashed base). The remaining 32 are the intended retirement of `heading`:
+  `test_manual_edits` (27 errors → Phase 5), `test_manual_structure` (2),
+  `test_script_routes` (1), `test_core` unfilled (2) — all covered by Phases
+  5–10.

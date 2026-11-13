@@ -4,7 +4,8 @@ characters:
 - kael
 - mira
 dramatic_role: plot_role
-heading: EXT. THE CORE - DAY
+int_ext: EXT.
+place: ""
 id: the-core-day
 location: the-garden
 order: 3
