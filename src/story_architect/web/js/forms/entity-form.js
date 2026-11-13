@@ -147,11 +147,6 @@ window.DASH = window.DASH || {};
     render(); focusFirst();
   };
 
-  function goScript() {
-    const id = S.id; close();
-    if (D.openScriptEditor) D.openScriptEditor(id);
-  }
-
   function close() {
     clearTimeout(S.timer); S.seq++;
     S.open = false; rootEl.classList.remove('open'); rootEl.innerHTML = '';
@@ -189,19 +184,18 @@ window.DASH = window.DASH || {};
   function tabsHtml() {
     const filled = S.spec.sections.filter((n) => String(S.sections[n] || '').trim()).length;
     const tab = (id, label, extra) => `<button class="ef-tab${S.tab === id ? ' active' : ''}" data-act="tab" data-tab="${id}">${label}${extra || ''}<i class="ef-dot" data-dot="${id}"></i></button>`;
-    const script = S.spec.script_link && S.mode === 'edit' ? tab('script', 'Script') : '';
     const extra = (S.spec.tabs || []).map((t) => {
       const f = S.spec.fields.find((x) => x.tab === t.id), n = f && plugin(f) && plugin(f).count ? plugin(f).count(f, S.values[f.key]) : 0;
       return tab(t.id, t.label, n ? `<small>${n}</small>` : '');
     }).join('');
-    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${extra}${script}</div>`;
+    return `<div class="ef-tabs">${tab('fields', 'Fields')}${S.spec.sections.length ? tab('sections', 'Sections', `<small>${filled}/${S.spec.sections.length}</small>`) : ''}${extra}</div>`;
   }
 
   function renderBody() {
     const body = document.getElementById('ef-body'); if (!body) return;
     const top = body.scrollTop;
     body.innerHTML = S.step === 'review' ? reviewHtml() : S.step === 'delete' ? deleteHtml()
-      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'script' ? scriptHtml() : S.tab === 'fields' ? fieldsHtml() : tabFieldsHtml(S.tab));
+      : `<div class="ef-banner" id="ef-banner"></div>` + (S.tab === 'sections' ? sectionsHtml() : S.tab === 'fields' ? fieldsHtml() : tabFieldsHtml(S.tab));
     body.scrollTop = top;
     body.querySelectorAll('textarea').forEach(autosize);
     paintMessages();
@@ -342,18 +336,6 @@ window.DASH = window.DASH || {};
       <button class="ef-add" data-act="rep-add" data-key="${h(f.key)}">+ ${h(f.add_label || 'Add')}</button></div>`;
   }
 
-  // What the script editor owns on a scene. Shown here so the form tells the whole story,
-  // never edited here so the heading line and these fields can't disagree.
-  function scriptHtml() {
-    const rows = S.spec.fields.filter((f) => f.kind === 'linked').map((f) => {
-      const r = (S.orig.computed || {})[f.key] || [];
-      return `<div class="ef-field"><div class="ef-label">${h(f.label)}</div>
-        <div class="ef-ro${r.length ? '' : ' none'}">${r.length ? r.map((x) => `<div>${h(x.display)}</div>`).join('') : 'Not set'}</div></div>`;
-    }).join('');
-    return `<div class="ef-note">The script, its heading, location, time of day and cast are written together in the script editor, so they always agree.</div>
-      ${rows}<div><button class="btn" data-act="open-script">Edit in script editor →</button></div>`;
-  }
-
   function listWidget(f, items) {
     return `<div class="ef-list">${items.map((it, i) => `<div class="ef-row">
         <input class="ef-input" data-list="${h(f.key)}" data-i="${i}" value="${h(it)}" autocomplete="off">
@@ -463,8 +445,8 @@ window.DASH = window.DASH || {};
 
   // ─── Footer ──────────────────────────────────────────────────────────────
   function footerHtml() {
-    if (S.discard) return `<div class="grow">${S.discard === 'script' ? 'Discard your changes and open the script editor?' : 'Discard your changes?'}</div>
-      <button class="btn btn-ghost" data-act="keep">Keep editing</button><button class="btn btn-danger" data-act="discard">${S.discard === 'script' ? 'Discard and open' : 'Discard'}</button>`;
+    if (S.discard) return `<div class="grow">Discard your changes?</div>
+      <button class="btn btn-ghost" data-act="keep">Keep editing</button><button class="btn btn-danger" data-act="discard">Discard</button>`;
     if (S.step === 'review') return `<button class="btn" data-act="back">Back</button><div class="grow"></div>
       <button class="btn btn-primary" data-act="confirm"${S.busy ? ' disabled' : ''}>${S.busy ? 'Saving…' : 'Confirm and save'}</button>`;
     if (S.step === 'delete') {
@@ -634,7 +616,7 @@ window.DASH = window.DASH || {};
       case 'ask-delete': askDelete(); break;
       case 'confirm-delete': confirmDelete(); break;
       case 'keep': S.discard = false; syncFooter(); break;
-      case 'discard': if (S.discard === 'script') goScript(); else close(); break;
+      case 'discard': close(); break;
       case 'list-add': {
         const k = el.dataset.key; (S.values[k] = S.values[k] || []).push('');
         renderBody(); const rows = document.querySelectorAll(`[data-list="${CSS.escape(k)}"]`); rows[rows.length - 1].focus(); break;
@@ -659,7 +641,6 @@ window.DASH = window.DASH || {};
       case 'rep-del': {
         S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
       }
-      case 'open-script': if (isDirty()) { S.discard = 'script'; syncFooter(); } else goScript(); break;
       case 'list-del': {
         S.values[el.dataset.key].splice(+el.dataset.i, 1); renderBody(); afterEdit(); break;
       }

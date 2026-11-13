@@ -211,10 +211,13 @@ structure tree show the heading for a scene edited in the editor.
 **Goal:** the test projects are in the target shape.
 
 Checklist:
-- [ ] `tests/fixtures/save-the-children/scenes/*.md`: replace `heading:` with
-      `int_ext:` + `place: ""`.
-- [ ] Standalone one-off script for the live project: parse each scene's FM
+- [x] `tests/fixtures/save-the-children/scenes/*.md`: replace `heading:` with
+      `int_ext:` + `place: ""`. (Done in Phase 1; gate re-verified in Phase 9 —
+      fixture DB builds, 3 scenes assemble with 3 composed headings.)
+- [x] Standalone one-off script for the live project: parse each scene's FM
       `heading` into `int_ext`/`place`. Not part of the app.
+      (`tasks/task_38/migrate_live_headings.py`. Applied to the live project;
+      DB rebuilt; 6 scenes assemble with headings.)
 
 **Gate:** the fixture DB builds and the pipeline shows 3 scenes.
 
@@ -938,3 +941,144 @@ read — the same derivation as the dashboard payload.
 - `docs/Dashboard inventory/0.4.4` still says a scene's `heading` comes "from
   `extra`" and describes `_scene_headings` as a string filter in `utils.js`; both
   are stale.
+
+---
+
+## Phase 9 brief — fixture + migration
+
+**Short summary.** Item 1 was already done in Phase 1; Phase 9 re-ran its gate
+against a freshly built DB (import succeeds, 3 scenes, three composed headings).
+Item 2's deliverable is `tasks/task_38/migrate_live_headings.py`, a task-local
+one-off in the same convention as `tasks/task_31/rename_plot_roles.py`: it
+replaces each scene's `heading:` frontmatter line with `int_ext:` +
+`place: ""` (or `forced_heading:`), derived through the app's own
+`scene_script.parse_heading_line` — no second parser. `location` and
+`time_of_day` are left alone; the retired free-text heading is only the source
+of the two missing fields. Verified end-to-end on a scratch copy of the live
+project: migrate → `story_import` succeeds → 6 scenes assemble with headings.
+Backups taken before anything was touched: `.story/story_20261113_225055.db`
+(via `core.db.backup_database`, WAL-safe) and
+`.story/backups/pre-task38-heading-migration-scenes/`. The live project was then
+migrated and its DB rebuilt — 6 scenes, 6 composed headings; the vault holds no
+`heading:` key any more.
+
+**Deviations.**
+
+- Item 1 landed in Phase 1; only its gate was re-verified here.
+- The script makes a surgical single-line edit instead of a frontmatter
+  round-trip dump, so every other byte of the note is untouched.
+- Existing structured fields win: a note already carrying `int_ext`/`place` keeps
+  them and only loses `heading`.
+- Removing `heading:` is what unblocks import — `_extra_for` refuses unknown
+  scene fields, so the notes could not be imported until it was gone.
+- **The live project was migrated and its DB rebuilt.** The plan assigns this
+  migration, the user asked for the DB backup ahead of it, and the `dry_run`
+  reported `would_be_destroyed: []`. Two backups exist:
+  `.story/story_20261113_225055.db` (taken by hand via `core.db.backup_database`)
+  and `.story/story_20261113_225534.db` (the importer's own), plus the markdown
+  snapshot `.story/backups/pre-task38-heading-migration-scenes/`.
+
+**Contract changes.** None — no app code changed in this phase.
+
+**Verification.**
+
+- Fixture gate: fresh copy → import → `screenplay_scene_headings` = 3
+  (`INT. THE CENTRAL ROOM - DAY`, `… - NIGHT`, `EXT. THE GARDEN - DAY`), and
+  `get_screenplay_text` renders them above the bodies.
+- Live-project migration on a scratch copy: 6/6 scenes migrated, import success,
+  6 headings composed (`EXT. THE GARDEN (DREAM) - DAY`, …); no `heading:` key
+  survives; the importer strips the Content lines from the database.
+- **Live project after `--apply` + import:** 6 scenes, `screenplay_scene_headings`
+  = 6 in sequence order, the dashboard scene list carries the same six lines,
+  `get_screenplay_text` renders each heading above its body, no `heading:` key
+  remains anywhere in the vault (only in the backup snapshot), and no stored
+  `extra` still carries `"heading"`.
+- Script dry run against the live project (read-only): 6 scenes, all parsed.
+- No app or test file changed, so the suite baseline is untouched (1297 passed,
+  2 failed — the two pre-existing failures).
+
+**Open question for the user** (not blocking this phase): the vault notes keep
+their `## Content` heading line — see the last finding below.
+
+**Resolved after the brief:** the user confirmed the vault notes are not
+needed while the database exists. Verified: nothing outside
+`tools/story_import.py` / `tools/story_export.py` reads the vault markdown, so
+the leftover Content lines cost nothing and **no export is run**.
+
+**Findings, not fixed here.**
+
+- Three pre-existing data discrepancies surface once the heading composes from
+  the linked location:
+  - `The Core - Day` — heading said `THE CORE`, linked location is `the-garden`
+    ("The Garden") → composes as `EXT. THE GARDEN - DAY`.
+  - `Garden Dream` — linked location `the-garden-dream` ("The Garden (dream)") →
+    `EXT. THE GARDEN (DREAM) - DAY` (was `THE GARDEN`).
+  - `The Door Closes` — FM `heading` said `LATER`; the declared `time_of_day:
+    DAY` and the Content line both say `DAY` → `INT. THE CENTRAL ROOM - DAY`.
+
+  These are inherent to composing from the linked entity; resolving them means
+  editing the notes' location links or registering a new location, which is
+  outside this phase.
+- The vault notes keep their `## Content` heading line after import (the
+  importer strips it from the database only). Harmless: nothing outside
+  `tools/story_import.py` / `tools/story_export.py` reads the vault markdown, and
+  re-import is idempotent. The user does not need the notes while the database
+  exists, so no export is run.
+
+---
+
+## Phase 9 addendum — scene facts edited in the form (user-approved)
+
+**Change.** The scene form edits the cast and where the scene happens:
+`characters` (reflist), `location` (ref) and `place` (text) moved onto the
+Fields tab, between `scene_objective` and `no_cast`. `SCRIPT_FIELDS` shrank to
+the writing-time trio `int_ext`, `time_of_day`, `forced_heading`; the Script tab
+and its read-only listing are gone (`script_link` dropped, `scriptHtml()`,
+`goScript()` and the `open-script` action deleted). No capability is lost — the
+scene panel already has "Open script" / "Write script"
+(`web/js/panels/entity-panels.js:434`). Both surfaces write the same entity
+fields, so they cannot drift: the editor reads them back through
+`load_scene_script`.
+
+**Why.** Cast, location and place are facts about the scene, settable when it is
+created; INT/EXT and the time belong to writing the script. The old Script tab
+listed those facts read-only and pointed elsewhere, which was a dead end rather
+than an editor.
+
+**Deviations.**
+
+- `location` and `place` render without the "Scene heading" group header
+  (`UNGROUPED_IN_FORM`): the form shows only half that group, and a header over
+  half a heading misleads. The schema `group` keys are untouched, so
+  `story_describe` still teaches the agent the whole model.
+- `place` is a plain text input here. The parent location's `places` suggestions
+  live in the script editor; wiring them into the form would mean feeding the
+  dashboard payload into the form, which this change does not do.
+- A client posting `int_ext` / `time_of_day` / `forced_heading` to the form is
+  still discarded server-side (`manual_entities._clean`), so the script editor
+  stays the only writer of the composed heading's remaining segments.
+- Creating a scene with a location and no `int_ext` was already allowed and
+  still is: the write boundary requires a heading only when Content is written.
+
+**Contract changes.**
+
+- The scene form spec exposes `characters` / `location` / `place` as editable
+  (`reflist` / `ref` / `text`) and no longer carries `script_link`.
+- `_clean("scene", …)` now accepts those three keys instead of discarding them.
+
+**Verification.**
+
+- Form spec: order is title, sequence_id, status, one_sentence, scene_objective,
+  characters, location, place, no_cast, dramatic_role, plot_roles; the trio
+  stays `linked`; `script_link` absent.
+- Real writes: `_clean` accepts cast/location/place and still drops the trio;
+  create + read-back carries all three.
+- Two-way sync through the shipped paths: form-set cast/location/place appear in
+  `load_scene_script` (cast `['kael']`, location `the-central-room`, place
+  `pantry`); a script save composes `INT. THE CENTRAL ROOM - PANTRY - NIGHT` and
+  keeps the cast; a later form edit to `location=the-garden`, `place=''` shows in
+  the editor immediately as `INT. THE GARDEN - NIGHT`.
+- `tests/test_manual_structure.py::TestSpec::test_scene` updated to the new
+  shape; focused suites pass. Full suite: **1297 passed, 2 failed** — the same
+  two failures every prior phase recorded (`test_no_hermes_imports`,
+  `tasks/task_30/test_skill_references`, both failing on the stashed base).

@@ -64,12 +64,19 @@ class TestSpec:
         by = {f["key"]: f for f in sp["fields"]}
         assert "order" not in by and "act_id" not in by            # Reorder's, not the form's
         assert by["sequence_id"]["required"] and by["sequence_id"]["ref"] == "sequence"
-        assert all(by[k]["kind"] == "linked" for k in
-                   ("int_ext", "place", "location", "time_of_day", "forced_heading", "characters"))
+        # Cast and where it happens are set here as well as in the script editor.
+        assert by["characters"]["kind"] == "reflist" and by["characters"]["ref"] == "character"
+        assert by["location"]["kind"] == "ref" and by["location"]["ref"] == "location"
+        assert by["place"]["kind"] == "text" and "group" not in by["place"]
+        # The rest of the heading belongs to the script editor.
+        assert all(by[k]["kind"] == "linked" for k in ("int_ext", "time_of_day", "forced_heading"))
         assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "valueturns"
         assert "turning_point" not in by and "scene_beats" not in by          # they live in the Beats tab
-        assert "Content" not in sp["sections"] and sp["script_link"]
-        assert [f["key"] for f in sp["fields"]][:3] == ["title", "sequence_id", "status"]
+        assert "Content" not in sp["sections"] and not sp.get("script_link")
+        keys = [f["key"] for f in sp["fields"]]
+        assert keys[:3] == ["title", "sequence_id", "status"]
+        assert keys.index("characters") < keys.index("no_cast") \
+            < keys.index("location") < keys.index("place")
 
     def test_sequence_and_act(self):
         assert {f["key"] for f in me.form_spec("sequence")["fields"]} >= {"title", "act_id", "primary_plot", "purpose"}

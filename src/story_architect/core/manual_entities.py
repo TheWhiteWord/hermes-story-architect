@@ -145,6 +145,8 @@ UI_REFS = {
     ("sequence", "act_id"): "act",
     ("sequence", "primary_plot"): "plot",
     ("scene", "sequence_id"): "sequence",
+    ("scene", "location"): "location",
+    ("scene", "characters"): "character",
 }
 
 # Where an act / sequence / scene sits is chosen once, when it is made. After that it
@@ -153,10 +155,12 @@ POSITION = {("sequence", "act_id"), ("scene", "sequence_id")}
 # `order` is Reorder's; a scene's `act_id` is just its sequence's act, kept in step by the form.
 HIDDEN = {("act", "order"), ("sequence", "order"), ("scene", "order"), ("scene", "act_id"),
           ("scene", "turning_point"), ("scene", "scene_beats")}      # the last two live in the Beats tab
-# Written by the script editor together with the script, so the composed
-# heading and these fields can never disagree. Shown, with a way to get there;
-# never edited here.
-SCRIPT_FIELDS = ("int_ext", "place", "location", "time_of_day", "forced_heading", "characters")
+# The writing-time part of the heading, owned by the script editor: it writes
+# these together with the script, so the composed line cannot disagree with
+# them. The entity form does not show or write them — `_clean` discards them if
+# a client posts them anyway. Cast, location and place are edited by both, since
+# they are facts about the scene as much as parts of its heading.
+SCRIPT_FIELDS = ("int_ext", "time_of_day", "forced_heading")
 # Shown but not editable in this form.
 READ_ONLY: dict = {}
 # Written by the form, but as a purpose-built editor on its own tab rather than a generic widget.
@@ -193,8 +197,8 @@ FIELD_ORDER = {
     "relationship": ["name", "characters", "perspectives", "status", "history", "scenes"],
     "act": ["title", "status", "act_objective"],
     "sequence": ["title", "act_id", "status", "primary_plot", "purpose"],
-    "scene": ["title", "sequence_id", "status", "one_sentence", "scene_objective", "no_cast",
-              "dramatic_role", "plot_roles"],
+    "scene": ["title", "sequence_id", "status", "one_sentence", "scene_objective",
+              "characters", "no_cast", "location", "place", "dramatic_role", "plot_roles"],
 }
 
 # A name the form can suggest from other fields until the person types their own.
@@ -205,6 +209,12 @@ AUTO_NAME = {"relationship": {"from": "characters", "join": " & "}}
 GROUPS = {(entity_type, key): meta["group"]
           for entity_type, schema in ENTITY_SCHEMAS.items()
           for key, meta in schema.items() if meta.get("group")}
+
+# A group is the script-side model: it names the fields that compose a heading,
+# which is what story_describe teaches the agent. A form that edits only part of
+# such a group renders no header — half a heading under a "Scene heading" title
+# would mislead.
+UNGROUPED_IN_FORM = {("scene", "location"), ("scene", "place")}
 
 MULTILINE = {"note", "history", "purpose", "spine", "controlling_idea", "act_objective"}
 
@@ -253,6 +263,7 @@ HELP = {
     ("scene", "sequence_id"): "Which sequence it belongs to. Choose once — move it later with Reorder.",
     ("scene", "one_sentence"): "One line that sums up the scene.",
     ("scene", "scene_objective"): "What the driving character wants in this scene.",
+    ("scene", "place"): "The specific place within that location, when it names a bigger area.",
     ("scene", "dramatic_role"): "Leave empty if the scene serves a plot. Transition and non-event scenes serve none.",
     ("scene", "no_cast"): "Tick this when nobody appears on purpose, e.g. an empty room.",
     **{k: v for k, v in VALUE_LADDER.items()},
@@ -318,7 +329,7 @@ def _field_spec(entity_type: str, key: str, meta: dict) -> dict:
         "required": False,
         "default": _json_default(meta),
     }
-    if (entity_type, key) in GROUPS:
+    if (entity_type, key) in GROUPS and (entity_type, key) not in UNGROUPED_IN_FORM:
         spec["group"] = GROUPS[(entity_type, key)]
     if (entity_type, key) in SHOW_IF:
         spec["show_if"] = SHOW_IF[(entity_type, key)]
@@ -402,8 +413,8 @@ def form_spec(entity_type: str) -> dict:
         "fields": fields,
         "sections": _sections(entity_type),
         "singleton": entity_type in SINGLETONS,
-        **({"script_link": True, "tabs": [{"id": "turns", "label": "Value turns"},
-                                          {"id": "beats", "label": "Beats"}]} if entity_type == "scene" else {}),
+        **({"tabs": [{"id": "turns", "label": "Value turns"},
+                     {"id": "beats", "label": "Beats"}]} if entity_type == "scene" else {}),
         **({"auto_name": AUTO_NAME[entity_type]} if entity_type in AUTO_NAME else {}),
     }
 
