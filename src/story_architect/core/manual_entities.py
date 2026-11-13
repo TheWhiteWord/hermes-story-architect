@@ -264,7 +264,7 @@ HELP = {
     ("scene", "one_sentence"): "One line that sums up the scene.",
     ("scene", "scene_objective"): "What the driving character wants in this scene.",
     ("scene", "place"): "The specific place within that location, when it names a bigger area.",
-    ("scene", "dramatic_role"): "Leave empty if the scene serves a plot. Transition and non-event scenes serve none.",
+    ("scene", "dramatic_role"): "Plot role if the scene serves a plot. Transition and non-event scenes serve none.",
     ("scene", "no_cast"): "Tick this when nobody appears on purpose, e.g. an empty room.",
     **{k: v for k, v in VALUE_LADDER.items()},
 }
