@@ -60,11 +60,11 @@ window.DASH = window.DASH || {};
   const V = () => S.view || S.data;
 
   function headingFrom(res) {
-    const h = res.heading || {};
+    const s = res.scene || {};
     return {
-      mode: h.mode || 'structured', int_ext: h.int_ext || 'INT.',
-      location: h.location || '', location_text: h.location_text || '',
-      time_of_day: h.time_of_day || '', text: h.text || '',
+      forced: !!s.forced_heading, int_ext: s.int_ext || '', place: s.place || '',
+      location: s.location || '', time_of_day: s.time_of_day || '',
+      forced_heading: s.forced_heading || '',
     };
   }
 
@@ -135,7 +135,7 @@ window.DASH = window.DASH || {};
 
   function locationName() {
     const l = locById(S.H.location);
-    return l ? l.name : (S.H.location_text || '');
+    return l ? l.name : '';
   }
   const headingText = () => M.composeHeading(S.H, locationName());
 
@@ -164,18 +164,21 @@ window.DASH = window.DASH || {};
 
   function headingRowHtml() {
     const H = S.H, dis = S.readonly ? 'disabled' : '';
-    if (H.mode === 'custom') {
+    if (H.forced) {
       return `<div class="se-row se-heading" data-heading>
         <div class="se-hline"><input class="se-hinput" id="se-hinput" spellcheck="false" ${S.readonly ? 'readonly' : ''}>
-        <button class="se-pill" data-h="fields" type="button" ${dis} title="Build the heading from INT/EXT, location and time">Use fields</button></div></div>`;
+        <button class="se-pill" data-h="fields" type="button" ${dis} title="Build the heading from INT/EXT, location, place and time">Use fields</button></div></div>`;
     }
     const name = locationName();
-    const registered = !!locById(H.location);
     return `<div class="se-row se-heading" data-heading>
       <div class="se-hline">
-        <button class="se-pill" data-h="ie" type="button" ${dis}>${esc(H.int_ext)}</button>
-        <button class="se-pill se-loc${!name ? ' se-warn' : ''}${name && !registered ? ' se-dashed' : ''}" data-h="loc" type="button" ${dis}
-          title="${registered ? 'Registered location' : (name ? 'Not a registered location' : 'Choose a location')}">${name ? esc(name.toUpperCase()) : 'LOCATION'}</button>
+        <button class="se-pill${!H.int_ext ? ' se-warn' : ''}" data-h="ie" type="button" ${dis}
+          title="INT/EXT">${esc(H.int_ext || 'INT/EXT')}</button>
+        <button class="se-pill${!name ? ' se-warn' : ''}" data-h="loc" type="button" ${dis}
+          title="${name ? 'Registered location' : 'Choose a location'}">${name ? esc(name.toUpperCase()) : 'LOCATION'}</button>
+        <span class="se-dash">-</span>
+        <button class="se-pill${!H.place ? ' se-dim' : ''}" data-h="place" type="button" ${dis}
+          title="The specific place within ${esc(name || 'the location')}">${esc((H.place || '').toUpperCase() || 'PLACE')}</button>
         <span class="se-dash">-</span>
         <button class="se-pill${!H.time_of_day ? ' se-warn' : ''}" data-h="tod" type="button" ${dis}>${esc(H.time_of_day || 'TIME')}</button>
         <button class="se-icon" data-h="custom" type="button" ${dis} title="Edit the heading as text">✎</button>
@@ -190,7 +193,7 @@ window.DASH = window.DASH || {};
       autosize(ta);
     });
     const hi = S.paper.querySelector('#se-hinput');
-    if (hi) hi.value = S.H.text;
+    if (hi) hi.value = S.H.forced_heading;
     S.ac = null;
     if (focus) focusBlock(focus.i, focus.pos);
   }
@@ -249,13 +252,11 @@ window.DASH = window.DASH || {};
     const none = !chips && !adhoc ? '<div class="se-muted se-small">No one yet</div>' : '';
 
     const loc = locById(S.H.location);   // the heading's own state: immediate
-    const typed = S.H.location_text && !locById(S.H.location);
     const locChip = loc
       ? `<button class="se-chip se-loc-chip" data-loc="${esc(loc.id)}" type="button" style="--c:#6bbfb0">${esc(loc.name.toUpperCase())}</button>
          ${loc.world ? `<button class="se-chip se-world-chip" data-world="${esc(loc.world.id)}" type="button" style="--c:#e0a86b">${esc(loc.world.name.toUpperCase())}</button>`
                      : '<span class="se-chip se-bad" title="This location belongs to no world">NO WORLD</span>'}`
-      : (typed ? `<span class="se-chip se-adhoc" title="Not a registered location">${esc(S.H.location_text.toUpperCase())}</span>`
-               : '<div class="se-muted se-small">No location</div>');
+      : '<div class="se-muted se-small">No location</div>';
 
     S.root.querySelector('#se-rail').innerHTML = `
       <div class="se-rail-sec"><div class="se-label">Element</div><div class="se-els">${els}</div></div>
@@ -370,8 +371,8 @@ window.DASH = window.DASH || {};
   function payload(withHash) {
     const p = {
       blocks: S.blocks.map(b => ({ type: b.type, text: b.type === 'parenthetical' ? M.wrapParenthetical(b.text) : b.text })),
-      heading: { mode: S.H.mode, int_ext: S.H.int_ext, location: S.H.location, location_text: S.H.location_text,
-                 time_of_day: S.H.time_of_day, text: S.H.text },
+      heading: { int_ext: S.H.int_ext, place: S.H.place, location: S.H.location,
+                 time_of_day: S.H.time_of_day, forced_heading: S.H.forced_heading },
       extra_cast: Array.from(S.extraCast),
     };
     if (withHash) p.base_hash = withHash;
@@ -472,15 +473,26 @@ window.DASH = window.DASH || {};
   // ── the specific menus ──
   function pickLocation(anchor) {
     const items = registry().locations.map(l => ({
-      label: l.name, sub: l.world ? l.world.name : 'no world', color: '#6bbfb0', value: { id: l.id }, disabled: false }));
+      label: l.name, sub: l.world ? l.world.name : 'no world', color: '#6bbfb0', value: l.id }));
     openPop(anchor, items, {
-      search: true, placeholder: 'Find a location, or type a new one',
-      free: (q) => ({ label: 'Use “' + q + '”', sub: 'not registered', value: { text: q } }),
-      onPick: (v) => {
-        if (v.id) { S.H.location = v.id; S.H.location_text = ''; } else { S.H.location = ''; S.H.location_text = v.text; }
-        if (S.H.mode === 'custom') S.H.mode = 'structured';
-        afterHeadingChange();
-      },
+      search: true, placeholder: 'Find a location',
+      onPick: (id) => { S.H.location = id; afterHeadingChange(); },
+    });
+  }
+
+  // The parent location's known places first, from the dashboard payload; a new
+  // one is always allowed, so a place is suggested, never required.
+  function pickPlace(anchor) {
+    const loc = locById(S.H.location);
+    const parent = ((DASH.story && DASH.story.locations) || [])
+      .find(l => String(l.id) === String(S.H.location));
+    const items = [{ label: '(no place)', value: '' }]
+      .concat((parent && parent.places || []).map(p => ({
+        label: p, sub: loc ? loc.name : 'this location', value: p })));
+    openPop(anchor, items, {
+      search: true, placeholder: 'Place within ' + (loc ? loc.name : 'the location') + ', or type a new one',
+      free: (q) => ({ label: 'Use “' + q + '”', sub: 'new place', value: q }),
+      onPick: (v) => { S.H.place = v; afterHeadingChange(); },
     });
   }
   function afterHeadingChange() { renderAll(); onChange(); }
@@ -585,7 +597,7 @@ window.DASH = window.DASH || {};
 
   function onInput(e) {
     const hi = e.target.closest('#se-hinput');
-    if (hi) { S.H.text = hi.value; return onChange(); }
+    if (hi) { S.H.forced_heading = hi.value; return onChange(); }
     const ta = e.target.closest('textarea[data-i]');
     if (!ta) return;
     const i = +ta.dataset.i, b = S.blocks[i];
@@ -806,8 +818,18 @@ window.DASH = window.DASH || {};
         if (k === 'ie') openPop(h, M.INT_EXT.map(v => ({ label: v, value: v })), { onPick: (v) => { S.H.int_ext = v; afterHeadingChange(); } });
         else if (k === 'tod') openPop(h, [{ label: '(no time)', value: '' }].concat(M.TIMES.map(v => ({ label: v, value: v }))), { onPick: (v) => { S.H.time_of_day = v; afterHeadingChange(); } });
         else if (k === 'loc') pickLocation(h);
-        else if (k === 'custom') { S.H.text = headingText(); S.H.mode = 'custom'; afterHeadingChange(); setTimeout(() => { const i = $('#se-hinput'); if (i) i.focus(); }, 0); }
-        else if (k === 'fields') { S.H.mode = 'structured'; afterHeadingChange(); }
+        else if (k === 'place') pickPlace(h);
+        else if (k === 'custom') {
+          // A forced heading replaces the composed one, so the exclusive fields
+          // are cleared: what this state holds is what a save writes.
+          const composed = headingText();
+          S.H.forced = true;
+          S.H.forced_heading = composed;
+          S.H.int_ext = ''; S.H.place = ''; S.H.time_of_day = '';
+          afterHeadingChange();
+          setTimeout(() => { const i = $('#se-hinput'); if (i) i.focus(); }, 0);
+        }
+        else if (k === 'fields') { S.H.forced = false; S.H.forced_heading = ''; afterHeadingChange(); }
         return;
       }
       if (e.target.closest('[data-end]') && !S.readonly) {
@@ -826,7 +848,7 @@ window.DASH = window.DASH || {};
       const st = e.target.closest('[data-set]');
       if (st) {
         if (st.dataset.set === 'add') return pickLocation(st);
-        S.H.location = ''; S.H.location_text = ''; return afterHeadingChange();
+        S.H.location = ''; return afterHeadingChange();
       }
       const ch = e.target.closest('[data-char]');
       if (ch) { const c2 = (DASH.story.characters || []).find(x => String(x.id) === ch.dataset.char); if (c2) DASH.showCharacterPanel(c2); return; }

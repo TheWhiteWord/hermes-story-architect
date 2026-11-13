@@ -168,9 +168,9 @@ script shows the new heading line.
 **Goal:** the heading row edits the fields.
 
 Checklist:
-- [ ] `web/js/script-editor/model.js`: `composeHeading` gains `place`; the
+- [x] `web/js/script-editor/model.js`: `composeHeading` gains `place`; the
       save blocker validates `int_ext` + location.
-- [ ] `web/js/script-editor/editor.js`: `headingFrom` / `payload` carry
+- [x] `web/js/script-editor/editor.js`: `headingFrom` / `payload` carry
       `int_ext`, `place`, `forced_heading`; the custom mode becomes
       `forced_heading`. The place input suggests from the parent location's
       `places` (free text still allowed).
@@ -691,3 +691,87 @@ are removed.
   `suggest_location` tests, offset by 2 new editor refusals. The 2 failures
   pre-date the task (`test_no_hermes_imports`, `task_30/test_skill_references`;
   both fail on the stashed base).
+
+---
+
+## Phase 6 brief — editor frontend
+
+**Short summary.** The heading row now edits the structured fields. It renders
+four pills — INT/EXT, LOCATION, PLACE, TIME — between the two `-` separators,
+and the preview (`composeHeading`) mirrors `scene_script.compose_heading`
+exactly: place upper-cased and omitted when empty, time always emitted
+(`UNSPECIFIED` when unset), and an unusable composed heading (no `int_ext`, no
+location) shown as empty. The save blocker validates `int_ext` + location and
+refuses a ` - ` in the place. The "✎" toggle is now the forced heading: it
+prefills from the composed line, clears `int_ext`/`place`/`time_of_day`, and
+writes `forced_heading`; "Use fields" clears it again. The payload is exactly
+the Phase 5 backend contract `{int_ext, place, location, time_of_day,
+forced_heading}`. The place menu suggests the parent location's `places` (from
+the dashboard payload) and still accepts free text.
+
+**Deviations.**
+
+- **`headingFrom` reads `res.scene`.** Phase 5 removed the response's
+  `heading` dict; the old reader returned an empty object, so every field
+  silently defaulted and `int_ext` lost its `'INT.'` fallback. The editor was
+  effectively blind to the stored heading until this phase.
+- **The payload actually carries the fields now.** It sent `mode`,
+  `location_text` and `text`, none of which `_heading_fields` reads — so a
+  "custom" heading saved the structured fields instead of the typed text. That
+  path is gone; the custom mode *is* `forced_heading`.
+- **A UI-only `forced` flag decides the text-input branch.** `forced_heading`
+  alone cannot discriminate "empty forced draft" from "structured scene": a
+  forced heading with no location is legal and saveable. The flag is not sent;
+  it only drives rendering and is part of the dirty snapshot.
+- **Toggling clears the exclusive source.** The server refuses a forced heading
+  together with `int_ext`/`place`/`time_of_day`, so the toggle clears them and
+  the state always holds what a save writes. Switching back and forth therefore
+  loses the other source's values — they were never stored either way.
+- **Free-text locations are gone.** `location` is a ref in the target schema
+  and the backend has no `location_text` storage (`_heading_fields` returns
+  only the slug), so typing an unregistered location could never persist. The
+  picker offers registered locations only; the rail's "not a registered
+  location" chip went with it. A location must be registered before it can be
+  used in a heading.
+- **Place suggestions come from the dashboard payload**
+  (`DASH.story.locations[].places`, computed in Phase 3), not from a new
+  registry query — the spec names that payload as the derivation site, so no
+  backend change was needed.
+- **`composeHeading` was corrected, not just extended.** It previously omitted
+  the time when unset and treated `int_ext` as always set; the server emits
+  `UNSPECIFIED` and refuses an unset `int_ext`. The preview now matches the
+  composer case for case (verified against the real function, below).
+- **The harness was not updated here.** `tests/script_editor_harness.js`
+  expects three pills, types an unregistered location, and its `DASH` stub
+  carries no `locations`. Phase 10 owns the harness.
+
+**Contract changes.**
+
+- The editor's load/save/check `heading` payload is
+  `{int_ext, place, location, time_of_day, forced_heading}` — the Phase 5
+  backend contract, which the frontend had never actually sent.
+- The heading row gains a PLACE pill; an unset `int_ext` shows an `INT/EXT`
+  placeholder (pill warn-coloured), an unset place is dim, an unset time keeps
+  its `TIME` warn.
+- `res.heading` is no longer read by the editor; the composed preview is
+  derived from the fields.
+
+**Verification.**
+
+- Model probe against the real `core/scene_script.compose_heading`: six cases
+  (place, `UNSPECIFIED`, whitespace, `INT./EXT.`, `EST.`) plus ten
+  blocker/composer assertions — all pass.
+- End-to-end jsdom probe driving the shipped `model.js` + `editor.js` against
+  a real server (a demo project whose Kitchen has the places `cellar` and
+  `pantry`): opens the scene on `INT. / KITCHEN / PANTRY / NIGHT`; the place
+  menu lists both known places; picking `cellar` and `DUSK` saves
+  `{int_ext: 'INT.', place: 'cellar', location: 'kitchen', time_of_day: 'DUSK',
+  forced_heading: ''}`; the GET round-trip returns those fields and
+  `scene.heading = 'INT. KITCHEN - CELLAR - DUSK'`; the assembled
+  `screenplay_text` and `screenplay_stats.sceneHeadings` show the same line.
+  The ✎ flow prefills `INT. KITCHEN - CELLAR - DUSK`, clears the exclusive
+  fields, saves `forced_heading: '.SNIPER SCOPE POV'`, and the assembled script
+  shows it; "Use fields" restores the field row.
+- Full suite: **1297 passed, 2 failed** — identical to the Phase 5 baseline
+  (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
+  stashed base).

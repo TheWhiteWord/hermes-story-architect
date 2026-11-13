@@ -102,30 +102,38 @@ DASH.SEModel = (function () {
   function snapshot(state) {
     return JSON.stringify({
       b: state.blocks.map(b => [b.type, b.text]),
-      h: [state.H.mode, state.H.int_ext, state.H.location, state.H.location_text,
-          state.H.time_of_day, state.H.mode === 'custom' ? state.H.text : ''],
+      h: [state.H.forced ? 1 : 0, state.H.int_ext, state.H.location, state.H.place,
+          state.H.time_of_day, state.H.forced_heading],
       c: Array.from(state.extraCast).sort(),
     });
   }
 
   // The heading as shown. The server composes the real one; this is only the
-  // preview, so it needs the same two rules: location upper-cased, time optional.
+  // preview, so it follows the same rules: a forced heading is shown verbatim,
+  // an unusable composed one is empty, the location and place are upper-cased,
+  // and a time is always emitted (UNSPECIFIED when unset).
   function composeHeading(H, locationName) {
-    if (H.mode === 'custom') return H.text || '';
-    const name = String(locationName || H.location_text || '').trim().replace(/\s+/g, ' ').toUpperCase();
+    if (H.forced) return H.forced_heading || '';
+    if (!H.int_ext) return '';
+    const name = String(locationName || '').trim().replace(/\s+/g, ' ').toUpperCase();
     if (!name) return '';
-    return H.int_ext + ' ' + name + (H.time_of_day ? ' - ' + H.time_of_day : '');
+    const place = String(H.place || '').trim().replace(/\s+/g, ' ').toUpperCase();
+    return H.int_ext + ' ' + name + (place ? ' - ' + place : '') +
+      ' - ' + (H.time_of_day || 'UNSPECIFIED');
   }
 
-  // Can this page be saved? Mirrors the one hard rule the server enforces on a
-  // structured heading (it needs a place); the rest the server refuses itself.
+  // Can this page be saved? Mirrors the hard rule the server enforces on a
+  // structured heading (it needs int_ext + location); the rest the server
+  // refuses itself.
   function saveBlocker(state) {
-    if (state.H.mode === 'custom') {
-      return /^\s*(\.[^.]|int|ext|est|i\/e)/i.test(state.H.text || '') ? '' : 'The heading must be a scene heading.';
+    const H = state.H;
+    if (H.forced) {
+      return /^\s*(\.[^.]|int|ext|est|i\/e)/i.test(H.forced_heading || '')
+        ? '' : 'The heading must be a scene heading.';
     }
-    if (!state.H.location && !(state.H.location_text || '').trim()) {
-      return 'Set a location in the scene heading.';
-    }
+    if (!H.int_ext) return 'Choose INT/EXT for the scene heading.';
+    if (!H.location) return 'Set a location in the scene heading.';
+    if ((H.place || '').includes(' - ')) return "The place cannot contain ' - '.";
     return '';
   }
 
