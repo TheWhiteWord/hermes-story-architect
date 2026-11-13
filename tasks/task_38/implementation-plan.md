@@ -115,14 +115,14 @@ a forced heading and structured fields is refused.
 **Goal:** the assembled script contains a heading line per scene.
 
 Checklist:
-- [ ] `core/db.py` `get_screenplay_text` (`:1567-1579`) and
+- [x] `core/db.py` `get_screenplay_text` (`:1567-1579`) and
       `get_dashboard_data` (`:1434-1444`): compose each scene's line from its
       fields before concatenating; skip scenes with empty Content. Resolve the
       location slug to its `name` (one join, or a name map alongside the scene
       rows).
-- [ ] `screenplay_scene_ids` is derived from the same per-scene list, so the
+- [x] `screenplay_scene_ids` is derived from the same per-scene list, so the
       ids align with the rendered headings.
-- [ ] `core/db.py`: the dashboard's location payload gains the computed `places`
+- [x] `core/db.py`: the dashboard's location payload gains the computed `places`
       (batched reverse lookup of each location's scenes' distinct `place`).
 
 **Gate:** the fixture (after Phase 9's markdown edit) assembles to one heading
@@ -438,3 +438,58 @@ it passes through untouched.
   pre-date the task (`test_no_hermes_imports`, `task_30/test_skill_references`;
   both fail on the stashed base). Every old-model test the boundary and the
   dropped default broke is fixed.
+
+---
+
+## Phase 3 brief — assembly
+
+**Short summary.** The assembled script now carries a heading line per scene.
+Both assembly paths (`get_dashboard_data` §3 and `get_screenplay_text`) select
+each scene's `extra` and its resolved location name alongside the body and pass
+the rows to one shared composer, `_compose_screenplay`: it emits
+`scene_heading(int_ext, location_name, place, time_of_day, forced_heading)`
+above the body and joins entries with a blank line. A scene with Content but no
+heading fields contributes its body alone, so imported notes stay visible.
+`screenplay_scene_ids` comes from the same list and holds only the ids whose
+entry rendered a heading, so ids align 1:1 with heading lines. The dashboard
+location payload gains `places`: the distinct non-empty `place` of each
+location's scenes, derived in one pass over the reverse lookup the denormalizer
+already builds.
+
+**Deviations.**
+
+- **`places` is computed from the existing reverse lookup, not a new query.**
+  `scene_locs` (scene → location ids) and `entity_by_id` extras are already
+  loaded for the dashboard; one in-memory pass fills the buckets, sorted
+  alphabetically. Same result as a batched SQL lookup, no extra round-trip.
+- **`screenplay_scene_ids` excludes body-only scenes.** The plan said the ids
+  are derived from the same per-scene list; deriving them from the entries
+  that rendered a heading is what makes them align with the rendered headings —
+  the property Phase 4's click-mapping gate checks.
+- **Each path keeps its own ordering query** (dashboard: sequence order;
+  `get_screenplay_text`: act→sequence→scene) and shares only the composer.
+  Unifying the queries would change the dashboard's concatenation order for a
+  project whose sequences interleave across acts.
+
+**Contract changes.**
+
+- `screenplay_text` is now `<heading>\n\n<body>` per scene instead of bare
+  bodies; a scene with no heading fields contributes its body alone.
+- `screenplay_scene_ids` aligns 1:1 with rendered heading lines (fewer ids than
+  content-bearing scenes when some scene has no heading).
+- Dashboard `story_data.locations[].places` = sorted distinct non-empty `place`
+  of that location's scenes.
+
+**Verification.**
+
+- Gate, fixture DB built by import: three heading lines (`INT. THE CENTRAL ROOM
+  - DAY`, `… - NIGHT`, `EXT. THE GARDEN - DAY`), stats `scenes = 3`,
+  `sceneIds` = the three scene ids.
+- Focused probe against real `create_entity` writes: place segment
+  (`INT. THE KITCHEN - PANTRY - NIGHT`), forced heading (`.SNIPER SCOPE POV`),
+  unset time → `UNSPECIFIED`, a body-only scene kept in the text but absent
+  from `screenplay_scene_ids`, and `places` = `["cellar", "pantry"]` on the
+  parent location, `[]` on a location without places.
+- Full suite: **1339 passed, 2 failed** — identical to the Phase 2 baseline
+  (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
+  stashed base).

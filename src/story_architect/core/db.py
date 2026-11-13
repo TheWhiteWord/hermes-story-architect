@@ -8,6 +8,7 @@ from pathlib import Path
 from .constants import (MEMORY_CATEGORIES, MEMORY_CHAR_LIMIT, MEMORY_ENTRY_LIMIT,
                         ENTITY_SCHEMAS, PLOT_ROLES)
 from .entity import PLOT_BEAT_FIELDS
+from .scene_script import scene_heading
 
 # The plot beat vocabulary read the other way, for the two lookups that key on
 # the relation kind. Field names are not role names pluralised (`crisis` stays
@@ -1016,7 +1017,7 @@ def get_dashboard_data(project_path: Path) -> dict:
     Returns dict with keys:
       story_data: column-oriented entities (for __STORY_DATA__)
       sections: {entity_id: {heading: body}} (for __SECTIONS__)
-      screenplay_text: concatenated scene ## Content (for __SCREENPLAY_STATS__)
+      screenplay_text: each scene's composed heading + Content (for __SCREENPLAY_STATS__)
       structural_stats: status/role counts (for __STRUCTURAL_STATS__)
       title_page: project frontmatter fields (for title page)
     """
@@ -1098,6 +1099,24 @@ def get_dashboard_data(project_path: Path) -> dict:
                 scene_plots.setdefault(to_id, []).append({"id": from_id, "role": role})
             elif kind in ("location_variant", "world_variant"):
                 variant_map[from_id] = to_id
+
+        # Computed places: distinct non-empty `place` of each location's scenes,
+        # derived on read so a scene written with a new place appears here next
+        # time without maintenance.
+        places_by_location: dict[str, list[str]] = {}
+        for sid, loc_ids in scene_locs.items():
+            scene = entity_by_id.get(sid)
+            if not scene or scene.get("type") != "scene":
+                continue
+            place = (scene.get("extra", {}).get("place") or "").strip()
+            if not place:
+                continue
+            for lid in loc_ids:
+                bucket = places_by_location.setdefault(lid, [])
+                if place not in bucket:
+                    bucket.append(place)
+        for bucket in places_by_location.values():
+            bucket.sort()
 
         # Plot scopes for milestone derivation (main plot's roles are milestones)
         plot_scopes = {}
@@ -1202,6 +1221,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                             "heading": s_extra.get("heading", ""),
                         })
                 d["scenes"] = scene_objs
+                d["places"] = places_by_location.get(eid, [])
                 locations.append(d)
 
             elif etype == "plot":
@@ -1431,17 +1451,17 @@ def get_dashboard_data(project_path: Path) -> dict:
                 sections[entity_type][entity_id] = {}
             sections[entity_type][entity_id][heading] = body
 
-        # 3. screenplay_text — scene ## Content concatenated in order
+        # 3. screenplay_text — each scene's composed heading + body, in order
         scene_content_rows = conn.execute(
-            """SELECT s.body, e.id, e.order_key, p.order_key as parent_order
+            """SELECT s.body, e.id, e.extra, l.name
                FROM sections s
                JOIN entities e ON s.entity_id = e.id
+               LEFT JOIN entities l ON e.location_id = l.id
                LEFT JOIN entities p ON e.parent_id = p.id
                WHERE e.type='scene' AND e.is_deleted=0 AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
-        screenplay_text = "\n\n".join(r[0] for r in scene_content_rows)
-        screenplay_scene_ids = [r[1] for r in scene_content_rows]
+        screenplay_text, screenplay_scene_ids = _compose_screenplay(scene_content_rows)
 
         # 4. structural_stats
         status_rows = conn.execute(
@@ -1564,18 +1584,48 @@ def get_dashboard_data(project_path: Path) -> dict:
         conn.close()
 
 
+def _compose_screenplay(rows) -> tuple[str, list[str]]:
+    """Compose each scene's heading line from its fields and join the entries.
+
+    `rows` are `(body, entity_id, extra_json, location_name)`. Returns the
+    assembled text and the ids of the scenes whose entry carries a heading —
+    one id per rendered heading line, in order, so a click on a heading maps to
+    its scene. A scene with Content but no heading fields contributes its body
+    alone.
+    """
+    parts: list[str] = []
+    scene_ids: list[str] = []
+    for body, entity_id, extra_json, location_name in rows:
+        extra = json.loads(extra_json) if extra_json else {}
+        heading = scene_heading(
+            extra.get("int_ext", ""),
+            location_name or "",
+            extra.get("place", ""),
+            extra.get("time_of_day", ""),
+            extra.get("forced_heading", ""),
+        )
+        if heading:
+            parts.append(f"{heading}\n\n{body}")
+            scene_ids.append(entity_id)
+        else:
+            parts.append(body)
+    return "\n\n".join(parts), scene_ids
+
+
 def get_screenplay_text(project_path: Path) -> str:
-    """Concatenate scene ## Content sections from DB, ordered by act→sequence→scene."""
+    """Compose each scene's heading + Content, ordered by act→sequence→scene."""
     conn = get_db(project_path)
     try:
         rows = conn.execute(
-            """SELECT s.body FROM sections s
+            """SELECT s.body, e.id, e.extra, l.name
+               FROM sections s
                JOIN entities e ON s.entity_id = e.id
+               LEFT JOIN entities l ON e.location_id = l.id
                LEFT JOIN entities p ON e.parent_id = p.id
                LEFT JOIN entities pp ON p.parent_id = pp.id
                WHERE e.type='scene' AND e.is_deleted=0 AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(pp.order_key, 0), COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
-        return "\n\n".join(r[0] for r in rows)
+        return _compose_screenplay(rows)[0]
     finally:
         conn.close()
