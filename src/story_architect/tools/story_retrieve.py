@@ -119,6 +119,26 @@ def _scene_beats(conn, scene_id: str) -> dict | None:
     return {"id": row[0], "scene": row[1], **json.loads(row[2] or "{}")}
 
 
+def _location_places(conn, location_id: str) -> list[str]:
+    """The distinct non-empty `place` of a location's scenes, sorted.
+
+    Derived at read time, so a scene written with a new place appears here on
+    the next read without maintenance. Same derivation as the dashboard's
+    location payload.
+    """
+    rows = conn.execute(
+        "SELECT e.extra FROM relations r JOIN entities e ON e.id=r.to_id "
+        "WHERE r.from_id=? AND r.kind='location_scene' "
+        "AND e.type='scene' AND e.is_deleted=0",
+        (location_id,)).fetchall()
+    places = set()
+    for (extra_json,) in rows:
+        place = (json.loads(extra_json or "{}").get("place") or "").strip()
+        if place:
+            places.add(place)
+    return sorted(places)
+
+
 def _project_path(conn) -> Path:
     """Recover the project folder from the database file the connection is on."""
     # ponytail: sqlite exposes the file path; the plugin always uses .story/story.db.
@@ -165,6 +185,10 @@ def _entity_fields(conn, data: dict, entity_type: str, wanted: set) -> dict:
         values["turning_point"] = sb.get("turning_point", "") if sb else ""
     if entity_type == "scene" and "scene_beats" in wanted:
         values["scene_beats"] = _scene_beats_id(conn, data["id"])
+    # A location's `places` is the same computed list the dashboard derives:
+    # the distinct non-empty `place` of its scenes.
+    if entity_type == "location" and "places" in wanted:
+        values["places"] = _location_places(conn, data["id"])
 
     # Relation-backed fields: plot beats are rows linking to scenes, not
     # columns. Their position in the output is wherever the schema puts them,

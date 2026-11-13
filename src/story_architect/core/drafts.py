@@ -581,7 +581,7 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
             sections = [{"name": n, "before": None, "after": v}
                         for n, v in (op.get("sections") or {}).items()]
             label = _display_name(entity_type, fm.get("name") or fm.get("title")
-                                  or fm.get("heading"), entity_id)
+                                  or _scene_heading_label(project_path, fm), entity_id)
             # optional schema hint for UI ordering of structured fields
             schema_hint = {}
             for f, m in schema.items():
@@ -684,6 +684,31 @@ def describe_ops(project_path: Path, ops: list) -> list[dict]:
 
 def _display_name(entity_type, name, fallback):
     return name if name else fallback
+
+
+def _scene_heading_label(project_path, fm):
+    """A create's label when it carries neither a name nor a title.
+
+    A scene's heading is composed from its fields, so the approval card shows
+    what the assembled script will show. The location segment is a slug, so it
+    is resolved against the project; an unresolvable one composes to nothing.
+    """
+    from .scene_script import scene_heading
+    loc = fm.get("location") or ""
+    name = ""
+    if loc:
+        try:
+            from .db import get_db
+            conn = get_db(project_path)
+            try:
+                row = conn.execute("SELECT name FROM entities WHERE id=?", (loc,)).fetchone()
+                name = row[0] if row else ""
+            finally:
+                conn.close()
+        except Exception:
+            pass
+    return scene_heading(fm.get("int_ext") or "", name, fm.get("place") or "",
+                         fm.get("time_of_day") or "", fm.get("forced_heading") or "")
 
 
 def _entity_name(project_path, entity_type, slug):

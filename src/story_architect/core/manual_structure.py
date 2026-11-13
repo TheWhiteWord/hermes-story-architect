@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 
 from .db import get_db
+from .scene_script import scene_heading
 
 SUMMARY = "Reordered by hand"
 
@@ -45,8 +46,11 @@ def _rows(conn):
                         "ORDER BY order_key, name, id").fetchall()
     seqs = conn.execute("SELECT id, name, parent_id FROM entities WHERE type='sequence' AND is_deleted=0 "
                         "ORDER BY order_key, name, id").fetchall()
-    scenes = conn.execute("SELECT id, name, parent_id, extra FROM entities WHERE type='scene' AND is_deleted=0 "
-                          "ORDER BY order_key, name, id").fetchall()
+    scenes = conn.execute(
+        "SELECT s.id, s.name, s.parent_id, s.extra, l.name "
+        "FROM entities s LEFT JOIN entities l ON s.location_id = l.id "
+        "WHERE s.type='scene' AND s.is_deleted=0 "
+        "ORDER BY s.order_key, s.name, s.id").fetchall()
     return acts, seqs, scenes
 
 
@@ -59,7 +63,10 @@ def _shape(acts, seqs, scenes) -> dict:
     seq_node = {q["id"]: q for qs in by_act.values() for q in qs}
     for sc in scenes:
         ex = json.loads(sc[3]) if sc[3] else {}
-        node = {"id": sc[0], "title": sc[1] or sc[0], "heading": ex.get("heading") or ""}
+        heading = scene_heading(ex.get("int_ext") or "", sc[4] or "",
+                                ex.get("place") or "", ex.get("time_of_day") or "",
+                                ex.get("forced_heading") or "")
+        node = {"id": sc[0], "title": sc[1] or sc[0], "heading": heading}
         if sc[2] in seq_node:
             seq_node[sc[2]]["scenes"].append(node)
         else:

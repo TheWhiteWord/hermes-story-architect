@@ -1119,6 +1119,23 @@ def get_dashboard_data(project_path: Path) -> dict:
         for bucket in places_by_location.values():
             bucket.sort()
 
+        # A scene's heading line, composed from its fields by the same composer
+        # the assembled screenplay uses, so the dashboard and the script agree.
+        # Keyed by scene id: the scene list and the character / location scene
+        # refs all read it.
+        scene_headings = {}
+        for eid, e in entity_by_id.items():
+            if e["type"] != "scene":
+                continue
+            loc = entity_by_id.get(e["location_id"], {}) if e["location_id"] else {}
+            scene_headings[eid] = scene_heading(
+                e["extra"].get("int_ext", ""),
+                loc.get("name", ""),
+                e["extra"].get("place", ""),
+                e["extra"].get("time_of_day", ""),
+                e["extra"].get("forced_heading", ""),
+            )
+
         # Plot scopes for milestone derivation (main plot's roles are milestones)
         plot_scopes = {}
         for e in ent_rows:
@@ -1166,11 +1183,10 @@ def get_dashboard_data(project_path: Path) -> dict:
                 for sid in char_scenes.get(eid, []):
                     if sid in entity_by_id:
                         s = entity_by_id[sid]
-                        s_extra = s.get("extra", {})
                         scene_objs.append({
                             "id": sid,
                             "title": s.get("name", ""),
-                            "heading": s_extra.get("heading", ""),
+                            "heading": scene_headings.get(sid, ""),
                         })
                 d["scenes"] = scene_objs
                 characters.append(d)
@@ -1200,6 +1216,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                 d["scene_objective"] = (
                     extra.get("scene_objective", "")
                     or scene_beats_by_scene.get(eid, {}).get("scene_objective", ""))
+                d["heading"] = scene_headings.get(eid, "")
                 scenes.append(d)
 
             elif etype == "location":
@@ -1215,11 +1232,10 @@ def get_dashboard_data(project_path: Path) -> dict:
                     sid = rel.get("to_id", "") if isinstance(rel, dict) else rel
                     if sid in entity_by_id:
                         s = entity_by_id[sid]
-                        s_extra = s.get("extra", {})
                         scene_objs.append({
                             "id": sid,
                             "title": s.get("name", ""),
-                            "heading": s_extra.get("heading", ""),
+                            "heading": scene_headings.get(sid, ""),
                         })
                 d["scenes"] = scene_objs
                 d["places"] = places_by_location.get(eid, [])

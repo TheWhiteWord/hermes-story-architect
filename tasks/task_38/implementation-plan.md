@@ -195,12 +195,12 @@ Checklist:
 **Goal:** every reader of the old field reads the new ones.
 
 Checklist:
-- [ ] `core/manual_structure.py:62`, `core/db.py:1153,1202`,
+- [x] `core/manual_structure.py:62`, `core/db.py:1153,1202`,
       `core/manual_entities.py:468`, `core/drafts.py:599`: derive the heading
       from the fields.
-- [ ] `web/js/views/scenes.js:62`, `panels/entity-panels.js:509`,
+- [x] `web/js/views/scenes.js:62`, `panels/entity-panels.js:509`,
       `core.js:111-121`: heading display from the fields.
-- [ ] `tools/story_retrieve.py:128-167`: `_entity_fields` derives a location's
+- [x] `tools/story_retrieve.py:128-167`: `_entity_fields` derives a location's
       computed `places` (distinct `place` of its scenes) for the agent's read.
 
 **Gate:** the scene list, scene panel, character/location panels and the
@@ -858,3 +858,83 @@ before the scenes. Export needed no change: the four fields already ride
 - The live project still carries the retired `heading:` frontmatter key, so it
   cannot import until Phase 9's one-off migration. After that migration its
   Content heading lines will canonicalise on the next import.
+
+---
+
+## Phase 8 brief — dashboard readers
+
+**Short summary.** Every reader of the retired `extra.heading` now derives the
+line from the fields. `core/db.py` composes one `scene_headings` map per scene —
+the same `scene_heading` composer the assembled screenplay uses, with the
+location slug resolved to its name — and uses it for the scene list and the
+character / location scene refs, so all three agree. `core/manual_structure.py`
+composes the reorder tree's `heading` from the fields; its scene query now joins
+the location name. `core/drafts.py`'s create label falls back to the composed
+heading when a scene carries neither a name nor a title.
+`tools/story_retrieve.py` derives a location's computed `places` for the agent's
+read — the same derivation as the dashboard payload.
+`core/manual_entities.py` was already correct (fixed in Phase 2).
+
+**Deviations.**
+
+- **`core/manual_entities.py:468` was already done.** Phase 2 replaced its
+  `extra.heading` read with `scene_heading(...)`; verified by blame. No change.
+- **The JS items needed no change.** The plan's premise was that the JS reads
+  the old field; it reads `scene.heading`, which the dashboard payload now
+  carries composed (`core/db.py`). Verified in jsdom against the real payload:
+  the scene list renders the composed line, the scene search matches it, the
+  scene panel shows it, and `core.js`'s character scene mapping resolves by id
+  and heading. `web/js/views/scenes.js:62`, `panels/entity-panels.js:509` and
+  `core.js:111-121` are unchanged.
+- **`core.js`'s location block was fixed, though the checklist did not list it.**
+  The gate names the location panel, and its scene refs were already broken: the
+  block kept only bare heading strings from `loc.scenes`, but the backend sends
+  `{id, title, heading}` objects, so `_scene_headings` was always `[]`. The
+  location card showed no scene tags, the location panel's "Characters here" was
+  empty, and `findLocation` could not resolve a heading. It now maps the refs to
+  their `heading`. This is a pre-existing bug, not a regression from the
+  retirement, but the gate cannot pass without it.
+- **`core/drafts.py:599` is line 584.** The plan's line numbers are from the spec
+  baseline; the only `fm.get("heading")` left was the create label's fallback.
+- **`_scene_headings` is now a heading list, not a string filter.** The
+  consumers (`locations.js:12`, `entity-panels.js:170,186`, `utils.js:12`) all
+  want heading strings, so the map/filter is the whole fix.
+
+**Contract changes.**
+
+- The dashboard payload's `story_data.scenes[].heading` is now the composed line
+  (it was `extra.heading`, then absent). `characters[].scenes[]` and
+  `locations[].scenes[]` carry the same composed line.
+- `manual_structure.load_tree`'s scene nodes carry the composed `heading`.
+- `story_retrieve` on a location returns the computed `places` (distinct
+  non-empty `place` of its scenes, sorted) when `places` is requested.
+- `describe_ops`' create label falls back to the composed heading for a scene
+  with neither a name nor a title.
+
+**Verification.**
+
+- Gate, fresh fixture DB built by import: the dashboard scene list, character
+  scene refs and location scene refs all carry the composed heading; the
+  structure tree carries it; a scene written with a place shows
+  `INT. THE CENTRAL ROOM - PANTRY - NIGHT`, a forced heading shows
+  `.SNIPER SCOPE POV`, and the parent location's `places` is `['pantry']`.
+- Gate, editor round-trip: `load_scene_script` → `save_scene_script` with
+  `place: cellar`, `time_of_day: DUSK` → the dashboard scene, the location scene
+  ref and `places` all show `INT. THE CENTRAL ROOM - CELLAR - DUSK`.
+- jsdom, the dashboard's own `core.js` / `views/scenes.js` / `views/locations.js`
+  / `panels/entity-panels.js` on the real `get_dashboard_data` payload: the scene
+  list renders the composed heading, the search matches it, the scene panel shows
+  it, the location card shows it, and `findLocation` resolves a heading.
+- `tests/dashboard_tabs_harness.js` on a clean fixture payload: all checks pass.
+- Full suite: **1297 passed, 2 failed** — identical to the Phase 7 baseline
+  (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
+  stashed base).
+
+**Findings, not fixed here.**
+
+- `showLocationPanel` computes a `scenes` chip list (`entity-panels.js:171-181`)
+  and never renders it — dead code, and the reason the location panel shows no
+  scene headings of its own. Removing it is a UI change beyond this phase.
+- `docs/Dashboard inventory/0.4.4` still says a scene's `heading` comes "from
+  `extra`" and describes `_scene_headings` as a string filter in `utils.js`; both
+  are stale.

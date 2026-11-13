@@ -140,10 +140,14 @@ DASH.normalise = function(data) {
     pl.characters = (pl.characters || []).map(String);
   });
 
-  // Locations: scenes may be heading strings — keep for cross-reference
+  // Locations: scene refs arrive as {id, title, heading} (or bare heading
+  // strings). Keep the heading: it is how the location card and panel label a
+  // scene, and how `findLocation` resolves a heading back to its location.
   (d.locations || []).forEach(loc => {
     if (!loc._scene_headings && Array.isArray(loc.scenes)) {
-      loc._scene_headings = loc.scenes.filter(s => typeof s === 'string');
+      loc._scene_headings = loc.scenes
+        .map(s => (typeof s === 'string' ? s : (s && s.heading) || ''))
+        .filter(Boolean);
     }
   });
 
