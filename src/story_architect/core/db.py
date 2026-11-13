@@ -1018,6 +1018,7 @@ def get_dashboard_data(project_path: Path) -> dict:
       story_data: column-oriented entities (for __STORY_DATA__)
       sections: {entity_id: {heading: body}} (for __SECTIONS__)
       screenplay_text: each scene's composed heading + Content (for __SCREENPLAY_STATS__)
+      screenplay_scene_headings: {text, id} per composed heading, in order (for __SCREENPLAY_STATS__)
       structural_stats: status/role counts (for __STRUCTURAL_STATS__)
       title_page: project frontmatter fields (for title page)
     """
@@ -1461,7 +1462,7 @@ def get_dashboard_data(project_path: Path) -> dict:
                WHERE e.type='scene' AND e.is_deleted=0 AND s.heading='Content' AND s.body != ''
                ORDER BY COALESCE(p.order_key, 0), e.order_key"""
         ).fetchall()
-        screenplay_text, screenplay_scene_ids = _compose_screenplay(scene_content_rows)
+        screenplay_text, screenplay_scene_headings = _compose_screenplay(scene_content_rows)
 
         # 4. structural_stats
         status_rows = conn.execute(
@@ -1576,7 +1577,7 @@ def get_dashboard_data(project_path: Path) -> dict:
             "story_data": story_data,
             "sections": sections,
             "screenplay_text": screenplay_text,
-            "screenplay_scene_ids": screenplay_scene_ids,
+            "screenplay_scene_headings": screenplay_scene_headings,
             "structural_stats": structural_stats,
             "title_page": title_page_data,
         }
@@ -1584,17 +1585,17 @@ def get_dashboard_data(project_path: Path) -> dict:
         conn.close()
 
 
-def _compose_screenplay(rows) -> tuple[str, list[str]]:
+def _compose_screenplay(rows) -> tuple[str, list[dict]]:
     """Compose each scene's heading line from its fields and join the entries.
 
     `rows` are `(body, entity_id, extra_json, location_name)`. Returns the
-    assembled text and the ids of the scenes whose entry carries a heading —
-    one id per rendered heading line, in order, so a click on a heading maps to
-    its scene. A scene with Content but no heading fields contributes its body
-    alone.
+    assembled text and, for each scene whose entry carries a heading, the
+    `{text, id}` pair of the line composed for it — so a reader matches a
+    rendered heading to its scene by text, never by position. A scene with
+    Content but no heading fields contributes its body alone.
     """
     parts: list[str] = []
-    scene_ids: list[str] = []
+    scene_headings: list[dict] = []
     for body, entity_id, extra_json, location_name in rows:
         extra = json.loads(extra_json) if extra_json else {}
         heading = scene_heading(
@@ -1606,10 +1607,10 @@ def _compose_screenplay(rows) -> tuple[str, list[str]]:
         )
         if heading:
             parts.append(f"{heading}\n\n{body}")
-            scene_ids.append(entity_id)
+            scene_headings.append({"text": heading, "id": entity_id})
         else:
             parts.append(body)
-    return "\n\n".join(parts), scene_ids
+    return "\n\n".join(parts), scene_headings
 
 
 def get_screenplay_text(project_path: Path) -> str:

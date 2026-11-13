@@ -46,8 +46,12 @@ SCHEMA = {
 }
 
 
-def _compute_screenplay_stats(screenplay_text, scene_ids=None):
+def _compute_screenplay_stats(screenplay_text, scene_headings=None):
     """Compute screenplay statistics from fountain text using fountain_lexer.
+
+    `scene_headings` are the `{text, id}` pairs `_compose_screenplay` produced,
+    in order; they ride out as `sceneHeadings` so a reader can match a rendered
+    heading to its scene by text.
 
     Returns a dict suitable for JSON injection as window.__SCREENPLAY_STATS__.
     Returns None on any error — dashboard still works without stats.
@@ -214,7 +218,7 @@ def _compute_screenplay_stats(screenplay_text, scene_ids=None):
         'sceneStats': scene_stats,
         'titlePage': title_page,
         'scriptHtml': script_html,
-        'sceneIds': scene_ids or [],
+        'sceneHeadings': scene_headings or [],
     }
 
 
@@ -267,18 +271,25 @@ def _build_title_page(project_frontmatter: dict) -> dict:
 
 
 def _parse_scene_location(heading):
-    """Parse scene heading text into location info. Minimal version of fountain_lexer.parse_location."""
+    """Parse scene heading text into location info.
+
+    The location segment splits on ` - `: the last segment is the time, the
+    middle ones are the place, the first is the parent location. Location stats
+    key on the parent only, so `INT. KITCHEN - PANTRY - NIGHT` and
+    `INT. KITCHEN - NIGHT` are the same location. The separator needs its
+    spaces, so a hyphenated name (`TWENTY-ONE`) is not split.
+    """
     import regex as re
     match = re.match(r'^[ \t]*([.](?![.])|(?:[*]{0,3}_?)(?:int[.]?\/ext|int[.]?\/e|ext|est|int|i[.]?\/e)[. ])(.+?)(#[-.0-9a-z]+#)?$', heading, re.IGNORECASE)
     if not match:
         return None
-    location_text = match.group(2)
-    split = re.search(r'(.*)[-–—−](.*)', location_text)
+    parts = re.split(r'\s+[-–—−]\s+', match.group(2))
     return {
-        'name': split.group(1).strip() if split else location_text.strip(),
+        'name': parts[0].strip(),
+        'place': ' - '.join(parts[1:-1]).strip(),
         'interior': 'I' in match.group(1),
         'exterior': 'EX' in match.group(1) or 'E.' in match.group(1),
-        'time_of_day': split.group(2).strip() if split else '',
+        'time_of_day': parts[-1].strip() if len(parts) > 1 else '',
     }
 
 

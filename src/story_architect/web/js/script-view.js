@@ -86,10 +86,20 @@ DASH.buildScriptView = function() {
   // A scene is its heading and everything up to the next heading, so any click
   // in that run opens the script editor on that scene, near what was clicked.
   // (The scene's own panel is one click away from the editor: "Open scene".)
-  let sceneIdx = -1;
+  // The id is matched by the heading line the server composed, never by
+  // position: a heading the server did not compose — a stored line in a
+  // scene's body — matches nothing, gets no id, and shifts nothing.
+  const norm = s => s.trim().replace(/^\./, "").split(/\s+/).join(" ").toUpperCase();
+  const composed = stats.sceneHeadings || [];
+  let composedIdx = 0;
+  let currentId = null;
   Array.from(body.children).forEach(el => {
-    if (el.classList.contains('fountain-scene_heading')) sceneIdx++;
-    const sceneId = sceneIdx >= 0 && stats.sceneIds && stats.sceneIds[sceneIdx];
+    if (el.classList.contains('fountain-scene_heading')) {
+      const want = composed[composedIdx];
+      currentId = want && norm(el.textContent) === norm(want.text) ? want.id : null;
+      if (currentId) composedIdx++;
+    }
+    const sceneId = currentId;
     if (!sceneId || el.tagName === 'HR') return;
     el.classList.add('se-clickable');
     el.title = 'Open in the script editor';

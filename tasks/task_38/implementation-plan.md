@@ -134,11 +134,13 @@ per scene; stats scenes = 3.
 scene.
 
 Checklist:
-- [ ] `app/stats.py` `_parse_scene_location` (`:269-282`): split the location
+- [x] `app/stats.py` `_parse_scene_location` (`:269-282`): split the location
       segment on ` - `; last = time, middle = place, first = parent. Location
       stats key on the parent only.
-- [ ] `web/js/script-view.js:89-93`: map ids by the rendered headings, not
-      positionally against the scene list.
+- [x] `web/js/script-view.js:89-93`: map ids by the rendered headings, not
+      positionally against the scene list. (Phase 4 found it already true of the
+      scene list; the Phase 4 addendum goes further and matches by heading text,
+      so a heading the server did not compose shifts nothing.)
 
 **Gate:** a scene with a place shows the parent in location stats; a scene
 without a heading (imported, permissive) does not shift the click mapping.
@@ -493,3 +495,123 @@ already builds.
 - Full suite: **1339 passed, 2 failed** — identical to the Phase 2 baseline
   (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
   stashed base).
+
+---
+
+## Phase 4 brief — stats + click mapping
+
+**Short summary.** `_parse_scene_location` now splits the location segment on
+` - ` into parent / place / time: the first segment is the parent location, the
+last is the time, the middle ones are the place. Location stats key on the
+parent, so `INT. THE KITCHEN - PANTRY - NIGHT` folds into `THE KITCHEN` instead
+of opening a second location row. The parser returns `place` beside the parent,
+the time and the int/ext flags; `web/js/script-view.js` needed no change (see
+the first deviation).
+
+**Deviations.**
+
+- **`web/js/script-view.js` was already correct.** The plan's premise — that the
+  view maps ids "positionally against the scene list" — describes the
+  pre-Phase-3 `screenIds`. The view maps `stats.sceneIds[sceneIdx]`, where
+  `sceneIdx` counts the **rendered headings**, and Phase 3 made `sceneIds`
+  heading-aligned (one id per composed heading, in order). That is "by the
+  rendered headings" already, so the item was verified rather than changed.
+- **The separator keeps its spaces.** `re.split(r'\s+[-–—−]\s+', …)` instead of
+  the old bare `[-–—−]`, so a hyphenated location name (`TWENTY-ONE`) is not
+  split apart. The composer only ever emits ` - `, so nothing legitimate is
+  lost, and the unicode dashes the old parser accepted still work.
+- **`place` is returned but not surfaced.** No stats column shows it; the
+  parser is the one the import path will share (Cleanup), so it carries the
+  place rather than dropping it on the floor.
+- **A stored heading line still shifts the click mapping.** The mapping is
+  correct only while every rendered heading was composed from fields. A scene
+  whose stored Content still opens with a heading line — a legacy note, which
+  Phase 7's import parses and strips and Phase 9 migrates — renders an extra
+  heading, and every heading after it opens the *next* scene. Reproduced in
+  jsdom against the real `script-view.js`. Closing it needs one id per
+  rendered heading from the server, which is a design change and not a
+  Phase 4 fix; flagged for the user.
+- **`fountain_lexer.parse_location_information` still carries the old greedy
+  split.** It is the duplicate the Cleanup list retires (nothing reads
+  `properties['locations']`), so it was left for the phase that removes it
+  rather than fixed twice.
+
+**Contract changes.**
+
+- `locationStats.locations[]` keys on the parent location: a scene with a place
+  no longer creates a `<parent> - <place>` row.
+- `_parse_scene_location` returns `place` — the middle segments joined with
+  ` - `, `''` when the heading has no place.
+
+**Verification.**
+
+- Gate, location stats: fixture DB built by import, plus a place scene written
+  through the real `create_entity` / `edit_entity` path and a heading-less scene
+  inserted the way the importer does (the import path runs no heading guard).
+  Before: three rows — `THE CENTRAL ROOM`, `THE GARDEN`, `THE CENTRAL ROOM -
+  PANTRY`. After: two rows, `THE CENTRAL ROOM` at `number_of_scenes = 3`.
+- Gate, click mapping: jsdom runs the dashboard's own `script-view.js` on the
+  payload `get_dashboard_data` produced for that project. Four rendered
+  headings, four `sceneIds`, `opened == sceneIds` heading by heading; the
+  heading-less scene's prose renders and carries no click handler.
+- Parser probe: `INT. THE KITCHEN - PANTRY - NIGHT` → name `THE KITCHEN`,
+  place `PANTRY`, time `NIGHT`; `INT. THE KITCHEN - NIGHT` → no place;
+  `INT. KITCHEN` → no time; `.SNIPER SCOPE POV` → name `SNIPER SCOPE POV`,
+  no time (unchanged).
+- Full suite: **1339 passed, 2 failed** — identical to the Phase 3 baseline
+  (`test_no_hermes_imports`, `task_30/test_skill_references`; both fail on the
+  stashed base).
+
+## Phase 4 addendum — click mapping by text (user-approved follow-up)
+
+The Phase 4 brief's "notable" entry — *a stored heading line still shifts the
+click mapping* — is superseded by this change. Its diagnosis was right: the
+view mapped `stats.sceneIds[sceneIdx]` positionally, which assumes the k-th
+rendered heading is the k-th scene that composed one, and the server cannot
+guarantee that (the lexer renders any heading line it finds in a body). Closing
+it needs the id to travel with the heading, not with a position.
+
+**Change.** `_compose_screenplay` now returns `(text, scene_headings)`, one
+`{text, id}` per composed heading in order — it already held both values in its
+loop. `_compute_screenplay_stats` takes `scene_headings=` and emits
+`sceneHeadings`; `get_dashboard_data` returns `screenplay_scene_headings`. The
+view walks its rendered headings and consumes the pairs **in order on a text
+match** (normalised: trimmed, whitespace collapsed, upper-cased, one leading
+`.` dropped — the lexer drops that dot from a forced heading). A heading that
+matches no pair gets no id and shifts nothing; a miss never advances, so a miss
+degrades to "no id", never to a wrong scene.
+
+**Contract change.** `screenplay_scene_ids` and `__SCREENPLAY_STATS__.sceneIds`
+are **gone**, replaced by `screenplay_scene_headings` /
+`__SCREENPLAY_STATS__.sceneHeadings` (`{text, id}[]`). The old key was a bare
+positional `string[]` that never said which heading belonged to which scene; the
+new one does, so it is strictly more useful to any reader. Neither key reaches
+the page beyond `__SCREENPLAY_STATS__`, and the only reader was
+`script-view.js` — no agent tool emits either (`tools/` has no reference; the
+agent addresses a scene by its slug from `story_load`). `docs/Dashboard
+inventory/0.4.4` and `0.4.5` follow the rename.
+
+**Verification.**
+- jsdom, real `script-view.js` + real `get_dashboard_data` payload (fixture + a
+  place scene + a scene whose Content still opens with a heading line): 5
+  rendered headings, 4 composed pairs; the rogue heading is not clickable and
+  opens nothing; clicking every heading opens exactly the 4 composed scenes in
+  order; prose after the rogue heading is not clickable; prose after a composed
+  heading opens that scene.
+- `tests/script_editor_harness.js`: the stub carries the new shape and a rogue
+  heading, and its script-view block was executed standalone (the full harness
+  needs a Phase-5 server) — 2/2 pass. It caught a real regression on the first
+  run: resetting the id per element left prose without one.
+- Full suite: **1339 passed, 2 failed** — the same two pre-existing failures.
+
+**Findings, not fixed here.**
+- `tests/script_editor_serve.py:35` still passes the retired `heading` field to
+  `create_entity`, which Phase 1 removed — the harness cannot build its project
+  at all yet. It is Phase 5/10 territory (the harness also asserts
+  `s.scene.heading`, which Phase 5 produces).
+- `tasks/task_38/spec.md:41,179` still name `screenplay_scene_ids` / `sceneIds`;
+  the spec is the approved baseline, so the deviation is recorded here instead.
+- The rogue line also inflates `lengthStats.scenes` (the lexer counts it as a
+  scene). The root-cause fix is at the write guard — refuse a scene whose
+  `Content` contains a heading line anywhere — which is a behaviour change and
+  a separate call.

@@ -56,12 +56,13 @@ def get_project_dashboard(root, slug) -> dict:
     data = get_dashboard_data(project_path)
     # screenplay stats previously computed in story_dashboard tool; recompute here
     scene_text = data.get("screenplay_text", "")
-    scene_ids = data.get("screenplay_scene_ids", [])
+    scene_headings = data.get("screenplay_scene_headings", [])
     screenplay_stats = None
     if scene_text:
         try:
             from story_architect.app.stats import _compute_screenplay_stats
-            screenplay_stats = _compute_screenplay_stats(scene_text, scene_ids=scene_ids)
+            screenplay_stats = _compute_screenplay_stats(
+                scene_text, scene_headings=scene_headings)
         except Exception:
             screenplay_stats = None
     data["screenplay_stats"] = screenplay_stats

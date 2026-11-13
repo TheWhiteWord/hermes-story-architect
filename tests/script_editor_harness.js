@@ -338,8 +338,11 @@ const waitFor = async (fn, what, ms) => {
   w2.DASH = { story: { scenes: [{ id: 'a', title: 'Scene A', characters: [], locations: [] }, { id: 'b', title: 'Scene B', characters: [], locations: [] }],
       characters: [], locations: [], plots: [] }, boot() {}, setEl() {}, openScriptEditor: (id, o) => opened.push([id, o && o.focusText]) };
   w2.__SECTIONS__ = { scene: { a: { Content: 'INT. A - DAY\n\nMara stands at the counter.\nRain hammers the window.\nMore.\n' }, b: { Content: '[placeholder — scene/Content]' } } };
-  w2.__SCREENPLAY_STATS__ = { sceneIds: ['a', 'b'], lengthStats: { pagesWhole: 2 }, scriptHtml:
+  w2.__SCREENPLAY_STATS__ = { sceneHeadings: [
+      { text: 'INT. A - DAY', id: 'a' }, { text: 'INT. B - NIGHT', id: 'b' }],
+    lengthStats: { pagesWhole: 2 }, scriptHtml:
     '<h3 class="fountain-scene_heading">INT. A - DAY</h3>\n<p><span class="fountain-action">Mara stands.</span></p>\n<div class="dialogue"><h4 class="fountain-character">MARA</h4><p class="fountain-dialogue">Hi.</p></div>\n' +
+    '<h3 class="fountain-scene_heading">INT. ROGUE - DAY</h3>\n' +
     '<h3 class="fountain-scene_heading">INT. B - NIGHT</h3>\n<p><span class="fountain-action">Quiet.</span></p>' };
   ['colors.js', 'utils.js', 'script-editor/model.js', 'panels/panel-manager.js', 'panels/entity-panels.js', 'script-view.js']
     .forEach(f => w2.eval(fs.readFileSync(path.join(WEB, 'js', f), 'utf8')));
@@ -351,7 +354,16 @@ const waitFor = async (fn, what, ms) => {
     assert.deepStrictEqual(opened.map(o => o[0]), ['a', 'b', 'a']);
     assert.strictEqual(opened[0][1], 'Hi.');
   });
-  await test('script view: a scene with no heading cannot shift the others (ids follow headings, not position)', async () => {
+  await test('script view: a heading the server did not compose opens nothing (ids follow text, not position)', async () => {
+    // INT. ROGUE - DAY is a stored line in a scene's body: the server composed
+    // no heading for it, so it gets no id and shifts nothing. Positionally it
+    // would have taken INT. B - NIGHT's id and every click below it would open
+    // the wrong scene.
+    const rogue = D2.querySelectorAll('.fountain-scene_heading')[1];
+    assert.ok(!rogue.classList.contains('se-clickable'), 'the rogue heading is clickable');
+    const before = opened.length;
+    rogue.click();
+    assert.strictEqual(opened.length, before, 'the rogue heading opened a scene');
     assert.ok(D2.querySelectorAll('.se-clickable').length >= 5);
   });
   await test('scene panel: the Content dump is replaced by a Script card that opens the editor', async () => {
