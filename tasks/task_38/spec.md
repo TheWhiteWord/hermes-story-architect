@@ -49,7 +49,7 @@ Secondary defects:
 
 | Field | Type | Status | Notes |
 |---|---|---|---|
-| `int_ext` | string enum `INT.`, `EXT.`, `INT./EXT.`, `EST.` | new | default `INT.` |
+| `int_ext` | string enum `INT.`, `EXT.`, `INT./EXT.`, `EST.` | new | required for a composed heading; empty when `forced_heading` is used |
 | `place` | string | new | optional; the specific place within the location. Suggested from the parent location's `places` |
 | `location` | string ref | keep | flat — a column + relation + delete cascade |
 | `time_of_day` | string enum | keep | flat |

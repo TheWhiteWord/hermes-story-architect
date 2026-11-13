@@ -64,7 +64,8 @@ class TestSpec:
         by = {f["key"]: f for f in sp["fields"]}
         assert "order" not in by and "act_id" not in by            # Reorder's, not the form's
         assert by["sequence_id"]["required"] and by["sequence_id"]["ref"] == "sequence"
-        assert all(by[k]["kind"] == "linked" for k in ("heading", "location", "time_of_day", "characters"))
+        assert all(by[k]["kind"] == "linked" for k in
+                   ("int_ext", "place", "location", "time_of_day", "forced_heading", "characters"))
         assert by["plot_roles"]["kind"] == "repeater" and by["value_turns"]["kind"] == "valueturns"
         assert "turning_point" not in by and "scene_beats" not in by          # they live in the Beats tab
         assert "Content" not in sp["sections"] and sp["script_link"]
@@ -155,7 +156,7 @@ class TestScene:
     def test_script_fields_are_shown_not_written(self, project):
         create_entity(project, "location", "kitchen", {"name": "Kitchen", "one_sentence": "x"})
         create_entity(project, "character", "kael", {"name": "Kael", "one_sentence": "x"})
-        edit_entity(project, "scene", "sc1", {"heading": "INT. KITCHEN - DAY", "time_of_day": "DAY",
+        edit_entity(project, "scene", "sc1", {"int_ext": "INT.", "time_of_day": "DAY",
                                               "location": "kitchen", "characters": ["kael"]}, "t")
         c = me.load_entity(project, "scene", "sc1")["computed"]
         assert c["heading"][0]["display"] == "INT. KITCHEN - DAY" and c["location"][0]["display"] == "Kitchen"
@@ -163,12 +164,14 @@ class TestScene:
         cur = me.load_entity(project, "scene", "sc1")
         assert "heading" not in cur["values"]
         out = me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"], "values": {
-            **cur["values"], "heading": "HACKED", "location": "x", "characters": [], "one_sentence": "s"}})
+            **cur["values"], "one_sentence": "s"}})
         assert out["computed"]["heading"][0]["display"] == "INT. KITCHEN - DAY"       # untouched
         assert out["computed"]["characters"][0]["display"] == "Kael"
 
     def test_the_script_is_never_touched(self, project):
-        edit_entity(project, "scene", "sc1", {"Content": "INT. KITCHEN - DAY\n\nKael waits."}, "t")
+        create_entity(project, "location", "kitchen", {"name": "Kitchen", "one_sentence": "x"})
+        edit_entity(project, "scene", "sc1", {"int_ext": "INT.", "location": "kitchen",
+                                              "Content": "INT. KITCHEN - DAY\n\nKael waits."}, "t")
         cur = me.load_entity(project, "scene", "sc1")
         assert "Content" not in cur["sections"]
         me.edit_form_entity(project, "scene", "sc1", {"base_version": cur["version"], "values": {
@@ -211,7 +214,9 @@ class TestDelete:
         assert not prev["can_delete"] and "2 sequences" in prev["blockers"][0]
 
     def test_scene_delete_warns_about_its_script_and_beats(self, project):
-        edit_entity(project, "scene", "sc1", {"Content": "INT. ROOM - DAY\n\nSomething happens."}, "t")
+        create_entity(project, "location", "room", {"name": "Room", "one_sentence": "x"})
+        edit_entity(project, "scene", "sc1", {"int_ext": "INT.", "location": "room",
+                                              "Content": "INT. ROOM - DAY\n\nSomething happens."}, "t")
         create_entity(project, "scene_beats", "sc1-beats", {"scene": "sc1"})
         prev = me.delete_preview(project, "scene", "sc1")
         assert prev["can_delete"] and "script" in prev["effects"][0] and "characters" in prev["effects"][0]
@@ -316,7 +321,9 @@ class TestApply:
         assert _scene(project, "sc4")["seq"] == "s3" and ms.load_tree(project)["unassigned"] == []
 
     def test_script_text_survives_a_move(self, project):
-        edit_entity(project, "scene", "sc2", {"Content": "INT. ROOM - DAY\n\nKeep me."}, "t")
+        create_entity(project, "location", "room", {"name": "Room", "one_sentence": "x"})
+        edit_entity(project, "scene", "sc2", {"int_ext": "INT.", "location": "room",
+                                              "Content": "INT. ROOM - DAY\n\nKeep me."}, "t")
         ms.apply(project, _target(project, lambda s: (_seq(s, "s1")["scenes"].remove("sc2"), _seq(s, "s3")["scenes"].append("sc2"))))
         conn = get_db(project)
         try:

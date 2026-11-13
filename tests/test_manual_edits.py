@@ -24,7 +24,7 @@ def project(tmp_path):
         create_entity(p, "character", slug, {"name": name, "story_role": role, "one_sentence": "T"})
     create_entity(p, "scene", "the-kitchen",
                   {"title": "The Kitchen", "sequence_id": "seq-1", "act_id": "act-1", "order": 2,
-                   "location": "kitchen", "time_of_day": "NIGHT", "heading": "INT. KITCHEN - NIGHT",
+                   "location": "kitchen", "int_ext": "INT.", "time_of_day": "NIGHT",
                    "characters": ["mara-chen"]},
                   sections={"Content": "INT. KITCHEN - NIGHT\n\nMara stands at the counter.\n\n"
                                        "MARA\n(quietly)\nYou knew.\n\nLEO\nSorry.\n"})
@@ -35,7 +35,7 @@ def _payload(scene, **over):
     p = {"base_hash": scene["hash"],
          "blocks": scene["blocks"],
          "heading": {"mode": "structured", "int_ext": "INT.", "location": "kitchen",
-                     "location_text": "", "time_of_day": "NIGHT"},
+                     "location_text": "", "place": "", "time_of_day": "NIGHT"},
          "extra_cast": []}
     p.update(over)
     return p
@@ -63,7 +63,8 @@ class TestLoad:
 
     def test_adhoc_names_from_other_scenes_are_offered(self, project):
         create_entity(project, "scene", "the-attic",
-                      {"title": "Attic", "sequence_id": "seq-1", "act_id": "act-1"},
+                      {"title": "Attic", "sequence_id": "seq-1", "act_id": "act-1",
+                       "int_ext": "INT.", "location": "attic"},
                       sections={"Content": "INT. ATTIC - DAY\n\nLEO\nHello.\n\nNORA\nHi.\n"})
         s = me.load_scene_script(project, "the-kitchen")
         assert {a["cue"]: a["scenes"] for a in s["adhoc_elsewhere"]} == {"LEO": 1, "NORA": 1}
@@ -78,11 +79,10 @@ class TestLoad:
         codes = {f["code"] for f in s["findings"]}
         assert {"heading_missing", "order_unset"} <= codes
 
-    def test_location_suggested_from_heading_but_not_linked(self, project):
-        create_entity(project, "scene", "s3", {"title": "S3", "sequence_id": "seq-1", "act_id": "act-1"},
-                      sections={"Content": "INT. KITCHEN - DAY\n\nHello.\n"})
-        s = me.load_scene_script(project, "s3")
-        assert s["scene"]["location"] == "" and s["heading"]["suggested_location"] == "kitchen"
+    def test_a_linked_location_is_not_suggested_again(self, project):
+        s = me.load_scene_script(project, "the-kitchen")
+        assert s["scene"]["location"] == "kitchen"
+        assert "suggested_location" not in s["heading"]
 
     def test_locked_scene_loads_locked(self, project):
         edit_entity(project, "scene", "the-kitchen", {"status": "locked"}, "lock")
@@ -96,7 +96,8 @@ class TestSave:
         blocks[0]["text"] = "Mara stands at the counter, a ledger open."
         out = me.save_scene_script(project, "the-kitchen", _payload(s, blocks=blocks))
         assert "a ledger open" in out["content"]
-        assert out["content"].startswith("INT. KITCHEN - NIGHT\n")
+        assert out["content"].lstrip().startswith("Mara stands at the counter, a ledger open.")
+        assert out["scene"]["heading"] == "INT. KITCHEN - NIGHT"
         assert out["previous_content"] == s["content"]
         assert out["scene"]["status"] == s["scene"]["status"]      # status is not touched
 
@@ -105,20 +106,18 @@ class TestSave:
         out = me.save_scene_script(project, "the-kitchen", _payload(
             s, heading={"mode": "structured", "int_ext": "EXT.", "location": "attic",
                         "location_text": "", "time_of_day": "DAWN"}))
-        assert out["content"].startswith("EXT. ATTIC - DAWN\n")
+        assert out["content"].lstrip().startswith("Mara stands at the counter.")
         assert out["scene"]["heading"] == "EXT. ATTIC - DAWN"
         assert out["scene"]["location"] == "attic" and out["scene"]["time_of_day"] == "DAWN"
         assert "location_no_world" in {f["code"] for f in out["findings"]}   # attic has no world
 
-    def test_unregistered_location_lives_in_the_heading_only(self, project):
+    def test_place_is_composed_into_the_heading(self, project):
         s = me.load_scene_script(project, "the-kitchen")
         out = me.save_scene_script(project, "the-kitchen", _payload(
-            s, heading={"mode": "structured", "int_ext": "INT.", "location": "",
-                        "location_text": "the cellar", "time_of_day": ""}))
-        assert out["content"].startswith("INT. THE CELLAR\n")
-        assert out["scene"]["location"] == ""
-        codes = {f["code"] for f in out["findings"]}
-        assert {"location_unregistered", "time_of_day_missing"} <= codes
+            s, heading={"mode": "structured", "int_ext": "INT.", "location": "kitchen",
+                        "place": "pantry", "time_of_day": "NIGHT"}))
+        assert out["scene"]["heading"] == "INT. KITCHEN - PANTRY - NIGHT"
+        assert out["scene"]["place"] == "pantry"
 
     def test_cast_is_script_speakers_plus_hand_added(self, project):
         s = me.load_scene_script(project, "the-kitchen")
@@ -144,7 +143,7 @@ class TestSave:
         out = me.save_scene_script(project, "the-kitchen", _payload(
             s, heading={"mode": "custom", "text": ".SNIPER SCOPE POV", "location": "kitchen",
                         "time_of_day": "NIGHT"}))
-        assert out["content"].startswith(".SNIPER SCOPE POV\n")
+        assert out["scene"]["forced_heading"] == ".SNIPER SCOPE POV"
         assert out["heading"]["mode"] == "custom"
 
     def test_stale_save_is_refused_and_nothing_is_written(self, project):

@@ -20,7 +20,7 @@ def client(tmp_path, monkeypatch):
     create_entity(proj, "world", "w", {"name": "W", "one_sentence": "T"})
     create_entity(proj, "location", "kitchen", {"name": "Kitchen", "one_sentence": "T", "world": "w"})
     create_entity(proj, "scene", "s1", {"title": "S1", "sequence_id": "seq-1", "act_id": "act-1", "order": 1,
-                                        "location": "kitchen", "time_of_day": "NIGHT"},
+                                        "location": "kitchen", "int_ext": "INT.", "time_of_day": "NIGHT"},
                   sections={"Content": "INT. KITCHEN - NIGHT\n\nRain.\n"})
     tc = TestClient(create_app(Config(root=root, port=8731)), base_url="http://127.0.0.1:8731")
     return tc, proj

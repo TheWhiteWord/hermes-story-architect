@@ -189,7 +189,7 @@ ENTITY_SCHEMAS = {
         "sequence_id": {"type": "string", "default": "", "optional": False, "description": "Parent sequence slug"},
         "order": {"type": "number", "default": 0, "optional": False, "description": "Position within parent sequence. Integer only. Use 0 when not yet decided (appends at end)."},
         "int_ext": {
-            "type": "string", "default": "INT.", "optional": True,
+            "type": "string", "default": "", "optional": True,
             "enum": INT_EXT_CHOICES, "group": "Scene heading",
             "description": "Scene heading, first segment: one of INT., EXT., INT./EXT., EST.",
         },

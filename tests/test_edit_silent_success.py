@@ -77,7 +77,7 @@ def _probe_value(meta: dict):
             return {}
         return {k: _probe_value(m) for k, m in (meta.get("sub_fields") or {}).items()}
     if meta.get("enum"):
-        return ""
+        return meta["enum"][0] if meta["enum"] else ""
     return "PROBE"
 
 
@@ -268,7 +268,11 @@ class TestValidKeysStillWork:
                     # so each edit runs against a fresh copy of the project.
                     shutil.rmtree(_project(vault) / ".story", ignore_errors=True)
                     _import(vault)
-                    _edit(vault, {key: probe}, etype, sample)
+                    data = {key: probe}
+                    if etype == "scene" and key == "forced_heading":
+                        data = {key: ".PROBE", "int_ext": "", "place": "",
+                                "time_of_day": ""}
+                    _edit(vault, data, etype, sample)
                 except ValueError:
                     rejected.append(f"{etype}.{key}")
         assert not rejected, f"valid keys wrongly rejected: {rejected}"

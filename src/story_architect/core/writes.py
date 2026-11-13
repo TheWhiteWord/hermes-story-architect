@@ -16,6 +16,7 @@ import sqlite3
 from pathlib import Path
 
 from .constants import ENTITY_SCHEMAS
+from .fountain_lexer import SCENE_HEADING_RE
 
 _FIELDS_TO_SKIP = {"id", "type"}
 
@@ -80,6 +81,47 @@ def create_project(slug: str, frontmatter_data: dict, root_path: Path) -> dict:
         "message": f"Created project: {slug}",
         "file": str(project_path / ".story" / "story.db"),
     }
+
+
+# ─── scene heading ───
+
+def _scene_heading_guard(state: dict) -> str:
+    """A scene with a script needs a heading; a forced heading is exclusive.
+
+    `state` is the merged heading state: `int_ext`, `location`, `place`,
+    `time_of_day`, `forced_heading` and `content`. Returns the body-only Content
+    — a leading heading line is stripped, so the heading composed at assembly
+    replaces it rather than duplicating it. A placeholder is a template, not a
+    script, so it passes through untouched.
+    """
+    from .scene_script import is_placeholder, split_heading
+
+    content = state.get("content") or ""
+    if is_placeholder(content):
+        return content
+
+    forced = state.get("forced_heading") or ""
+    int_ext = state.get("int_ext") or ""
+    place = state.get("place") or ""
+    time_of_day = state.get("time_of_day") or ""
+    location = state.get("location") or ""
+
+    if content.strip() and not ((int_ext and location) or forced):
+        raise ValueError(
+            "a scene with a script needs a heading — set int_ext + location, "
+            "or a forced heading")
+
+    if forced and (int_ext or place or time_of_day):
+        raise ValueError(
+            "forced_heading is exclusive with the composed heading — "
+            "clear int_ext, place and time_of_day, or unset forced_heading")
+    if forced and not SCENE_HEADING_RE.match(forced):
+        raise ValueError(
+            "forced_heading must be a scene heading "
+            "(INT./EXT. … or a forced '.HEADING')")
+
+    _, body = split_heading(content)
+    return body
 
 
 # ─── create ───
@@ -200,6 +242,11 @@ def create_entity(project_path: Path, entity_type: str, slug: str,
             validate_scene_dramatic_role(merged.get("dramatic_role", ""),
                                          merged.get("plot_roles", []))
             check_references(project_path, entity_type, merged)
+            # The heading guard, on the merged state. It returns body-only
+            # Content: an agent-written heading line is replaced by the heading
+            # composed at assembly, never stored beside it.
+            sections["Content"] = _scene_heading_guard(
+                {**merged, "content": sections.get("Content", "")})
 
         # Validate plot characters reference existing entities
         if entity_type == "plot":
@@ -466,6 +513,37 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                     ).fetchall()
                 ]
             validate_scene_dramatic_role(merged_role, merged_roles)
+
+        # ── A scene's heading, checked on its MERGED state ──
+        # The same rule the dramatic_role check follows: an edit that sets only
+        # `forced_heading` must be caught against the structured fields already
+        # stored, and an edit that sets only `place` must be caught against a
+        # stored forced heading. Refused before BEGIN, so nothing is written.
+        if entity_type == "scene":
+            stored = conn.execute(
+                "SELECT location_id, extra FROM entities WHERE id=?", (entity_id,)).fetchone()
+            stored_location = stored[0] if stored and stored[0] else ""
+            stored_extra = json.loads(stored[1]) if stored and stored[1] else {}
+            content_row = conn.execute(
+                "SELECT body FROM sections WHERE entity_id=? AND heading='Content'",
+                (entity_id,)).fetchone()
+            scene_schema = ENTITY_SCHEMAS["scene"]
+            merged_heading = {
+                "int_ext": data.get("int_ext",
+                                    stored_extra.get("int_ext",
+                                                     scene_schema["int_ext"]["default"])),
+                "place": data.get("place", stored_extra.get("place", "")),
+                "time_of_day": data.get("time_of_day",
+                                        stored_extra.get("time_of_day", "")),
+                "forced_heading": data.get("forced_heading",
+                                           stored_extra.get("forced_heading", "")),
+                "location": data.get("location", stored_location),
+                "content": section_updates.get(
+                    "Content", content_row[0] if content_row else ""),
+            }
+            body = _scene_heading_guard(merged_heading)
+            if "Content" in data:
+                section_updates["Content"] = body
 
         # ── A scene_beats, checked on its MERGED state ──
         # The same rule the dramatic_role contradiction check follows: an edit

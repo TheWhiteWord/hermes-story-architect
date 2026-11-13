@@ -133,17 +133,18 @@ class TestHeading:
             assert p["mode"] == "custom" and p["text"] == text
 
     def test_compose(self):
-        assert ss.compose_heading("INT.", "The kitchen", "NIGHT") == "INT. THE KITCHEN - NIGHT"
-        assert ss.compose_heading("EXT.", "Pier") == "EXT. PIER"
+        assert ss.compose_heading("INT.", "The kitchen", "", "NIGHT") == "INT. THE KITCHEN - NIGHT"
+        assert ss.compose_heading("EXT.", "Pier") == "EXT. PIER - UNSPECIFIED"
+        assert ss.compose_heading("INT.", "The kitchen", "Pantry", "NIGHT") == "INT. THE KITCHEN - PANTRY - NIGHT"
         with pytest.raises(ValueError):
-            ss.compose_heading("INT.", "", "DAY")
+            ss.compose_heading("INT.", "", "", "DAY")
         with pytest.raises(ValueError):
-            ss.compose_heading("INT.", "A", "EVENING")
+            ss.compose_heading("INT.", "A", "", "EVENING")
 
     def test_compose_then_parse_is_identity(self):
-        h = ss.compose_heading("INT./EXT.", "Car", "DUSK")
+        h = ss.compose_heading("INT./EXT.", "Car", "", "DUSK")
         p = ss.parse_heading(h)
-        assert ss.compose_heading(p["int_ext"], p["location_text"], p["time_of_day"]) == h
+        assert ss.compose_heading(p["int_ext"], p["location_text"], "", p["time_of_day"]) == h
 
     def test_suggest_is_exact_only(self):
         locs = [{"id": "kitchen", "name": "The Kitchen"}, {"id": "kitchen-annex", "name": "Kitchen Annex"}]

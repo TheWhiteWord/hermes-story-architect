@@ -560,12 +560,15 @@ class TestPhase3ToolSurface:
             {"title": "Act 1"})
         create_entity(project_path, "sequence", "seq-1",
             {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project_path, "location", "kitchen",
+            {"name": "Kitchen", "one_sentence": "x"})
         create_entity(project_path, "scene", "test-scene",
             {"title": "Test Scene", "sequence_id": "seq-1", "act_id": "act-1"})
 
         # Edit with data bag: frontmatter field + body section
         result = edit_entity(project_path, "scene", "test-scene",
-            {"status": "written", "Content": "Updated content text."},
+            {"status": "written", "int_ext": "INT.", "location": "kitchen",
+             "Content": "Updated content text."},
             "Update status and content")
         assert result["success"] is True
 
@@ -793,10 +796,10 @@ class TestUnfilledFields:
 
     def test_unfilled_fields_scene_location(self):
         from story_architect.core.entity import unfilled_fields
-        extra = {"location": "", "heading": "", "dramatic_role": ""}
+        extra = {"location": "", "int_ext": "", "dramatic_role": ""}
         result = unfilled_fields("scene", extra)
         assert "location" in result
-        assert "heading" in result
+        assert "int_ext" in result
         # dramatic_role is at default "" but also optional — should appear
         assert "dramatic_role" in result
 
@@ -811,10 +814,10 @@ class TestUnfilledFields:
     def test_unfilled_fields_skips_status(self):
         """status is a workflow state, never reported as unfilled."""
         from story_architect.core.entity import unfilled_fields
-        extra = {"status": "planned", "heading": "", "dramatic_role": ""}
+        extra = {"status": "planned", "int_ext": "", "dramatic_role": ""}
         result = unfilled_fields("scene", extra)
         assert "status" not in result
-        assert "heading" in result
+        assert "int_ext" in result
         assert "dramatic_role" in result
 
     def test_unfilled_fields_skips_booleans(self):

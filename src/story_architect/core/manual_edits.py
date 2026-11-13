@@ -136,6 +136,13 @@ def _view(st: dict, characters: list[dict], locations: dict, *, content: str,
                              blocks=blocks, content=content, lossless=lossless)
 
 
+def _composed_heading(extra: dict, loc: dict | None) -> str:
+    """The scene's heading line, for readers that still show one."""
+    return ss.scene_heading(extra.get("int_ext") or "", loc["name"] if loc else "",
+                            extra.get("place") or "", extra.get("time_of_day") or "",
+                            extra.get("forced_heading") or "")
+
+
 def _view_from_blocks(st, characters, locations, *, heading_line, blocks, content,
                       lossless=True) -> dict:
     extra = st["extra"]
@@ -145,6 +152,10 @@ def _view_from_blocks(st, characters, locations, *, heading_line, blocks, conten
                                else extra.get("heading", ""))
     loc = locations.get(st["location"])
     heading["location"] = st["location"] if loc else ""
+    heading["int_ext"] = extra.get("int_ext", "") or "INT."
+    if extra.get("forced_heading"):
+        heading["mode"] = "custom"
+        heading["text"] = extra["forced_heading"]
     if loc is None:
         heading["suggested_location"] = ss.suggest_location(
             heading["location_text"], list(locations.values()))
@@ -170,8 +181,11 @@ def _view_from_blocks(st, characters, locations, *, heading_line, blocks, conten
     scene = {
         "id": st["id"], "title": st["title"], "status": st["status"],
         "order": st["order"], "sequence_id": st["sequence_id"],
-        "location": st["location"], "time_of_day": extra.get("time_of_day", ""),
-        "heading": extra.get("heading", ""), "dramatic_role": extra.get("dramatic_role", ""),
+        "location": st["location"], "int_ext": extra.get("int_ext", ""),
+        "place": extra.get("place", ""), "time_of_day": extra.get("time_of_day", ""),
+        "forced_heading": extra.get("forced_heading", ""),
+        "heading": _composed_heading(extra, loc),
+        "dramatic_role": extra.get("dramatic_role", ""),
         "no_cast": bool(extra.get("no_cast")),
         "scene_objective": extra.get("scene_objective", ""),
     }
@@ -256,8 +270,11 @@ def check_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict
         except ValueError:
             heading_line = None
 
+    forced = (hd.get("text") or "").strip() if hd.get("mode") == "custom" else ""
     draft = {**st, "location": slug,
-             "extra": {**st["extra"], "time_of_day": tod},
+             "extra": {**st["extra"], "int_ext": hd.get("int_ext") or "",
+                       "place": hd.get("place") or "", "time_of_day": tod,
+                       "forced_heading": forced},
              "characters": extra_cast}
     content = ss.compose_content(heading_line, blocks)
     view = _view_from_blocks(draft, characters, locations, heading_line=heading_line,
@@ -349,10 +366,16 @@ def save_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
 
     content = ss.compose_content(heading, blocks)
     previous = st["raw_content"]
+    if hd.get("mode") == "custom":
+        data = {"Content": content, "forced_heading": heading,
+                "int_ext": "", "place": "", "time_of_day": "",
+                "location": slug, "characters": cast}
+    else:
+        data = {"Content": content, "int_ext": hd.get("int_ext") or "INT.",
+                "place": hd.get("place") or "", "time_of_day": tod,
+                "location": slug, "characters": cast}
     result = edit_entity(
-        project_path, "scene", scene_id,
-        {"Content": content, "heading": heading, "location": slug,
-         "time_of_day": tod, "characters": cast},
+        project_path, "scene", scene_id, data,
         "Script edited by hand in the script editor")
     if result.get("success") is False or result.get("error"):
         raise ScriptError(result.get("error") or result.get("message") or "Save failed.")

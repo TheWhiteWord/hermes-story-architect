@@ -92,18 +92,18 @@ each with a heading-derived description, and `validate_entity` refuses a bad
 **Goal:** a scene with a script cannot be saved without a heading.
 
 Checklist:
-- [ ] `core/writes.py` `create_entity` (beside `:186-199`) and `edit_entity`
+- [x] `core/writes.py` `create_entity` (beside `:186-199`) and `edit_entity`
       (beside `:442-468`): a scene branch on the merged state — Content
       non-empty ⇒ structured (`int_ext` + `location`) or `forced_heading`;
       otherwise `ValueError` before `BEGIN`.
-- [ ] `core/writes.py`: the same branch refuses `forced_heading` together with
+- [x] `core/writes.py`: the same branch refuses `forced_heading` together with
       any of `int_ext` / `place` / `time_of_day` (exclusive heading source).
       `location` is allowed with either.
-- [ ] `core/scene_script.py`: `compose_heading(int_ext, location_name, place,
+- [x] `core/scene_script.py`: `compose_heading(int_ext, location_name, place,
       time_of_day)` — always emits a time (`UNSPECIFIED` when unset), uppercases
       the location, validates the no-dash rule. The caller resolves the location
       slug to its `name`.
-- [ ] A helper that strips a leading heading line from incoming Content
+- [x] A helper that strips a leading heading line from incoming Content
       (`split_heading`) so an agent-written line is replaced, not duplicated.
 
 **Gate:** `create_entity` / `edit_entity` refuse a scene with body-only Content
@@ -276,12 +276,14 @@ end — a dead helper left behind is the next session's guess.
 
 **Fix — tests**
 
-- `tests/test_scene_script.py`: `compose_heading` with `place` and the
-  always-time rule; the no-dash refusal.
-- `tests/test_manual_edits.py`: the payload shape (`int_ext`, `place`,
-  `forced_heading`).
-- `tests/test_core.py`: the `heading` field assertions (`unfilled_fields`,
-  round-trip).
+Fixed in Phase 2 (the boundary and the dropped `int_ext` default broke them):
+`test_scene_script` (the new `compose_heading` signature), `test_manual_edits`
+(the payload shape and body-only Content), `test_core` (the `heading` field
+assertions, `test_edit_note_with_data_bag`), `test_edit_silent_success` (the
+acceptance sweep now probes a valid heading), `test_manual_structure` (every
+Content write carries heading fields) and `test_script_routes` (the fixture).
+
+Still open:
 - `tests/test_draft_preview.py`: the lint finding.
 - `tests/test_round_trip.py`, `tests/test_values_export_import.py`: the field.
 - `tests/dashboard_tabs_harness.js`: the heading row and the click mapping.
@@ -309,7 +311,8 @@ would encode the old model.
 ## Phase 1 brief — schema + validation
 
 **Short summary.** The scene schema carries the structured heading. `heading` is
-retired and replaced by `int_ext` (enum `INT_EXT_CHOICES`, default `INT.`),
+retired and replaced by `int_ext` (enum `INT_EXT_CHOICES`, default `INT.` —
+dropped in Phase 2, see the Phase 2 brief),
 `place` and `forced_heading`; `location` and `time_of_day` keep their storage but
 their descriptions now name the heading segment they compose. All five carry
 `group: "Scene heading"`, and `manual_entities.GROUPS` derives from that key
@@ -361,3 +364,77 @@ the form. Fixture markdown was migrated to the new fields.
   `test_manual_edits` (27 errors → Phase 5), `test_manual_structure` (2),
   `test_script_routes` (1), `test_core` unfilled (2) — all covered by Phases
   5–10.
+
+---
+
+## Phase 2 brief — write boundary
+
+**Short summary.** A scene with a script can no longer be saved without a
+heading. `writes.create_entity` and `writes.edit_entity` run one guard
+(`_scene_heading_guard`) on the merged state before `BEGIN`: non-empty Content
+requires `int_ext` + `location` or a `forced_heading`, and a `forced_heading`
+is refused together with `int_ext`, `place` or `time_of_day`. The guard returns
+body-only Content — a leading heading line is stripped with
+`scene_script.split_heading`, so the heading composed at assembly replaces an
+agent-written line instead of duplicating it. `compose_heading` gained `place`,
+always emits a time (`UNSPECIFIED` when unset) and refuses a ` - ` in the
+location name or place. A placeholder Content is a template, not a script, so
+it passes through untouched.
+
+**Deviations.**
+
+- **`int_ext` has no default.** The schema default is empty, so a composed
+  heading requires the caller to set it and a forced heading is empty by
+  default — the exclusivity check (`forced_heading and (int_ext or place or
+  time_of_day)`) needs no clearing. This replaced the earlier `INT.` default at
+  the user's call.
+- **`place` is upper-cased too.** The plan says "uppercases the location"; the
+  place is a segment of the same uppercase heading line, so it is upper-cased
+  as well. The stored `place` keeps the author's case; only the composed line
+  is upper-case.
+- **The guard strips a leading heading line.** The spec's write-boundary
+  pseudocode only validates, but "Content is body-only … never stored" needs
+  the strip at the write boundary, or an agent-written heading line is
+  duplicated at assembly. `split_heading` already existed and is now used here.
+- **The old-model tests were fixed in this phase, not Phase 10.** The boundary
+  and the dropped default broke `test_core`, `test_edit_silent_success`,
+  `test_manual_structure`, `test_manual_edits`, `test_script_routes` and
+  `test_scene_script`; all were updated to the new model (heading fields on
+  every Content write, body-only Content, the new `compose_heading` signature).
+  Fixing them pulled in the Phase 5 `manual_edits` changes — see below.
+
+**Contract changes.**
+
+- New VALUE refusals on every authored scene write: `a scene with a script
+  needs a heading — set int_ext + location, or a forced heading`;
+  `forced_heading is exclusive with the composed heading — clear int_ext, place
+  and time_of_day, or unset forced_heading`;
+  `forced_heading must be a scene heading (INT./EXT. … or a forced '.HEADING')`.
+- A forced heading must leave `int_ext`, `place` and `time_of_day` empty; a
+  composed heading must set `int_ext`.
+- `compose_heading(int_ext, location_name, place, time_of_day)` — the third
+  positional is now `place`; a time is always emitted.
+- `scene_heading(int_ext, location_name, place, time_of_day, forced_heading)`
+  — the heading line for readers that still show one (the form's computed row,
+  the editor); empty when the scene has neither heading.
+- The script editor writes the structured fields (`int_ext`, `place`,
+  `time_of_day`, `forced_heading`) instead of the retired `heading` key, and
+  `load_scene_script` reports them; `findings`' `heading_missing` is decided by
+  the fields, not by a Content line (Content is body-only now).
+- A scene's stored `Content` is body-only: a leading heading line is stripped
+  on write.
+
+**Verification.**
+
+- Gate, against a real fixture DB: create/edit refuse body-only Content with no
+  heading fields; a forced heading passes with `int_ext` empty, and is refused
+  when `int_ext`/`place`/`time_of_day` are set; an edit that adds a forced
+  heading to a scene with a stored `int_ext` is refused; an agent-written
+  heading line is stripped from stored Content.
+- `compose_heading`: `INT. THE KITCHEN - NIGHT`, `INT. THE KITCHEN - PANTRY -
+  NIGHT`, `EXT. PIER - UNSPECIFIED`; a ` - ` in a location name or place is
+  refused.
+- Full suite: **1339 passed, 2 failed** (Phase 1: 1307 / 7 / 27). The 2 failures
+  pre-date the task (`test_no_hermes_imports`, `task_30/test_skill_references`;
+  both fail on the stashed base). Every old-model test the boundary and the
+  dropped default broke is fixed.

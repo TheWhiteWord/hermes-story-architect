@@ -15,8 +15,9 @@ or a transition is. `tests/test_scene_script.py` pins that parity against the
 lexer on real scene content.
 
 Block types: action, character, parenthetical, dialogue, transition, note, raw.
-The scene heading is NOT a block: it is generated from INT/EXT + location +
-time of day (see `compose_heading`) and written as the first line of Content.
+The scene heading is NOT a block: it is composed from the scene's fields at
+assembly (see `compose_heading`) and never stored in Content, which holds the
+body only.
 
 What this module deliberately does not do: touch the database, decide who may
 write, or validate that a location exists. Those are `core/manual_edits.py`.
@@ -276,8 +277,14 @@ def parse_heading(heading: str | None) -> dict:
             "time_of_day": time_text, "text": text}
 
 
-def compose_heading(int_ext: str, location_name: str, time_of_day: str = "") -> str:
-    """`INT. KITCHEN - NIGHT`. The location name is upper-cased, as in a script."""
+def compose_heading(int_ext: str, location_name: str, place: str = "",
+                    time_of_day: str = "") -> str:
+    """`INT. KITCHEN - NIGHT` / `INT. KITCHEN - PANTRY - NIGHT`.
+
+    The location and place are upper-cased, as in a script. A time is always
+    emitted — `UNSPECIFIED` when unset — so the last ` - ` segment is always the
+    time and the parser can split the line unambiguously.
+    """
     if int_ext not in INT_EXT_CHOICES:
         raise ValueError(f"int_ext must be one of {', '.join(INT_EXT_CHOICES)}")
     if time_of_day and time_of_day not in SCENE_TIMES_OF_DAY:
@@ -285,7 +292,29 @@ def compose_heading(int_ext: str, location_name: str, time_of_day: str = "") -> 
     name = " ".join((location_name or "").split()).upper()
     if not name:
         raise ValueError("a heading needs a location")
-    return f"{int_ext} {name}" + (f" - {time_of_day}" if time_of_day else "")
+    if " - " in name:
+        raise ValueError("location name cannot contain ' - '")
+    place = " ".join((place or "").split()).upper()
+    if " - " in place:
+        raise ValueError("place cannot contain ' - '")
+    heading = f"{int_ext} {name}"
+    if place:
+        heading += f" - {place}"
+    return f"{heading} - {time_of_day or 'UNSPECIFIED'}"
+
+
+def scene_heading(int_ext: str, location_name: str, place: str = "",
+                  time_of_day: str = "", forced_heading: str = "") -> str:
+    """The scene's heading line: the forced text, or the composed one.
+
+    Empty when the scene has neither — a planned scene, or an incomplete one.
+    """
+    if forced_heading:
+        return forced_heading
+    try:
+        return compose_heading(int_ext, location_name, place, time_of_day)
+    except ValueError:
+        return ""
 
 
 def suggest_location(location_text: str, locations: list[dict]) -> str | None:
@@ -426,10 +455,12 @@ def findings(*, scene: dict, heading: dict, heading_line: str | None,
         out.append(_finding(CRITICAL, "not_editable",
                             "This script uses Fountain the editor cannot round-trip "
                             "without losing text, so it opens read-only. Edit it with the harness."))
-    if not heading_line:
+    if (not heading_line
+            and not (scene.get("int_ext") and scene.get("location"))
+            and not scene.get("forced_heading")):
         out.append(_finding(CRITICAL, "heading_missing",
-                            "The script has no scene heading. A scene without one is "
-                            "absent from the script view.", field="heading"))
+                            "The scene has no heading. Set int_ext + location, or a "
+                            "forced heading.", field="heading"))
     if not scene.get("order"):
         out.append(_finding(CRITICAL, "order_unset",
                             "Scene order is 0 — it has not been placed in its sequence yet.",

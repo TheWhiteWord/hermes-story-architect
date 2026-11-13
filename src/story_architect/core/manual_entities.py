@@ -33,6 +33,7 @@ from .constants import (ACT_STATUSES, CONFLICT_LEVELS, ENTITY_LABELS, ENTITY_SCH
 from .db import get_db
 from .entity import (ENTITY_COLUMN_MAP, REVERSED_RELATION_KINDS, _RELATION_FIELDS,
                      coerce_number, standard_sections)
+from .scene_script import scene_heading
 
 # What the form can edit today. The spec builder is generic; this is the gate,
 # so a type goes live when its form has been exercised, not when its schema exists.
@@ -468,8 +469,10 @@ def _scene_rows(conn, scene_id: str) -> dict:
     cast = [r[0] for r in conn.execute(
         "SELECT e.name FROM relations r JOIN entities e ON e.id=r.from_id "
         "WHERE r.to_id=? AND r.kind='character_scene' AND e.is_deleted=0 ORDER BY r.\"order\"", (scene_id,))]
+    heading = scene_heading(ex.get("int_ext") or "", loc, ex.get("place") or "",
+                            ex.get("time_of_day") or "", ex.get("forced_heading") or "")
     return {
-        "heading": one(ex.get("heading")), "location": one(loc),
+        "heading": one(heading), "location": one(loc),
         "time_of_day": one(ex.get("time_of_day")), "characters": [{"display": n} for n in cast],
     }
 
