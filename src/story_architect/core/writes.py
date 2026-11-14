@@ -364,7 +364,7 @@ def edit_entity(project_path: Path, entity_type: str, slug: str,
                              standard_sections as get_std_sections)
         standard_sections = set(get_std_sections(entity_type))
         # The one column map, owned by core.entity. An out-of-tree copy that
-        # was missing `project` made editing a logline write it into `extra` and
+        # missed `project` made editing a logline write it into `extra` and
         # report success while the column stayed unchanged.
         column_map = ENTITY_COLUMN_MAP.get(entity_type, {})
         schema = ENTITY_SCHEMAS.get(entity_type, {})
@@ -1112,8 +1112,7 @@ def _default_for(entity_type: str, field: str):
 
     Resetting a reference to this rather than a bare "" keeps the two apart: a
     field whose default is a real value (project.screenplay_title is "Default")
-    resets to that, while an unfilled field resets to empty (B12 — these
-    defaults were once visible placeholders like "Location not set").
+    resets to that, while an unfilled field resets to empty.
     """
     return ENTITY_SCHEMAS.get(entity_type, {}).get(field, {}).get("default", "")
 

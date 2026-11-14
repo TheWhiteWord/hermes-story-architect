@@ -23,11 +23,11 @@
   }
 
   // Parse a text/event-stream body into normalized events.
-  // Also accepts the legacy Phase 3 shapes (tool_started / tool_finished).
+  // Also accepts the tool_started / tool_finished shapes.
   async function* sse(res) {
     const reader = res.body.getReader();
     const dec = new TextDecoder();
-    const open = {}; // legacy tool name -> id
+    const open = {}; // tool name -> id, while a tool call is open
     let n = 0, buf = '';
     for (;;) {
       const { done, value } = await reader.read();

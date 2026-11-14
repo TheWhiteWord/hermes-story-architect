@@ -341,7 +341,7 @@ def save_scene_script(project_path: Path, scene_id: str, payload: dict) -> dict:
 
     fields = _heading_fields(hd, locations)
 
-    # Cast: who the script names (registered), plus whoever was added by hand.
+    # Cast: who the script names (registered), plus whoever is added by hand.
     by_id = {c["id"]: c for c in characters}
     extra_cast = payload.get("extra_cast") or []
     bad = [c for c in extra_cast if c not in by_id]

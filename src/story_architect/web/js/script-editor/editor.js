@@ -222,8 +222,8 @@ window.DASH = window.DASH || {};
   function roleColor(role) { return DASH.roleColor ? DASH.roleColor(role) : '#8a8a8a'; }
 
   // Who is in the scene: everyone the script names (as of the last check) plus
-  // whoever was added by hand. The hand-added are read from local state, so a
-  // chip appears the moment "+" is used, not when the next check returns.
+  // whoever was added by hand. The hand-added come from local state, so a chip
+  // appears the moment "+" is used, not when the next check returns.
   function castEntries() {
     const v = V(), known = (v && v.cast) || [];
     const speaking = known.filter(c => c.in_script);
@@ -821,7 +821,7 @@ window.DASH = window.DASH || {};
         else if (k === 'place') pickPlace(h);
         else if (k === 'custom') {
           // A forced heading replaces the composed one, so the exclusive fields
-          // are cleared: what this state holds is what a save writes.
+          // are cleared: this state holds exactly what a save writes.
           const composed = headingText();
           S.H.forced = true;
           S.H.forced_heading = composed;

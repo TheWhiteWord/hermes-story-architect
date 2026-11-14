@@ -8,7 +8,6 @@ from story_architect.core.fountain_lexer import (
     classify_line,
     trim_character_extension,
     trim_character_force_symbol,
-    parse_location,
     extract_scene_content,
     fountain_to_html,
     CHARACTER_RE,
@@ -74,48 +73,6 @@ class TestCharacterExtension:
 
     def test_no_force_symbol(self):
         assert trim_character_force_symbol("KAEL") == "KAEL"
-
-
-# ---- Location Parsing Tests ----
-
-class TestLocationParsing:
-    def test_int(self):
-        loc = parse_location("INT. KITCHEN - NIGHT")
-        assert loc["name"] == "KITCHEN"
-        assert loc["time_of_day"] == "NIGHT"
-        assert loc["interior"] is True
-        assert loc["exterior"] is False
-
-    def test_ext(self):
-        loc = parse_location("EXT. PARK - DAY")
-        assert loc["name"] == "PARK"
-        assert loc["time_of_day"] == "DAY"
-        assert loc["interior"] is False
-        assert loc["exterior"] is True
-
-    def test_int_ext(self):
-        loc = parse_location("INT./EXT. CAR - NIGHT")
-        assert loc["name"] == "CAR"
-        assert loc["interior"] is True
-        assert loc["exterior"] is True
-
-    def test_ie(self):
-        loc = parse_location("I/E. CAR - NIGHT")
-        assert loc["name"] == "CAR"
-        assert loc["interior"] is True
-        assert loc["exterior"] is True
-
-    def test_est(self):
-        loc = parse_location("EST. CITY - NIGHT")
-        assert loc["name"] == "CITY"
-
-    def test_no_time(self):
-        loc = parse_location("INT. KITCHEN")
-        assert loc["name"] == "KITCHEN"
-        assert loc["time_of_day"] == ""
-
-    def test_not_heading(self):
-        assert parse_location("NOT A HEADING") is None
 
 
 # ---- Regex Tests ----

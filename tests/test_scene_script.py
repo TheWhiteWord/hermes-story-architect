@@ -40,10 +40,11 @@ class TestRoundTrip:
 
     def test_serialization_is_stable(self):
         h, blocks = _roundtrip(SCRIPT)
-        again = ss.compose_content(h, blocks)
+        body = ss.serialize_blocks(blocks)
+        again = "\n\n".join(p for p in (h, body) if p) + "\n"
         h2, blocks2 = _roundtrip(again)
         assert blocks2 == blocks
-        assert ss.compose_content(h2, blocks2) == again
+        assert "\n\n".join(p for p in (h2, ss.serialize_blocks(blocks2)) if p) + "\n" == again
         assert ss.is_lossless(SCRIPT, h, blocks)
 
     def test_all_caps_action_before_dialogue_gets_a_force_marker(self):

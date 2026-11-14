@@ -62,9 +62,9 @@ def validate_ops(ops) -> list[dict]:
     """Shape-check an op list. Returns the ops unchanged, or raises.
 
     Structural only — is each op dispatchable, with the keys its handler
-    reads. Field-level checks (required fields, enums) are Phase 6's
-    `validate_entity` pass, and cross-entity references stay at commit: they
-    read committed state, and a staged create is not there yet.
+    reads. Field-level checks (required fields, enums) are `validate_entity`'s
+    pass, and cross-entity references stay at commit: they read committed
+    state, and a staged create is not there yet.
     """
     if not isinstance(ops, list) or not ops:
         raise DraftError("`ops` must be a non-empty list of op objects.")

@@ -84,9 +84,9 @@ def ensure_draft_status_column(conn: sqlite3.Connection) -> None:
     table that already exists.
 
     The *table* itself needs no such repair — create_schema makes it, and
-    create_project is the only way a real database comes into being. That
-    reasoning is recorded in tests/test_legacy_db_migration.py and still holds;
-    only the column is new.
+    create_project is the only way a real database comes into being; that
+    reasoning is recorded in tests/test_legacy_db_migration.py, which covers the
+    table only.
     """
     if "status" not in {r[1] for r in conn.execute("PRAGMA table_info(drafts)")}:
         conn.execute("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'open'")

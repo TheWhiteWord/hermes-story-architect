@@ -156,14 +156,6 @@ def classify_line(line, prev_type=None):
     return 'action'
 
 
-def parse_location(heading):
-    """Parse scene heading string into location info. Returns None if not a heading."""
-    match = SCENE_HEADING_RE.match(heading)
-    if not match:
-        return None
-    return parse_location_information(match)
-
-
 def tokenize(script):
     """Parse Fountain screenplay and return token list."""
     return parse(script)['tokens']

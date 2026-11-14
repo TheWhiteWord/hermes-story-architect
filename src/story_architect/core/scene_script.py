@@ -208,12 +208,6 @@ def _would_misparse(lines: list[str]) -> bool:
     return not (len(got) == 1 and got[0]["type"] == "action")
 
 
-def compose_content(heading: str | None, blocks: list[dict]) -> str:
-    body = serialize_blocks(blocks)
-    parts = [p for p in (heading, body) if p]
-    return "\n\n".join(parts) + ("\n" if parts else "")
-
-
 def _words(text: str) -> list[str]:
     return re.findall(r"\w+", text or "", re.UNICODE)
 
@@ -222,7 +216,8 @@ def is_lossless(content: str, heading: str | None, blocks: list[dict]) -> bool:
     """True when opening this content in the editor and saving it back keeps
     every word. A False here means the editor must open read-only rather than
     silently rewrite a script it does not fully understand."""
-    again = compose_content(heading, blocks)
+    body = serialize_blocks(blocks)
+    again = "\n\n".join(p for p in (heading, body) if p) + ("\n" if heading or body else "")
     if _words(again) != _words(content):
         return False
     h2, body2 = split_heading(again)

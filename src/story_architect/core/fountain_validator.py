@@ -32,10 +32,9 @@ WHY IT MUST NOT BE MODIFIED FOR AUTHORING
 
     Making this stricter to serve authoring would break a working importer to
     solve an unrelated problem. The fix is a SEPARATE module wired into
-    `validate_shape` in core/drafts.py, taking inspiration from this one. See
-    tasks/task_17*/bugs.md (B11). Do not rename this file either: a new module
-    must not look like a variant of this one, or the two "validate Fountain"
-    while answering different questions.
+    `validate_shape` in core/drafts.py. Do not rename this file either: a new
+    module must not look like a variant of this one, or the two "validate
+    Fountain" while answering different questions.
 
 TODO(import feature): this is the only intended caller. Until then, leave
 this file untouched.

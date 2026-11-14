@@ -44,11 +44,11 @@ def validate_entity(entity_type: str, frontmatter: dict) -> list[str]:
             _validate_field(entity_type, field, frontmatter[field], meta, warnings)
 
     if entity_type == "character":
-        # `empty_ok` like the enum check below: since B12 an unfilled
-        # field is stored empty, so an exported note carries `story_role: ''`
-        # and the write path accepts it. Without this the importer refused
-        # exactly what story_export writes, and a DB -> markdown -> DB
-        # round-trip failed while the write path stored the same value.
+        # `empty_ok` because an unfilled field is stored empty, so an exported
+        # note carries `story_role: ''` and the write path accepts it. Without
+        # this the importer refused exactly what story_export writes, and a
+        # DB -> markdown -> DB round-trip failed while the write path stored the
+        # same value.
         _validate_enum(frontmatter, "story_role", VALID_ROLES, warnings, empty_ok=True)
 
     if entity_type == "plot" and "status" in frontmatter:
@@ -288,7 +288,7 @@ def update_sections(note_path: Path, sections: list[str]) -> None:
         frontmatter.dump(post, f, sort_keys=False)
 
 
-# ─── DB column/relation mapping (Phase 3) ───
+# ─── DB column/relation mapping ───
 
 # FM field name → DB column name, per entity type
 ENTITY_COLUMN_MAP = {
@@ -314,7 +314,7 @@ FIELDS_TO_SKIP = {"id", "type"}
 # scene (`from_id=character, to_id=scene`), so a scene does not own them.
 # The importer, every existing row, and every reader (story_retrieve,
 # story_export, core/db.py) assume this direction; writing it the other way
-# left the cast unreadable the moment a scene was authored through story_draft.
+# leaves the cast unreadable the moment a scene is authored through story_draft.
 # Single authority — relation_endpoints() is the only place direction is decided.
 REVERSED_RELATION_KINDS = {"character_scene"}
 
@@ -396,9 +396,9 @@ def _is_empty(value, default) -> bool:
       * an empty string, list or dict — a field the user deliberately cleared;
       * None.
 
-    Since B12 an unfilled field is stored empty, so the second case is the one
-    that fires for prose fields; the first is still load-bearing for the
-    defaults that are 0, False, [] or a real value.
+    Since an unfilled field is stored empty, the second case is the one that
+    fires for prose fields; the first is still load-bearing for the defaults
+    that are 0, False, [] or a real value.
     """
     if value is None:
         return True
