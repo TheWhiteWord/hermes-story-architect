@@ -191,7 +191,10 @@ ENTITY_SCHEMAS = {
         "int_ext": {
             "type": "string", "default": "", "optional": True,
             "enum": INT_EXT_CHOICES, "group": "Scene heading",
-            "description": "Scene heading, first segment: one of INT., EXT., INT./EXT., EST.",
+            "description": "Scene heading, first segment: one of INT., EXT., INT./EXT., EST. "
+                           "The heading line is composed from int_ext, location, place and "
+                           "time_of_day at assembly — `## Content` is body-only and never "
+                           "holds a heading line.",
         },
         "place": {
             "type": "string", "default": "", "optional": True, "group": "Scene heading",

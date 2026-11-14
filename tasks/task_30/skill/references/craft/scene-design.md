@@ -196,14 +196,6 @@ a write. They are judgements, and `Notes` is where they are written.
   the scene's conflict turns; the scene says who is in it. Nothing compares
   them. → `references/craft/character-arc.md`
 
-- **`heading` and the Content's first line are two different things.** The
-  field is a slug-friendly heading for the user's own organisation, and it is
-  optional. The script reads the *first line of the `Content` section*, and
-  that line must be a Fountain scene heading — one beginning `INT`, `EXT`,
-  `EST` or `I/E`. A scene whose Content does not open with one is simply
-  absent from the screenplay, with no error. The field and the line can
-  disagree and nothing checks it.
-
 ## Consistency
 
 **A scene's cast against what the scene does.** The turn happens to someone.

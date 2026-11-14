@@ -11,7 +11,12 @@ The rule this illustrates is in `../screenplay-format.md`.
 
 ## The example
 
+The scene carries `int_ext: INT.`, `location: water-archive`, `place: basement`,
+`time_of_day: DAY`. The heading is composed from those fields at assembly:
+
 INT. WATER ARCHIVE - BASEMENT - DAY
+
+`Content` is the body alone — no heading line:
 
 Fluorescent tubes. Ranks of grey shelving disappear into the dark. Water finds
 its way down one wall in a thin steady thread.
@@ -42,8 +47,8 @@ Put it down.
 
 ## What each part is doing
 
-- **The heading** opens the scene: `INT.` inside, the location, the time. It is
-  the first non-blank line, which is the one thing the lint checks.
+- **The heading** is composed from the fields, not written in `Content`. `INT.`
+  inside, the location's name, the place, the time.
 - **Action** is flush left and says what the camera sees. The water is doing
   work here — it is the image the scene will be remembered by.
 - **Cues** are the name alone, capitals, on their own line. Every one of them
@@ -58,9 +63,9 @@ Put it down.
 ## The result
 
 Verified by running the example through the lexer: **one scene heading, five
-character cues, five dialogue blocks, two parentheticals, and no lint
-finding.** Every name is on its own line in capitals, which is the part nothing
-checks and the part that decides whether this reads as a scene.
+character cues, five dialogue blocks, two parentheticals.** Every name is on
+its own line in capitals, which is the part nothing checks and the part that
+decides whether this reads as a scene.
 
 Whether a cue then *links* to a character entity is the script view's matching
 rather than the lexer's, and it depends on the name matching a character that

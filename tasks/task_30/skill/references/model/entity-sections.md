@@ -188,7 +188,8 @@ home for.
   itself is recorded as `value_turns` after the scene exists; this section holds
   the reasoning. → `../craft/value-pass.md`
 - **Dramatic Function** — its role in the larger structure.
-- **Production** — location, time, heading. Screenplay-facing.
+- **Production** — location, time, and the heading's fields. Pairs with
+  `location`, `time_of_day`, `int_ext`, `place` and `forced_heading`.
 - **Notes**
 
 *The scene's `Conflict` and `Beats` content lives in the `scene_beats` record.

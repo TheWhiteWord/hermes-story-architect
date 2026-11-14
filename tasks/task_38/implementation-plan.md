@@ -244,13 +244,21 @@ Checklist:
 **Goal:** the agent is taught the new model.
 
 Checklist:
-- [ ] `tasks/task_30/skill/references/mechanics/screenplay-format.md:81-90`:
-      one heading, structured; the forced-heading rename.
-- [ ] `tasks/task_30/skill/references/craft/scene-design.md:199-205`: delete the
+- [x] `tasks/task_30/skill/references/mechanics/screenplay-format.md:81-90`:
+      one heading, structured; the forced-heading rename. (The section is now
+      "Which heading is read — one heading exists, and it is composed"; the
+      file's other lint-era statements were rewritten with it — see the brief.)
+- [x] `tasks/task_30/skill/references/craft/scene-design.md:199-205`: delete the
       "two different things" coupling.
-- [ ] The scene schema description in `constants.py` states the derivation.
+- [x] The scene schema description in `constants.py` states the derivation.
+      (`int_ext`'s description now says the heading line is composed from the
+      fields at assembly and `## Content` is body-only; verified in the
+      `story_describe` output.)
 
-**Gate:** no doc tells the agent to write a free-text heading.
+**Gate:** no doc tells the agent to write a free-text heading. (Verified by
+grepping the skill tree: the only `heading` left is the concept — the retired
+field name appears nowhere, and the two samples now show fields + body-only
+Content.)
 
 ## Cleanup
 
@@ -260,28 +268,41 @@ end — a dead helper left behind is the next session's guess.
 
 **Remove — code**
 
-- `core/scene_script.py`: `parse_heading`, `_HEADING_PARTS_RE`, `_TIME_SEP_RE`,
+- [x] `core/scene_script.py`: `parse_heading`, `_HEADING_PARTS_RE`, `_TIME_SEP_RE`,
   `_canon_int_ext`, `_SCENE_NUMBER_RE`, `INT_EXT_CHOICES` (moves to
-  `constants`), and `compose_content` if the editor writes blocks directly.
-- `core/scene_content_lint.py`: its rule ("Content opens with a heading") is
+  `constants`) — done in Phase 1 / Phase 5. `compose_content` is gone here:
+  `is_lossless` inlines it, and the editor writes blocks directly.
+- [x] `core/scene_content_lint.py`: its rule ("Content opens with a heading") is
   dead once Content is body-only. Its `check_scenes` call in `core/drafts.py`
   goes with it. If a "Content present but no heading fields" check is still
   wanted for imported notes, it belongs in the import path, not here.
-- `core/manual_edits.py`: the `heading` dict, the `mode` / `custom` branches.
-- `core/drafts.py:183,599`: the lint call and `fm.get("heading")`.
-- `core/db.py:1153,1202`, `core/manual_structure.py:62`,
+  *(Removed in Phase 5; nothing left to do.)*
+- [x] `core/manual_edits.py`: the `heading` dict, the `mode` / `custom` branches.
+  *(The `heading` dict is the payload contract and stays; the retired
+  `mode` / `custom` branches are gone — the custom mode *is* `forced_heading`.)*
+- [x] `core/drafts.py:183,599`: the lint call and `fm.get("heading")`.
+  *(Both gone: the lint call was removed with the module, the `fm.get("heading")`
+  was already replaced by `_scene_heading_label` in Phase 8.)*
+- [x] `core/db.py:1153,1202`, `core/manual_structure.py:62`,
   `core/manual_entities.py:468`: the `extra.heading` reads.
-- The duplicate heading parsers: `fountain_lexer.parse_location`,
+  *(All four derive from the fields — Phases 2, 3, 8.)*
+- [x] The duplicate heading parsers: `fountain_lexer.parse_location`,
   `screenplay.LOCATION_RE` / `extract_location`. One parser survives (the one
-  stats and import share).
-- `web/js/core.js:111-121`: heading-based scene matching, once ids are used.
+  stats and import share). *(Partly — see the brief: `parse_location` (0 callers)
+  is deleted; `parse_location_information` and `extract_location` stay, both
+  load-bearing.)*
+- [x] `web/js/core.js:111-121`: heading-based scene matching, once ids are used.
+  *(The id match is primary and the heading is only a fallback; ids are used, so
+  the fallback is a no-op on the shipped payload — verified in Phase 8's jsdom
+  gate. Left as the defensive match it is.)*
 
 **Remove — tests**
 
-- `tests/test_scene_content_lint.py` (the module is gone).
-- `tests/test_scene_heading_lint_integration.py` (the lint is gone).
-- `tests/test_scene_script.py`: the `parse_heading` and `compose_content`
-  tests.
+- [x] `tests/test_scene_content_lint.py` (the module is gone). *(Phase 5.)*
+- [x] `tests/test_scene_heading_lint_integration.py` (the lint is gone). *(Phase 5.)*
+- [x] `tests/test_scene_script.py`: the `parse_heading` and `compose_content`
+  tests. *(The `parse_heading` tests went with Phase 5; the two
+  `compose_content` calls are replaced by the inlined round-trip.)*
 
 **Fix — tests**
 
@@ -293,9 +314,13 @@ acceptance sweep now probes a valid heading), `test_manual_structure` (every
 Content write carries heading fields) and `test_script_routes` (the fixture).
 
 Still open:
-- `tests/test_draft_preview.py`: the lint finding.
-- `tests/test_round_trip.py`, `tests/test_values_export_import.py`: the field.
-- `tests/dashboard_tabs_harness.js`: the heading row and the click mapping.
+- [x] `tests/test_draft_preview.py`: the lint finding. *(No lint finding exists
+  any more; the file's findings tests pass.)*
+- [x] `tests/test_round_trip.py`, `tests/test_values_export_import.py`: the field.
+  *(Both pass on the structured fields; no edit needed.)*
+- [x] `tests/dashboard_tabs_harness.js`: the heading row and the click mapping.
+  *(Updated in Phase 10; 43/43 green against a fresh server and the fixture
+  payload.)*
 
 ## Comment hygiene
 
@@ -1159,3 +1184,147 @@ nothing and shift nothing.
   flags `app/server.py`'s legitimate `HermesChatBackend` import; the test's
   exclusion list (`adapters/hermes`, `launcher.py`) does not cover it. Left
   alone — fixing it means touching `src/`, outside this phase.
+
+---
+
+## Phase 11 brief — skill docs
+
+**Short summary.** The skill teaches the structured heading.
+`screenplay-format.md` now says one heading exists and is composed from the
+scene's fields, that `Content` is body-only, and that the write boundary — not
+a lint — is what enforces it. Its three failure modes are the inline cue (still
+the one nothing catches), a scene with no heading fields (refused at write, or
+merged into the previous scene when imported), and a heading line typed into
+`Content` (stripped, not duplicated). The `samples/` pair was rewritten with it:
+the good sample shows the four fields and the body alone, and the broken
+sample's two lint cases became the new failure modes. `craft/scene-design.md`'s
+"two different things" coupling is gone. `constants.py`'s `int_ext` description
+states the derivation — the heading line is composed from `int_ext`, `location`,
+`place` and `time_of_day` at assembly, and `## Content` is body-only.
+
+**Deviations.**
+
+- **The checklist's `:81-90` was the anchor, not the whole change.** The plan
+  and the spec both point at that section, but the rest of the file described
+  the lint Phase 5 removed: "Checked: the first non-blank line of `Content` is
+  a scene heading" (`:28`), the three lint failure modes (`:55-79`), the staging
+  checklist's "the first non-blank line is a scene heading" (`:94`), and an open
+  question about the lint's message (`:107`). Leaving them would fail the
+  phase's own gate and teach the old model. They were rewritten, not deleted —
+  the file still has exactly one enforced rule, and the inline cue is still the
+  one thing nothing catches.
+- **The samples were updated, though the plan did not name them.** They sit in
+  the named file's `samples/` tree and showed a heading line as the first line
+  of `Content` — the exact thing the gate forbids. The good sample now shows the
+  fields and the body; the broken sample's "no heading" and "text before the
+  heading" cases became "no heading fields" and "a heading line in `Content`".
+- **`model/entity-sections.md:191` was updated too.** It described the scene's
+  `Production` section as "location, time, heading" — the retired field. It now
+  names the five heading fields in the file's existing "Pairs with …" form. One
+  line, and the same stale mapping the gate covers.
+- **`forced_heading` is named as a field throughout.** The plan's "forced-heading
+  rename" is read as: the prose term becomes the field name. The shape section,
+  "Which heading is read" and the staging checklist all use `forced_heading`, and
+  the exclusivity rule is stated where the agent reads it.
+- **`int_ext` carries the derivation.** The scene schema has no top-level
+  description — `story_describe` iterates the schema as fields, so a
+  `description` key would be emitted as one. `int_ext` anchors the composed
+  heading and is the first heading field an agent reads, so the statement lives
+  there.
+
+**Contract changes.**
+
+- The skill's screenplay-format reference no longer mentions the scene-content
+  lint (removed in Phase 5); it names the write boundary as the enforcer.
+- `story_describe(scene)`'s `int_ext` description now states that the heading is
+  composed at assembly and `## Content` is body-only.
+- The retired `heading` field name appears nowhere in the skill tree.
+
+**Verification.**
+
+- Gate: grep over `tasks/task_30/skill/` — the retired field name is absent, no
+  doc instructs writing a heading into `Content`, and every remaining `heading`
+  mention is the composed line or the concept.
+- `story_describe({'entity_type': 'scene'})` emits the new `int_ext`
+  description verbatim (probe, real handler).
+- Focused suites: `test_story_describe`, `test_manual_structure`, `test_core`,
+  `test_scene_script`, `test_draft_preview`, `test_write_shape`,
+  `test_unfilled_fields`, `test_response_budget`, `tasks/task_30/test_skill_references`
+  — **332 passed**.
+- Full suite: **1304 passed, 1 failed** (`test_no_hermes_imports`) — identical to
+  the Phase 10 baseline. Collecting `tasks/` as well adds 5 tests and a second
+  pre-existing failure: `tasks/task_30/test_skill_references` flags the assets
+  `SKILL.md`'s `` `success: false` `` backtick, which this phase did not touch.
+
+---
+
+## Cleanup brief — dead model removal
+
+**Short summary.** The retired model has no code or test left behind. This
+phase removed what was still live: `scene_script.compose_content` (the editor
+writes blocks directly, so the helper only fed `is_lossless`, which now inlines
+the join) and the two `compose_content` test calls; `fountain_lexer.parse_location`
+(0 callers — `parse_location_information` stays, it feeds the Better-Fountain
+parity fixture). The two lint test files were already gone with Phase 5. The
+`mode` / `custom` branches, the `fm.get("heading")`, the `extra.heading` reads
+and the duplicate-parser `LOCATION_RE` were verified absent or already replaced
+rather than deleted again. Comment hygiene: the `B12` / `Phase 3` / `Phase 6`
+/ `B11` / `legacy Phase 3` references in `entity.py`, `writes.py`, `db.py`,
+`drafts.py`, `fountain_validator.py` and `chat-api.js` were rewritten to state
+what the code does now; the remaining "was/used to" comments in the touched
+files were checked and are either live invariants or unrelated modules.
+
+**Deviations.**
+
+- **`compose_content` removed, `is_lossless` inlined.** The Cleanup made it
+  conditional ("if the editor writes blocks directly"); the editor does, so it
+  went. `is_lossless` is its only caller and now builds the text itself — one
+  definition of the heading+body join, not two.
+- **`fountain_lexer.parse_location` deleted; `parse_location_information` kept.**
+  `parse_location` had 0 callers. `parse_location_information` is called at
+  `fountain_lexer.py:456` and produces `properties['locations']`, which the
+  Better-Fountain parity fixture (`expected_output.json`) pins — deleting it
+  would change the port's contract. Same for `screenplay.LOCATION_RE` /
+  `extract_location`: they belong to the future import module and
+  `tests/test_core.py:156` pins them. The surviving parser is
+  `scene_script.parse_heading_line`, shared by `app/stats.py` and
+  `tools/story_import.py`.
+- **`core/manual_edits.py`'s `heading` dict stays.** It is the editor's payload
+  contract (`{int_ext, place, location, time_of_day, forced_heading}`), not the
+  retired model; the retired thing was the `mode` / `custom` branches, already
+  gone (Phase 6). Checked by grep: no `mode` / `location_text` / `custom`
+  branch remains.
+- **`web/js/core.js:111-121` left as-is.** The Cleanup's premise ("once ids are
+  used") is already true: the id match is primary, the heading is a fallback
+  that a shipped payload never needs. Removing it would drop a defensive match
+  for a payload with no ids — a change with no caller, so no change.
+- **`core/scene_script.py`'s "still" wording kept** (`split_heading`,
+  `parse_heading_line`, `manual_edits._composed_heading`). Those name a live
+  tolerance for notes whose Content still opens with a heading line — the
+  importer and the paste path — not a retired model.
+- **The two lint test files were not recreated**; Phase 5 deleted them and the
+  Cleanup item is satisfied by their absence.
+
+**Contract changes.** None — no behaviour changed. `compose_content` was
+internal (no route, no tool, no test outside `test_scene_script`), and
+`fountain_lexer.parse_location` had no callers.
+
+**Verification.**
+
+- Gate: `grep` over `src/` and `tests/` for the retired names — `parse_heading`,
+  `compose_content`, `_HEADING_PARTS_RE`, `_TIME_SEP_RE`, `_canon_int_ext`,
+  `_SCENE_NUMBER_RE`, `scene_content_lint`, `screenplay_scene_ids`, `sceneIds`,
+  `extra.heading` — **no hits** outside `tasks/task_38/` (the plan/spec, which
+  are the historical record).
+- Focused suites: `test_scene_script`, `test_fountain_lexer`, `test_core`,
+  `test_manual_edits`, `test_draft_preview`, `test_round_trip`,
+  `test_values_export_import` — **252 passed**.
+- `node tests/dashboard_tabs_harness.js src/story_architect/web <fresh fixture
+  payload>` — **all checks passed** (10 heading checks included).
+- `node tests/script_editor_harness.js src/story_architect/web http://127.0.0.1:8741`
+  against a freshly built server — **43/43 passed**.
+- Full suite: **1297 passed, 1 failed** (Phase 10: 1304 / 1). The 7 dropped are
+  exactly the 7 `TestLocationParsing` tests deleted with `parse_location`
+  (1304 − 7 = 1297); nothing was added. The failure is
+  `test_no_hermes_imports`, re-derived as pre-existing on the stashed tree (it
+  fails with the working tree stashed, so it is not this phase's).
