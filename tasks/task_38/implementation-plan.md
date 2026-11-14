@@ -226,14 +226,16 @@ Checklist:
 **Goal:** the invariants are pinned.
 
 Checklist:
-- [ ] `tests/test_scene_script.py`: `compose_heading` with place; the always-time
+- [x] `tests/test_scene_script.py`: `compose_heading` with place; the always-time
       rule; the no-dash refusal.
-- [ ] `tests/test_manual_edits.py`: save with fields; refusal without a heading;
+- [x] `tests/test_manual_edits.py`: save with fields; refusal without a heading;
       forced heading.
-- [ ] `tests/test_scene_heading_lint_integration.py`: update to the new fields.
-- [ ] `tests/test_core.py`: round-trip carries the fields; the pipeline shows
+- [x] ~~`tests/test_scene_heading_lint_integration.py`: update to the new fields.~~
+      **Removed in Phase 5** (commit `e4c613e`) with `core/scene_content_lint.py`;
+      the rule it pinned is now the composer boundary, covered by items 1, 2 and 4.
+- [x] `tests/test_core.py`: round-trip carries the fields; the pipeline shows
       scenes.
-- [ ] Dashboard harness: the heading row and the click mapping.
+- [x] Dashboard harness: the heading row and the click mapping.
 
 **Gate:** the full suite is green.
 
@@ -1082,3 +1084,78 @@ than an editor.
   shape; focused suites pass. Full suite: **1297 passed, 2 failed** — the same
   two failures every prior phase recorded (`test_no_hermes_imports`,
   `tasks/task_30/test_skill_references`, both failing on the stashed base).
+
+## Phase 10 brief — tests
+
+**Short summary.** The invariants are pinned in the three suites that can see
+them. `test_scene_script.py::TestHeading` grew from two assertions to seven:
+the place segment (upper-cased, collapsed, omitted when blank), the
+always-emitted time (`UNSPECIFIED` when unset), the per-segment `' - '`
+refusal, composer/validator agreement on `INT_EXT_CHOICES`,
+`scene_heading`'s forced-over-composed precedence, and `split_heading`'s
+leading-line strip. `test_manual_edits.py` gained the editor's three paths:
+a forced save clears the composed fields, a save with no heading at all is
+refused before anything is written (hash unchanged), and a composed save
+carries every field through to `get_screenplay_text`. `test_core.py` gained
+two tests: the pipeline shows one composed line per scene (the 0-scene bug,
+with `lengthStats.scenes == 2`, the ordered `screenplay_scene_headings`, the
+dashboard's own copy agreeing, and the location's computed `places` picking up
+the new place), and an import → export → import round trip on the fixture that
+asserts `int_ext`/`place` survive and the second import composes the declared
+heading. The dashboard harness gained a heading block: the payload's composed
+headings in order, the assembled text carrying each heading above its own
+body, the scene row/search/panel and the location card tag, and the click
+mapping — including a heading the server did not compose, which must open
+nothing and shift nothing.
+
+**Deviations.**
+
+- **Checklist item 3 is obsolete, not done.** `tests/test_scene_heading_lint_integration.py`
+  was deleted in Phase 5 (`e4c613e`) along with `core/scene_content_lint.py`;
+  the rule it pinned is now the composer boundary and is covered by items 1, 2
+  and 4. Marked struck-through in the checklist rather than recreated.
+- **The pipeline test had to be rewritten, not just extended.** It wrote Content
+  straight to the DB with the heading line inside the body — the shape the
+  Phase 5 boundary now refuses. It now writes body-only Content and passes
+  `int_ext`/`location`/`time_of_day` at create, the way the importer does.
+- **The dashboard harness needed a real DOM for these checks.** Its existing
+  checks run the modules in a fake `window` with no `document`, so the views and
+  panels could not run there. The heading block runs in its own jsdom window
+  against the same repo tree, loading `core.js`, the two views, the panels and
+  `script-view.js`, and reading back the containers they write. The pre-existing
+  checks are untouched.
+- **Three stale old-model assertions fixed in `tests/script_editor_harness.js`**,
+  which Phase 8/9 had left behind: the heading row now has four pills (`PLACE`
+  is always present, dim when empty); the "unregistered location" path is gone —
+  `pickLocation` only lists registered locations, so the free-text slot is the
+  place, and the test now types a new place and asserts
+  `EXT. ATTIC - THE CELLAR - DUSK`; and Content is body-only, so the
+  "Keep mine" and "save writes one coherent scene" assertions check the body
+  prefix rather than a leading heading line.
+- **`tests/script_editor_serve.py` needed one field.** Its `locked-one` fixture
+  wrote a heading line into Content with no structured fields, which the Phase 5
+  guard now refuses — the server crashed on boot. It carries `int_ext` like the
+  other headed fixture.
+- **The location panel was not changed.** Its scene rows are titled by the scene
+  (`r.title`), not by the heading; the plan's item 5 asks for the heading row
+  and the click mapping, and the location card tag already carries it. The
+  harness check asserts the row link resolves, not a heading it never showed.
+
+**Contract changes.** None — no application code changed in this phase.
+
+**Verification.**
+
+- `pytest tests/test_scene_script.py tests/test_manual_edits.py tests/test_core.py -q`:
+  **126 passed**.
+- `node tests/dashboard_tabs_harness.js src/story_architect/web <payload>`:
+  **all checks passed**, including the ten new heading checks.
+- `node tests/script_editor_harness.js src/story_architect/web http://127.0.0.1:8741`
+  against a freshly built server: **43/43 passed**. The harness is not
+  idempotent — it mutates the served project — so it needs a fresh
+  `script_editor_serve.py` per run.
+- Full suite: **1304 passed, 1 failed** — `test_no_hermes_imports`, the same
+  pre-existing failure every prior phase recorded. Confirmed present on a
+  stashed clean tree and on `master`, so it is not a Phase 10 regression. It
+  flags `app/server.py`'s legitimate `HermesChatBackend` import; the test's
+  exclusion list (`adapters/hermes`, `launcher.py`) does not cover it. Left
+  alone — fixing it means touching `src/`, outside this phase.

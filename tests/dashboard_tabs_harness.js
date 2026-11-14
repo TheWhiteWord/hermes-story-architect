@@ -46,6 +46,7 @@ for (const f of [
   'panels/panel-tabs.js',
   'panels/scene-beats-tab.js',
   'panels/character-journey-tab.js',
+  'script-view.js',
 ]) load(f);
 
 const D = DASH;
@@ -539,6 +540,142 @@ check('every data-* a tab reads is one it emits, or a documented protocol', func
   for (const m of js.matchAll(/querySelector\(['"]\[data-([\w-]+)/g)) read.add(m[1]);
   const orphans = [...read].filter(k => !emitted.has(k) && !PROTOCOL.has(k));
   assert.deepStrictEqual(orphans, [], 'read but never emitted: ' + orphans.join(', '));
+});
+
+// ---- the scene heading row and the click mapping -------------------------------------------
+// The payload's `screenplay_scene_headings` are what get_dashboard_data produced
+// for the fixture, and the assembled text is the same producer's output. The
+// checks are the property the assembly exists for: every scene that composed a
+// heading renders one, and a click inside it opens THAT scene.
+//
+// These need a DOM, so they run in their own jsdom window below — the pure
+// checks above run in the harness's fake `window`, which has no `document`.
+console.log('--- scene heading ---');
+check('the payload carries one composed heading per scene, in order', function () {
+  assert.deepStrictEqual(payload.screenplay_scene_headings, [
+    { text: 'INT. THE CENTRAL ROOM - DAY', id: 'central-room-day' },
+    { text: 'INT. THE CENTRAL ROOM - NIGHT', id: 'central-room-night' },
+    { text: 'EXT. THE GARDEN - DAY', id: 'the-core-day' },
+  ]);
+});
+check('the assembled text carries each heading above its body', function () {
+  const text = payload.screenplay_text;
+  const day = text.indexOf('INT. THE CENTRAL ROOM - DAY');
+  const night = text.indexOf('INT. THE CENTRAL ROOM - NIGHT');
+  const garden = text.indexOf('EXT. THE GARDEN - DAY');
+  assert.ok(day >= 0 && night > day && garden > night, text);
+  // Each heading is followed by its own body, not by the next heading.
+  assert.ok(text.indexOf('KAEL stands before the door') > day, text);
+  assert.ok(text.indexOf('The ADMINISTRATOR speaks') > night, text);
+});
+
+// The DOM block: the dashboard's own views, panels and script view, in jsdom.
+const { JSDOM } = require('jsdom');
+const dom = new JSDOM(`<!doctype html><body><div id="main"></div>
+  <aside id="detail-panel"><div id="panel-type"></div><div id="panel-name"></div>
+  <div id="panel-body"></div><div id="panel-footer"></div></aside>
+  <div id="scene-list"></div><div id="location-list"></div>
+  <div id="scenes-subtitle"></div><div id="locations-subtitle"></div>
+  <div id="screenplay-container"></div><div id="script-subtitle"></div></body>`,
+  { url: 'http://localhost/', runScripts: 'outside-only' });
+const w = dom.window;
+const doc = w.document;
+w.DASH = {};
+w.__SECTIONS__ = payload.sections || {};
+const run = f => w.eval(fs.readFileSync(path.join(JS, f), 'utf8'));
+for (const f of [
+  'colors.js', 'utils.js', 'navigation.js', 'core.js',
+  'views/scenes.js', 'views/locations.js',
+  'graph/value-graph.js',
+  'graph/track-data.js',
+  'panels/panel-manager.js', 'panels/entity-panels.js', 'panels/panel-tabs.js',
+  'script-editor/model.js',
+  'script-view.js',
+]) run(f);
+const V = w.DASH;
+V.story = V.normalise(JSON.parse(JSON.stringify(payload.story)));
+const opened = [];
+V.openScriptEditor = (id, opts) => opened.push([id, opts]);
+V.setEl = () => {};
+V.network = null;
+const panelHtml = () => doc.getElementById('panel-body').innerHTML;
+
+check('the scene list shows the composed heading under its title', function () {
+  const item = V.renderSceneItem(V.story.scenes.find(s => s.id === 'central-room-day'));
+  assert.ok(item.includes('INT. THE CENTRAL ROOM - DAY'), item);
+  assert.ok(item.indexOf('Central Room - Day') < item.indexOf('INT. THE CENTRAL ROOM - DAY'), item);
+});
+check('the scene search matches the composed heading', function () {
+  V.buildScenesView();              // filterScenes reads DASH.allScenes and renders
+  V.filterScenes('garden');
+  const garden = doc.getElementById('scene-list').innerHTML;
+  assert.ok(garden.includes('the-core-day'), garden);
+  assert.ok(!garden.includes('central-room-day'), garden);
+  V.filterScenes('central room');
+  const central = doc.getElementById('scene-list').innerHTML;
+  assert.ok(central.includes('central-room-day') && central.includes('central-room-night'), central);
+  assert.ok(!central.includes('the-core-day'), central);
+});
+check('the scene panel shows the composed heading', function () {
+  V.showScenePanel('central-room-day');
+  assert.ok(/INT\. THE CENTRAL ROOM - DAY/.test(panelHtml()), panelHtml());
+});
+check('a location\'s scene refs open their scene', function () {
+  V.buildLocationsView();           // the panel selects a card from this list
+  V.showLocationPanel('the-central-room');
+  const html = panelHtml();
+  // The panel's rows are titled by the scene, not by its heading — the heading
+  // is the card tag, checked above. What matters here is the link resolves.
+  assert.ok(html.includes('jr-scene'), html);
+  assert.ok(html.includes('scene:central-room-day') && html.includes('scene:central-room-night'), html);
+});
+check('the location card tags carry the composed heading', function () {
+  V.buildLocationsView();
+  const html = doc.getElementById('location-list').innerHTML;
+  assert.ok(html.includes('INT. THE CENTRAL ROOM - DAY'), html);
+});
+
+// The click mapping: script-view.js walks the rendered headings and consumes the
+// server's `{text, id}` pairs in order, so a heading that was not composed opens
+// nothing rather than opening the wrong scene.
+w.__SCREENPLAY_STATS__ = {
+  sceneHeadings: payload.screenplay_scene_headings,
+  scriptHtml: payload.screenplay_text.split('\n\n').map(part => {
+    const lines = part.split('\n');
+    return /^\s*(\.|INT|EXT|EST|I\/E)/.test(lines[0])
+      ? `<h3 class="fountain-scene_heading">${lines[0]}</h3><p><span class="fountain-action">${lines.slice(1).join(' ')}</span></p>`
+      : `<p><span class="fountain-action">${part}</span></p>`;
+  }).join(''),
+};
+V.buildScriptView();
+check('every composed heading is clickable and opens its own scene', function () {
+  const heads = Array.from(doc.querySelectorAll('.fountain-scene_heading'));
+  assert.strictEqual(heads.length, 3, heads.map(h => h.textContent).join('|'));
+  heads.forEach(h => assert.ok(h.classList.contains('se-clickable'), h.textContent));
+  heads[0].click();
+  assert.deepStrictEqual(opened.map(o => o[0]), ['central-room-day']);
+});
+check('a click in the body opens the scene that heading belongs to', function () {
+  const heads = doc.querySelectorAll('.fountain-scene_heading');
+  heads[1].nextElementSibling.click();          // the action under the NIGHT heading
+  assert.strictEqual(opened[opened.length - 1][0], 'central-room-night');
+});
+check('a heading the server did not compose opens nothing and shifts nothing', function () {
+  // A stored line in a scene's body renders as a heading, but the server composed
+  // no pair for it. It must not be clickable, and every heading after it must
+  // still open its own scene — positionally it would take the next id.
+  const stats = w.__SCREENPLAY_STATS__;
+  stats.scriptHtml = stats.scriptHtml.replace(
+    '<h3 class="fountain-scene_heading">INT. THE CENTRAL ROOM - NIGHT</h3>',
+    '<h3 class="fountain-scene_heading">INT. ROGUE - DAY</h3>' +
+    '<p><span class="fountain-action">A stored line.</span></p>' +
+    '<h3 class="fountain-scene_heading">INT. THE CENTRAL ROOM - NIGHT</h3>');
+  V.buildScriptView();
+  const heads = Array.from(doc.querySelectorAll('.fountain-scene_heading'));
+  assert.strictEqual(heads.length, 4, heads.map(h => h.textContent).join('|'));
+  assert.ok(!heads[1].classList.contains('se-clickable'), 'the rogue heading is clickable');
+  heads[2].click();
+  assert.strictEqual(opened[opened.length - 1][0], 'central-room-night');
 });
 
 if (fails.length) { console.log('\n' + fails.length + ' FAILED'); process.exit(1); }

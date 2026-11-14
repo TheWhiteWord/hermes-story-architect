@@ -148,6 +148,40 @@ class TestSave:
         assert out["scene"]["forced_heading"] == ".SNIPER SCOPE POV"
         assert out["scene"]["heading"] == ".SNIPER SCOPE POV"
 
+    def test_forced_heading_clears_the_composed_fields(self, project):
+        """The two heading sources are exclusive, so the stored state after a
+        forced save carries no structured field at all — a later reader cannot
+        find a half-heading."""
+        s = me.load_scene_script(project, "the-kitchen")
+        out = me.save_scene_script(project, "the-kitchen", _payload(
+            s, heading={"forced_heading": ".SNIPER SCOPE POV", "location": "kitchen"}))
+        assert out["scene"]["int_ext"] == "" and out["scene"]["place"] == ""
+        assert out["scene"]["time_of_day"] == ""
+        assert out["scene"]["location"] == "kitchen"      # the link survives
+
+    def test_a_save_with_no_heading_at_all_is_refused(self, project):
+        """The boundary's rule, reached through the editor: a scene with a script
+        and no heading is refused before anything is written."""
+        s = me.load_scene_script(project, "the-kitchen")
+        with pytest.raises(me.ScriptError, match="needs a heading"):
+            me.save_scene_script(project, "the-kitchen", _payload(
+                s, heading={"int_ext": "", "location": "", "place": "",
+                            "time_of_day": "", "forced_heading": ""}))
+        assert me.load_scene_script(project, "the-kitchen")["hash"] == s["hash"]
+
+    def test_a_composed_save_carries_every_field(self, project):
+        """One save writes the fields and the body together, so the assembled
+        heading and the scene's stored fields cannot disagree."""
+        s = me.load_scene_script(project, "the-kitchen")
+        out = me.save_scene_script(project, "the-kitchen", _payload(
+            s, heading={"int_ext": "INT./EXT.", "location": "kitchen", "place": "pantry",
+                        "time_of_day": "DUSK", "forced_heading": ""}))
+        assert (out["scene"]["int_ext"], out["scene"]["place"],
+                out["scene"]["time_of_day"]) == ("INT./EXT.", "pantry", "DUSK")
+        assert out["scene"]["heading"] == "INT./EXT. KITCHEN - PANTRY - DUSK"
+        from story_architect.core.db import get_screenplay_text
+        assert "INT./EXT. KITCHEN - PANTRY - DUSK" in get_screenplay_text(project)
+
     def test_stale_save_is_refused_and_nothing_is_written(self, project):
         s = me.load_scene_script(project, "the-kitchen")
         edit_entity(project, "scene", "the-kitchen",

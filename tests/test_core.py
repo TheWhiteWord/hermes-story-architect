@@ -743,15 +743,20 @@ class TestScreenplayStatsFromSceneContent:
             {"title": "Act 1"})
         create_entity(project_path, "sequence", "seq-1",
             {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project_path, "location", "the-institute",
+            {"name": "The Institute", "one_sentence": "T"})
         create_entity(project_path, "scene", "scene-1",
-            {"title": "The Institute", "sequence_id": "seq-1", "act_id": "act-1"})
+            {"title": "The Institute", "sequence_id": "seq-1", "act_id": "act-1",
+             "int_ext": "EXT.", "location": "the-institute", "time_of_day": "DAY"})
 
-        # Update the Content section (created empty alongside the entity)
+        # The body is written directly, the way the importer does — the write
+        # boundary does not run here, so the heading line is stripped by hand and
+        # the fields are what compose the line at assembly.
         conn = get_db(project_path)
         try:
             conn.execute(
                 "UPDATE sections SET body=? WHERE entity_id=? AND heading='Content'",
-                ("EXT. THE INSTITUTE - DAY\n\nA vast decaying building.\n\nKAEL (15, intense) stares at a wall of pale light.\n\nKAEL\nSomething's wrong. Everything arrives too perfectly.", "scene-1")
+                ("A vast decaying building.\n\nKAEL (15, intense) stares at a wall of pale light.\n\nKAEL\nSomething's wrong. Everything arrives too perfectly.", "scene-1")
             )
             conn.commit()
         finally:
@@ -759,6 +764,7 @@ class TestScreenplayStatsFromSceneContent:
 
         scene_text = get_screenplay_text(project_path)
         assert scene_text, "get_screenplay_text returned empty string"
+        assert "EXT. THE INSTITUTE - DAY" in scene_text
 
         from story_architect.app.stats import _compute_screenplay_stats
         stats = _compute_screenplay_stats(scene_text)
@@ -767,6 +773,101 @@ class TestScreenplayStatsFromSceneContent:
         assert stats["scriptHtml"], "scriptHtml should not be empty for valid scene content"
         assert "lengthStats" in stats
         assert stats["lengthStats"]["scenes"] >= 1
+
+    def test_the_pipeline_shows_a_scene_per_composed_heading(self, tmp_path):
+        """The 0-scene bug, pinned: a scene's heading is composed from its
+        fields, so the assembled text carries one line per scene and the stats
+        count them. Before the composer, the same project assembled to bare
+        bodies and `lengthStats.scenes` was 0."""
+        from story_architect.core.db import get_dashboard_data, get_db, get_screenplay_text
+
+        project_path = tmp_path / "test-project"
+        project_path.mkdir()
+        (project_path / ".story").mkdir()
+        (project_path / "project.md").write_text("---\nname: Test\n---\n")
+
+        create_entity(project_path, "act", "act-1", {"title": "Act 1"})
+        create_entity(project_path, "sequence", "seq-1",
+                      {"title": "Seq 1", "act_id": "act-1"})
+        create_entity(project_path, "location", "the-institute",
+                      {"name": "The Institute", "one_sentence": "T"})
+        create_entity(project_path, "project", "test", {"name": "Test"})
+        for i, (tod, place) in enumerate([("DAY", ""), ("NIGHT", "cellar")], start=1):
+            create_entity(project_path, "scene", f"scene-{i}",
+                          {"title": f"Scene {i}", "sequence_id": "seq-1", "act_id": "act-1",
+                           "order": i, "int_ext": "INT.", "location": "the-institute",
+                           "time_of_day": tod, "place": place},
+                          sections={"Content": f"Body {i}.\n"})
+
+        text = get_screenplay_text(project_path)
+        assert "INT. THE INSTITUTE - DAY" in text
+        assert "INT. THE INSTITUTE - CELLAR - NIGHT" in text
+
+        from story_architect.app.stats import _compute_screenplay_stats
+        stats = _compute_screenplay_stats(text)
+        assert stats["lengthStats"]["scenes"] == 2
+
+        data = get_dashboard_data(project_path)
+        assert data["screenplay_scene_headings"] == [
+            {"text": "INT. THE INSTITUTE - DAY", "id": "scene-1"},
+            {"text": "INT. THE INSTITUTE - CELLAR - NIGHT", "id": "scene-2"},
+        ]
+        # The dashboard's own copy of the line agrees with the assembled one.
+        headings = {s["id"]: s["heading"] for s in data["story_data"]["scenes"]}
+        assert headings["scene-2"] == "INT. THE INSTITUTE - CELLAR - NIGHT"
+        # And the location's computed places carry the new place on the next read.
+        loc = next(l for l in data["story_data"]["locations"] if l["id"] == "the-institute")
+        assert loc["places"] == ["cellar"]
+
+    def test_the_fixture_round_trip_carries_the_heading_fields(self, fixture_path):
+        """Import → export → import carries `int_ext` and `place`, and the
+        heading the second import composes is the one the notes declared.
+
+        The fixture's notes hold the fields and body-only Content, which is the
+        shape the writer produces; a round trip that dropped a field would
+        silently turn a headed scene back into a body-only one.
+        """
+        import json
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from story_architect.tools.story_export import handler as export_handler
+        from story_architect.tools.story_import import handler as import_handler
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            project = tmp / "save-the-children"
+            shutil.copytree(str(fixture_path), str(project))
+            import_handler({"project": str(project), "root_path": tmp})
+
+            export_dir = tmp / "exported"
+            export_dir.mkdir()
+            exported = export_dir / "proj"
+            shutil.copytree(str(project), str(exported))
+            for f in exported.rglob("*.md"):
+                f.unlink()
+            assert json.loads(export_handler(
+                {"project": str(exported), "root_path": str(export_dir)}))["success"] is True
+
+            reimport = tmp / "reimported"
+            (reimport / "save-the-children").parent.mkdir(parents=True)
+            shutil.copytree(str(exported), str(reimport / "save-the-children"))
+            dest = reimport / "save-the-children"
+            import_handler({"project": str(dest), "confirm": True,
+                            "root_path": str(reimport)})
+
+            from story_architect.core.db import get_db, get_screenplay_text
+            conn = get_db(dest)
+            try:
+                rows = {sid: json.loads(extra) for sid, extra in conn.execute(
+                    "SELECT id, extra FROM entities WHERE type='scene'")}
+            finally:
+                conn.close()
+            assert rows["central-room-day"]["int_ext"] == "INT."
+            assert rows["the-core-day"]["int_ext"] == "EXT."
+            assert rows["central-room-day"].get("place", "") == ""
+            assert "INT. THE CENTRAL ROOM - DAY" in get_screenplay_text(dest)
 
 
 # ---- Unfilled Fields Tests ----

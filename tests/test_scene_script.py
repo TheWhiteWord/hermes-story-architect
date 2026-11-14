@@ -110,6 +110,8 @@ class TestParityWithLexer:
 
 
 class TestHeading:
+    """The composer and the line readers, on the rules the assembly depends on."""
+
     def test_compose(self):
         assert ss.compose_heading("INT.", "The kitchen", "", "NIGHT") == "INT. THE KITCHEN - NIGHT"
         assert ss.compose_heading("EXT.", "Pier") == "EXT. PIER - UNSPECIFIED"
@@ -118,6 +120,60 @@ class TestHeading:
             ss.compose_heading("INT.", "", "", "DAY")
         with pytest.raises(ValueError):
             ss.compose_heading("INT.", "A", "", "EVENING")
+
+    def test_the_place_segment_is_upper_cased_and_omitted_when_empty(self):
+        """The place is a segment of the upper-case line; the stored value keeps
+        its own case, so the composer is the only place it is normalised."""
+        assert ss.compose_heading("INT.", "The Kitchen", "pantry", "NIGHT") == \
+            "INT. THE KITCHEN - PANTRY - NIGHT"
+        # Whitespace is collapsed, so a sloppy value still composes one segment.
+        assert ss.compose_heading("INT.", "The Kitchen", "  back   room ", "NIGHT") == \
+            "INT. THE KITCHEN - BACK ROOM - NIGHT"
+        assert " - PANTRY - " not in ss.compose_heading("INT.", "The Kitchen", "   ", "NIGHT")
+
+    def test_a_time_is_always_emitted(self):
+        """The last ` - ` segment is always the time, so the parser can split the
+        line unambiguously. `UNSPECIFIED` is what an unset time composes to."""
+        assert ss.compose_heading("EXT.", "Pier", "", "") == "EXT. PIER - UNSPECIFIED"
+        assert ss.compose_heading("EXT.", "Pier", "Quay", "") == \
+            "EXT. PIER - QUAY - UNSPECIFIED"
+
+    def test_the_separator_may_not_appear_in_a_segment(self):
+        """` - ` is the separator between place and time, so a segment carrying
+        it would make the composed line unparseable."""
+        with pytest.raises(ValueError, match=r"location name cannot contain ' - '"):
+            ss.compose_heading("INT.", "The Kitchen - Cellar", "", "NIGHT")
+        with pytest.raises(ValueError, match=r"place cannot contain ' - '"):
+            ss.compose_heading("INT.", "The Kitchen", "pantry - cellar", "NIGHT")
+
+    def test_the_composer_and_the_validator_agree_on_the_enum(self):
+        """Both read `INT_EXT_CHOICES`, so a value one accepts the other does."""
+        from story_architect.core.constants import INT_EXT_CHOICES
+
+        for value in INT_EXT_CHOICES:
+            assert ss.compose_heading(value, "Kitchen", "", "DAY") == \
+                f"{value} KITCHEN - DAY"
+        for value in ("", "INT", "int.", "I/E", "OUT."):
+            with pytest.raises(ValueError):
+                ss.compose_heading(value, "Kitchen", "", "DAY")
+
+    def test_scene_heading_is_the_forced_line_or_the_composed_one(self):
+        """Readers that still show a line get one source: forced wins, an
+        unusable composed heading reads as no heading at all."""
+        assert ss.scene_heading("", "", "", "", "") == ""
+        assert ss.scene_heading("INT.", "Kitchen", "Pantry", "NIGHT", "") == \
+            "INT. KITCHEN - PANTRY - NIGHT"
+        assert ss.scene_heading("", "", "", "", ".SNIPER SCOPE POV") == ".SNIPER SCOPE POV"
+        assert ss.scene_heading("OUT.", "Kitchen", "", "NIGHT", "") == ""
+
+    def test_split_heading_takes_a_leading_line_and_leaves_the_body(self):
+        """A note whose Content still opens with a heading line is canonicalised
+        on import; the line is stripped so the composed heading is not duplicated."""
+        assert ss.split_heading("INT. KITCHEN - NIGHT\n\nRain.\n") == \
+            ("INT. KITCHEN - NIGHT", "\nRain.\n")
+        assert ss.split_heading("Rain.\n") == (None, "Rain.\n")
+        assert ss.split_heading("   \n\nRain.\n") == (None, "Rain.\n")
+        assert ss.split_heading("[placeholder — scene/Content]") == (None, "")
 
 
 class TestCast:

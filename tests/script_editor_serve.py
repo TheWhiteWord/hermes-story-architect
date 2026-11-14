@@ -39,7 +39,8 @@ def build(root: Path) -> None:
     create_entity(p, "scene", "blank", {"title": "Blank", "sequence_id": "seq-1", "act_id": "act-1"})
     edit_entity(p, "scene", "blank", {"order": 0}, "unplace")
     create_entity(p, "scene", "locked-one", {"title": "Locked One", "sequence_id": "seq-1", "act_id": "act-1",
-                                             "order": 3, "location": "kitchen", "time_of_day": "DAY"},
+                                             "order": 3, "int_ext": "INT.", "location": "kitchen",
+                                             "time_of_day": "DAY"},
                   sections={"Content": "INT. KITCHEN - DAY\n\nNothing moves.\n"})
     edit_entity(p, "scene", "locked-one", {"status": "locked"}, "lock")
 

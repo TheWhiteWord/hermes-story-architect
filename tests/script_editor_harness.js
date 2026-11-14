@@ -64,7 +64,9 @@ const waitFor = async (fn, what, ms) => {
   await openScene('the-kitchen', 'The Kitchen');
 
   await test('opens on the scene and shows the generated heading', async () => {
-    assert.deepStrictEqual($$('.se-hline .se-pill').map(b => b.textContent), ['INT.', 'KITCHEN', 'NIGHT']);
+    // The place pill is always present, dim when empty: the row is the composer,
+    // so every segment has a control even before it is filled.
+    assert.deepStrictEqual($$('.se-hline .se-pill').map(b => b.textContent), ['INT.', 'KITCHEN', 'PLACE', 'NIGHT']);
     assert.strictEqual($('#se-sub').textContent, 'Script · INT. KITCHEN - NIGHT');
   });
   await test('blocks come back typed, in order', async () => {
@@ -184,13 +186,12 @@ const waitFor = async (fn, what, ms) => {
     $('[data-h="tod"]').click(); md($$('.se-pop-item').find(b => /DUSK/.test(b.textContent)));
     assert.ok(/EXT\. ATTIC - DUSK/.test($('#se-sub').textContent));
   });
-  await test('an unregistered location is typed, kept as heading text only, and warned about', async () => {
-    $('[data-h="loc"]').click();
+  await test('a new place is typed into the heading and kept as heading text', async () => {
+    $('[data-h="place"]').click();
     const q = $('.se-pop-q'); q.value = 'the cellar'; q.dispatchEvent(new w.Event('input', { bubbles: true }));
     md($$('.se-pop-item').find(b => /Use “the cellar”/.test(b.textContent)));
-    assert.ok(/EXT\. THE CELLAR - DUSK/.test($('#se-sub').textContent));
-    assert.ok($('.se-chip.se-adhoc'), 'shown dashed in settings');
-    await waitFor(() => /not a registered location/.test($('#se-drawer').textContent), 'the location warning');
+    assert.ok(/EXT\. ATTIC - THE CELLAR - DUSK/.test($('#se-sub').textContent));
+    assert.ok(/THE CELLAR/.test($('[data-h="place"]').textContent));
   });
   await test('settings "−" clears the location; save is blocked until one is set again', async () => {
     $('[data-set="remove"]').click();
@@ -240,7 +241,7 @@ const waitFor = async (fn, what, ms) => {
     $('#se-save').click();
     await waitFor(() => $('#se-dirty').hidden && /saved/i.test($('#se-toast').textContent), 'the save to finish');
     const s = await get('/api/projects/demo/scenes/the-kitchen/script');
-    assert.ok(s.content.startsWith('INT. KITCHEN - NIGHT\n'), s.content);
+    assert.ok(s.content.startsWith('Mara stands at the counter'), s.content);
     assert.ok(/ledger open\. Rain hammers the window\./.test(s.content), s.content);
     assert.ok(/DETECTIVE OAK\nEvening, Mara\./.test(s.content), s.content);
     assert.strictEqual(s.scene.heading, 'INT. KITCHEN - NIGHT');
@@ -273,7 +274,7 @@ const waitFor = async (fn, what, ms) => {
     assert.ok(/Hermes rewrote this\./.test((await get('/api/projects/demo/scenes/the-kitchen/script')).content), 'nothing written yet');
     $('[data-banner="overwrite"]').click();
     await waitFor(() => $('#se-dirty').hidden, 'the overwrite');
-    assert.ok(/^INT\. KITCHEN - NIGHT\n\nMine\./.test((await get('/api/projects/demo/scenes/the-kitchen/script')).content));
+    assert.ok(/^Mine\./.test((await get('/api/projects/demo/scenes/the-kitchen/script')).content));
   });
   await test('a change from elsewhere while there are unsaved edits raises the conflict banner, not an overwrite', async () => {
     type(focusEnd(at(0)), 'Unsaved.');
@@ -312,7 +313,7 @@ const waitFor = async (fn, what, ms) => {
     assert.strictEqual(blocks().length, 1);
     assert.strictEqual(D.activeElement, at(0), 'the cursor is on the page');
     const t = $('#se-drawer').textContent;
-    assert.ok(/order is 0/i.test(t) && /Time of day is not set/.test(t) && /No location is set/.test(t) && /no scene heading/.test(t), t);
+    assert.ok(/order is 0/i.test(t) && /Time of day is not set/.test(t) && /No location is set/.test(t) && /no heading/.test(t), t);
     assert.ok($('#se-save').disabled);
     assert.ok($('[data-h="loc"]').classList.contains('se-warn') && $('[data-h="tod"]').classList.contains('se-warn'));
   });
