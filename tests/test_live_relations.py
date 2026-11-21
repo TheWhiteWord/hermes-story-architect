@@ -238,8 +238,10 @@ def test_story_load_upgrades_an_old_database_instead_of_failing(proj):
 def test_every_read_of_relations_goes_through_the_view():
     """A raw `FROM relations` read would show a deleted entity again.
 
-    Writers (INSERT / DELETE / UPDATE) use the table and are not matched. The two
-    allowed reads are the view's own definition: SCHEMA_SQL and migration 4.
+    Writers (INSERT / DELETE / UPDATE) use the table and are not matched. The
+    allowed reads are the view's own definition (SCHEMA_SQL and migration 4)
+    and the integrity oracle: it must see rows the view hides, because a
+    dangling reference whose other end is in the trash is still an orphan.
     """
     pattern = re.compile(r"(?<!DELETE )\b(?:FROM|JOIN)\s+relations\b")
     found = {}
@@ -247,7 +249,7 @@ def test_every_read_of_relations_goes_through_the_view():
         n = len(pattern.findall(f.read_text(encoding="utf-8")))
         if n:
             found[str(f.relative_to(SRC))] = n
-    assert found == {"core/db.py": 2}, (
+    assert found == {"core/db.py": 2, "core/integrity.py": 2}, (
         f"raw reads of the relations table: {found}. Read `live_relations` instead.")
 
 

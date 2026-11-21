@@ -139,3 +139,15 @@ def snapshot(p):
     """Every table that holds project data, row for row."""
     return {t: sorted(map(repr, sql(p, f"SELECT * FROM {t}")))
             for t in ("entities", "relations", "sections", "revisions")}
+
+
+# ─── the integrity oracle ───
+
+def assert_no_orphans(project_path):
+    """No row points at something that is not there (core.integrity)."""
+    from story_architect.core.integrity import find_orphans
+    conn = sqlite3.connect(str(project_path / ".story" / "story.db"))
+    try:
+        assert find_orphans(conn) == {}
+    finally:
+        conn.close()

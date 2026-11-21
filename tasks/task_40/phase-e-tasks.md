@@ -403,9 +403,10 @@ Make `hard_delete` (in `core/trash.py`) skip the `sections` delete; the purge sc
 must now fail with a `sections` orphan. Restore.
 
 ### Done when
-- [ ] `core/integrity.py` + `tests/test_integrity.py` (clean, six categories, grandchild
-      case, scenario matrix) pass.
-- [ ] Mutation check done. · [ ] Close-out.
+- [x] `core/integrity.py` + `tests/test_integrity.py` (clean, six categories, grandchild
+      case, scenario matrix) pass. *(FTS check kept, with `rank=1` — see Discoveries.)*
+- [x] Mutation check done. · [x] Close-out. *(DB-4 source scan needed a named exemption
+      for the checker's raw reads — owner approved; see Discoveries.)*
 
 ---
 
@@ -949,11 +950,11 @@ with a mix of legacy and new stamps; "deleted together" still groups.
 
 # Part 6 — Progress log and discoveries (the agent fills this in)
 
-Baseline at start: `____ passed, 1 failed` (expected `1602 passed, 1 failed`).
+Baseline at start: `1602 passed, 1 failed` (expected `1602 passed, 1 failed`).
 
 | Task | Status | Commit | Tests after | Notes |
 |---|---|---|---|---|
-| T1 orphan checker | | | | |
+| T1 orphan checker | done | `e-t1-orphan-checker` (branch tip) | 1622 passed, 1 failed | +20 tests, 8 mutations verified; FTS check needs `rank=1`; source-scan exemption owner-approved |
 | T2 indexes | | | | |
 | T3 connection plumbing | | | | |
 | T4 atomic version checks | | | | |
@@ -964,7 +965,35 @@ Baseline at start: `____ passed, 1 failed` (expected `1602 passed, 1 failed`).
 **Discoveries** (anything surprising, any bug you saw but did not fix, any place the code
 contradicted this file):
 
--
+- **T1: the FTS snippet in this file is inert as written.** For an external-content
+  FTS5 table, `INSERT INTO sections_fts(sections_fts) VALUES('integrity-check')` only
+  checks the index's internal structure; the comparison against `sections` happens
+  only with `rank=1` (sqlite.org/fts5.html §6.7). Probed all three desync classes
+  (missing index entry, stale entry, token mismatch): the bare form reads clean on
+  all three, `rank=1` raises on all three. The checker uses
+  `INSERT INTO sections_fts(sections_fts, rank) VALUES('integrity-check', 1)`;
+  mutation M5 pins it. Not flaky — kept.
+- **T1: DB-4's source scan contradicted T1's design.** `test_live_relations.py::
+  test_every_read_of_relations_goes_through_the_view` whitelisted only `core/db.py`
+  for raw `FROM relations` reads, which the checker's design requires. Reading via
+  `live_relations` would miss a dangling reference whose other end is in the trash
+  (the view hides that row). Owner approved a named exemption: the whitelist now
+  includes `core/integrity.py` (2 reads) with the reason in the docstring; the guard
+  is unchanged for every other file.
+- **T1: the checker is deliberately outside the hiding layer and the twin battery.**
+  `find_orphans` is an oracle over the raw tables, not a data reader: it must see
+  flagged-deleted rows as existing. It is not added to `everything_a_reader_can_say`
+  (DB-4's reader rule targets readers that hide references).
+- **T1: a partial draft landing reads as success.** `drafts.commit` returns
+  `committed: True` + `applied: [...]` on success but `committed: [landed ops]` +
+  `failed: {...}` on a mid-way stop — a truthy-`committed` assert passes on both.
+  The draft scenario first used `status` in a character edit (copied from a
+  shape-only op in `test_purge_approval.py`); commit refused it and only the create
+  landed. Fixed to a valid field and `assert success and len(applied) == 3`.
+  T5's report-shape work should keep this asymmetry in mind.
+- **T1: no orphans in any scenario.** All ten write scenarios (delete+restore of
+  character/scene/plot/location/world, targeted purge, bulk purge `older_than_days=0`,
+  create-edit-delete, draft commit, full re-import) leave the database clean.
 
 ---
 
