@@ -430,3 +430,30 @@ def test_the_entity_index_rejects_a_malformed_ref(client):
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "invalid"
+
+
+def test_the_read_script_route_returns_formatted_html_with_scene_numbers(client):
+    tc, project = client
+    store.adopt(project)
+
+    body = tc.get(f"/api/projects/{SLUG}/history/read/branch:main/script", headers=HDR).json()
+
+    assert body["text"]
+    assert 'data-scenenumber="1"' in body["html"]
+    assert "fountain-scene_heading" in body["html"]
+
+
+def test_scene_text_cannot_become_markup_in_the_read_script_route(client):
+    tc, project = client
+    store.adopt(project)
+    edit_entity(
+        project,
+        "scene",
+        "central-room-day",
+        {"Content": "He reads <script>alert(1)</script>."},
+        "x",
+    )
+
+    body = tc.get(f"/api/projects/{SLUG}/history/read/branch:main/script", headers=HDR).json()
+
+    assert "<script>" not in body["html"]

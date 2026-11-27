@@ -346,3 +346,95 @@ def test_a_draft_is_compared_through_its_view(fixture_path):
 
     assert result["entities"]["kael"]["fields"]["name"] == {"a": "Kael", "b": "Kael Later"}
     assert _keys(result) == ["field:character:kael:name"]
+
+
+# ─── script rows carry what a screenplay view needs ──────────────────────────
+
+
+def test_a_script_row_carries_its_blocks_heading_first(state):
+    a, b = state
+    edit_entity(
+        b,
+        "scene",
+        "central-room-day",
+        {"Content": "KAEL opens the door.\n\nKAEL\n(low)\nIt is open."},
+        "rewrite",
+    )
+    row = {r["id"]: r for r in diff.compare(a, b)["script"]}["central-room-day"]
+
+    assert [x["type"] for x in row["blocks"]["b"]] == [
+        "heading",
+        "action",
+        "character",
+        "parenthetical",
+        "dialogue",
+    ]
+    assert row["blocks"]["b"][0]["text"] == "INT. THE CENTRAL ROOM - DAY"
+    assert row["blocks"]["a"][0]["type"] == "heading"
+
+
+def test_a_missing_side_has_no_blocks_and_no_number(state):
+    a, b = state
+    delete_entity(b, "scene", "the-core-day", "cut", confirm=True)
+    row = {r["id"]: r for r in diff.compare(a, b)["script"]}["the-core-day"]
+
+    assert row["status"] == "removed"
+    assert row["blocks"]["b"] is None and row["number"]["b"] is None
+    assert row["blocks"]["a"] and row["number"]["a"] is not None
+
+
+def test_scene_numbers_are_ranks_in_the_composed_script(state):
+    """The number a reader sees, not the scene's position in its sequence."""
+    a, b = state
+    numbers = {r["id"]: r["number"]["a"] for r in diff.compare(a, b)["script"]}
+    from white_words.scriptwriting.core.screenplay import extract_scenes
+
+    composed = get_screenplay_text(a)
+    assert sorted(n for n in numbers.values() if n) == list(
+        range(1, len(extract_scenes(composed)) + 1)
+    )
+
+
+def test_a_scene_without_text_has_no_number_and_does_not_shift_the_rest(state):
+    a, b = state
+    before = {r["id"]: r["number"]["b"] for r in diff.compare(a, b)["script"]}
+    create_entity(
+        b,
+        "scene",
+        "empty-scene",
+        {
+            "title": "Empty",
+            "sequence_id": "seq-discovery",
+            "int_ext": "INT.",
+            "location": "the-central-room",
+            "time_of_day": "NIGHT",
+        },
+    )
+    rows = {r["id"]: r for r in diff.compare(a, b)["script"]}
+
+    assert rows["empty-scene"]["number"]["b"] is None
+    assert {i: r["number"]["b"] for i, r in rows.items() if i != "empty-scene"} == before
+
+
+def test_adding_a_scene_with_text_shifts_the_numbers_after_it(state):
+    a, b = state
+    create_entity(
+        b,
+        "scene",
+        "new-scene",
+        {
+            "title": "New",
+            "sequence_id": "seq-discovery",
+            "int_ext": "INT.",
+            "location": "the-central-room",
+            "time_of_day": "NIGHT",
+        },
+        {"Content": "KAEL waits."},
+    )
+    rows = {r["id"]: r for r in diff.compare(a, b)["script"]}
+
+    shifted = [
+        r for r in rows.values() if r["number"]["a"] and r["number"]["b"] != r["number"]["a"]
+    ]
+    assert rows["new-scene"]["number"]["a"] is None and rows["new-scene"]["number"]["b"] is not None
+    assert all(r["number"]["b"] == r["number"]["a"] + 1 for r in shifted)

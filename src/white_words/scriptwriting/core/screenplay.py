@@ -5,12 +5,38 @@ Not currently consumed by any tool handler. Pure functions only — no DB, no to
 """
 
 import re
+from html import escape
+
 from .constants import FUZZY_THRESHOLD
 from .fountain_lexer import parse as fountain_parse, tokens_to_html, trim_character_extension
 
 LOCATION_RE = re.compile(
     r"^(?:INT\.|EXT\.|EST\.|INT\./EXT\.|I/E\.)\s+(.+?)(?:\s*-\s*(?:DAY|NIGHT|DUSK|DAWN|LATER|CONTINUOUS|MOMENTS LATER))?$"
 )
+
+
+_TITLE_FIELD = re.compile(r"^(tl|tc|tr|cc|bl|br):\s")
+
+
+def render_html(text: str) -> str:
+    """A composed screenplay as the Script view shows it: Fountain HTML with scene numbers.
+
+    The lexer leaves token text as written and `tokens_to_html` does not escape it, so a
+    scene that contains `<` would become markup; text and numbers are escaped here, after
+    lexing, so Fountain's own `>` syntax has already been consumed.
+    """
+    tokens = [
+        t
+        for t in fountain_parse(text)["tokens"]
+        if t.get("text") and not _TITLE_FIELD.match(t["text"])
+    ]
+    safe = []
+    for token in tokens:
+        token = {**token, "text": escape(token["text"], quote=False)}
+        if token.get("number") is not None:
+            token["number"] = escape(str(token["number"]))
+        safe.append(token)
+    return tokens_to_html(safe)
 
 
 def extract_scenes(screenplay_content: str) -> list[dict]:

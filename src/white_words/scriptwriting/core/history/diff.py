@@ -32,6 +32,7 @@ import difflib
 from pathlib import Path
 
 from ..db import get_db
+from .. import scene_script
 from ..scene_script import scene_heading
 from . import logical, refmap
 
@@ -182,6 +183,28 @@ def _placement(entities: dict, order: dict, entity_id: str) -> dict:
     }
 
 
+def _numbers(entities: dict, order: dict) -> dict[str, int]:
+    """Each scene's number in the composed screenplay: its rank among scenes with text.
+
+    The assembly (`db._screenplay_rows`) leaves out a scene whose `Content` is empty, so
+    such a scene has no number, and the scenes after it count one fewer.
+    """
+    with_text = [
+        s for s in _story_order(entities, order) if entities[s]["sections"].get("Content", "") != ""
+    ]
+    return {scene_id: n for n, scene_id in enumerate(with_text, 1)}
+
+
+def _blocks(text: str | None) -> list[dict] | None:
+    """A scene's script entry as screenplay blocks: its heading, then what `scene_script`
+    makes of the body."""
+    if text is None:
+        return None
+    heading, body = scene_script.split_heading(text)
+    head = [{"type": "heading", "text": heading}] if heading else []
+    return head + scene_script.parse_blocks(body)
+
+
 def _text(entities: dict, entity_id: str) -> str:
     """A scene's script entry, composed the way the screenplay assembly does."""
     fields = entities[entity_id]["fields"]
@@ -202,6 +225,7 @@ def _script(
 ) -> list[dict]:
     """One row per scene, in the second state's story order, then the removed ones."""
     in_b = _story_order(b, order_b)
+    numbers = {"a": _numbers(a, order_a), "b": _numbers(b, order_b)}
     gone = [i for i, row in diff.items() if row["type"] == "scene" and row["status"] == "removed"]
     rows = []
     for entity_id in in_b + gone:
@@ -231,6 +255,11 @@ def _script(
                 "status": status,
                 "placement": placement,
                 "text": text,
+                "blocks": {"a": _blocks(text["a"]), "b": _blocks(text["b"])},
+                "number": {
+                    "a": numbers["a"].get(entity_id) if old else None,
+                    "b": numbers["b"].get(entity_id) if new else None,
+                },
                 "diff": text_diff(text["a"] or "", text["b"] or "") if status == "edited" else [],
                 "items": _scene_items(diff, order_diff, entity_id, status, placement),
             }
