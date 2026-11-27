@@ -363,9 +363,9 @@ def _refusal(result: dict):
 
 
 def _script(views, compose, project, parsed, ref):
+    """The composed screenplay of one state, through a private copy of it."""
     from white_words.scriptwriting.core.screenplay import render_html
 
-    """The composed screenplay of one state, through a private copy of it."""
     with views.ref_view(project, parsed) as path:
         text = compose(path)
         return {"ref": ref, "text": text, "html": render_html(text)}
