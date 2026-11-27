@@ -152,7 +152,17 @@ def plan(
         wanted=set(selection or ()),
     )
     ctx.items = _classify(ctx)
+    classified = len(ctx.decisions)
     _build(ctx)
+    # A conflict nobody selected needs no answer: what stays is `mine`, which is what
+    # Apply would leave anyway. Only the decisions raised while building selected items
+    # (index `classified` onward) and the classified ones the selection reached remain.
+    reached = {_entity_key(k) for k in ctx.wanted}
+    ctx.decisions[:] = [
+        d
+        for i, d in enumerate(ctx.decisions)
+        if i >= classified or d["item"] in ctx.wanted or d["item"] in reached
+    ]
     open_keys = [
         d["key"]
         for d in ctx.decisions
@@ -166,6 +176,19 @@ def plan(
         "ready": not open_keys,
         "fingerprint": target_fingerprint,
     }
+
+
+def _entity_key(key: str) -> str:
+    """The entity an item key belongs to: `field:scene:x:place` is part of `entity:scene:x`.
+
+    A decision about the entity itself (deleted on one side, edited on the other) is
+    reached by selecting any of its parts.
+    """
+    kind, _, rest = key.partition(":")
+    if kind in ("field", "section"):
+        entity_type, _, rest = rest.partition(":")
+        return f"entity:{entity_type}:{rest.split(':', 1)[0]}"
+    return key
 
 
 class _Context:

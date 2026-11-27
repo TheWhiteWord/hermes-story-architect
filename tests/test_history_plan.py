@@ -137,6 +137,34 @@ def test_a_conflict_is_a_decision_and_carries_both_values(sides):
     assert result["ops"] == []  # the default (mine) writes nothing
 
 
+def test_a_conflict_nobody_selected_asks_nothing(sides):
+    """Unselected, it leaves `mine` in place: there is nothing to answer, and Apply is not
+    held up by it."""
+    base, ours, theirs = sides
+    edit_entity(ours, "character", "kael", {"name": "Mine"}, "ours")
+    edit_entity(theirs, "character", "kael", {"name": "Theirs"}, "theirs")
+    edit_entity(theirs, "character", "mira", {"one_sentence": "Brought over."}, "theirs")
+
+    result = plan.plan(base, ours, theirs, selection=["field:character:mira:one_sentence"])
+
+    assert result["decisions"] == [] and result["open"] == []
+    assert result["ready"] is True
+    assert [op["entity_id"] for op in result["ops"]] == ["mira"]
+    assert next(i for i in result["items"] if i["state"] == "conflict")["decision"]
+
+
+def test_the_same_conflict_asks_once_it_is_selected(sides):
+    base, ours, theirs = sides
+    edit_entity(ours, "character", "kael", {"name": "Mine"}, "ours")
+    edit_entity(theirs, "character", "kael", {"name": "Theirs"}, "theirs")
+
+    asked = plan.plan(base, ours, theirs, selection=["field:character:kael:name"])
+    nothing = plan.plan(base, ours, theirs, selection=[])
+
+    assert [d["code"] for d in asked["decisions"]] == ["D2"] and asked["ready"] is False
+    assert nothing["decisions"] == [] and nothing["ready"] is True
+
+
 def test_a_section_conflict_is_the_same_decision(sides):
     base, ours, theirs = sides
     edit_entity(ours, "character", "kael", {"Notes": "mine"}, "ours")
