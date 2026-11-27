@@ -160,8 +160,18 @@ check('text removed entirely is all deletions', tag(T.lines('x\ny', null)) === '
 const longText = Array.from({ length: 30 }, (_, i) => 'line ' + i).join('\n');
 const folded = T.collapse(T.lines(longText, longText.replace('line 15', 'LINE 15')), 2);
 check('a long unchanged run folds to a gap with its size and keeps two lines of context', folded.filter((o) => o.op === 'gap').map((o) => o.skipped).join() === '13,12' && folded.length === 8);
+const pinned = T.collapse([{ op: 'eq', k: 'h' }, { op: 'eq' }, { op: 'eq' }, { op: 'eq' }, { op: 'eq' }, { op: 'add' }], 1, true);
+check('a pinned first row survives folding', pinned[0].k === 'h' && pinned[1].op === 'gap' && pinned[1].skipped === 3);
+check('without pinning the first row folds like any other', T.collapse([{ op: 'eq' }, { op: 'eq' }, { op: 'eq' }, { op: 'add' }], 1)[0].op === 'gap');
 const big = (tag) => Array.from({ length: 500 }, (_, i) => tag + i).join('\n');
 check('two huge unrelated texts diff without hanging, as delete-then-add', (() => { const t = Date.now(); const d = T.lines(big('a'), big('b')); return d.length === 1000 && d[0].op === 'del' && d[999].op === 'add' && Date.now() - t < 2000; })());
+
+const bk = (...xs) => xs.map((x) => ({ type: x[0], text: x[1] }));
+const btag = (ops) => ops.map((o) => o.op[0] + o.block.type[0] + ':' + o.block.text).join('|');
+check('equal blocks are all unchanged', btag(T.blocks(bk(['action', 'a']), bk(['action', 'a']))) === 'ea:a');
+check('a block that changed text is one deletion and one addition', btag(T.blocks(bk(['dialogue', 'x'], ['action', 'a']), bk(['dialogue', 'y'], ['action', 'a']))) === 'dd:x|ad:y|ea:a');
+check('the same text as another kind of block is a change', btag(T.blocks(bk(['action', 'KAEL']), bk(['character', 'KAEL']))) === 'da:KAEL|ac:KAEL');
+check('a missing side is all additions or all deletions', btag(T.blocks(null, bk(['action', 'a']))) === 'aa:a' && btag(T.blocks(bk(['action', 'a']), undefined)) === 'da:a');
 
 // ─── routes, refs and values ───
 const K = global.DASH.draftsCommon;
@@ -185,7 +195,7 @@ const entities = [
   { id: 'a1', type: 'act', name: 'Act I', one_sentence: '' },
   { id: 'k', type: 'character', name: 'Kael', one_sentence: '' },
 ];
-const rm = (extra) => Object.assign({ projectName: 'Oz', label: 'Draft 7', tab: 'entities', script: 'INT. FARM', entities, selected: null, detail: null }, extra || {});
+const rm = (extra) => Object.assign({ projectName: 'Oz', label: 'Draft 7', tab: 'entities', html: '<h3 class="fountain-scene_heading" data-scenenumber="1">INT. FARM</h3>', entities, selected: null, detail: null }, extra || {});
 let rh = Rd.html(rm());
 check('the reader says it is read-only and names the draft', /read-only/.test(rh) && /Draft 7/.test(rh));
 check('entity types are listed in story order, not arrival order', rh.indexOf('Acts · 1') < rh.indexOf('Scenes · 1') && rh.indexOf('Scenes · 1') < rh.indexOf('Characters · 1'));
@@ -196,7 +206,8 @@ rh = Rd.html(rm({ selected: { type: 'scene', id: 's1' }, detail }));
 check('the selected entity is marked and its populated fields and sections are shown', /dr-item on" data-rd="pick" data-type="scene" data-id="s1"/.test(rh) && /<dt>status<\/dt>/.test(rh) && /KAEL stands/.test(rh));
 check('empty fields and blank sections are left out', !/<dt>one sentence/.test(rh) && !/<dt>location/.test(rh) && !/>Notes</.test(rh));
 check('ids inside values read as names', /<span title="k">Kael<\/span>/.test(rh));
-check('the script tab shows the screenplay, or says there is none', /<pre class="dr-script">INT\. FARM/.test(Rd.html(rm({ tab: 'script' }))) && /no scenes yet/.test(Rd.html(rm({ tab: 'script', script: '' }))));
+check('the script tab shows the screenplay as the Script view sets it, scene number included', /screenplay-doc screenplay-content dr-script"><h3 class="fountain-scene_heading" data-scenenumber="1">INT\. FARM/.test(Rd.html(rm({ tab: 'script' }))));
+check('an empty screenplay says there is no script text yet', /no scenes with script text yet/.test(Rd.html(rm({ tab: 'script', html: '' }))));
 check('the reader has no inline handlers', !/\bon[a-z]+\s*=\s*["']/.test(rh.replace(/data-[a-z]+="[^"]*"/g, '')));
 
 // ─── compare ───
@@ -210,27 +221,46 @@ const changed = (id, f, sec) => ({ id, type: 'scene', status: 'changed', fields:
 check('two identical drafts say so and offer no tabs', (() => { const h = Cp.html(cm({ entities: { s1: { id: 's1', type: 'scene', status: 'unchanged', fields: {}, sections: {} } } })); return /identical/.test(h) && !/role="tablist"/.test(h); })());
 check('the summary is singular for one difference', Cp.summary(cm({ entities: { s1: changed('s1', { status: { a: 'x', b: 'y' } }) } })).text === '1 entity differs (1 changed)');
 check('the summary counts kinds, order changes and scenes', Cp.summary(cm({ entities: { s1: changed('s1'), s2: { id: 's2', type: 'scene', status: 'added' }, s3: { id: 's3', type: 'scene', status: 'removed' } }, order: { 'scene:sq': { a: ['s1'], b: ['s2'] } }, script: [{ id: 's1', status: 'edited', placement: {}, text: {} }, { id: 's2', status: 'added', placement: {}, text: {} }] })).text === '3 entities differ (1 changed, 1 added, 1 removed) · 1 order change · 2 scenes differ in the script');
-let ch = Cp.html(cm({ entities: { s1: changed('s1', { status: { a: 'planned', b: 'locked' }, characters: { a: ['k'], b: [] } }, { Content: { a: 'one', b: 'two' } }) } }));
+let ch = Cp.html(cm({ entities: { s1: changed('s1', { status: { a: 'planned', b: 'locked' }, characters: { a: ['k'], b: [] } }, { Notes: { a: 'one', b: 'two' } }) } }));
 check('a changed entity shows both values and a line diff', /cp-val a">planned/.test(ch) && /cp-val b">locked/.test(ch) && /ln del/.test(ch) && /ln add/.test(ch));
 check('ids in a changed value read as names', /<span title="k">Kael<\/span>/.test(ch));
 check('an entity name from the data cannot open a tag', !/<i>farm/.test(ch) && /The &lt;i&gt;farm&lt;\/i&gt;/.test(ch));
+const contentChange = { Content: { a: 'one\ntwo', b: 'one\nTWO\nthree' }, Objective: { a: 'old', b: 'new' } };
+ch = Cp.html(cm({ entities: { s1: changed('s1', {}, contentChange) } }));
+check('a scene\'s Content is summarised, not diffed, in the entities tab', /Script text changed · <span class="plus">\+2<\/span> <span class="minus">−1<\/span> lines/.test(ch) && !/<div class="ln (add|del)"><span class="g" aria-hidden="true">[+−]<\/span>(TWO|three)/.test(ch));
+check('the summary links to that scene in the Script tab', /data-cp="goto" data-scene="s1"/.test(ch));
+check('other sections of a scene still show their diff', /<div class="ln del"><span class="g" aria-hidden="true">−<\/span>old/.test(ch) && /<div class="ln add"><span class="g" aria-hidden="true">\+<\/span>new/.test(ch));
+check('a section called Content on another kind of entity is still diffed', /ln add/.test(Cp.html(cm({ entities: { k: Object.assign(changed('k', {}, { Content: { a: 'x', b: 'y' } }), { type: 'character' }) } }))));
 check('the first three changed entities open and the rest stay folded', (() => { const e = {}; ['s1', 's2', 's3', 'k'].forEach((id) => { e[id] = changed(id, { status: { a: '1', b: '2' } }); }); return (Cp.html(cm({ entities: e })).match(/<details class="cp-ent" open>/g) || []).length === 3; })());
 ch = Cp.html(cm({ entities: { s2: { id: 's2', type: 'scene', status: 'added' }, s3: { id: 's3', type: 'scene', status: 'removed' } } }));
 check('an added or removed entity says which draft holds it', /only in alt · open draft/.test(ch) && /only in Draft 1/.test(ch));
 ch = Cp.html(cm({ order: { 'scene:sq': { a: ['s1', 's3'], b: ['s1', 's2'] } }, entities: { s1: changed('s1', { status: { a: 'a', b: 'b' } }) } }));
 check('an order change marks what left and what arrived, under the parent name', /Order of scenes in Road/.test(ch) && /<li class="del">Poppy/.test(ch) && /<li class="add">Gate/.test(ch));
+const blk = (...xs) => xs.map(([type, text]) => ({ type, text }));
+const heading = ['heading', 'INT. THE ROAD - DAY'];
 const script = [
-  { id: 's1', status: 'edited', placement: { a: { act: 'a1', sequence: 'sq', position: 1 }, b: { act: 'a1', sequence: 'sq', position: 1 } }, text: { a: 'one', b: 'two' } },
-  { id: 's2', status: 'moved', placement: { a: { act: 'a1', sequence: 'sq', position: 2 }, b: { act: 'a1', sequence: 'sq', position: 1 } }, text: { a: 'same', b: 'same' } },
-  { id: 's3', status: 'unchanged', placement: { a: { act: 'a1', sequence: 'sq', position: 3 }, b: { act: 'a1', sequence: 'sq', position: 3 } }, text: { a: 'x', b: 'x' } },
+  { id: 's1', status: 'edited', placement: { a: { act: 'a1', sequence: 'sq', position: 1 }, b: { act: 'a1', sequence: 'sq', position: 1 } }, text: { a: 'one', b: 'two' }, number: { a: 1, b: 1 },
+    blocks: { a: blk(heading, ['action', 'Dorothy waits.'], ['character', 'DOROTHY'], ['dialogue', 'Hello.']), b: blk(heading, ['action', 'Dorothy waits.'], ['character', 'DOROTHY'], ['dialogue', 'Hello <b>there</b>.']) } },
+  { id: 's2', status: 'moved', placement: { a: { act: 'a1', sequence: 'sq', position: 2 }, b: { act: 'a1', sequence: 'sq', position: 1 } }, text: { a: 'same', b: 'same' }, number: { a: 3, b: 2 }, blocks: { a: blk(heading), b: blk(heading) } },
+  { id: 's3', status: 'unchanged', placement: { a: { act: 'a1', sequence: 'sq', position: 3 }, b: { act: 'a1', sequence: 'sq', position: 3 } }, text: { a: 'x', b: 'x' }, number: { a: 2, b: 3 }, blocks: { a: blk(heading), b: blk(heading) } },
 ];
 let sh = Cp.html(cm({ script }, { tab: 'script' }));
 check('the script tab hides unchanged scenes behind a toggle that counts them', !/Poppy/.test(sh) && /Show 1 unchanged scene</.test(sh));
 check('ticking the toggle shows them', /Poppy/.test(Cp.html(cm({ script }, { tab: 'script', showSame: true }))));
-check('a moved scene says where it was and where it is, and shows no text diff', /was Act I · Road · #2 → now Act I · Road · #1/.test(sh) && !/cp-diff/.test(Cp.html(cm({ script: [script[1]] }, { tab: 'script' }))));
-const bigScene = Array.from({ length: 40 }, (_, i) => 'LINE ' + i).join('\n');
-sh = Cp.html(cm({ script: [{ id: 's2', status: 'added', placement: { b: { act: 'a1', sequence: 'sq', position: 1 } }, text: { a: '', b: bigScene } }] }, { tab: 'script' }));
-check('a long new scene folds after a screenful and says how much is hidden', /Show 16 more lines/.test(sh) && (sh.match(/class="ln add"/g) || []).length === 40);
+check('a scene row says its number in the script, not its position in a sequence', /scene 1 · Act I · Road/.test(sh) && !/#\d/.test(sh));
+check('a scene whose number moved says how', /scene 3 → 2/.test(sh));
+check('a moved scene shows no text diff', !/screenplay-doc/.test(Cp.html(cm({ script: [script[1]] }, { tab: 'script' }))));
+check('a scene that is new says so, one that left says what it was, one with no text says that', (() => {
+  const row = (number, status) => Cp.html(cm({ script: [{ id: 's1', status, placement: {}, text: {}, number, blocks: { a: null, b: null } }] }, { tab: 'script' }));
+  return /scene 4 \(new\)/.test(row({ a: null, b: 4 }, 'added')) && /was scene 4/.test(row({ a: 4, b: null }, 'removed')) && /no script text/.test(row({ a: null, b: null }, 'added'));
+})());
+check('a script diff is set as a screenplay, in the Script view classes', /screenplay-doc screenplay-content cs/.test(sh) && /<h4 class="fountain-character">DOROTHY<\/h4>/.test(sh) && /<p class="fountain-dialogue">/.test(sh) && /<p class="fountain-action">Dorothy waits\./.test(sh));
+check('a heading carries the scene number of the side it is on, and stays visible when the change is further down', /data-scenenumber="1"/.test(sh) && sh.indexOf('fountain-scene_heading') < sh.indexOf('cs-row del'));
+check('only the changed block is marked; the unchanged blocks are context', (sh.match(/class="cs-row add"/g) || []).length === 1 && (sh.match(/class="cs-row del"/g) || []).length === 1);
+check('script text cannot open a tag', !/<b>there/.test(sh) && /Hello &lt;b&gt;there&lt;\/b&gt;/.test(sh));
+const bigBlocks = Array.from({ length: 40 }, (_, i) => ({ type: 'action', text: 'LINE ' + i }));
+sh = Cp.html(cm({ script: [{ id: 's2', status: 'added', placement: { b: { act: 'a1', sequence: 'sq', position: 1 } }, text: { a: null, b: 'x' }, number: { a: null, b: 5 }, blocks: { a: null, b: bigBlocks } }] }, { tab: 'script' }));
+check('a long new scene folds after a screenful and says how much is hidden', /Show 16 more blocks/.test(sh) && (sh.match(/class="cs-row add"/g) || []).length === 40);
 check('each picker offers every draft and marks the selected one', (() => { const h = Cp.html(cm({ entities: { s1: changed('s1') } })); return /<option value="snapshot:d1" selected>/.test(h) && /<option value="branch:alt" selected>/.test(h) && /Open drafts/.test(h) && /Saved drafts/.test(h); })());
 check('compare has no inline handlers', !/\bon[a-z]+\s*=\s*["']/.test(ch.replace(/data-[a-z]+="[^"]*"/g, '')));
 

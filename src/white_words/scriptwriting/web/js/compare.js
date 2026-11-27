@@ -25,6 +25,15 @@ window.DASH = window.DASH || {};
       + (rest.length ? '<details class="cp-more"><summary>Show ' + plural(rest.length, 'more line') + '</summary>' + rest.map(diffRow).join('') + '</details>' : '') + '</div>';
   }
 
+  // A scene's Content is its script text, and the Script tab shows it in full; here it is
+  // only counted, so the entities tab stays about what else changed.
+  function scriptNote(id, v) {
+    const ops = D.textDiff.lines(v.a, v.b);
+    const n = (op) => ops.filter((o) => o.op === op).length;
+    return '<div class="cp-scriptnote">Script text changed · <span class="plus">+' + n('add') + '</span> <span class="minus">−' + n('del') + '</span> '
+      + (n('add') === 1 && n('del') === 0 ? 'line' : 'lines') + ' <button class="cp-link" data-cp="goto" data-scene="' + esc(id) + '">See it in the Script tab</button></div>';
+  }
+
   function fieldRow(key, v, m) {
     const name = (id) => (m.names[id] ? m.names[id].name : undefined);
     return '<div class="cp-field"><div class="cp-key">' + esc(C.keyLabel(key)) + '</div><div class="cp-vals">'
@@ -40,9 +49,10 @@ window.DASH = window.DASH || {};
     }
     const fields = Object.keys(e.fields || {});
     const secs = Object.keys(e.sections || {});
+    const body = (h) => (e.type === 'scene' && h === 'Content' ? scriptNote(e.id, e.sections[h]) : diffBlock(e.sections[h].a, e.sections[h].b));
     return '<details class="cp-ent"' + (i < 3 ? ' open' : '') + '><summary class="cp-sum">' + head + '<span class="cp-note">' + plural(fields.length + secs.length, 'difference') + '</span></summary><div class="cp-body">'
       + fields.map((k) => fieldRow(k, e.fields[k], m)).join('')
-      + secs.map((h) => '<div class="cp-sec"><div class="cp-key">' + esc(h) + '</div>' + diffBlock(e.sections[h].a, e.sections[h].b) + '</div>').join('')
+      + secs.map((h) => '<div class="cp-sec"><div class="cp-key">' + esc(h) + '</div>' + body(h) + '</div>').join('')
       + '</div></details>';
   }
 
@@ -81,9 +91,46 @@ window.DASH = window.DASH || {};
       + (order.length ? '<h3 class="pj-sub">Order</h3>' + order.map((k) => orderRow(k, m.diff.order[k], m)).join('') : '');
   }
 
+  const ELEMENT = {
+    heading: ['h3', 'fountain-scene_heading'], action: ['p', 'fountain-action'], character: ['h4', 'fountain-character'],
+    parenthetical: ['p', 'fountain-parenthetical'], dialogue: ['p', 'fountain-dialogue'], transition: ['h2', 'fountain-transition'],
+    note: ['p', 'fountain-note'], raw: ['p', 'fountain-action'],
+  };
+
+  // One screenplay block, set the way the Script view sets it. A heading carries the
+  // scene's number in the script it belongs to (the one it has on that side).
+  function blockEl(block, number) {
+    const [tag, cls] = ELEMENT[block.type] || ELEMENT.raw;
+    const num = block.type === 'heading' && number != null ? ' data-scenenumber="' + esc(number) + '"' : '';
+    return '<' + tag + ' class="' + cls + '"' + num + '>' + esc(block.text) + '</' + tag + '>';
+  }
+
+  function blockRow(o, r) {
+    if (o.op === 'gap') return '<div class="cs-row gap">⋯ ' + plural(o.skipped, 'unchanged block') + '</div>';
+    const g = o.op === 'add' ? '+' : o.op === 'del' ? '−' : ' ';
+    const number = o.op === 'del' ? r.number.a : (r.number.b != null ? r.number.b : r.number.a);
+    return '<div class="cs-row ' + o.op + '"><span class="g" aria-hidden="true">' + g + '</span><div class="cs-block">' + blockEl(o.block, number) + '</div></div>';
+  }
+
+  function screenplayDiff(r) {
+    const ops = D.textDiff.collapse(D.textDiff.blocks(r.blocks && r.blocks.a, r.blocks && r.blocks.b), 2, true);
+    const rest = ops.slice(SHOWN);
+    return '<div class="screenplay-doc screenplay-content cs">' + ops.slice(0, SHOWN).map((o) => blockRow(o, r)).join('')
+      + (rest.length ? '<details class="cp-more"><summary>Show ' + plural(rest.length, 'more block') + '</summary>' + rest.map((o) => blockRow(o, r)).join('') + '</details>' : '') + '</div>';
+  }
+
+  // "Scene 7", or how the number moved, in the script the scene is part of.
+  function numberText(r) {
+    const a = r.number && r.number.a;
+    const b = r.number && r.number.b;
+    if (a == null && b == null) return 'no script text';
+    if (a == null) return 'scene ' + b + ' (new)';
+    if (b == null) return 'was scene ' + a;
+    return a === b ? 'scene ' + b : 'scene ' + a + ' → ' + b;
+  }
+
   function where(p, m) {
-    if (!p) return '';
-    return [nameOf(m, p.act), nameOf(m, p.sequence), '#' + p.position].join(' · ');
+    return p ? [nameOf(m, p.act), nameOf(m, p.sequence)].join(' · ') : '';
   }
 
   function scriptBody(m) {
@@ -97,9 +144,9 @@ window.DASH = window.DASH || {};
       const b = r.placement && r.placement.b;
       const moved = a && b && where(a, m) !== where(b, m);
       const place = moved ? 'was ' + where(a, m) + ' → now ' + where(b, m) : where(b || a, m);
-      const text = r.text || {};
-      const body = r.status === 'unchanged' ? '' : r.status === 'moved' && text.a === text.b ? '' : diffBlock(text.a, text.b);
-      return '<section class="cp-scene"><header class="cp-sum"><span class="cp-chip st-' + r.status + '">' + r.status + '</span><span class="cp-name">' + esc(nameOf(m, r.id)) + '</span><span class="cp-note">' + esc(place) + '</span></header>' + body + '</section>';
+      const body = r.status === 'moved' && (r.text || {}).a === (r.text || {}).b ? '' : screenplayDiff(r);
+      return '<section class="cp-scene" data-scene="' + esc(r.id) + '"><header class="cp-sum"><span class="cp-chip st-' + r.status + '">' + r.status + '</span><span class="cp-name">' + esc(nameOf(m, r.id)) + '</span>'
+        + '<span class="cp-note">' + esc(numberText(r) + (place ? ' · ' + place : '')) + '</span></header>' + body + '</section>';
     }).join('');
   }
 
@@ -156,6 +203,12 @@ window.DASH = window.DASH || {};
       if (!t) return;
       if (t.dataset.cp === 'tab') { m.tab = S.tab = t.dataset.tab; draw(); }
       else if (t.dataset.cp === 'swap') go(m.b, m.a);
+      else if (t.dataset.cp === 'goto') {
+        m.tab = S.tab = 'script';
+        draw();
+        const sc = Array.prototype.find.call(el.querySelectorAll('[data-scene]'), (x) => x.dataset.scene === t.dataset.scene);
+        if (sc) sc.scrollIntoView({ block: 'start' });
+      }
     };
     el.onchange = (e) => {
       const t = e.target.closest('[data-cp]');

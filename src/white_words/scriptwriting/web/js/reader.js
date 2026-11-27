@@ -39,7 +39,7 @@ window.DASH = window.DASH || {};
     const name = (id) => byId[id];
     const tab = (id, label) => '<button class="dr-tab' + (m.tab === id ? ' on' : '') + '" role="tab" aria-selected="' + (m.tab === id) + '" data-rd="tab" data-tab="' + id + '">' + label + '</button>';
     const body = m.tab === 'script'
-      ? (m.script ? '<pre class="dr-script">' + esc(m.script) + '</pre>' : '<p class="pj-empty">This draft has no scenes yet.</p>')
+      ? (m.html ? '<div class="screenplay-doc screenplay-content dr-script">' + m.html + '</div>' : '<p class="pj-empty">This draft has no scenes with script text yet.</p>')
       : '<div class="dr-cols"><nav class="dr-list" aria-label="Entities">' + listHtml(m) + '</nav><article class="dr-detail">' + detailHtml(m.detail, name) + '</article></div>';
     return '<div class="pj-inner dr"><header class="dr-head"><a class="btn" href="#/">← Projects</a><h1>' + esc(m.projectName) + '</h1>'
       + '<span class="pj-chip">' + esc(m.label) + '</span><span class="pj-chip">read-only</span></header>'
@@ -63,7 +63,7 @@ window.DASH = window.DASH || {};
         D.historyApi(slug, 'GET', '/read/' + q + '/entities'),
         D.historyApi(slug, 'GET', '/read/' + q + '/script'),
       ]);
-      m = { projectName: ctx.projectName(slug), label: C.refLabel(ref, hist), tab: 'script', script: script.text, entities: idx.entities, selected: null, detail: null };
+      m = { projectName: ctx.projectName(slug), label: C.refLabel(ref, hist), tab: 'script', html: script.html, entities: idx.entities, selected: null, detail: null };
     } catch (e) {
       el.innerHTML = '<div class="pj-inner"><a class="btn" href="#/">← Projects</a><p class="pj-empty bad">' + esc(e.message) + '</p></div>';
       return;
