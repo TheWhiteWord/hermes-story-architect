@@ -141,6 +141,7 @@ window.DASH = window.DASH || {};
     const r = D.draftsCommon.parse(location.hash);
     if (r.kind === 'read') { D.reader.show(el, r, ctx); return; }
     if (r.kind === 'compare') { D.compare.show(el, r, ctx); return; }
+    if (r.kind === 'merge') { D.merge.show(el, r, ctx); return; }
     el.onclick = null;
     el.onchange = null;
     try { await loadList(); } catch (e) { /* the cards keep what they had */ }

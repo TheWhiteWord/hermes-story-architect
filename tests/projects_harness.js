@@ -19,6 +19,7 @@ require(path.join(JS, 'text-diff.js'));
 require(path.join(JS, 'drafts-common.js'));
 require(path.join(JS, 'reader.js'));
 require(path.join(JS, 'compare.js'));
+require(path.join(JS, 'merge.js'));
 require(path.join(JS, 'projects.js'));
 require(path.join(JS, 'draft-chip.js'));
 
@@ -263,6 +264,76 @@ sh = Cp.html(cm({ script: [{ id: 's2', status: 'added', placement: { b: { act: '
 check('a long new scene folds after a screenful and says how much is hidden', /Show 16 more blocks/.test(sh) && (sh.match(/class="cs-row add"/g) || []).length === 40);
 check('each picker offers every draft and marks the selected one', (() => { const h = Cp.html(cm({ entities: { s1: changed('s1') } })); return /<option value="snapshot:d1" selected>/.test(h) && /<option value="branch:alt" selected>/.test(h) && /Open drafts/.test(h) && /Saved drafts/.test(h); })());
 check('compare has no inline handlers', !/\bon[a-z]+\s*=\s*["']/.test(ch.replace(/data-[a-z]+="[^"]*"/g, '')));
+
+// ─── the merge workspace ───
+const Mg = global.DASH.merge;
+const mnames = { k: { name: 'Kael', type: 'character' }, s1: { name: 'The <i>farm</i>', type: 'scene' }, s2: { name: 'The gate', type: 'scene' }, sq: { name: 'The road', type: 'sequence' }, h: { name: 'The holder', type: 'scene' } };
+const dec = (code, extra) => Object.assign({ key: 'entity:character:k#' + code, item: 'entity:character:k', code, kind: 'k', options: ['mine', 'theirs', 'custom'], choice: 'mine', set_by: 'default', value: null, error: null, message: 'It clashes.' }, extra || {});
+const mm = (plan, extra) => Object.assign({
+  slug: 'p', sid: 'm1', projectName: 'Oz', target: { id: 'main', name: 'main' }, sourceLabel: 'Experiment 1', stale: false, imprecise: false, names: mnames, tab: 'changes', showKept: false, preview: null, result: null,
+  selected: new Set(), diff: { entities: {}, order: {}, script: [] }, labels: { a: 'main · open draft', b: 'Experiment 1' },
+  plan: Object.assign({ items: [], decisions: [], open: [], ops: [], ready: true }, plan || {}),
+}, extra || {});
+const fieldItem = (key, state, extra) => Object.assign({ key, kind: 'field', type: 'character', id: 'k', name: 'one_sentence', state }, extra || {});
+
+check('a decision that nobody answered says it needs a choice, and shows no option as chosen', (() => { const h = Mg.decisionHtml(dec('D2', { ours: 'a', theirs: 'b' }), mm()); return /needs your choice/.test(h) && !/mg-opt on/.test(h); })());
+check('an answered decision is marked, with its choice pressed', (() => { const h = Mg.decisionHtml(dec('D2', { set_by: 'user', choice: 'theirs', ours: 'a', theirs: 'b' }), mm()); return /answered/.test(h) && /mg-opt on" data-mg="choose"[^>]*data-choice="theirs"/.test(h); })());
+check('D2 offers Keep mine, Take theirs and Write my own, and shows both values', (() => { const h = Mg.decisionHtml(dec('D2', { ours: 'old', theirs: 'new' }), mm()); return />Keep mine</.test(h) && />Take theirs</.test(h) && />Write my own</.test(h) && /cp-val a">[^]*old/.test(h) && /cp-val b">[^]*new/.test(h); })());
+check('D2 custom shows an editor holding the typed value, escaped', (() => { const h = Mg.decisionHtml(dec('D2', { set_by: 'user', choice: 'custom', value: 'a <b>x</b>', ours: 'a', theirs: 'b' }), mm()); return /<textarea[^>]*data-mg="val"[^>]*>a &lt;b&gt;x&lt;\/b&gt;<\/textarea>/.test(h) && !/<b>x/.test(h); })());
+check('D4 names the holder, and its custom answer is a list of roles', (() => { const h = Mg.decisionHtml(dec('D4', { options: ['mine', 'theirs', 'replace', 'custom'], holder: { id: 'h', name: 'The holder' }, roles: ['setup', 'climax'], set_by: 'user', choice: 'custom', value: 'climax' }), mm()); return /Currently on “The holder”/.test(h) && />Another role…</.test(h) && /<option value="climax" selected>/.test(h); })());
+check('D1 keep-both offers the suggested id and the name to change', (() => { const h = Mg.decisionHtml(dec('D1', { options: ['keep-mine', 'take-theirs', 'keep-both', 'combine'], choice: 'keep-both', set_by: 'user', suggested_id: 'k-2', ours: { id: 'k', fields: { name: 'Mine' } }, theirs: { id: 'k', fields: { name: 'Theirs' } } }), mm()); return /data-part="id"[^>]*value="k-2"/.test(h) && /data-field="name"[^>]*value="Theirs"/.test(h) && />Combine field by field</.test(h); })());
+check('D1 uses a title when the entity has no name', /data-field="title"/.test(Mg.decisionHtml(dec('D1', { options: ['keep-both'], choice: 'keep-both', set_by: 'user', theirs: { fields: { title: 'T' } }, ours: { fields: {} } }), mm())));
+check('D7 shows both orders by name and arranges with buttons, the ends disabled', (() => { const h = Mg.decisionHtml(dec('D7', { key: 'order:scene:sq#D7', item: 'order:scene:sq', ours: ['s1', 's2'], theirs: ['s2', 's1'], set_by: 'user', choice: 'custom', value: ['s2', 's1'] }), mm()); return /Order of scenes in The road/.test(h) && /<ol class="mg-order"><li><span>The gate<\/span><button[^>]*data-i="0"[^>]*disabled/.test(h) && /data-i="1"[^>]*data-dir="1"[^>]*disabled/.test(h); })());
+check('D9 words its options by which side deleted', (() => { const ours = Mg.decisionHtml(dec('D9', { options: ['keep-mine', 'take-theirs'], deleted_on: 'ours' }), mm()); const theirs = Mg.decisionHtml(dec('D9', { options: ['keep-mine', 'take-theirs'], deleted_on: 'theirs' }), mm()); return />Keep it deleted</.test(ours) && />Restore it, with B’s changes</.test(ours) && />Keep it, with my changes</.test(theirs) && />Delete it</.test(theirs); })());
+check('D3 only explains the placement; the planner has no other choice to give', (() => { const h = Mg.decisionHtml(dec('D3', { options: ['after-predecessor', 'pick'] }), mm()); return !/data-mg="choose"/.test(h) && /Placed after/.test(h); })());
+check('an optional decision does not claim to need a choice', !/needs your choice/.test(Mg.decisionHtml(dec('D5', { options: ['bring', 'drop', 'cancel'], choice: 'bring' }), mm())));
+check('a suggestion from Hermes is labelled and can be accepted', (() => { const h = Mg.decisionHtml(dec('D2', { set_by: 'agent-suggested', choice: 'theirs', ours: 'a', theirs: 'b' }), mm()); return /suggested by Hermes/.test(h) && /data-mg="accept"/.test(h); })());
+check('a refused typed value shows why and keeps the decision open', (() => { const h = Mg.decisionHtml(dec('D1', { set_by: 'user', choice: 'keep-both', error: 'That id is taken.', options: ['keep-both'], ours: {}, theirs: {} }), mm()); return /role="alert">That id is taken\./.test(h) && /needs your choice/.test(h); })());
+check('every decision can be taken to Hermes', /data-mg="ask"/.test(Mg.decisionHtml(dec('D2', { ours: 1, theirs: 2 }), mm())));
+check('a decision names its subject in words, not keys', /scene “The gate” · one sentence/.test(Mg.decisionHtml(dec('D2', { item: 'field:scene:s2:one_sentence', ours: 1, theirs: 2 }), mm())) && Mg.subject('order:scene:sq', mm()) === 'Order of scenes in The road');
+check('a hostile name or message cannot open a tag', !/<img|<script/.test(Mg.decisionHtml(dec('D1', { message: '<img src=x>', options: ['keep-mine'], ours: { fields: { name: '<script>' } }, theirs: { fields: { name: '<img>' } } }), mm())));
+
+const items = [
+  fieldItem('field:character:k:one_sentence', 'take', { value: 'new' }),
+  fieldItem('field:character:k:name', 'keep', { ours: 'x' }),
+  fieldItem('field:character:k:goals_short', 'conflict', { ours: 'a', theirs: 'b', decision: 'field:character:k:goals_short#D2' }),
+  { key: 'entity:scene:s2', kind: 'entity', type: 'scene', id: 's2', state: 'take' },
+  fieldItem('field:character:k:same', 'same'),
+];
+let mh = Mg.html(mm({ items, decisions: [], open: [] }));
+check('changes are grouped by entity, in the order the app lists types (scenes before characters)', mh.indexOf('data-group="scene:s2"') > -1 && mh.indexOf('data-group="scene:s2"') < mh.indexOf('data-group="character:k"'));
+check('what is only on your side is hidden behind a counted toggle, and same-on-both never shows', !/data-item="field:character:k:name"/.test(mh) && /Show the 1 change that only exist/.test(mh) && !/field:character:k:same/.test(mh));
+check('ticking the toggle shows the your-side-only change, with its tick disabled', (() => { const h = Mg.html(mm({ items }, { showKept: true })); return /data-item="field:character:k:name"/.test(h) && /data-key="field:character:k:name"[^>]*disabled/.test(h); })());
+check('a new entity says it is new in B and a one-sided change says it changed in B', /new in B/.test(mh) && /changed in B/.test(mh) && /changed on both sides/.test(mh));
+check('nothing ticked: Apply and Preview are off, and the footer says what to do', /data-mg="apply" disabled/.test(mh) && /data-mg="preview" disabled/.test(mh) && /Tick something to bring first/.test(mh));
+mh = Mg.html(mm({ items }, { selected: new Set(['field:character:k:one_sentence']) }));
+check('with something ticked and nothing open, Apply and Preview are on', !/data-mg="apply" disabled/.test(mh) && !/data-mg="preview" disabled/.test(mh) && /1 item ticked/.test(mh));
+check('a partly ticked group is indeterminate and a fully ticked one is checked', /data-group="character:k" data-partial="1"/.test(mh) && /data-key="field:character:k:one_sentence" checked/.test(mh));
+check('a fully ticked group is checked', /data-group="scene:s2" checked/.test(Mg.html(mm({ items }, { selected: new Set(['entity:scene:s2']) }))));
+mh = Mg.html(mm({ items, decisions: [dec('D2', { key: 'field:character:k:goals_short#D2', item: 'field:character:k:goals_short', ours: 'a', theirs: 'b' })], open: ['field:character:k:goals_short#D2'] }, { selected: new Set(['field:character:k:goals_short']) }));
+check('an open decision lists in the panel and keeps Apply off, saying how many', /Decisions · 1 open/.test(mh) && /data-mg="apply" disabled/.test(mh) && /1 decision still open/.test(mh));
+check('a stale plan says so, offers a refresh and keeps Apply off', (() => { const h = Mg.html(mm({ items }, { stale: true, selected: new Set(['field:character:k:one_sentence']) })); return /data-mg="replan"/.test(h) && /data-mg="apply" disabled/.test(h); })());
+check('an imprecise base is explained', /more than one common ancestor/.test(Mg.html(mm({ items }, { imprecise: true }))));
+check('the merge names its target and source', /Merge into main/.test(mh) && /from Experiment 1/.test(mh));
+check('the summary counts what can be brought, the clashes and the your-side-only changes', /3 changes can be brought, 1 of them clashes with yours · 1 only on your side/.test(mh));
+
+const scriptRow = { id: 's2', status: 'edited', items: ['entity:scene:s2', 'field:scene:s2:place', 'field:scene:s2:gone'], placement: {}, text: { a: 'a', b: 'b' }, number: { a: 1, b: 1 }, blocks: { a: [{ type: 'heading', text: 'INT. A' }], b: [{ type: 'heading', text: 'INT. B' }] } };
+const sitems = [{ key: 'entity:scene:s2', kind: 'entity', type: 'scene', id: 's2', state: 'take' }, fieldItem('field:scene:s2:place', 'take', { type: 'scene', id: 's2', name: 'place', value: 'x' }), fieldItem('field:scene:s2:gone', 'keep', { type: 'scene', id: 's2', name: 'gone' })];
+let sh2 = Mg.html(mm({ items: sitems }, { tab: 'script', diff: { entities: {}, order: {}, script: [scriptRow] } }));
+check('the script tab ticks a scene for all of its bringable items and ignores your-side-only ones', /data-mg="scene" data-id="s2"/.test(sh2) && /screenplay-doc/.test(sh2));
+check('a scene is checked only when all its items are, and partly otherwise', /data-id="s2" checked/.test(Mg.html(mm({ items: sitems }, { tab: 'script', selected: new Set(['entity:scene:s2', 'field:scene:s2:place']), diff: { entities: {}, order: {}, script: [scriptRow] } }))) && /data-id="s2" data-partial="1"/.test(Mg.html(mm({ items: sitems }, { tab: 'script', selected: new Set(['entity:scene:s2']), diff: { entities: {}, order: {}, script: [scriptRow] } }))));
+check('a scene that only changed on your side cannot be ticked', /data-id="s2" disabled/.test(Mg.html(mm({ items: [sitems[2]] }, { tab: 'script', diff: { entities: {}, order: {}, script: [scriptRow] } }))));
+
+check('a clean preview says how many operations', /Preview is clean: 3 operations/.test(Mg.html(mm({ items }, { preview: { status: 'clean', plan: { ops: [1, 2, 3] } } }))));
+check('a refused preview lists what the validators said', (() => { const h = Mg.html(mm({ items }, { preview: { status: 'refused', message: 'The dry run refused this merge.', failures: [{ message: 'role is not valid' }] } })); return /role="alert"/.test(h) && /role is not valid/.test(h); })());
+check('a blocked preview says why', /still unanswered/.test(Mg.html(mm({ items }, { preview: { status: 'blocked', message: 'Two decisions are still unanswered.' } }))));
+check('after applying, the page says what happened and how to go back', (() => { const h = Mg.html(mm({ items, ops: [] }, { result: { complete: true, ops_applied: 11 } })); return /Merge applied/.test(h) && /11 changes brought from Experiment 1/.test(h) && /complete merge/.test(h) && /href="#\/"/.test(h); })());
+check('an incomplete merge says what is still offered', /still offered next time/.test(Mg.html(mm({ items }, { result: { complete: false, ops_applied: 1 } }))));
+check('the merge page has no inline handlers and escapes names', (() => { const h = Mg.html(mm({ items: [{ key: 'entity:scene:s1', kind: 'entity', type: 'scene', id: 's1', state: 'take' }] }, { selected: new Set() })); return !/\bon[a-z]+\s*=\s*["']/.test(h.replace(/data-[a-z]+="[^"]*"/g, '')) && !/<i>farm/.test(h) && /The &lt;i&gt;farm&lt;\/i&gt;/.test(h); })());
+check('the compare page offers a merge only when A is a branch\'s open draft', (() => { const base = { projectName: 'Oz', a: 'branch:alt', b: 'snapshot:d1', hist: history(), labels: { a: 'x', b: 'y' }, names: {}, tab: 'entities', showSame: false, diff: { entities: { s1: { id: 's1', type: 'scene', status: 'changed', fields: { status: { a: 1, b: 2 } }, sections: {} } }, order: {}, script: [] } }; return /Merge B into alt…/.test(Cp.html(base)) && !/data-cp="merge"/.test(Cp.html(Object.assign({}, base, { a: 'snapshot:d1', b: 'branch:alt' }))) && /choose that branch/.test(Cp.html(Object.assign({}, base, { a: 'snapshot:d1', b: 'branch:alt' }))); })());
+check('a closed merge says so instead of offering ticks', (() => { const h = Mg.html(mm({ items }, { session: { status: 'discarded' } })); return /This merge is closed/.test(h) && /without applying anything/.test(h) && !/data-mg="tick"/.test(h); })());
+check('an applied merge reopened says its changes are in', /its changes are in main/.test(Mg.html(mm({ items }, { session: { status: 'applied' } }))));
+check('a merge route round-trips', (() => { const r = K.parse(K.href({ kind: 'merge', slug: 'p', session: 'abc 1' })); return r.kind === 'merge' && r.session === 'abc 1' && r.slug === 'p'; })());
 
 console.log(failures.length ? '\n' + failures.length + ' FAILED' : '\nall checks passed (' + ran + ' checks)');
 process.exit(failures.length ? 1 : 0);

@@ -158,17 +158,27 @@ window.DASH = window.DASH || {};
       + groups.map((g) => '<optgroup label="' + esc(g.group) + '">' + g.items.map((i) => '<option value="' + esc(i.ref) + '"' + (i.ref === value ? ' selected' : '') + '>' + esc(i.label) + '</option>').join('') + '</optgroup>').join('') + '</select>';
   }
 
+  // A merge goes into a branch's open draft, so A has to be one; B is where it comes from.
+  function mergeBar(m) {
+    if (m.a === m.b) return '';
+    if (m.a.indexOf('branch:') !== 0) return '<p class="cp-hint">To bring changes from B into a branch, choose that branch\'s open draft as A.</p>';
+    const target = (m.hist.branches || []).find((b) => 'branch:' + b.id === m.a);
+    return '<div class="cp-mergebar"><button class="btn btn-primary" data-cp="merge">Merge B into ' + esc(target ? target.name : 'this branch') + '…</button>'
+      + '<span class="cp-hint">Choose which changes to bring, then settle what clashes. Nothing is applied until you say so.</span></div>';
+  }
+
   function html(m) {
     const s = summary(m);
     const tab = (id, label) => '<button class="dr-tab' + (m.tab === id ? ' on' : '') + '" role="tab" aria-selected="' + (m.tab === id) + '" data-cp="tab" data-tab="' + id + '">' + label + '</button>';
     const body = s.identical ? '<p class="pj-empty">These two drafts are identical.</p>' : (m.tab === 'script' ? scriptBody(m) : entitiesBody(m));
     return '<div class="pj-inner dr"><header class="dr-head"><a class="btn" href="#/">← Projects</a><h1>Compare</h1><span class="pj-chip">' + esc(m.projectName) + '</span></header>'
       + '<div class="cp-picks"><label>A ' + picker('a', m.a, m.hist) + '</label><button class="btn" data-cp="swap" title="Swap A and B" aria-label="Swap A and B">⇄</button><label>B ' + picker('b', m.b, m.hist) + '</label></div>'
+      + mergeBar(m)
       + '<p class="cp-summary">' + esc(s.text) + '</p>'
       + (s.identical ? '' : '<div class="dr-tabs" role="tablist">' + tab('entities', 'Entities') + tab('script', 'Script') + '</div>') + body + '</div>';
   }
 
-  D.compare = { html, summary };
+  D.compare = { html, summary, parts: { fieldRow, diffBlock, orderRow, screenplayDiff, numberText, where, scriptNote, nameOf } };
 
   if (typeof document === 'undefined') return;
 
@@ -203,6 +213,11 @@ window.DASH = window.DASH || {};
       if (!t) return;
       if (t.dataset.cp === 'tab') { m.tab = S.tab = t.dataset.tab; draw(); }
       else if (t.dataset.cp === 'swap') go(m.b, m.a);
+      else if (t.dataset.cp === 'merge') {
+        D.historyApi(slug, 'POST', '/merges', { target: m.a.slice('branch:'.length), source: m.b })
+          .then((started) => { location.hash = C.href({ kind: 'merge', slug, session: started.id }); })
+          .catch((err) => D.efToast && D.efToast(err.message, 'bad'));
+      }
       else if (t.dataset.cp === 'goto') {
         m.tab = S.tab = 'script';
         draw();

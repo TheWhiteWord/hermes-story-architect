@@ -20,16 +20,18 @@ window.DASH = window.DASH || {};
 
   // ─── routes: #/drafts/<slug>/read/<ref> and #/drafts/<slug>/compare/<a>/<b> ───
   function parse(hash) {
-    const m = /^#\/drafts\/([^/]+)\/(read|compare)\/(.+)$/.exec(hash || '');
+    const m = /^#\/drafts\/([^/]+)\/(read|compare|merge)\/(.+)$/.exec(hash || '');
     if (!m) return { kind: 'list' };
     const slug = dec(m[1]);
     const refs = m[3].split('/').map(dec);
     if (m[2] === 'read' && refs[0]) return { kind: 'read', slug, ref: refs[0] };
+    if (m[2] === 'merge' && refs[0]) return { kind: 'merge', slug, session: refs[0] };
     if (m[2] === 'compare' && refs[0] && refs[1]) return { kind: 'compare', slug, a: refs[0], b: refs[1] };
     return { kind: 'list' };
   }
   function href(r) {
     if (r.kind === 'read') return '#/drafts/' + enc(r.slug) + '/read/' + enc(r.ref);
+    if (r.kind === 'merge') return '#/drafts/' + enc(r.slug) + '/merge/' + enc(r.session);
     if (r.kind === 'compare') return '#/drafts/' + enc(r.slug) + '/compare/' + enc(r.a) + '/' + enc(r.b);
     return '#/';
   }

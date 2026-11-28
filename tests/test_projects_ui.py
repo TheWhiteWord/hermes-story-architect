@@ -45,7 +45,7 @@ def test_the_harness_reports_how_many_checks_it_ran():
     assert out.returncode == 0, (out.stdout + out.stderr)[-3000:]
     m = re.search(r"all checks passed \((\d+) checks\)", out.stdout)
     assert m is not None, out.stdout[-3000:]
-    assert int(m.group(1)) >= 110, out.stdout[-3000:]
+    assert int(m.group(1)) >= 150, out.stdout[-3000:]
 
 
 def test_the_page_loads_its_scripts_in_an_order_that_works():
@@ -61,6 +61,7 @@ def test_the_page_loads_its_scripts_in_an_order_that_works():
             "drafts-common.js",
             "reader.js",
             "compare.js",
+            "merge.js",
             "draft-chip.js",
             "projects.js",
             "chat-api.js",
