@@ -424,6 +424,17 @@ def _mark(project_path: Path, session_id: str, status: str) -> dict:
         return _write(conn, _get(conn, session_id), status=status)
 
 
+def _source_name(project_path: Path, session: dict) -> str:
+    """The source as a person named it: a draft's label, or a branch's name."""
+    source = session["source"]
+    if source["kind"] == "branch":
+        return f"{store.get_branch(project_path, source['id'])['name']} (open draft)"
+    for draft in store.list_branches(project_path)["snapshots"]:
+        if draft["id"] == source["id"]:
+            return draft["label"]
+    return source["id"]
+
+
 def _live(project_path: Path, session: dict, complete: bool) -> dict:
     """The live head is the target: `execute.apply` owns this path end to end."""
     branch = store.get_branch(project_path, session["target_branch_id"])
@@ -432,7 +443,7 @@ def _live(project_path: Path, session: dict, complete: bool) -> dict:
         project_path,
         planned,
         parent_source=_source_draft(session) if complete else None,
-        label=f"Before merge from {session['source']['id']}",
+        label=f"Before merge from {_source_name(project_path, session)}",
     )
 
 
@@ -471,7 +482,7 @@ def _parked(project_path: Path, session: dict, conn, branch: dict, complete: boo
         baseline = store.restore_point(
             project_path,
             conn,
-            f"Before merge from {session['source']['id']}",
+            f"Before merge from {_source_name(project_path, session)}",
             branch_id=branch["id"],
             head=scratch,
         )

@@ -519,3 +519,22 @@ def test_a_typed_value_is_stored_with_the_answer_and_replaced_by_the_next(projec
     session.set_decision(project, started["id"], key, "custom", value="Mira Between")
     assert session.apply(project, started["id"])["status"] == "applied"
     assert _name_of(project, "mira") == "Mira Between"
+
+
+def test_the_draft_saved_before_a_merge_is_named_for_its_source_not_its_id(project):
+    edit_entity(project, "character", "mira", {"name": "Mira Ours"}, "ours")
+    theirs = _copy_of_side_changed(project, "mira", "Mira Theirs")
+    started = session.start(
+        project, "main", {"kind": "snapshot", "id": theirs}, selection=["field:character:mira:name"]
+    )
+    key = session.show(project, started["id"])["plan"]["decisions"][0]["key"]
+    session.set_decision(project, started["id"], key, "theirs")
+
+    session.apply(project, started["id"])
+
+    labels = [d["label"] for d in store.list_branches(project)["snapshots"]]
+    source_label = next(
+        d["label"] for d in store.list_branches(project)["snapshots"] if d["id"] == theirs
+    )
+    assert f"Before merge from {source_label}" in labels
+    assert not any(theirs in label for label in labels)
