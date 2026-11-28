@@ -1151,5 +1151,77 @@ page, and 44 more harness checks (96).
 - Not covered by pytest, checked in Chromium on the Oz demo: pickers, swap, the unchanged
   scenes toggle, back to the list with history still open, Read from a draft row.
 
+### UI patch 4 — script display, and the merge workspace
+**Applies on top of UI patch 3** (read and compare, already on this branch). Eight commits: backend for the script views, the script display, two planner
+fixes, the typed-value channel, the pre-merge draft's name, and the workspace.
+
+**Script display (asked for after reviewing patch 3)**
+- The reader shows the screenplay through the Script view's own pipeline (`screenplay.render_html`,
+  the Fountain lexer, `screenplay.css`), scene numbers included. A scene's number is its
+  rank among scenes that have text (`db._screenplay_rows` leaves out empty `Content`); the
+  scene/sequence numbering problem is not touched.
+- `render_html` escapes token text after lexing. `app/stats.py` builds the Script view's
+  `scriptHtml` through `tokens_to_html` **without** escaping, so a scene containing `<`
+  becomes markup there. Pre-existing and out of scope; worth its own fix.
+- Compare's script tab sets each scene as a screenplay and diffs it by block (`scene_script`
+  blocks, which the diff now returns as `blocks`), with the heading pinned and unchanged
+  runs folded. The entities tab no longer repeats a scene's `Content`: it counts the
+  lines and links to the script tab. Other sections still diff there.
+
+**Merge workspace** (`merge.js`, route `#/drafts/<slug>/merge/<session>`; started from
+Compare when A is a branch's open draft)
+- Items are the planner's three-way items, grouped by entity, with ticks; the script tab is
+  a lens (a scene ticks all of its bringable items). Changes that exist only on your side
+  are hidden behind a counted toggle. Decisions sit in a panel above, one card per
+  decision, with the editors for typed answers. Preview is explicit; Apply opens a
+  confirmation listing the operations and the complete-merge choice (off by default).
+- **Backend found missing and added:** a decision answer carried only a `choice`, so the
+  "Custom" outcomes in §7.3/§7.5 had nowhere to put a value (`custom` silently applied
+  theirs; keep-both always used `<id>-2`). Answers now carry an optional `value`:
+  D2 custom = the typed field or section value; D4 custom = a role from `PLOT_ROLES`;
+  D1 keep-both = `{id, fields, sections}`; D7 custom = an id list (a partial list is
+  completed). A value the plan cannot use sets `decision.error`, keeps the decision open
+  and falls back to the default behaviour.
+- **Planner fixes:** a conflict nobody selected no longer raises a decision or blocks Apply;
+  selecting one part of an entity reaches decisions about the entity itself (D9).
+- The draft saved before a merge is named for its source ("Before merge from Experiment 1").
+
+**Deviations from the spec, and gaps, stated plainly**
+- **D3's chosen option is not consumed by the planner** (`pick`, `after-predecessor`,
+  `before-successor` are in the catalogue and nothing reads them); a scene is always placed
+  by the default proposal. The workspace therefore shows D3 as information, with no
+  buttons. A placement override for a scene arriving into an existing sequence has no
+  decision at all. This is the main thing left of §7.5.
+- **Operation summaries use ids** ("Release inciting_incident in the-humbug from
+  the-audience"), and D7's message names the sequence by id. The cards use names; the
+  summaries are the server's text.
+- **No chat is docked on this page.** The mock-up showed one; chat belongs to the writing
+  view and is not mounted on the projects page. See the hook below.
+- Opening the URL of a discarded or applied merge shows that it is closed.
+
+**The Ask Hermes hook (for T11)**
+- Every decision card has an "Ask Hermes about this" button that calls
+  `DASH.askHermes(ctx)`. `merge.js` defines a stub only when nothing else has (it shows
+  that Hermes cannot see merges from this page yet). `ctx` is `{slug, session, decision,
+  subject, target, source}`: `decision` is the planner's decision as returned by
+  `GET /merges/{id}`, `subject` a sentence naming what it is about.
+- T11 needs to: (1) give the agent the merge context (`chat/context.py` attachment kind,
+  e.g. `merge_decision` with the session id and decision key); (2) decide where the chat
+  lives for this page (mount the existing chat panel on the projects page, or open the
+  project's chat in an overlay), then define `DASH.askHermes` to open it with that
+  attachment; (3) have `story_merge suggest` call `PUT /merges/{id}/decisions/{key}` with
+  `set_by: "agent-suggested"` and a `value` where the choice takes one.
+- The UI side of a suggestion is done: a decision whose `set_by` is `agent-suggested` shows
+  "suggested by Hermes" with an Accept button (which re-sends the same choice and value as
+  `user`); the other options stay available. Verified in Chromium against the real route.
+- Nothing applies from a suggestion: `ready` stays false until a person answers.
+
+Not covered by pytest, checked in Chromium on the Oz demo with a scripted scenario (field
+and section conflicts, a role collision, the same id added on both sides, an order
+conflict, delete against edit): ticking, each decision card, typed values for D1/D2/D4/D7,
+the script lens, Preview, Apply with a complete merge, Accept on a suggestion, Discard, and
+the database afterwards (the typed id and name, the typed sentence, the one inciting
+incident, the restored character, the pending merge parent).
+
 ### Deviations
 ### Issues
