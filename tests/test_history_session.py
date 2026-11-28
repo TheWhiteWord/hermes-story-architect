@@ -499,3 +499,23 @@ def _head_name(project, branch_id):
         return conn.execute("SELECT name FROM entities WHERE id='kael'").fetchone()[0]
     finally:
         conn.close()
+
+
+def test_a_typed_value_is_stored_with_the_answer_and_replaced_by_the_next(project):
+    edit_entity(project, "character", "mira", {"name": "Mira Ours"}, "ours")
+    theirs = _copy_of_side_changed(project, "mira", "Mira Theirs")
+    started = session.start(
+        project, "main", {"kind": "snapshot", "id": theirs}, selection=["field:character:mira:name"]
+    )
+    key = session.show(project, started["id"])["plan"]["decisions"][0]["key"]
+
+    typed = session.set_decision(project, started["id"], key, "custom", value="Mira Between")
+    assert typed["decisions"][key]["value"] == "Mira Between"
+    assert session.show(project, started["id"])["plan"]["ready"] is True
+
+    changed = session.set_decision(project, started["id"], key, "theirs")
+    assert "value" not in changed["decisions"][key]
+
+    session.set_decision(project, started["id"], key, "custom", value="Mira Between")
+    assert session.apply(project, started["id"])["status"] == "applied"
+    assert _name_of(project, "mira") == "Mira Between"

@@ -1049,3 +1049,180 @@ def test_planning_changes_neither_side(sides):
         for s, p in (("base", base), ("ours", ours), ("theirs", theirs))
     }
     assert before == after
+
+
+# ─── a typed value: what `custom`, and a keep-both's id and fields, are answered with ──
+
+
+def _typed(base, ours, theirs, key, choice, value, **kwargs):
+    return plan.plan(
+        base,
+        ours,
+        theirs,
+        decisions={key: {"choice": choice, "value": value, "set_by": "user"}},
+        **kwargs,
+    )
+
+
+def test_d2_custom_writes_the_typed_value(sides):
+    base, ours, theirs = sides
+    edit_entity(ours, "character", "kael", {"name": "Mine"}, "ours")
+    edit_entity(theirs, "character", "kael", {"name": "Theirs"}, "theirs")
+    key = "field:character:kael:name#D2"
+
+    result = _typed(base, ours, theirs, key, "custom", "Kael Both", selection=[key.split("#")[0]])
+
+    [op] = result["ops"]
+    assert op["data"] == {"name": "Kael Both"}
+    assert _decision(result, key)["value"] == "Kael Both" and result["ready"] is True
+
+
+def test_d2_custom_without_a_value_stays_open_and_says_why(sides):
+    base, ours, theirs = sides
+    edit_entity(ours, "character", "kael", {"name": "Mine"}, "ours")
+    edit_entity(theirs, "character", "kael", {"name": "Theirs"}, "theirs")
+    key = "field:character:kael:name#D2"
+
+    result = _resolved(base, ours, theirs, key, "custom", selection=[key.split("#")[0]])
+
+    assert result["ops"] == [] and result["ready"] is False
+    assert key in result["open"] and "Write the value" in _decision(result, key)["error"]
+
+
+def test_a_section_conflict_takes_only_text_as_its_custom_value(sides):
+    base, ours, theirs = sides
+    edit_entity(ours, "character", "kael", {"Identity": "Mine."}, "ours")
+    edit_entity(theirs, "character", "kael", {"Identity": "Theirs."}, "theirs")
+    key = "section:character:kael:Identity#D2"
+
+    text = _typed(base, ours, theirs, key, "custom", "Both, merged.", selection=[key.split("#")[0]])
+    other = _typed(base, ours, theirs, key, "custom", ["no"], selection=[key.split("#")[0]])
+
+    assert text["ops"][0]["data"] == {"Identity": "Both, merged."}
+    assert other["ops"] == [] and _decision(other, key)["error"]
+
+
+def test_a_changed_answer_does_not_keep_the_old_value(sides):
+    base, ours, theirs = sides
+    edit_entity(ours, "character", "kael", {"name": "Mine"}, "ours")
+    edit_entity(theirs, "character", "kael", {"name": "Theirs"}, "theirs")
+    key = "field:character:kael:name#D2"
+
+    result = _resolved(base, ours, theirs, key, "theirs", selection=[key.split("#")[0]])
+
+    assert result["ops"][0]["data"] == {"name": "Theirs"}
+
+
+def test_d4_custom_gives_the_incoming_scene_the_typed_role(sides):
+    base, ours, theirs = sides
+    _scene_with_role(theirs, "rival", "the-resistance", "inciting_incident")
+    key = "entity:scene:rival#D4"
+
+    result = _typed(
+        base, ours, theirs, key, "custom", "complication", selection=["entity:scene:rival"]
+    )
+
+    [create] = [op for op in result["ops"] if op["op"] == "create"]
+    assert create["frontmatter"]["plot_roles"][0]["role"] == "complication"
+    assert [op["op"] for op in result["ops"] if op["op"] == "release"] == []
+    assert "complication" in _decision(result, key)["roles"] and result["ready"] is True
+
+
+def test_d4_custom_with_no_valid_role_drops_the_entry_and_stays_open(sides):
+    base, ours, theirs = sides
+    _scene_with_role(theirs, "rival", "the-resistance", "inciting_incident")
+    key = "entity:scene:rival#D4"
+
+    result = _typed(
+        base, ours, theirs, key, "custom", "not-a-role", selection=["entity:scene:rival"]
+    )
+
+    [create] = [op for op in result["ops"] if op["op"] == "create"]
+    assert create["frontmatter"]["plot_roles"] == []
+    assert key in result["open"] and _decision(result, key)["error"]
+
+
+def test_d1_keep_both_uses_the_id_and_fields_that_were_typed(sides):
+    base, ours, theirs = sides
+    _both_add(theirs, ours)
+    key = "entity:character:dup#D1"
+
+    result = _typed(
+        base,
+        ours,
+        theirs,
+        key,
+        "keep-both",
+        {"id": "dup-the-spy", "fields": {"name": "Dup the Spy"}},
+        selection=["entity:character:dup"],
+    )
+
+    [op] = [o for o in result["ops"] if o["op"] == "create"]
+    assert op["id"] == "dup-the-spy" and op["frontmatter"]["name"] == "Dup the Spy"
+    assert _decision(result, key)["suggested_id"] == "dup-2" and result["ready"] is True
+
+
+def test_d1_keep_both_refuses_an_id_the_story_already_has(sides):
+    base, ours, theirs = sides
+    _both_add(theirs, ours)
+    key = "entity:character:dup#D1"
+
+    for bad in ("kael", "has space", "dup"):
+        result = _typed(
+            base, ours, theirs, key, "keep-both", {"id": bad}, selection=["entity:character:dup"]
+        )
+        [op] = [o for o in result["ops"] if o["op"] == "create"]
+        assert op["id"] == "dup-2", bad  # the suggestion stands in
+        assert key in result["open"] and _decision(result, key)["error"], bad
+
+
+def test_d7_custom_applies_the_typed_order(sides):
+    base, ours, theirs = sides
+    reorder(ours, "scene", ["central-room-day", "the-core-day", "central-room-night"], "ours")
+    reorder(theirs, "scene", ["the-core-day", "central-room-night", "central-room-day"], "theirs")
+    key = "order:scene:seq-discovery#D7"
+    arranged = ["central-room-night", "central-room-day", "the-core-day"]
+
+    result = _typed(
+        base, ours, theirs, key, "custom", arranged, selection=["order:scene:seq-discovery"]
+    )
+
+    [op] = result["ops"]
+    assert op["op"] == "reorder" and op["ordered_ids"] == arranged
+    assert result["ready"] is True
+
+
+def test_d7_custom_keeps_the_list_complete_when_the_typed_one_is_partial(sides):
+    base, ours, theirs = sides
+    reorder(ours, "scene", ["central-room-day", "the-core-day", "central-room-night"], "ours")
+    reorder(theirs, "scene", ["the-core-day", "central-room-night", "central-room-day"], "theirs")
+    key = "order:scene:seq-discovery#D7"
+
+    result = _typed(
+        base,
+        ours,
+        theirs,
+        key,
+        "custom",
+        ["central-room-night"],
+        selection=["order:scene:seq-discovery"],
+    )
+
+    [op] = result["ops"]
+    assert op["ordered_ids"][0] == "central-room-night"
+    assert sorted(op["ordered_ids"]) == sorted(
+        ["central-room-day", "the-core-day", "central-room-night"]
+    )
+
+
+def test_d7_custom_with_something_other_than_a_list_stays_open(sides):
+    base, ours, theirs = sides
+    reorder(ours, "scene", ["central-room-day", "the-core-day", "central-room-night"], "ours")
+    reorder(theirs, "scene", ["the-core-day", "central-room-night", "central-room-day"], "theirs")
+    key = "order:scene:seq-discovery#D7"
+
+    result = _typed(
+        base, ours, theirs, key, "custom", "oops", selection=["order:scene:seq-discovery"]
+    )
+
+    assert result["ops"] == [] and key in result["open"] and _decision(result, key)["error"]

@@ -48,6 +48,7 @@ class DecisionKeyError(ValueError):
     different HTTP statuses.
     """
 
+
 __all__ = [
     "start",
     "show",
@@ -314,8 +315,13 @@ def set_selection(project_path: Path, session_id: str, selection) -> dict:
         return _write(conn, session, selection=sorted(set(selection or ())))
 
 
-def set_decision(project_path: Path, session_id: str, key: str, choice, *, set_by="user") -> dict:
+def set_decision(
+    project_path: Path, session_id: str, key: str, choice, *, value=None, set_by="user"
+) -> dict:
     """Record one decision's answer. `set_by` is `user` or `agent-suggested` (§7.5).
+
+    `value` is what a `custom` answer, or a keep-both's new id and fields, was typed as;
+    an answer replaces the previous one whole, so a changed choice drops the old value.
 
     An agent's suggestion does not answer the decision: the planner keeps Apply disabled
     for it until a person chooses, which is the whole point of the distinction.
@@ -347,7 +353,14 @@ def set_decision(project_path: Path, session_id: str, key: str, choice, *, set_b
         return _write(
             conn,
             session,
-            decisions={**session["decisions"], key: {"choice": choice, "set_by": set_by}},
+            decisions={
+                **session["decisions"],
+                key: {
+                    "choice": choice,
+                    "set_by": set_by,
+                    **({"value": value} if value is not None else {}),
+                },
+            },
         )
 
 

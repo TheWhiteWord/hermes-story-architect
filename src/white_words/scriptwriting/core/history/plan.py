@@ -24,11 +24,12 @@ survives a re-plan.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from ..constants import UNIQUE_PLOT_ROLES
+from ..constants import PLOT_ROLES, UNIQUE_PLOT_ROLES
 from ..db import get_db
 from ..trash import restore_check
 from . import diff, refmap, fingerprint
@@ -166,7 +167,7 @@ def plan(
     open_keys = [
         d["key"]
         for d in ctx.decisions
-        if d["set_by"] in UNANSWERED and not CATALOGUE[d["code"]].get("optional")
+        if d["error"] or (d["set_by"] in UNANSWERED and not CATALOGUE[d["code"]].get("optional"))
     ]
     return {
         "items": ctx.items,
@@ -207,7 +208,7 @@ class _Context:
         self.ops: list[dict] = []
         self.arriving: dict[str, list[str]] = {}  # parent order key → ids entering
         self.leaving: dict[str, set[str]] = {}
-        self.take_order: set[str] = set()
+        self.take_order: dict[str, list[str]] = {}
         self.cancelled: set[str] = set()
         self.planned_creates: set[str] = set()  # ids this plan already emits a create for
         self.placement_checks: list[tuple[str, str, str]] = []  # deferred D3 checks
@@ -230,7 +231,7 @@ class _Context:
             if existing["key"] == key:
                 return key, existing["choice"]
         entry = CATALOGUE[code]
-        choice, set_by = self.chosen.get(key, (None, "default"))
+        choice, set_by, value = self.chosen.get(key, (None, "default", None))
         if choice is None or choice not in (options or entry["options"]):
             choice = default or entry.get("default") or entry["options"][0]
         self.decisions.append(
@@ -243,10 +244,19 @@ class _Context:
                 "default": entry.get("default") or entry["options"][0],
                 "choice": choice,
                 "set_by": set_by,
+                "value": value,
+                "error": None,
                 **(detail or {}),
             }
         )
         return key, choice
+
+    def decision(self, key: str) -> dict:
+        return next(d for d in self.decisions if d["key"] == key)
+
+    def reject(self, key: str, message: str) -> None:
+        """A typed value the plan cannot use: the decision stays open and says why."""
+        self.decision(key)["error"] = message
 
     # ── ops ──
 
@@ -271,14 +281,17 @@ class _Context:
         return fields.get("name") or fields.get("title") or entity_id
 
 
-def _answers(decisions) -> dict[str, tuple[str, str]]:
-    """`{key: choice}` or `{key: {choice, set_by}}` → `{key: (choice, set_by)}`."""
+def _answers(decisions) -> dict[str, tuple[str, str, object]]:
+    """`{key: choice}` or `{key: {choice, set_by, value}}` → `{key: (choice, set_by, value)}`.
+
+    `value` is what a `custom` (or a keep-both's id and fields) was typed as.
+    """
     out = {}
     for key, value in (decisions or {}).items():
         if isinstance(value, dict):
-            out[key] = (value.get("choice"), value.get("set_by") or "user")
+            out[key] = (value.get("choice"), value.get("set_by") or "user", value.get("value"))
         else:
-            out[key] = (value, "user")
+            out[key] = (value, "user", None)
     return out
 
 
@@ -340,6 +353,7 @@ def _entity_items(ctx: _Context, entity_id: str) -> list[dict]:
                 "they differ.",
                 "ours": ctx.o[0][entity_id],
                 "theirs": ctx.t[0][entity_id],
+                "suggested_id": _new_id(ctx, entity_id),
             },
         )
         return [{**base_item, "state": "conflict", "decision": f"{key}#D1"}]
@@ -596,12 +610,27 @@ def _emit_d1(ctx: _Context, item: dict, choice: str) -> None:
                 summary=f"Combine both {entity_type} {entity_id}",
             )
         return
-    new_id = _new_id(ctx, entity_id)
-    _emit_create(ctx, entity_id, entity_type, as_id=new_id, rewrite_id={entity_id: new_id})
+    typed = ctx.decision(item["decision"])["value"]
+    typed = typed if isinstance(typed, dict) else {}
+    new_id = _keep_both_id(ctx, item["decision"], entity_id, typed.get("id"))
+    _emit_create(
+        ctx,
+        entity_id,
+        entity_type,
+        as_id=new_id,
+        rewrite_id={entity_id: new_id},
+        overrides=(typed.get("fields") or {}, typed.get("sections") or {}),
+    )
 
 
 def _emit_create(
-    ctx: _Context, entity_id: str, entity_type: str, *, as_id=None, rewrite_id=None
+    ctx: _Context,
+    entity_id: str,
+    entity_type: str,
+    *,
+    as_id=None,
+    rewrite_id=None,
+    overrides=({}, {}),
 ) -> None:
     """Create an entity from `theirs`' shape, pulling in what it names (§7.4).
 
@@ -618,6 +647,7 @@ def _emit_create(
         fields = refmap.rewrite(
             entity_type, fields, by_id=rewrite_id, by_name=_name_map(ctx, rewrite_id)
         )
+    fields, sections = {**fields, **overrides[0]}, {**sections, **overrides[1]}
     fields, sections = _resolve(ctx, entity_type, entity_id, fields, sections, seen={entity_id})
     if entity_id in ctx.cancelled:
         return
@@ -817,9 +847,9 @@ def _proposal(ctx: _Context, source_id: str, parent: str) -> dict:
 def _emit_change(ctx: _Context, item: dict) -> None:
     """A field or section arriving from theirs — or the one side a conflict chose."""
     if item["state"] == "conflict":
-        if _choice(ctx, item) not in ("theirs", "custom"):
+        found, value = _conflict_value(ctx, item)
+        if not found:
             return
-        value = item["theirs"]
     else:
         value = item.get("value")
     name = item["name"]
@@ -842,6 +872,24 @@ def _emit_change(ctx: _Context, item: dict) -> None:
         if old:
             ctx.leaving.setdefault(f"scene:{old}", set()).add(item["id"])
         ctx.arriving.setdefault(f"scene:{value}", []).append(item["id"])
+
+
+def _conflict_value(ctx: _Context, item: dict) -> tuple[bool, object]:
+    """What a conflict writes: theirs' value, or the one typed for `custom`.
+
+    `(False, None)` when `mine` stays, or when a custom answer has no usable value, in
+    which case the decision is told why and stays open.
+    """
+    choice = _choice(ctx, item)
+    if choice == "theirs":
+        return True, item["theirs"]
+    if choice != "custom":
+        return False, None
+    typed = ctx.decision(item["decision"])["value"]
+    if typed is None or (item["kind"] == "section" and not isinstance(typed, str)):
+        ctx.reject(item["decision"], "Write the value you want to keep.")
+        return False, None
+    return True, typed
 
 
 def _resolve_change(ctx: _Context, item: dict, value):
@@ -884,8 +932,8 @@ def _check_roles(ctx: _Context, scene_id: str, entity_type: str, entries) -> lis
     Runs on the list the edit would actually write, so a whole-value role list cannot
     slip a second climax past the planner (D-T7-C). Returns the list to write instead:
     `mine` drops the colliding entry from the incoming scene, `theirs`/`replace` take it
-    off the holder first (§7.7.2's "edits that release roles"), `custom` leaves both
-    alone because the custom editor has already changed the entry.
+    off the holder first (§7.7.2's "edits that release roles"), `custom` gives the
+    incoming scene the role that was typed instead, and leaves the holder alone.
     """
     if entity_type != "scene" or not isinstance(entries, list):
         return None
@@ -903,10 +951,11 @@ def _check_roles(ctx: _Context, scene_id: str, entity_type: str, entries) -> lis
             ctx.released.add((holder, plot, role))
             _emit_release(ctx, holder, plot, role)
             continue
-        _, choice = ctx.decide(
+        decision_key, choice = ctx.decide(
             "D4",
             f"entity:scene:{scene_id}",
             detail={
+                "roles": list(PLOT_ROLES),
                 "message": f"Plot “{ctx.name('ours', plot)}” already has its "
                 f"{role.replace('_', ' ')} on “{ctx.name('ours', holder)}”.",
                 "plot": plot,
@@ -919,6 +968,16 @@ def _check_roles(ctx: _Context, scene_id: str, entity_type: str, entries) -> lis
             _emit_release(ctx, holder, plot, role)
         elif choice == "mine":
             out = [e for e in out if not (e.get("plot") == plot and e.get("role") == role)]
+        elif choice == "custom":
+            typed = ctx.decision(decision_key)["value"]
+            if typed not in PLOT_ROLES:
+                ctx.reject(decision_key, "Pick the role this scene plays in that plot instead.")
+                out = [e for e in out if not (e.get("plot") == plot and e.get("role") == role)]
+            else:
+                out = [
+                    {**e, "role": typed} if e.get("plot") == plot and e.get("role") == role else e
+                    for e in out
+                ]
     return out if out != list(entries) else None
 
 
@@ -940,7 +999,11 @@ def _released_by_selection(ctx: _Context, holder: str, plot: str, role: str) -> 
     if item["state"] == "take":
         value = item.get("value")
     elif item["state"] == "conflict" and _choice(ctx, item) in ("theirs", "custom"):
-        value = item["theirs"]
+        value = (
+            item["theirs"]
+            if _choice(ctx, item) == "theirs"
+            else ctx.decision(item["decision"])["value"]
+        )
     else:
         return False
     return not any(
@@ -1101,10 +1164,18 @@ def _emit_restore(ctx: _Context, entity_id: str, entity_type: str) -> None:
 def _emit_order(ctx: _Context, item: dict) -> None:
     """Order is one item per parent; selecting it takes that side's list (D7 if both)."""
     key = item["key"][len("order:") :]
-    if item["state"] == "take" or (
-        item["state"] == "conflict" and _choice(ctx, item) in ("theirs", "custom")
-    ):
-        ctx.take_order.add(key)
+    if item["state"] == "take":
+        ctx.take_order[key] = ctx.t[1].get(key, [])
+    elif item["state"] == "conflict":
+        choice = _choice(ctx, item)
+        if choice == "theirs":
+            ctx.take_order[key] = ctx.t[1].get(key, [])
+        elif choice == "custom":
+            typed = ctx.decision(item["decision"])["value"]
+            if isinstance(typed, list) and all(isinstance(i, str) for i in typed):
+                ctx.take_order[key] = typed
+            else:
+                ctx.reject(item["decision"], "Arrange the order you want.")
 
 
 def _settle_orders(ctx: _Context) -> None:
@@ -1113,7 +1184,7 @@ def _settle_orders(ctx: _Context) -> None:
     `reorder` renumbers `1..n` and does not verify completeness (F13), so the full list
     is built here and asserted before the op is emitted (§7.6).
     """
-    for key in sorted(set(ctx.arriving) | set(ctx.leaving) | ctx.take_order):
+    for key in sorted(set(ctx.arriving) | set(ctx.leaving) | set(ctx.take_order)):
         entity_type, parent = key.split(":", 1)
         if not parent or entity_type not in ("scene", "sequence"):
             continue
@@ -1122,7 +1193,7 @@ def _settle_orders(ctx: _Context) -> None:
         entering = list(dict.fromkeys(i for i in ctx.arriving.get(key, []) if i not in current))
         result = [i for i in current if i not in leaving]
         if key in ctx.take_order:
-            wanted = [i for i in ctx.t[1].get(key, []) if i in result or i in entering]
+            wanted = [i for i in ctx.take_order[key] if i in result or i in entering]
             result = wanted + [i for i in result if i not in wanted]
         for entity_id in entering:
             result = _place(ctx, key, entity_id, result)
@@ -1156,6 +1227,25 @@ def _place(ctx: _Context, parent_key: str, entity_id: str, result: list[str]) ->
                 cut = result.index(neighbour)
                 return result[:cut] + [entity_id] + result[cut:]
     return result + [entity_id]
+
+
+_ID = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _keep_both_id(ctx: _Context, decision_key: str, entity_id: str, typed) -> str:
+    """The id a keep-both gives theirs: the one typed if it is usable, else the suggestion."""
+    suggestion = _new_id(ctx, entity_id)
+    if typed is None or typed == "":
+        return suggestion
+    taken = set(ctx.o[0]) | set(ctx.t[0]) | set(ctx.trashed) | ctx.planned_creates
+    if not isinstance(typed, str) or not _ID.match(typed) or typed in taken:
+        ctx.reject(
+            decision_key,
+            f"“{typed}” cannot be the new id: use letters, digits, hyphens or "
+            "underscores, and not an id the story already has.",
+        )
+        return suggestion
+    return typed
 
 
 def _new_id(ctx: _Context, entity_id: str) -> str:

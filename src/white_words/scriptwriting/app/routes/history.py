@@ -296,7 +296,12 @@ def make_router(config, app):
         return _run(
             slug,
             lambda p: session.set_decision(
-                p, session_id, key, body["choice"], set_by=body.get("set_by") or "user"
+                p,
+                session_id,
+                key,
+                body["choice"],
+                value=body.get("value"),
+                set_by=body.get("set_by") or "user",
             ),
         )
 

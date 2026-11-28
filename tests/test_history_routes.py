@@ -457,3 +457,30 @@ def test_scene_text_cannot_become_markup_in_the_read_script_route(client):
     body = tc.get(f"/api/projects/{SLUG}/history/read/branch:main/script", headers=HDR).json()
 
     assert "<script>" not in body["html"]
+
+
+def test_a_typed_value_travels_through_the_decision_route_and_is_applied(client):
+    tc, project = client
+    started = _merge(tc, project, selection=[NAME]).json()
+    base = f"/api/projects/{SLUG}/history/merges/{started['id']}"
+
+    put = tc.put(
+        f"{base}/decisions/{NAME}%23D2",
+        json={"choice": "custom", "value": "Kael Between"},
+        headers=HDR,
+    )
+    shown = tc.get(base, headers=HDR).json()
+    applied = tc.post(f"{base}/apply", json={"confirm": True}, headers=HDR)
+
+    assert put.status_code == 200
+    assert put.json()["decisions"][f"{NAME}#D2"]["value"] == "Kael Between"
+    assert shown["plan"]["decisions"][0]["value"] == "Kael Between" and shown["plan"]["ready"]
+    assert applied.status_code == 200
+    from white_words.scriptwriting.core.db import get_db
+
+    conn = get_db(project)
+    try:
+        row = conn.execute("SELECT name FROM entities WHERE id='kael'").fetchone()
+    finally:
+        conn.close()
+    assert row[0] == "Kael Between"
